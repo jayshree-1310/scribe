@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build / caches
+dist/
+build/
+.turbo/
+coverage/
+
+# AI/editor generated files
+.cursor/
+.claude/
+.agents/
+.devin/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Editor temporary files
+*.swp
+*.swo

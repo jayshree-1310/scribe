@@ -1,0 +1,263 @@
+// use prisma-next
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  email     String   @unique
+
+  isAuthor      Boolean @default(false)
+  readingStreak Int     @default(0)
+  authorLevel   Int     @default(1)
+  readerLevel   Int     @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  comments          Comment[]
+  ratings           Rating[]
+  readingHistory    ReadingHistory[]
+  badges            UserBadge[]
+  challengeEntries  ChallengeEntry[]
+  createdClubs      BookClub[]
+  clubMemberships   ClubMembership[]
+  channels          BroadcastChannel[]
+  subscriptions     ChannelSubscriber[]
+}
+
+model Story {
+  id             String    @id @default(uuid())
+  authorId       String
+  title          String
+  coverUrl       String?
+  description    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @default(now())
+  isCompleted    Boolean   @default(false)
+  viewCount      Int       @default(0)
+  likeCount      Int       @default(0)
+  ratingAverage  Decimal?
+  kidsAppropriate Boolean  @default(false)
+
+  author   User      @relation(fields: [authorId], references: [id])
+  chapters Chapter[]
+  genres   StoryGenre[]
+  comments       Comment[]
+  ratings        Rating[]
+  readingHistory ReadingHistory[]
+  challengeEntries ChallengeEntry[]
+}
+
+model Chapter {
+  id            String   @id @default(uuid())
+  storyId       String
+  title         String
+  content       String
+  chapterNumber Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+  publishedAt   DateTime?
+
+  story Story @relation(fields: [storyId], references: [id])
+  multimedia Multimedia[]
+  comments       Comment[]
+  readingHistory ReadingHistory[]
+  @@unique([storyId, chapterNumber])
+}
+
+enum MultimediaType {
+  @@type("pg/text@1")
+
+  IMAGE
+  AUDIO
+  VIDEO
+  LINK
+}
+
+model Multimedia {
+  id           String          @id @default(uuid())
+  chapterId    String
+  type         MultimediaType
+  url          String
+  displayOrder Int             @default(0)
+  createdAt    DateTime        @default(now())
+
+  chapter Chapter @relation(fields: [chapterId], references: [id])
+}
+
+model Genre {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  stories StoryGenre[]
+}
+
+model StoryGenre {
+  storyId String
+  genreId String
+
+  story Story @relation(fields: [storyId], references: [id])
+  genre Genre @relation(fields: [genreId], references: [id])
+
+  @@id([storyId, genreId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  userId    String
+  storyId   String
+  chapterId String?
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  story   Story    @relation(fields: [storyId], references: [id])
+  chapter Chapter? @relation(fields: [chapterId], references: [id])
+}
+
+model Rating {
+  id        String   @id @default(uuid())
+  userId    String
+  storyId   String
+  rating    Decimal
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  story Story @relation(fields: [storyId], references: [id])
+
+  @@unique([userId, storyId])
+}
+
+model ReadingHistory {
+  id         String   @id @default(uuid())
+  userId     String
+  storyId    String
+  chapterId  String?
+  progress   Int      @default(0)
+  lastReadAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  story   Story    @relation(fields: [storyId], references: [id])
+  chapter Chapter? @relation(fields: [chapterId], references: [id])
+
+  @@unique([userId, storyId])
+}
+
+model Badge {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+
+  users UserBadge[]
+}
+
+model UserBadge {
+  id       String   @id @default(uuid())
+  userId   String
+  badgeId  String
+  earnedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id])
+  badge Badge @relation(fields: [badgeId], references: [id])
+
+  @@unique([userId, badgeId])
+}
+
+model WritingChallenge {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime
+  createdAt   DateTime @default(now())
+
+  entries ChallengeEntry[]
+}
+
+model ChallengeEntry {
+  id          String   @id @default(uuid())
+  challengeId String
+  userId      String
+  storyId     String
+  submittedAt DateTime @default(now())
+
+  challenge WritingChallenge @relation(fields: [challengeId], references: [id])
+  user      User             @relation(fields: [userId], references: [id])
+  story     Story            @relation(fields: [storyId], references: [id])
+
+  @@unique([challengeId, userId, storyId])
+}
+
+enum ClubRole {
+  @@type("pg/text@1")
+
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model BookClub {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  creatorId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  creator     User             @relation(fields: [creatorId], references: [id])
+  memberships ClubMembership[]
+}
+
+model ClubMembership {
+  id       String   @id @default(uuid())
+  clubId   String
+  userId   String
+  role     ClubRole @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  club BookClub @relation(fields: [clubId], references: [id])
+  user User     @relation(fields: [userId], references: [id])
+
+  @@unique([clubId, userId])
+}
+
+model BroadcastChannel {
+  id          String   @id @default(uuid())
+  authorId    String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  author      User                @relation(fields: [authorId], references: [id])
+  subscribers ChannelSubscriber[]
+  posts       ChannelPost[]
+}
+
+model ChannelSubscriber {
+  id           String   @id @default(uuid())
+  channelId    String
+  userId       String
+  subscribedAt DateTime @default(now())
+
+  channel BroadcastChannel @relation(fields: [channelId], references: [id])
+  user    User             @relation(fields: [userId], references: [id])
+
+  @@unique([channelId, userId])
+}
+
+model ChannelPost {
+  id        String   @id @default(uuid())
+  channelId String
+  content   String
+  postedAt  DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  channel BroadcastChannel @relation(fields: [channelId], references: [id])
+}

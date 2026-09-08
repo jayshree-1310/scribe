@@ -1,0 +1,409 @@
+/* ==========================================================================
+   Immersive reader
+
+   Reading themes are independent of the app theme: someone can read in Sepia
+   while the rest of Scribe is dark. Each theme sets its own surface and ink.
+   ========================================================================== */
+
+.reader {
+  --read-bg: var(--surface);
+  --read-ink: #22201c;
+  --read-ink-soft: #5d574d;
+  --read-rule: rgba(34, 32, 28, 0.14);
+  --read-measure: 38rem;
+  --read-size: 1.1875rem;
+
+  min-height: 100dvh;
+  background-color: var(--read-bg);
+  color: var(--read-ink);
+}
+
+.reader[data-reading-theme='light'] {
+  --read-bg: #ffffff;
+  --read-ink: #1c1a17;
+  --read-ink-soft: #57514a;
+  --read-rule: rgba(28, 26, 23, 0.13);
+}
+
+.reader[data-reading-theme='sepia'] {
+  --read-bg: #f6efe1;
+  --read-ink: #3a2f21;
+  --read-ink-soft: #6b5b45;
+  --read-rule: rgba(58, 47, 33, 0.16);
+}
+
+.reader[data-reading-theme='dark'] {
+  --read-bg: #17161a;
+  --read-ink: #e6e2da;
+  --read-ink-soft: #a49d92;
+  --read-rule: rgba(230, 226, 218, 0.14);
+}
+
+.reader[data-font-size='sm'] { --read-size: 1.0625rem; }
+.reader[data-font-size='md'] { --read-size: 1.1875rem; }
+.reader[data-font-size='lg'] { --read-size: 1.3125rem; }
+.reader[data-font-size='xl'] { --read-size: 1.5rem; }
+
+.reader[data-width='narrow'] { --read-measure: 32rem; }
+.reader[data-width='medium'] { --read-measure: 38rem; }
+.reader[data-width='wide'] { --read-measure: 46rem; }
+
+/* Progress --------------------------------------------------------------- */
+
+.reader__progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 50;
+  height: 3px;
+  background-color: var(--read-rule);
+}
+
+.reader__progress > span {
+  display: block;
+  height: 100%;
+  background-color: var(--brand);
+  transform-origin: left center;
+  transition: transform 90ms linear;
+}
+
+/* Bar -------------------------------------------------------------------- */
+
+.reader__bar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  background-color: color-mix(in srgb, var(--read-bg) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--read-rule);
+  transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+
+.reader.is-focus .reader__bar {
+  opacity: 0;
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+
+.reader.is-focus:hover .reader__bar,
+.reader.is-focus .reader__bar:focus-within {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.reader__back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--read-ink-soft);
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.reader__back:hover {
+  color: var(--brand);
+}
+
+.reader__back-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 22rem;
+}
+
+.reader__bar-actions {
+  display: flex;
+  gap: var(--space-1);
+  flex: none;
+}
+
+.reader__bar-actions .btn--ghost {
+  color: var(--read-ink-soft);
+}
+
+.reader__bar-actions .btn--ghost:hover {
+  color: var(--read-ink);
+  background-color: color-mix(in srgb, var(--read-ink) 8%, transparent);
+}
+
+.reader__bookmark.is-on {
+  color: var(--brand) !important;
+}
+
+/* Article ---------------------------------------------------------------- */
+
+.reader__main {
+  padding: var(--space-10) var(--space-5) var(--space-16);
+}
+
+.reader__article {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: var(--read-measure);
+  margin-inline: auto;
+}
+
+.reader__eyebrow {
+  color: var(--read-ink-soft);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.reader__title {
+  font-size: clamp(1.75rem, 1.2rem + 2vw, 2.5rem);
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+.reader__byline {
+  color: var(--read-ink-soft);
+  font-size: var(--text-base);
+}
+
+.reader__prose {
+  margin-top: var(--space-6);
+  font-family: var(--font-reading);
+  font-size: var(--read-size);
+  line-height: 1.72;
+}
+
+.reader__prose > p + p {
+  margin-top: 1.35em;
+}
+
+/* Classic first-line indent, but not on the opening paragraph. */
+.reader__prose > p + p {
+  text-indent: 1.4em;
+}
+
+.reader__prose > p:first-child::first-letter {
+  float: left;
+  margin: 0.05em 0.08em 0 0;
+  font-size: 3.1em;
+  line-height: 0.84;
+  font-weight: 600;
+}
+
+/* Chapter media ---------------------------------------------------------- */
+
+.media {
+  margin: var(--space-8) 0;
+}
+
+.media__plate {
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+.media figcaption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--read-ink-soft);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  text-indent: 0;
+}
+
+.media__player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--read-rule);
+  border-radius: var(--radius-full);
+  background-color: color-mix(in srgb, var(--read-ink) 4%, transparent);
+}
+
+.media__play {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-full);
+  background-color: var(--brand);
+  color: var(--brand-fg);
+}
+
+.media__play--overlay {
+  width: 3.25rem;
+  height: 3.25rem;
+  background-color: rgba(255, 255, 255, 0.92);
+  color: #1c1a17;
+  box-shadow: var(--shadow-lg);
+}
+
+.media__track {
+  flex: 1;
+  height: 0.25rem;
+  border-radius: var(--radius-full);
+  background-color: var(--read-rule);
+}
+
+.media__bar {
+  display: block;
+  width: 34%;
+  height: 100%;
+  border-radius: inherit;
+  background-color: var(--brand);
+}
+
+.media__time {
+  color: var(--read-ink-soft);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Footer and pager ------------------------------------------------------- */
+
+.reader__footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin-top: var(--space-12);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--read-rule);
+  font-family: var(--font-sans);
+}
+
+.reader__reactions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.reader__pager {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.reader__pager .select {
+  flex: 1;
+  min-width: 0;
+}
+
+.reader__hint {
+  color: var(--read-ink-soft);
+  font-size: var(--text-sm);
+}
+
+.reader__comments {
+  margin-top: var(--space-10);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--read-rule);
+  font-family: var(--font-sans);
+}
+
+.reader__comments h2 {
+  font-size: var(--text-xl);
+}
+
+.reader__comments ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: var(--space-5) 0;
+}
+
+.reader__comments li {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.reader__comment-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.reader__comment-head span {
+  color: var(--read-ink-soft);
+  font-size: var(--text-xs);
+}
+
+.reader__no-comments {
+  margin: var(--space-5) 0;
+  color: var(--read-ink-soft);
+}
+
+.reader__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+  max-width: 34rem;
+  margin: 0 auto;
+  padding: var(--space-16) var(--space-5);
+}
+
+/* Settings dialog -------------------------------------------------------- */
+
+.reader-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.reader-settings__label {
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.reader-settings .segmented {
+  width: 100%;
+}
+
+.reader-settings .segmented__option {
+  flex: 1;
+}
+
+/* Responsive ------------------------------------------------------------- */
+
+@media (max-width: 40rem) {
+  .reader__bar {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .reader__back-text {
+    max-width: 9rem;
+  }
+
+  .reader__main {
+    padding: var(--space-6) var(--space-4) var(--space-12);
+  }
+
+  .reader__prose {
+    font-size: max(var(--read-size), 1.0625rem);
+  }
+
+  .reader__pager {
+    flex-wrap: wrap;
+  }
+
+  .reader__pager .btn {
+    flex: 1;
+  }
+
+  .reader__pager .select {
+    order: -1;
+    flex-basis: 100%;
+  }
+}

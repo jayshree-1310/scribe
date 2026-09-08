@@ -1,0 +1,195 @@
+/* ==========================================================================
+   Charts — recessive axes, thin marks, text in text tokens
+   ========================================================================== */
+
+.chart {
+  margin: 0;
+}
+
+.chart__legend {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 550;
+}
+
+.chart__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.chart__swatch {
+  display: inline-block;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 2px;
+  flex: none;
+}
+
+.chart__plot {
+  position: relative;
+}
+
+.chart__plot svg {
+  display: block;
+  width: 100%;
+  overflow: visible;
+  touch-action: pan-y;
+}
+
+/* Axis text wears text tokens, never a series colour. */
+.chart__tick {
+  fill: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__end-label {
+  fill: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.chart__tooltip {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  min-width: 8.5rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--surface);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm);
+  pointer-events: none;
+  animation: fade-in var(--dur-fast) var(--ease-out);
+}
+
+.chart__tooltip p {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+}
+
+.chart__tooltip strong {
+  margin-left: auto;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__tooltip-date {
+  margin-bottom: var(--space-1);
+  color: var(--text) !important;
+  font-weight: 600;
+}
+
+.chart__table {
+  margin-top: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.chart__table summary {
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.chart__table summary:hover {
+  color: var(--brand);
+}
+
+.chart__table table {
+  width: 100%;
+  margin-top: var(--space-3);
+  border-collapse: collapse;
+}
+
+.chart__table th,
+.chart__table td {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart__table thead th,
+.chart__table tbody th {
+  text-align: left;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.chart__table > table {
+  display: block;
+  max-height: 14rem;
+  overflow-y: auto;
+}
+
+/* Rating breakdown -------------------------------------------------------- */
+
+.rating-bars {
+  display: flex;
+  flex-direction: column;
+  /* 2px surface gap between adjacent bars. */
+  gap: 0.375rem;
+  margin: 0;
+}
+
+.rating-bars__row {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.rating-bars__score {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.rating-bars__track {
+  height: 0.625rem;
+  border-radius: var(--radius-full);
+  background-color: var(--surface-3);
+  overflow: hidden;
+}
+
+.rating-bars__fill {
+  display: block;
+  height: 100%;
+  /* 4px rounded data-end, anchored to the baseline at the left. */
+  border-radius: 0 4px 4px 0;
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+.rating-bars__count {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 5.5rem;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.rating-bars__share {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+/* Forced colours: fall back to system colours and keep the labels. */
+@media (forced-colors: active) {
+  .chart__swatch,
+  .rating-bars__fill {
+    forced-color-adjust: none;
+    background: CanvasText !important;
+  }
+}

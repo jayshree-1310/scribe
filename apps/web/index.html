@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Scribe is where stories are read chapter by chapter and written in public. Discover serials, join book clubs, and publish your own."
+    />
+    <meta name="color-scheme" content="light dark" />
+    <title>Scribe — read, write and share stories</title>
+    <script>
+      // Apply the stored theme before first paint so there is no flash of the
+      // wrong palette. Mirrors the logic in src/lib/theme.ts.
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('scribe:theme')
+          var pref = stored === 'light' || stored === 'dark' ? stored : null
+          var dark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          document.documentElement.dataset.theme = pref || (dark ? 'dark' : 'light')
+        } catch (error) {
+          /* storage blocked — the provider will set it on mount */
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

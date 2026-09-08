@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "outDir": "dist",
+    "rootDir": "src",
+    "noEmit": false,
+    "resolveJsonModule": true,
+    "types": [
+      "node"
+    ]
+  },
+  "include": ["src/**/*.ts"]
+}
