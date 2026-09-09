@@ -2,22 +2,23 @@ import {
   defineContract,
   field,
   model,
-} from '@prisma/orm-postgres/contract-builder';
+} from "@prisma/orm-postgres/contract-builder";
 
 export const contract = defineContract(
   {
-    namespaces: ['auth'],
+    namespaces: ["auth"],
   },
   ({ field, model }) => {
-    const User = model('User', {
+    const User = model("User", {
       fields: {
         id: field.id.uuidv4String(),
         username: field.text().unique(),
         email: field.text().unique(),
+        passwordHash: field.text(),
       },
     }).sql({
-      table: 'user',
-      namespace: 'auth',
+      table: "user",
+      namespace: "auth",
     });
 
     return {
