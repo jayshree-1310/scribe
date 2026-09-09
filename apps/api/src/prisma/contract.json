@@ -94,6 +94,13 @@
                   "kind": "scalar"
                 }
               },
+              "avatarUrl": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "createdAt": {
                 "nullable": false,
                 "type": {
@@ -101,8 +108,29 @@
                   "kind": "scalar"
                 }
               },
+              "displayName": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "email": {
                 "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "emailVerified": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "googleId": {
+                "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -123,7 +151,7 @@
                 }
               },
               "passwordHash": {
-                "nullable": false,
+                "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -300,11 +328,23 @@
                 "authorLevel": {
                   "column": "authorLevel"
                 },
+                "avatarUrl": {
+                  "column": "avatarUrl"
+                },
                 "createdAt": {
                   "column": "createdAt"
                 },
+                "displayName": {
+                  "column": "displayName"
+                },
                 "email": {
                   "column": "email"
+                },
+                "emailVerified": {
+                  "column": "emailVerified"
+                },
+                "googleId": {
+                  "column": "googleId"
                 },
                 "id": {
                   "column": "id"
@@ -2394,6 +2434,11 @@
                   "nativeType": "int4",
                   "nullable": false
                 },
+                "avatarUrl": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "createdAt": {
                   "codecId": "pg/timestamptz-temporal@1",
                   "default": {
@@ -2403,10 +2448,29 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "displayName": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "email": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
+                },
+                "emailVerified": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": false
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "googleId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 },
                 "id": {
                   "codecId": "pg/text@1",
@@ -2425,7 +2489,7 @@
                 "passwordHash": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
-                  "nullable": false
+                  "nullable": true
                 },
                 "readerLevel": {
                   "codecId": "pg/int4@1",
@@ -2476,6 +2540,11 @@
                 {
                   "columns": [
                     "email"
+                  ]
+                },
+                {
+                  "columns": [
+                    "googleId"
                   ]
                 }
               ]
@@ -4286,7 +4355,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "61cd8b821c72071de38ad69cfea3f87d9c013f889c389c048eb92d83cec6878f"
+    "storageHash": "28de4e98f951d4018265faec4e326b9f947b47f9ae6763498eed0838cd22fc9b"
   },
   "execution": {
     "executionHash": "2a8f10d344652873c2c64255cf26b8b7ef763928007ad7cae38f4ead2fc152a3",

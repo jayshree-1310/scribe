@@ -68,10 +68,14 @@ export function LoginPage() {
     setGooglePending(true)
     setFormError(null)
     try {
-      await signInWithGoogle()
-      navigate(destination, { replace: true })
-    } catch {
-      setFormError('Google sign-in did not complete. Please try again.')
+      const { created } = await signInWithGoogle()
+      navigate(created ? '/onboarding' : destination, { replace: true })
+    } catch (error) {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : 'Google sign-in did not complete. Please try again.',
+      )
     } finally {
       setGooglePending(false)
     }

@@ -1,3 +1,13 @@
+# Local development stack: every service runs in Docker, with the API and web
+# app bind-mounted from the working tree so edits reload in place.
+#
+#   docker compose up -d --build          # whole stack
+#   docker compose run --rm api-migrate   # apply pending migrations
+#
+# For a production-style build of the same code, see docker-compose.prod.yml.
+
+name: scribe
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -30,6 +40,80 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: dev
+    container_name: scribe-api
+    restart: unless-stopped
+    env_file:
+      - apps/api/.env
+    # Overrides whatever `apps/api/.env` says: inside the network the
+    # dependencies answer on their service names and their *container* ports,
+    # not on the host ports published above.
+    environment:
+      DATABASE_URL: postgresql://scribe:scribe_dev_password@postgres:5432/scribe
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "1303:1303"
+    volumes:
+      # Source is mounted so `tsx watch` sees host edits. The nested
+      # anonymous volumes keep the image's own installed dependencies: a bare
+      # bind mount would hide them behind the host's (or an absent) tree.
+      - ./apps/api:/app/apps/api
+      - /app/node_modules
+      - /app/apps/api/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: dev
+    container_name: scribe-web
+    restart: unless-stopped
+    env_file:
+      - apps/web/.env
+    environment:
+      # The Vite dev proxy runs inside this container, so /api has to reach
+      # the API by service name.
+      VITE_API_PROXY_TARGET: http://api:1303
+    ports:
+      - "1302:1302"
+    volumes:
+      - ./apps/web:/app/apps/web
+      - /app/node_modules
+      - /app/apps/web/node_modules
+    depends_on:
+      - api
+
+  # One-shot: not started by `docker compose up`, run it explicitly with
+  #   docker compose run --rm api-migrate
+  api-migrate:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: dev
+    env_file:
+      - apps/api/.env
+    environment:
+      DATABASE_URL: postgresql://scribe:scribe_dev_password@postgres:5432/scribe
+    working_dir: /app/apps/api
+    command: ["pnpm", "exec", "prisma", "db", "migrate", "--yes"]
+    volumes:
+      - ./apps/api:/app/apps/api
+      - /app/node_modules
+      - /app/apps/api/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
 
 volumes:
   postgres_data:

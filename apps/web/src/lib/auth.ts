@@ -18,6 +18,12 @@ export interface OnboardingAnswers {
   wantsToWrite: boolean
 }
 
+export interface GoogleSignInResult {
+  user: User
+  /** True when this sign-in created the account, so it needs onboarding. */
+  created: boolean
+}
+
 export interface AuthContextValue {
   session: Session | null
   /** True until the stored session has been read. */
@@ -28,7 +34,7 @@ export interface AuthContextValue {
     email: string
     password: string
   }) => Promise<User>
-  signInWithGoogle: () => Promise<User>
+  signInWithGoogle: () => Promise<GoogleSignInResult>
   completeOnboarding: (answers: OnboardingAnswers) => void
   signOut: () => void
 }

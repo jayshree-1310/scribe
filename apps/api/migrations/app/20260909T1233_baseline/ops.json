@@ -1,0 +1,3668 @@
+[
+  {
+    "id": "schema.auth",
+    "label": "Create schema \"auth\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"auth\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"auth\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "schema.challenges",
+    "label": "Create schema \"challenges\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"challenges\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"challenges\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "schema.channels",
+    "label": "Create schema \"channels\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"channels\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"channels\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "schema.clubs",
+    "label": "Create schema \"clubs\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"clubs\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"clubs\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "schema.content",
+    "label": "Create schema \"content\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"content\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"content\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "schema.engagement",
+    "label": "Create schema \"engagement\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"engagement\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"engagement\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "schema.gamification",
+    "label": "Create schema \"gamification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"gamification\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"gamification\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "schema.library",
+    "label": "Create schema \"library\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"library\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"library\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "schema.public",
+    "label": "Create schema \"public\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"public\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"public\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "table.user",
+    "label": "Create table \"user\"",
+    "summary": "Creates table \"user\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "table",
+        "name": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"user\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"user\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"user\"",
+        "sql": "CREATE TABLE \"auth\".\"user\" (\n  \"authorLevel\" int4 DEFAULT 1 NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"email\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"isAuthor\" bool DEFAULT false NOT NULL,\n  \"passwordHash\" text NOT NULL,\n  \"readerLevel\" int4 DEFAULT 1 NOT NULL,\n  \"readingStreak\" int4 DEFAULT 0 NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"username\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"user\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"user\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.challengeEntry",
+    "label": "Create table \"challengeEntry\"",
+    "summary": "Creates table \"challengeEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "table",
+        "name": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"challengeEntry\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"challengeEntry\"",
+        "sql": "CREATE TABLE \"challenges\".\"challengeEntry\" (\n  \"challengeId\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"submittedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"challengeEntry\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.writingChallenge",
+    "label": "Create table \"writingChallenge\"",
+    "summary": "Creates table \"writingChallenge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "table",
+        "name": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"writingChallenge\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"writingChallenge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"writingChallenge\"",
+        "sql": "CREATE TABLE \"challenges\".\"writingChallenge\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"description\" text,\n  \"endAt\" timestamptz NOT NULL,\n  \"id\" text NOT NULL,\n  \"startAt\" timestamptz NOT NULL,\n  \"title\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"writingChallenge\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"writingChallenge\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.broadcastChannel",
+    "label": "Create table \"broadcastChannel\"",
+    "summary": "Creates table \"broadcastChannel\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "table",
+        "name": "broadcastChannel"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"broadcastChannel\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"broadcastChannel\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"broadcastChannel\"",
+        "sql": "CREATE TABLE \"channels\".\"broadcastChannel\" (\n  \"authorId\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"description\" text,\n  \"id\" text NOT NULL,\n  \"name\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"broadcastChannel\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"broadcastChannel\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.channelPost",
+    "label": "Create table \"channelPost\"",
+    "summary": "Creates table \"channelPost\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "table",
+        "name": "channelPost"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"channelPost\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"channelPost\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"channelPost\"",
+        "sql": "CREATE TABLE \"channels\".\"channelPost\" (\n  \"channelId\" text NOT NULL,\n  \"content\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"postedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"channelPost\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"channelPost\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.channelSubscriber",
+    "label": "Create table \"channelSubscriber\"",
+    "summary": "Creates table \"channelSubscriber\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "table",
+        "name": "channelSubscriber"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"channelSubscriber\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"channelSubscriber\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"channelSubscriber\"",
+        "sql": "CREATE TABLE \"channels\".\"channelSubscriber\" (\n  \"channelId\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"subscribedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"channelSubscriber\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"channelSubscriber\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.bookClub",
+    "label": "Create table \"bookClub\"",
+    "summary": "Creates table \"bookClub\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "table",
+        "name": "bookClub"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"bookClub\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"bookClub\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"bookClub\"",
+        "sql": "CREATE TABLE \"clubs\".\"bookClub\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"creatorId\" text NOT NULL,\n  \"description\" text,\n  \"id\" text NOT NULL,\n  \"name\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"bookClub\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"bookClub\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.clubMembership",
+    "label": "Create table \"clubMembership\"",
+    "summary": "Creates table \"clubMembership\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "table",
+        "name": "clubMembership"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"clubMembership\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubMembership\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"clubMembership\"",
+        "sql": "CREATE TABLE \"clubs\".\"clubMembership\" (\n  \"clubId\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"joinedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"role\" text DEFAULT 'MEMBER' NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"clubMembership_role_check_50a44636\" CHECK (\"role\" IN ('OWNER', 'ADMIN', 'MEMBER'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"clubMembership\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubMembership\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.chapter",
+    "label": "Create table \"chapter\"",
+    "summary": "Creates table \"chapter\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "table",
+        "name": "chapter"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"chapter\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"chapter\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"chapter\"",
+        "sql": "CREATE TABLE \"content\".\"chapter\" (\n  \"chapterNumber\" int4 NOT NULL,\n  \"content\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"publishedAt\" timestamptz,\n  \"storyId\" text NOT NULL,\n  \"title\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"chapter\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"chapter\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.genre",
+    "label": "Create table \"genre\"",
+    "summary": "Creates table \"genre\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "table",
+        "name": "genre"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"genre\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"genre\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"genre\"",
+        "sql": "CREATE TABLE \"content\".\"genre\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"hue\" int4 DEFAULT 268 NOT NULL,\n  \"id\" text NOT NULL,\n  \"name\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"genre\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"genre\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.multimedia",
+    "label": "Create table \"multimedia\"",
+    "summary": "Creates table \"multimedia\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "table",
+        "name": "multimedia"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"multimedia\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"multimedia\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"multimedia\"",
+        "sql": "CREATE TABLE \"content\".\"multimedia\" (\n  \"chapterId\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"displayOrder\" int4 DEFAULT 0 NOT NULL,\n  \"id\" text NOT NULL,\n  \"type\" text NOT NULL,\n  \"url\" text NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"multimedia_type_check_cb66da76\" CHECK (\"type\" IN ('IMAGE', 'AUDIO', 'VIDEO', 'LINK'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"multimedia\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"multimedia\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.story",
+    "label": "Create table \"story\"",
+    "summary": "Creates table \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "table",
+        "name": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"story\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"story\"",
+        "sql": "CREATE TABLE \"content\".\"story\" (\n  \"authorId\" text NOT NULL,\n  \"coverUrl\" text,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"description\" text,\n  \"id\" text NOT NULL,\n  \"isCompleted\" bool DEFAULT false NOT NULL,\n  \"isbn\" text,\n  \"kidsAppropriate\" bool DEFAULT false NOT NULL,\n  \"likeCount\" int4 DEFAULT 0 NOT NULL,\n  \"pageCount\" int4,\n  \"publishedAt\" timestamptz,\n  \"publisher\" text,\n  \"ratingAverage\" numeric,\n  \"title\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"viewCount\" int4 DEFAULT 0 NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"story\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.storyGenre",
+    "label": "Create table \"storyGenre\"",
+    "summary": "Creates table \"storyGenre\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "table",
+        "name": "storyGenre"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"storyGenre\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"storyGenre\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"storyGenre\"",
+        "sql": "CREATE TABLE \"content\".\"storyGenre\" (\n  \"genreId\" text NOT NULL,\n  \"storyId\" text NOT NULL,\n  PRIMARY KEY (\"storyId\", \"genreId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"storyGenre\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"storyGenre\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.comment",
+    "label": "Create table \"comment\"",
+    "summary": "Creates table \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "table",
+        "name": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"comment\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"comment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"comment\"",
+        "sql": "CREATE TABLE \"engagement\".\"comment\" (\n  \"chapterId\" text,\n  \"content\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"comment\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"comment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.rating",
+    "label": "Create table \"rating\"",
+    "summary": "Creates table \"rating\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "table",
+        "name": "rating"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"rating\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"rating\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"rating\"",
+        "sql": "CREATE TABLE \"engagement\".\"rating\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"rating\" numeric NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"rating\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"rating\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.readingHistory",
+    "label": "Create table \"readingHistory\"",
+    "summary": "Creates table \"readingHistory\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "table",
+        "name": "readingHistory"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"readingHistory\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"readingHistory\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"readingHistory\"",
+        "sql": "CREATE TABLE \"engagement\".\"readingHistory\" (\n  \"chapterId\" text,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"lastReadAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"progress\" int4 DEFAULT 0 NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"readingHistory\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"readingHistory\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.badge",
+    "label": "Create table \"badge\"",
+    "summary": "Creates table \"badge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "table",
+        "name": "badge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"badge\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"badge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"badge\"",
+        "sql": "CREATE TABLE \"gamification\".\"badge\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"description\" text,\n  \"id\" text NOT NULL,\n  \"imageUrl\" text,\n  \"name\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"badge\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"badge\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.userBadge",
+    "label": "Create table \"userBadge\"",
+    "summary": "Creates table \"userBadge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "table",
+        "name": "userBadge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"userBadge\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"userBadge\"",
+        "sql": "CREATE TABLE \"gamification\".\"userBadge\" (\n  \"badgeId\" text NOT NULL,\n  \"earnedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"userBadge\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.libraryEntry",
+    "label": "Create table \"libraryEntry\"",
+    "summary": "Creates table \"libraryEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "library",
+        "objectType": "table",
+        "name": "libraryEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"libraryEntry\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"library\".\"libraryEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"libraryEntry\"",
+        "sql": "CREATE TABLE \"library\".\"libraryEntry\" (\n  \"addedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"status\" text DEFAULT 'WANT_TO_READ' NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"libraryEntry_status_check_f8242d24\" CHECK (\"status\" IN ('WANT_TO_READ', 'READING', 'FINISHED'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"libraryEntry\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"library\".\"libraryEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.user.user_username_key",
+    "label": "Add unique constraint on \"user\" (username)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "unique",
+        "name": "user_username_key",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"user_username_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "user_username_key",
+          "auth",
+          "\"auth\".\"user\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"user_username_key\"",
+        "sql": "ALTER TABLE \"auth\".\"user\" ADD CONSTRAINT \"user_username_key\" UNIQUE (\"username\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"user_username_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "user_username_key",
+          "auth",
+          "\"auth\".\"user\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.user.user_email_key",
+    "label": "Add unique constraint on \"user\" (email)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "unique",
+        "name": "user_email_key",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"user_email_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "user_email_key",
+          "auth",
+          "\"auth\".\"user\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"user_email_key\"",
+        "sql": "ALTER TABLE \"auth\".\"user\" ADD CONSTRAINT \"user_email_key\" UNIQUE (\"email\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"user_email_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "user_email_key",
+          "auth",
+          "\"auth\".\"user\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.challengeEntry.challengeEntry_challengeId_userId_storyId_key",
+    "label": "Add unique constraint on \"challengeEntry\" (challengeId, userId, storyId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "unique",
+        "name": "challengeEntry_challengeId_userId_storyId_key",
+        "table": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"challengeEntry_challengeId_userId_storyId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "challengeEntry_challengeId_userId_storyId_key",
+          "challenges",
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"challengeEntry_challengeId_userId_storyId_key\"",
+        "sql": "ALTER TABLE \"challenges\".\"challengeEntry\" ADD CONSTRAINT \"challengeEntry_challengeId_userId_storyId_key\" UNIQUE (\"challengeId\", \"userId\", \"storyId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"challengeEntry_challengeId_userId_storyId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "challengeEntry_challengeId_userId_storyId_key",
+          "challenges",
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.channelSubscriber.channelSubscriber_channelId_userId_key",
+    "label": "Add unique constraint on \"channelSubscriber\" (channelId, userId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "unique",
+        "name": "channelSubscriber_channelId_userId_key",
+        "table": "channelSubscriber"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"channelSubscriber_channelId_userId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "channelSubscriber_channelId_userId_key",
+          "channels",
+          "\"channels\".\"channelSubscriber\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"channelSubscriber_channelId_userId_key\"",
+        "sql": "ALTER TABLE \"channels\".\"channelSubscriber\" ADD CONSTRAINT \"channelSubscriber_channelId_userId_key\" UNIQUE (\"channelId\", \"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"channelSubscriber_channelId_userId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "channelSubscriber_channelId_userId_key",
+          "channels",
+          "\"channels\".\"channelSubscriber\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.clubMembership.clubMembership_clubId_userId_key",
+    "label": "Add unique constraint on \"clubMembership\" (clubId, userId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "unique",
+        "name": "clubMembership_clubId_userId_key",
+        "table": "clubMembership"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"clubMembership_clubId_userId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "clubMembership_clubId_userId_key",
+          "clubs",
+          "\"clubs\".\"clubMembership\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"clubMembership_clubId_userId_key\"",
+        "sql": "ALTER TABLE \"clubs\".\"clubMembership\" ADD CONSTRAINT \"clubMembership_clubId_userId_key\" UNIQUE (\"clubId\", \"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"clubMembership_clubId_userId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "clubMembership_clubId_userId_key",
+          "clubs",
+          "\"clubs\".\"clubMembership\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.chapter.chapter_storyId_chapterNumber_key",
+    "label": "Add unique constraint on \"chapter\" (storyId, chapterNumber)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "unique",
+        "name": "chapter_storyId_chapterNumber_key",
+        "table": "chapter"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"chapter_storyId_chapterNumber_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapter_storyId_chapterNumber_key",
+          "content",
+          "\"content\".\"chapter\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"chapter_storyId_chapterNumber_key\"",
+        "sql": "ALTER TABLE \"content\".\"chapter\" ADD CONSTRAINT \"chapter_storyId_chapterNumber_key\" UNIQUE (\"storyId\", \"chapterNumber\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"chapter_storyId_chapterNumber_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapter_storyId_chapterNumber_key",
+          "content",
+          "\"content\".\"chapter\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.genre.genre_name_key",
+    "label": "Add unique constraint on \"genre\" (name)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "unique",
+        "name": "genre_name_key",
+        "table": "genre"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"genre_name_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "genre_name_key",
+          "content",
+          "\"content\".\"genre\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"genre_name_key\"",
+        "sql": "ALTER TABLE \"content\".\"genre\" ADD CONSTRAINT \"genre_name_key\" UNIQUE (\"name\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"genre_name_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "genre_name_key",
+          "content",
+          "\"content\".\"genre\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.story.story_isbn_key",
+    "label": "Add unique constraint on \"story\" (isbn)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "unique",
+        "name": "story_isbn_key",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"story_isbn_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "story_isbn_key",
+          "content",
+          "\"content\".\"story\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"story_isbn_key\"",
+        "sql": "ALTER TABLE \"content\".\"story\" ADD CONSTRAINT \"story_isbn_key\" UNIQUE (\"isbn\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"story_isbn_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "story_isbn_key",
+          "content",
+          "\"content\".\"story\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.rating.rating_userId_storyId_key",
+    "label": "Add unique constraint on \"rating\" (userId, storyId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "unique",
+        "name": "rating_userId_storyId_key",
+        "table": "rating"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"rating_userId_storyId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "rating_userId_storyId_key",
+          "engagement",
+          "\"engagement\".\"rating\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"rating_userId_storyId_key\"",
+        "sql": "ALTER TABLE \"engagement\".\"rating\" ADD CONSTRAINT \"rating_userId_storyId_key\" UNIQUE (\"userId\", \"storyId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"rating_userId_storyId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "rating_userId_storyId_key",
+          "engagement",
+          "\"engagement\".\"rating\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.readingHistory.readingHistory_userId_storyId_key",
+    "label": "Add unique constraint on \"readingHistory\" (userId, storyId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "unique",
+        "name": "readingHistory_userId_storyId_key",
+        "table": "readingHistory"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"readingHistory_userId_storyId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "readingHistory_userId_storyId_key",
+          "engagement",
+          "\"engagement\".\"readingHistory\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"readingHistory_userId_storyId_key\"",
+        "sql": "ALTER TABLE \"engagement\".\"readingHistory\" ADD CONSTRAINT \"readingHistory_userId_storyId_key\" UNIQUE (\"userId\", \"storyId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"readingHistory_userId_storyId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "readingHistory_userId_storyId_key",
+          "engagement",
+          "\"engagement\".\"readingHistory\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.badge.badge_name_key",
+    "label": "Add unique constraint on \"badge\" (name)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "unique",
+        "name": "badge_name_key",
+        "table": "badge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"badge_name_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "badge_name_key",
+          "gamification",
+          "\"gamification\".\"badge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"badge_name_key\"",
+        "sql": "ALTER TABLE \"gamification\".\"badge\" ADD CONSTRAINT \"badge_name_key\" UNIQUE (\"name\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"badge_name_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "badge_name_key",
+          "gamification",
+          "\"gamification\".\"badge\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.userBadge.userBadge_userId_badgeId_key",
+    "label": "Add unique constraint on \"userBadge\" (userId, badgeId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "unique",
+        "name": "userBadge_userId_badgeId_key",
+        "table": "userBadge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"userBadge_userId_badgeId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "userBadge_userId_badgeId_key",
+          "gamification",
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"userBadge_userId_badgeId_key\"",
+        "sql": "ALTER TABLE \"gamification\".\"userBadge\" ADD CONSTRAINT \"userBadge_userId_badgeId_key\" UNIQUE (\"userId\", \"badgeId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"userBadge_userId_badgeId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "userBadge_userId_badgeId_key",
+          "gamification",
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.libraryEntry.libraryEntry_userId_storyId_key",
+    "label": "Add unique constraint on \"libraryEntry\" (userId, storyId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "library",
+        "objectType": "unique",
+        "name": "libraryEntry_userId_storyId_key",
+        "table": "libraryEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"libraryEntry_userId_storyId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "libraryEntry_userId_storyId_key",
+          "library",
+          "\"library\".\"libraryEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"libraryEntry_userId_storyId_key\"",
+        "sql": "ALTER TABLE \"library\".\"libraryEntry\" ADD CONSTRAINT \"libraryEntry_userId_storyId_key\" UNIQUE (\"userId\", \"storyId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"libraryEntry_userId_storyId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "libraryEntry_userId_storyId_key",
+          "library",
+          "\"library\".\"libraryEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.challengeEntry.challengeEntry_challengeId_idx_73b8115d",
+    "label": "Create index \"challengeEntry_challengeId_idx_73b8115d\" on \"challengeEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "index",
+        "name": "challengeEntry_challengeId_idx_73b8115d",
+        "table": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"challengeEntry_challengeId_idx_73b8115d\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"challengeEntry_challengeId_idx_73b8115d\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"challengeEntry_challengeId_idx_73b8115d\"",
+        "sql": "CREATE INDEX \"challengeEntry_challengeId_idx_73b8115d\" ON \"challenges\".\"challengeEntry\" (\"challengeId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"challengeEntry_challengeId_idx_73b8115d\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"challengeEntry_challengeId_idx_73b8115d\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.challengeEntry.challengeEntry_storyId_idx_cd452158",
+    "label": "Create index \"challengeEntry_storyId_idx_cd452158\" on \"challengeEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "index",
+        "name": "challengeEntry_storyId_idx_cd452158",
+        "table": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"challengeEntry_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"challengeEntry_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"challengeEntry_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"challengeEntry_storyId_idx_cd452158\" ON \"challenges\".\"challengeEntry\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"challengeEntry_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"challengeEntry_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.challengeEntry.challengeEntry_userId_idx_a489d58a",
+    "label": "Create index \"challengeEntry_userId_idx_a489d58a\" on \"challengeEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "index",
+        "name": "challengeEntry_userId_idx_a489d58a",
+        "table": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"challengeEntry_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"challengeEntry_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"challengeEntry_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"challengeEntry_userId_idx_a489d58a\" ON \"challenges\".\"challengeEntry\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"challengeEntry_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"challengeEntry_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.broadcastChannel.broadcastChannel_authorId_idx_e47547ed",
+    "label": "Create index \"broadcastChannel_authorId_idx_e47547ed\" on \"broadcastChannel\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "index",
+        "name": "broadcastChannel_authorId_idx_e47547ed",
+        "table": "broadcastChannel"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"broadcastChannel_authorId_idx_e47547ed\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"broadcastChannel_authorId_idx_e47547ed\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"broadcastChannel_authorId_idx_e47547ed\"",
+        "sql": "CREATE INDEX \"broadcastChannel_authorId_idx_e47547ed\" ON \"channels\".\"broadcastChannel\" (\"authorId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"broadcastChannel_authorId_idx_e47547ed\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"broadcastChannel_authorId_idx_e47547ed\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.channelPost.channelPost_channelId_idx_166d3598",
+    "label": "Create index \"channelPost_channelId_idx_166d3598\" on \"channelPost\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "index",
+        "name": "channelPost_channelId_idx_166d3598",
+        "table": "channelPost"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"channelPost_channelId_idx_166d3598\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"channelPost_channelId_idx_166d3598\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"channelPost_channelId_idx_166d3598\"",
+        "sql": "CREATE INDEX \"channelPost_channelId_idx_166d3598\" ON \"channels\".\"channelPost\" (\"channelId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"channelPost_channelId_idx_166d3598\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"channelPost_channelId_idx_166d3598\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.channelSubscriber.channelSubscriber_channelId_idx_166d3598",
+    "label": "Create index \"channelSubscriber_channelId_idx_166d3598\" on \"channelSubscriber\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "index",
+        "name": "channelSubscriber_channelId_idx_166d3598",
+        "table": "channelSubscriber"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"channelSubscriber_channelId_idx_166d3598\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"channelSubscriber_channelId_idx_166d3598\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"channelSubscriber_channelId_idx_166d3598\"",
+        "sql": "CREATE INDEX \"channelSubscriber_channelId_idx_166d3598\" ON \"channels\".\"channelSubscriber\" (\"channelId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"channelSubscriber_channelId_idx_166d3598\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"channelSubscriber_channelId_idx_166d3598\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.channelSubscriber.channelSubscriber_userId_idx_a489d58a",
+    "label": "Create index \"channelSubscriber_userId_idx_a489d58a\" on \"channelSubscriber\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "index",
+        "name": "channelSubscriber_userId_idx_a489d58a",
+        "table": "channelSubscriber"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"channelSubscriber_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"channelSubscriber_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"channelSubscriber_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"channelSubscriber_userId_idx_a489d58a\" ON \"channels\".\"channelSubscriber\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"channelSubscriber_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"channelSubscriber_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.bookClub.bookClub_creatorId_idx_3a77d800",
+    "label": "Create index \"bookClub_creatorId_idx_3a77d800\" on \"bookClub\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "index",
+        "name": "bookClub_creatorId_idx_3a77d800",
+        "table": "bookClub"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"bookClub_creatorId_idx_3a77d800\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"bookClub_creatorId_idx_3a77d800\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"bookClub_creatorId_idx_3a77d800\"",
+        "sql": "CREATE INDEX \"bookClub_creatorId_idx_3a77d800\" ON \"clubs\".\"bookClub\" (\"creatorId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"bookClub_creatorId_idx_3a77d800\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"bookClub_creatorId_idx_3a77d800\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.clubMembership.clubMembership_clubId_idx_7aff947d",
+    "label": "Create index \"clubMembership_clubId_idx_7aff947d\" on \"clubMembership\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "index",
+        "name": "clubMembership_clubId_idx_7aff947d",
+        "table": "clubMembership"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"clubMembership_clubId_idx_7aff947d\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubMembership_clubId_idx_7aff947d\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"clubMembership_clubId_idx_7aff947d\"",
+        "sql": "CREATE INDEX \"clubMembership_clubId_idx_7aff947d\" ON \"clubs\".\"clubMembership\" (\"clubId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"clubMembership_clubId_idx_7aff947d\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubMembership_clubId_idx_7aff947d\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.clubMembership.clubMembership_userId_idx_a489d58a",
+    "label": "Create index \"clubMembership_userId_idx_a489d58a\" on \"clubMembership\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "index",
+        "name": "clubMembership_userId_idx_a489d58a",
+        "table": "clubMembership"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"clubMembership_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubMembership_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"clubMembership_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"clubMembership_userId_idx_a489d58a\" ON \"clubs\".\"clubMembership\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"clubMembership_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubMembership_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapter.chapter_storyId_idx_cd452158",
+    "label": "Create index \"chapter_storyId_idx_cd452158\" on \"chapter\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "chapter_storyId_idx_cd452158",
+        "table": "chapter"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapter_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"chapter_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapter_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"chapter_storyId_idx_cd452158\" ON \"content\".\"chapter\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapter_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"chapter_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.multimedia.multimedia_chapterId_idx_411dd3d6",
+    "label": "Create index \"multimedia_chapterId_idx_411dd3d6\" on \"multimedia\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "multimedia_chapterId_idx_411dd3d6",
+        "table": "multimedia"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"multimedia_chapterId_idx_411dd3d6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"multimedia_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"multimedia_chapterId_idx_411dd3d6\"",
+        "sql": "CREATE INDEX \"multimedia_chapterId_idx_411dd3d6\" ON \"content\".\"multimedia\" (\"chapterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"multimedia_chapterId_idx_411dd3d6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"multimedia_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.story.story_authorId_idx_e47547ed",
+    "label": "Create index \"story_authorId_idx_e47547ed\" on \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "story_authorId_idx_e47547ed",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"story_authorId_idx_e47547ed\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story_authorId_idx_e47547ed\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"story_authorId_idx_e47547ed\"",
+        "sql": "CREATE INDEX \"story_authorId_idx_e47547ed\" ON \"content\".\"story\" (\"authorId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"story_authorId_idx_e47547ed\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story_authorId_idx_e47547ed\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.storyGenre.storyGenre_genreId_idx_8fce6a7b",
+    "label": "Create index \"storyGenre_genreId_idx_8fce6a7b\" on \"storyGenre\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "storyGenre_genreId_idx_8fce6a7b",
+        "table": "storyGenre"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"storyGenre_genreId_idx_8fce6a7b\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"storyGenre_genreId_idx_8fce6a7b\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"storyGenre_genreId_idx_8fce6a7b\"",
+        "sql": "CREATE INDEX \"storyGenre_genreId_idx_8fce6a7b\" ON \"content\".\"storyGenre\" (\"genreId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"storyGenre_genreId_idx_8fce6a7b\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"storyGenre_genreId_idx_8fce6a7b\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.storyGenre.storyGenre_storyId_idx_cd452158",
+    "label": "Create index \"storyGenre_storyId_idx_cd452158\" on \"storyGenre\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "storyGenre_storyId_idx_cd452158",
+        "table": "storyGenre"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"storyGenre_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"storyGenre_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"storyGenre_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"storyGenre_storyId_idx_cd452158\" ON \"content\".\"storyGenre\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"storyGenre_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"storyGenre_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.comment.comment_chapterId_idx_411dd3d6",
+    "label": "Create index \"comment_chapterId_idx_411dd3d6\" on \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "comment_chapterId_idx_411dd3d6",
+        "table": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"comment_chapterId_idx_411dd3d6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"comment_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"comment_chapterId_idx_411dd3d6\"",
+        "sql": "CREATE INDEX \"comment_chapterId_idx_411dd3d6\" ON \"engagement\".\"comment\" (\"chapterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"comment_chapterId_idx_411dd3d6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"comment_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.comment.comment_storyId_idx_cd452158",
+    "label": "Create index \"comment_storyId_idx_cd452158\" on \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "comment_storyId_idx_cd452158",
+        "table": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"comment_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"comment_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"comment_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"comment_storyId_idx_cd452158\" ON \"engagement\".\"comment\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"comment_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"comment_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.comment.comment_userId_idx_a489d58a",
+    "label": "Create index \"comment_userId_idx_a489d58a\" on \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "comment_userId_idx_a489d58a",
+        "table": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"comment_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"comment_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"comment_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"comment_userId_idx_a489d58a\" ON \"engagement\".\"comment\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"comment_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"comment_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.rating.rating_storyId_idx_cd452158",
+    "label": "Create index \"rating_storyId_idx_cd452158\" on \"rating\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "rating_storyId_idx_cd452158",
+        "table": "rating"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"rating_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"rating_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"rating_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"rating_storyId_idx_cd452158\" ON \"engagement\".\"rating\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"rating_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"rating_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.rating.rating_userId_idx_a489d58a",
+    "label": "Create index \"rating_userId_idx_a489d58a\" on \"rating\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "rating_userId_idx_a489d58a",
+        "table": "rating"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"rating_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"rating_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"rating_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"rating_userId_idx_a489d58a\" ON \"engagement\".\"rating\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"rating_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"rating_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.readingHistory.readingHistory_chapterId_idx_411dd3d6",
+    "label": "Create index \"readingHistory_chapterId_idx_411dd3d6\" on \"readingHistory\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "readingHistory_chapterId_idx_411dd3d6",
+        "table": "readingHistory"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"readingHistory_chapterId_idx_411dd3d6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"readingHistory_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"readingHistory_chapterId_idx_411dd3d6\"",
+        "sql": "CREATE INDEX \"readingHistory_chapterId_idx_411dd3d6\" ON \"engagement\".\"readingHistory\" (\"chapterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"readingHistory_chapterId_idx_411dd3d6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"readingHistory_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.readingHistory.readingHistory_storyId_idx_cd452158",
+    "label": "Create index \"readingHistory_storyId_idx_cd452158\" on \"readingHistory\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "readingHistory_storyId_idx_cd452158",
+        "table": "readingHistory"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"readingHistory_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"readingHistory_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"readingHistory_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"readingHistory_storyId_idx_cd452158\" ON \"engagement\".\"readingHistory\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"readingHistory_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"readingHistory_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.readingHistory.readingHistory_userId_idx_a489d58a",
+    "label": "Create index \"readingHistory_userId_idx_a489d58a\" on \"readingHistory\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "readingHistory_userId_idx_a489d58a",
+        "table": "readingHistory"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"readingHistory_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"readingHistory_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"readingHistory_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"readingHistory_userId_idx_a489d58a\" ON \"engagement\".\"readingHistory\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"readingHistory_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"readingHistory_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.userBadge.userBadge_badgeId_idx_e78e6f52",
+    "label": "Create index \"userBadge_badgeId_idx_e78e6f52\" on \"userBadge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "index",
+        "name": "userBadge_badgeId_idx_e78e6f52",
+        "table": "userBadge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"userBadge_badgeId_idx_e78e6f52\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"userBadge_badgeId_idx_e78e6f52\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"userBadge_badgeId_idx_e78e6f52\"",
+        "sql": "CREATE INDEX \"userBadge_badgeId_idx_e78e6f52\" ON \"gamification\".\"userBadge\" (\"badgeId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"userBadge_badgeId_idx_e78e6f52\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"userBadge_badgeId_idx_e78e6f52\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.userBadge.userBadge_userId_idx_a489d58a",
+    "label": "Create index \"userBadge_userId_idx_a489d58a\" on \"userBadge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "index",
+        "name": "userBadge_userId_idx_a489d58a",
+        "table": "userBadge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"userBadge_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"userBadge_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"userBadge_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"userBadge_userId_idx_a489d58a\" ON \"gamification\".\"userBadge\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"userBadge_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"userBadge_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.libraryEntry.libraryEntry_storyId_idx_cd452158",
+    "label": "Create index \"libraryEntry_storyId_idx_cd452158\" on \"libraryEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "library",
+        "objectType": "index",
+        "name": "libraryEntry_storyId_idx_cd452158",
+        "table": "libraryEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"libraryEntry_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"library\".\"libraryEntry_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"libraryEntry_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"libraryEntry_storyId_idx_cd452158\" ON \"library\".\"libraryEntry\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"libraryEntry_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"library\".\"libraryEntry_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.libraryEntry.libraryEntry_userId_idx_a489d58a",
+    "label": "Create index \"libraryEntry_userId_idx_a489d58a\" on \"libraryEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "library",
+        "objectType": "index",
+        "name": "libraryEntry_userId_idx_a489d58a",
+        "table": "libraryEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"libraryEntry_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"library\".\"libraryEntry_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"libraryEntry_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"libraryEntry_userId_idx_a489d58a\" ON \"library\".\"libraryEntry\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"libraryEntry_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"library\".\"libraryEntry_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.libraryEntry.libraryEntry_userId_status_addedAt_idx_0db0014a",
+    "label": "Create index \"libraryEntry_userId_status_addedAt_idx_0db0014a\" on \"libraryEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "library",
+        "objectType": "index",
+        "name": "libraryEntry_userId_status_addedAt_idx_0db0014a",
+        "table": "libraryEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"libraryEntry_userId_status_addedAt_idx_0db0014a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"library\".\"libraryEntry_userId_status_addedAt_idx_0db0014a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"libraryEntry_userId_status_addedAt_idx_0db0014a\"",
+        "sql": "CREATE INDEX \"libraryEntry_userId_status_addedAt_idx_0db0014a\" ON \"library\".\"libraryEntry\" (\"userId\", \"status\", \"addedAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"libraryEntry_userId_status_addedAt_idx_0db0014a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"library\".\"libraryEntry_userId_status_addedAt_idx_0db0014a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.challengeEntry.challengeEntry_challengeId_fkey",
+    "label": "Add foreign key \"challengeEntry_challengeId_fkey\" on \"challengeEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "foreignKey",
+        "name": "challengeEntry_challengeId_fkey",
+        "table": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"challengeEntry_challengeId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "challengeEntry_challengeId_fkey",
+          "challenges",
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"challengeEntry_challengeId_fkey\"",
+        "sql": "ALTER TABLE \"challenges\".\"challengeEntry\"\nADD CONSTRAINT \"challengeEntry_challengeId_fkey\"\nFOREIGN KEY (\"challengeId\")\nREFERENCES \"challenges\".\"writingChallenge\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"challengeEntry_challengeId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "challengeEntry_challengeId_fkey",
+          "challenges",
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.challengeEntry.challengeEntry_userId_fkey",
+    "label": "Add foreign key \"challengeEntry_userId_fkey\" on \"challengeEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "foreignKey",
+        "name": "challengeEntry_userId_fkey",
+        "table": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"challengeEntry_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "challengeEntry_userId_fkey",
+          "challenges",
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"challengeEntry_userId_fkey\"",
+        "sql": "ALTER TABLE \"challenges\".\"challengeEntry\"\nADD CONSTRAINT \"challengeEntry_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"challengeEntry_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "challengeEntry_userId_fkey",
+          "challenges",
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.challengeEntry.challengeEntry_storyId_fkey",
+    "label": "Add foreign key \"challengeEntry_storyId_fkey\" on \"challengeEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "foreignKey",
+        "name": "challengeEntry_storyId_fkey",
+        "table": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"challengeEntry_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "challengeEntry_storyId_fkey",
+          "challenges",
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"challengeEntry_storyId_fkey\"",
+        "sql": "ALTER TABLE \"challenges\".\"challengeEntry\"\nADD CONSTRAINT \"challengeEntry_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"challengeEntry_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "challengeEntry_storyId_fkey",
+          "challenges",
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.broadcastChannel.broadcastChannel_authorId_fkey",
+    "label": "Add foreign key \"broadcastChannel_authorId_fkey\" on \"broadcastChannel\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "foreignKey",
+        "name": "broadcastChannel_authorId_fkey",
+        "table": "broadcastChannel"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"broadcastChannel_authorId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "broadcastChannel_authorId_fkey",
+          "channels",
+          "\"channels\".\"broadcastChannel\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"broadcastChannel_authorId_fkey\"",
+        "sql": "ALTER TABLE \"channels\".\"broadcastChannel\"\nADD CONSTRAINT \"broadcastChannel_authorId_fkey\"\nFOREIGN KEY (\"authorId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"broadcastChannel_authorId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "broadcastChannel_authorId_fkey",
+          "channels",
+          "\"channels\".\"broadcastChannel\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.channelPost.channelPost_channelId_fkey",
+    "label": "Add foreign key \"channelPost_channelId_fkey\" on \"channelPost\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "foreignKey",
+        "name": "channelPost_channelId_fkey",
+        "table": "channelPost"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"channelPost_channelId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "channelPost_channelId_fkey",
+          "channels",
+          "\"channels\".\"channelPost\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"channelPost_channelId_fkey\"",
+        "sql": "ALTER TABLE \"channels\".\"channelPost\"\nADD CONSTRAINT \"channelPost_channelId_fkey\"\nFOREIGN KEY (\"channelId\")\nREFERENCES \"channels\".\"broadcastChannel\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"channelPost_channelId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "channelPost_channelId_fkey",
+          "channels",
+          "\"channels\".\"channelPost\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.channelSubscriber.channelSubscriber_channelId_fkey",
+    "label": "Add foreign key \"channelSubscriber_channelId_fkey\" on \"channelSubscriber\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "foreignKey",
+        "name": "channelSubscriber_channelId_fkey",
+        "table": "channelSubscriber"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"channelSubscriber_channelId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "channelSubscriber_channelId_fkey",
+          "channels",
+          "\"channels\".\"channelSubscriber\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"channelSubscriber_channelId_fkey\"",
+        "sql": "ALTER TABLE \"channels\".\"channelSubscriber\"\nADD CONSTRAINT \"channelSubscriber_channelId_fkey\"\nFOREIGN KEY (\"channelId\")\nREFERENCES \"channels\".\"broadcastChannel\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"channelSubscriber_channelId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "channelSubscriber_channelId_fkey",
+          "channels",
+          "\"channels\".\"channelSubscriber\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.channelSubscriber.channelSubscriber_userId_fkey",
+    "label": "Add foreign key \"channelSubscriber_userId_fkey\" on \"channelSubscriber\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "foreignKey",
+        "name": "channelSubscriber_userId_fkey",
+        "table": "channelSubscriber"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"channelSubscriber_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "channelSubscriber_userId_fkey",
+          "channels",
+          "\"channels\".\"channelSubscriber\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"channelSubscriber_userId_fkey\"",
+        "sql": "ALTER TABLE \"channels\".\"channelSubscriber\"\nADD CONSTRAINT \"channelSubscriber_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"channelSubscriber_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "channelSubscriber_userId_fkey",
+          "channels",
+          "\"channels\".\"channelSubscriber\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.bookClub.bookClub_creatorId_fkey",
+    "label": "Add foreign key \"bookClub_creatorId_fkey\" on \"bookClub\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "foreignKey",
+        "name": "bookClub_creatorId_fkey",
+        "table": "bookClub"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"bookClub_creatorId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "bookClub_creatorId_fkey",
+          "clubs",
+          "\"clubs\".\"bookClub\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"bookClub_creatorId_fkey\"",
+        "sql": "ALTER TABLE \"clubs\".\"bookClub\"\nADD CONSTRAINT \"bookClub_creatorId_fkey\"\nFOREIGN KEY (\"creatorId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"bookClub_creatorId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "bookClub_creatorId_fkey",
+          "clubs",
+          "\"clubs\".\"bookClub\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.clubMembership.clubMembership_clubId_fkey",
+    "label": "Add foreign key \"clubMembership_clubId_fkey\" on \"clubMembership\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "foreignKey",
+        "name": "clubMembership_clubId_fkey",
+        "table": "clubMembership"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"clubMembership_clubId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "clubMembership_clubId_fkey",
+          "clubs",
+          "\"clubs\".\"clubMembership\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"clubMembership_clubId_fkey\"",
+        "sql": "ALTER TABLE \"clubs\".\"clubMembership\"\nADD CONSTRAINT \"clubMembership_clubId_fkey\"\nFOREIGN KEY (\"clubId\")\nREFERENCES \"clubs\".\"bookClub\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"clubMembership_clubId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "clubMembership_clubId_fkey",
+          "clubs",
+          "\"clubs\".\"clubMembership\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.clubMembership.clubMembership_userId_fkey",
+    "label": "Add foreign key \"clubMembership_userId_fkey\" on \"clubMembership\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "foreignKey",
+        "name": "clubMembership_userId_fkey",
+        "table": "clubMembership"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"clubMembership_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "clubMembership_userId_fkey",
+          "clubs",
+          "\"clubs\".\"clubMembership\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"clubMembership_userId_fkey\"",
+        "sql": "ALTER TABLE \"clubs\".\"clubMembership\"\nADD CONSTRAINT \"clubMembership_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"clubMembership_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "clubMembership_userId_fkey",
+          "clubs",
+          "\"clubs\".\"clubMembership\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chapter.chapter_storyId_fkey",
+    "label": "Add foreign key \"chapter_storyId_fkey\" on \"chapter\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "foreignKey",
+        "name": "chapter_storyId_fkey",
+        "table": "chapter"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chapter_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapter_storyId_fkey",
+          "content",
+          "\"content\".\"chapter\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chapter_storyId_fkey\"",
+        "sql": "ALTER TABLE \"content\".\"chapter\"\nADD CONSTRAINT \"chapter_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chapter_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapter_storyId_fkey",
+          "content",
+          "\"content\".\"chapter\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.multimedia.multimedia_chapterId_fkey",
+    "label": "Add foreign key \"multimedia_chapterId_fkey\" on \"multimedia\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "foreignKey",
+        "name": "multimedia_chapterId_fkey",
+        "table": "multimedia"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"multimedia_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "multimedia_chapterId_fkey",
+          "content",
+          "\"content\".\"multimedia\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"multimedia_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"content\".\"multimedia\"\nADD CONSTRAINT \"multimedia_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"multimedia_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "multimedia_chapterId_fkey",
+          "content",
+          "\"content\".\"multimedia\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.story.story_authorId_fkey",
+    "label": "Add foreign key \"story_authorId_fkey\" on \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "foreignKey",
+        "name": "story_authorId_fkey",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"story_authorId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "story_authorId_fkey",
+          "content",
+          "\"content\".\"story\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"story_authorId_fkey\"",
+        "sql": "ALTER TABLE \"content\".\"story\"\nADD CONSTRAINT \"story_authorId_fkey\"\nFOREIGN KEY (\"authorId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"story_authorId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "story_authorId_fkey",
+          "content",
+          "\"content\".\"story\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.storyGenre.storyGenre_storyId_fkey",
+    "label": "Add foreign key \"storyGenre_storyId_fkey\" on \"storyGenre\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "foreignKey",
+        "name": "storyGenre_storyId_fkey",
+        "table": "storyGenre"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"storyGenre_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyGenre_storyId_fkey",
+          "content",
+          "\"content\".\"storyGenre\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"storyGenre_storyId_fkey\"",
+        "sql": "ALTER TABLE \"content\".\"storyGenre\"\nADD CONSTRAINT \"storyGenre_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"storyGenre_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyGenre_storyId_fkey",
+          "content",
+          "\"content\".\"storyGenre\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.storyGenre.storyGenre_genreId_fkey",
+    "label": "Add foreign key \"storyGenre_genreId_fkey\" on \"storyGenre\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "foreignKey",
+        "name": "storyGenre_genreId_fkey",
+        "table": "storyGenre"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"storyGenre_genreId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyGenre_genreId_fkey",
+          "content",
+          "\"content\".\"storyGenre\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"storyGenre_genreId_fkey\"",
+        "sql": "ALTER TABLE \"content\".\"storyGenre\"\nADD CONSTRAINT \"storyGenre_genreId_fkey\"\nFOREIGN KEY (\"genreId\")\nREFERENCES \"content\".\"genre\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"storyGenre_genreId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyGenre_genreId_fkey",
+          "content",
+          "\"content\".\"storyGenre\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.comment.comment_userId_fkey",
+    "label": "Add foreign key \"comment_userId_fkey\" on \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "comment_userId_fkey",
+        "table": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"comment_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "comment_userId_fkey",
+          "engagement",
+          "\"engagement\".\"comment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"comment_userId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"comment\"\nADD CONSTRAINT \"comment_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"comment_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "comment_userId_fkey",
+          "engagement",
+          "\"engagement\".\"comment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.comment.comment_storyId_fkey",
+    "label": "Add foreign key \"comment_storyId_fkey\" on \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "comment_storyId_fkey",
+        "table": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"comment_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "comment_storyId_fkey",
+          "engagement",
+          "\"engagement\".\"comment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"comment_storyId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"comment\"\nADD CONSTRAINT \"comment_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"comment_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "comment_storyId_fkey",
+          "engagement",
+          "\"engagement\".\"comment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.comment.comment_chapterId_fkey",
+    "label": "Add foreign key \"comment_chapterId_fkey\" on \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "comment_chapterId_fkey",
+        "table": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"comment_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "comment_chapterId_fkey",
+          "engagement",
+          "\"engagement\".\"comment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"comment_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"comment\"\nADD CONSTRAINT \"comment_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"comment_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "comment_chapterId_fkey",
+          "engagement",
+          "\"engagement\".\"comment\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.rating.rating_userId_fkey",
+    "label": "Add foreign key \"rating_userId_fkey\" on \"rating\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "rating_userId_fkey",
+        "table": "rating"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"rating_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "rating_userId_fkey",
+          "engagement",
+          "\"engagement\".\"rating\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"rating_userId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"rating\"\nADD CONSTRAINT \"rating_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"rating_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "rating_userId_fkey",
+          "engagement",
+          "\"engagement\".\"rating\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.rating.rating_storyId_fkey",
+    "label": "Add foreign key \"rating_storyId_fkey\" on \"rating\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "rating_storyId_fkey",
+        "table": "rating"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"rating_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "rating_storyId_fkey",
+          "engagement",
+          "\"engagement\".\"rating\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"rating_storyId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"rating\"\nADD CONSTRAINT \"rating_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"rating_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "rating_storyId_fkey",
+          "engagement",
+          "\"engagement\".\"rating\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.readingHistory.readingHistory_userId_fkey",
+    "label": "Add foreign key \"readingHistory_userId_fkey\" on \"readingHistory\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "readingHistory_userId_fkey",
+        "table": "readingHistory"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"readingHistory_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "readingHistory_userId_fkey",
+          "engagement",
+          "\"engagement\".\"readingHistory\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"readingHistory_userId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"readingHistory\"\nADD CONSTRAINT \"readingHistory_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"readingHistory_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "readingHistory_userId_fkey",
+          "engagement",
+          "\"engagement\".\"readingHistory\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.readingHistory.readingHistory_storyId_fkey",
+    "label": "Add foreign key \"readingHistory_storyId_fkey\" on \"readingHistory\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "readingHistory_storyId_fkey",
+        "table": "readingHistory"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"readingHistory_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "readingHistory_storyId_fkey",
+          "engagement",
+          "\"engagement\".\"readingHistory\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"readingHistory_storyId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"readingHistory\"\nADD CONSTRAINT \"readingHistory_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"readingHistory_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "readingHistory_storyId_fkey",
+          "engagement",
+          "\"engagement\".\"readingHistory\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.readingHistory.readingHistory_chapterId_fkey",
+    "label": "Add foreign key \"readingHistory_chapterId_fkey\" on \"readingHistory\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "readingHistory_chapterId_fkey",
+        "table": "readingHistory"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"readingHistory_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "readingHistory_chapterId_fkey",
+          "engagement",
+          "\"engagement\".\"readingHistory\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"readingHistory_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"readingHistory\"\nADD CONSTRAINT \"readingHistory_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"readingHistory_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "readingHistory_chapterId_fkey",
+          "engagement",
+          "\"engagement\".\"readingHistory\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.userBadge.userBadge_userId_fkey",
+    "label": "Add foreign key \"userBadge_userId_fkey\" on \"userBadge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "foreignKey",
+        "name": "userBadge_userId_fkey",
+        "table": "userBadge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"userBadge_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "userBadge_userId_fkey",
+          "gamification",
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"userBadge_userId_fkey\"",
+        "sql": "ALTER TABLE \"gamification\".\"userBadge\"\nADD CONSTRAINT \"userBadge_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"userBadge_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "userBadge_userId_fkey",
+          "gamification",
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.userBadge.userBadge_badgeId_fkey",
+    "label": "Add foreign key \"userBadge_badgeId_fkey\" on \"userBadge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "foreignKey",
+        "name": "userBadge_badgeId_fkey",
+        "table": "userBadge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"userBadge_badgeId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "userBadge_badgeId_fkey",
+          "gamification",
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"userBadge_badgeId_fkey\"",
+        "sql": "ALTER TABLE \"gamification\".\"userBadge\"\nADD CONSTRAINT \"userBadge_badgeId_fkey\"\nFOREIGN KEY (\"badgeId\")\nREFERENCES \"gamification\".\"badge\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"userBadge_badgeId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "userBadge_badgeId_fkey",
+          "gamification",
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.libraryEntry.libraryEntry_userId_fkey",
+    "label": "Add foreign key \"libraryEntry_userId_fkey\" on \"libraryEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "library",
+        "objectType": "foreignKey",
+        "name": "libraryEntry_userId_fkey",
+        "table": "libraryEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"libraryEntry_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "libraryEntry_userId_fkey",
+          "library",
+          "\"library\".\"libraryEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"libraryEntry_userId_fkey\"",
+        "sql": "ALTER TABLE \"library\".\"libraryEntry\"\nADD CONSTRAINT \"libraryEntry_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"libraryEntry_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "libraryEntry_userId_fkey",
+          "library",
+          "\"library\".\"libraryEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.libraryEntry.libraryEntry_storyId_fkey",
+    "label": "Add foreign key \"libraryEntry_storyId_fkey\" on \"libraryEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "library",
+        "objectType": "foreignKey",
+        "name": "libraryEntry_storyId_fkey",
+        "table": "libraryEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"libraryEntry_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "libraryEntry_storyId_fkey",
+          "library",
+          "\"library\".\"libraryEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"libraryEntry_storyId_fkey\"",
+        "sql": "ALTER TABLE \"library\".\"libraryEntry\"\nADD CONSTRAINT \"libraryEntry_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"libraryEntry_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "libraryEntry_storyId_fkey",
+          "library",
+          "\"library\".\"libraryEntry\""
+        ]
+      }
+    ]
+  }
+]

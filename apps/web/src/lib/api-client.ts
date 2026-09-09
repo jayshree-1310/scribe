@@ -6,6 +6,8 @@
  * message that is safe to show a person.
  */
 
+import { getAccessToken } from './access-token'
+
 /** Error envelope returned by the API (`apps/api/src/lib/http-error.ts`). */
 interface ApiErrorBody {
   error?: {
@@ -114,13 +116,23 @@ export async function request<T>(
 
   let response: Response
   try {
+    const accessToken = getAccessToken()
+
     response = await fetch(buildUrl(path, query), {
       method,
       headers: {
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        // Attached here rather than per call site, so no request can forget it.
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...headers,
       },
       body: body === undefined ? undefined : JSON.stringify(body),
+      /**
+       * The refresh token is an HttpOnly cookie. Same-origin is the default,
+       * and the dev server proxies `/api`, but a deployed build pointed at
+       * another origin via `VITE_API_URL` needs this to send it at all.
+       */
+      credentials: 'include',
       signal: composed,
     })
   } catch (cause) {

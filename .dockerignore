@@ -1,0 +1,51 @@
+# The build context is the repository root for every image here (the pnpm
+# lockfile and workspace manifest live there).
+
+# Installed in the image, never copied in: host node_modules are built for the
+# host platform and would shadow the image's own tree.
+node_modules
+**/node_modules
+
+# Build output and caches
+dist
+build
+**/dist
+**/build
+.turbo
+**/.turbo
+coverage
+**/coverage
+
+# Secrets: real values are injected by Compose/env_file at run time.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+.git
+.github
+.gitignore
+docs
+README.md
+**/*.md
+!apps/api/prisma-next.md
+
+# Editor / agent scratch
+.vscode
+.idea
+.cursor
+.claude
+.agents
+.devin
+**/.cursor
+**/.claude
+**/.agents
+**/.devin
+
+# Docker's own files
+Dockerfile
+**/Dockerfile
+.dockerignore
+docker-compose*.yml

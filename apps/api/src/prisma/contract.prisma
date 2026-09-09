@@ -30,7 +30,24 @@ namespace auth {
     id        String   @id @default(uuid())
     username  String   @unique
     email     String   @unique
-    passwordHash String
+
+    /// Null for accounts that only ever signed in with Google, which have no
+    /// password to hash. Password login must therefore treat a null hash as
+    /// "this account cannot be signed into that way".
+    passwordHash String?
+
+    /// Google's `sub` claim: stable for the life of the account, unlike the
+    /// email, which can be reassigned. This is the anchor for matching a
+    /// returning Google user.
+    googleId      String? @unique
+    /// True only when the identity provider asserted it. Password signups have
+    /// no verification flow yet, so they stay false.
+    emailVerified Boolean @default(false)
+
+    /// Supplied by Google (`name` / `picture`); absent for password signups,
+    /// where the UI falls back to the username.
+    displayName String?
+    avatarUrl   String?
 
     isAuthor      Boolean @default(false)
     readingStreak Int     @default(0)

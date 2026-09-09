@@ -9,7 +9,27 @@ import {
   type OnboardingAnswers,
 } from '../../lib/auth'
 import { db } from '../../data/api'
+import { signInWithGoogleIdToken, type AuthUser } from '../../data/auth-api'
+import { requestGoogleIdToken } from '../../lib/google-identity'
 import type { Session, User } from '../../types/domain'
+
+/**
+ * Widens the account the API returns into the profile shape the UI renders.
+ *
+ * The API owns identity — id, username, email, display name — while the
+ * presentational fields (hue, counts, stats) still come from the mock profile,
+ * because no profile endpoint exists yet. This mirrors what `signIn` and
+ * `register` already do, so all three paths produce the same shape.
+ */
+function toUser(account: AuthUser): User {
+  return {
+    ...db.currentUser,
+    id: account.id,
+    username: account.username,
+    email: account.email,
+    displayName: account.displayName ?? account.username,
+  }
+}
 
 function readStoredSession(): Session | null {
   try {
@@ -106,11 +126,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [start],
   )
 
+  /**
+   * Real Google sign-in: Google identifies the visitor in the browser, the API
+   * verifies the resulting ID token against Google's keys, and the session it
+   * issues is indistinguishable from a password login's.
+   *
+   * Takes no arguments, as before, so the sign-in and register pages calling it
+   * are unchanged. A brand-new account lands in onboarding, matching
+   * `register`, while a returning one goes straight in.
+   */
   const signInWithGoogle = useCallback(async () => {
-    await wait(900)
-    const user = db.currentUser
-    start(user, true)
-    return user
+    const idToken = await requestGoogleIdToken()
+    const { user: account, created } = await signInWithGoogleIdToken(idToken)
+
+    const user = toUser(account)
+    start(user, !created)
+    return { user, created }
   }, [start])
 
   const completeOnboarding = useCallback((answers: OnboardingAnswers) => {

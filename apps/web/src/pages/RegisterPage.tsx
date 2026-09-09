@@ -89,10 +89,14 @@ export function RegisterPage() {
   async function onGoogle() {
     setGooglePending(true)
     try {
-      await signInWithGoogle()
-      navigate('/onboarding', { replace: true })
-    } catch {
-      setFormError('Google sign-up did not complete. Please try again.')
+      const { created } = await signInWithGoogle()
+      navigate(created ? '/onboarding' : '/home', { replace: true })
+    } catch (error) {
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : 'Google sign-up did not complete. Please try again.',
+      )
     } finally {
       setGooglePending(false)
     }

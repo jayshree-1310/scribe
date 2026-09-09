@@ -10,6 +10,7 @@ import {
   createRefreshToken,
   verifyRefreshToken,
 } from "../lib/jwt.js";
+import { verifyGoogleIdToken } from "../lib/google.js";
 import { redis } from "../lib/redis.js";
 import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
 
@@ -287,7 +288,7 @@ async function storeSession(
 
 /* Rate limiting --------------------------------------------------------- */
 
-type RateLimitScope = "signup" | "login" | "refresh" | "logout";
+type RateLimitScope = "signup" | "login" | "refresh" | "logout" | "google";
 
 /**
  * `req.ip` reports IPv4 callers as IPv4-mapped IPv6 (`::ffff:127.0.0.1`) on a
@@ -456,11 +457,16 @@ router.post("/login", async (req, res) => {
 
   const user = await db.orm.auth.User.where((u) => u.email.eq(email)).first();
 
-  // Verifying a dummy hash for an unknown email keeps the two failures
-  // indistinguishable in both timing and response.
-  const passwordValid = user
-    ? await argon2.verify(user.passwordHash, password)
-    : (await argon2.verify(DUMMY_PASSWORD_HASH, password), false);
+  /**
+   * Verifying a dummy hash keeps an unknown email indistinguishable from a
+   * known one, in both timing and response. A *null* hash takes the same path:
+   * a Google-only account has no password, and saying so would confirm the
+   * address is registered.
+   */
+  const passwordValid =
+    user && user.passwordHash !== null
+      ? await argon2.verify(user.passwordHash, password)
+      : (await argon2.verify(DUMMY_PASSWORD_HASH, password), false);
 
   if (!user || !passwordValid) {
     await chargeRateLimit(req, "login");
@@ -629,6 +635,167 @@ router.post("/logout-all", async (req, res) => {
   res.status(200).json({
     message: "Signed out of all sessions",
     revoked,
+  });
+});
+
+/* Google sign-in --------------------------------------------------------- */
+
+const googleSchema = z.object({
+  idToken: z.string().min(1).max(4096),
+});
+
+/**
+ * Google supplies a name and an email, never a username, but ours is required
+ * and unique. Derive a candidate from the email's local part, fall back to the
+ * name, and fall back again to a generic stem — then let the caller retry with
+ * a fresh suffix if the unique index objects.
+ */
+function deriveUsername(identity: {
+  email: string;
+  name: string | null;
+}): string {
+  const source = identity.email.split("@")[0] ?? identity.name ?? "reader";
+
+  const base = source
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, "")
+    .slice(0, 16);
+
+  // The suffix keeps derived names from colliding constantly, and keeps one
+  // user's email local part from being guessable as another's username.
+  const suffix = randomBytes(3).toString("hex");
+
+  return `${base.length >= 3 ? base : "reader"}_${suffix}`;
+}
+
+/**
+ * Exchanges a Google ID token for one of our sessions.
+ *
+ * The token is verified against Google's keys with our client id as the
+ * audience, so a token minted for another application — validly signed by
+ * Google — is refused. On success this issues exactly what `/login` issues, so
+ * everything downstream (rotation, replay detection, revocation) behaves
+ * identically regardless of how the user signed in.
+ */
+router.post("/google", async (req, res) => {
+  await assertWithinRateLimit(req, "google", 20);
+  await chargeRateLimit(req, "google");
+
+  const { idToken } = parseOrThrow(googleSchema, req.body);
+
+  const identity = await verifyGoogleIdToken(idToken);
+
+  if (!identity) {
+    throw HttpError.unauthorized("Google sign-in failed. Please try again.");
+  }
+
+  /**
+   * An unverified address must not be trusted: it is what makes matching an
+   * existing account by email safe at all.
+   */
+  if (!identity.emailVerified) {
+    throw HttpError.unauthorized(
+      "Your Google email address is not verified.",
+    );
+  }
+
+  let user = await db.orm.auth.User.where((u) =>
+    u.googleId.eq(identity.googleId),
+  ).first();
+
+  /** Lets the client route a brand-new account into onboarding. */
+  let created = false;
+
+  if (user) {
+    // Keep the profile fields fresh, but never overwrite a name the user set.
+    await db.orm.auth.User.where((u) => u.id.eq(user!.id)).update({
+      displayName: user.displayName ?? identity.name,
+      avatarUrl: identity.picture,
+      emailVerified: true,
+    });
+  } else {
+    const byEmail = await db.orm.auth.User.where((u) =>
+      u.email.eq(identity.email),
+    ).first();
+
+    if (byEmail) {
+      /**
+       * Same address, no Google link yet: adopt it. Safe only because Google
+       * asserted the address is verified.
+       *
+       * Existing sessions are revoked as a precaution. If this account was
+       * created by someone squatting the address before its owner arrived,
+       * their sessions die here.
+       */
+      await db.orm.auth.User.where((u) => u.id.eq(byEmail.id)).update({
+        googleId: identity.googleId,
+        displayName: byEmail.displayName ?? identity.name,
+        avatarUrl: byEmail.avatarUrl ?? identity.picture,
+        emailVerified: true,
+      });
+
+      await revokeAllSessions(byEmail.id);
+
+      user = await db.orm.auth.User.where((u) => u.id.eq(byEmail.id)).first();
+    } else {
+      // Retry on a username collision: the unique index is the arbiter, and a
+      // derived name can lose a race with another signup.
+      for (let attempt = 0; attempt < 5 && !user; attempt += 1) {
+        try {
+          created = true;
+          user = await db.orm.auth.User.create({
+            username: deriveUsername(identity),
+            email: identity.email,
+            passwordHash: null,
+            googleId: identity.googleId,
+            displayName: identity.name,
+            avatarUrl: identity.picture,
+            emailVerified: true,
+          });
+        } catch (error) {
+          const isConflict =
+            error instanceof Error &&
+            "sqlState" in error &&
+            (error as { sqlState?: string }).sqlState === "23505";
+
+          if (!isConflict) throw error;
+
+          // A concurrent request may have created this exact Google user.
+          created = false;
+          user = await db.orm.auth.User.where((u) =>
+            u.googleId.eq(identity.googleId),
+          ).first();
+        }
+      }
+    }
+  }
+
+  if (!user) {
+    throw new HttpError(
+      500,
+      "internal_error",
+      "Could not create your account. Please try again.",
+    );
+  }
+
+  const accessToken = await issueSession(
+    res,
+    user.id,
+    randomBytes(32).toString("hex"),
+    Date.now() + ABSOLUTE_SESSION_TTL_SECONDS * 1000,
+  );
+
+  res.status(200).json({
+    message: "Login successful",
+    accessToken,
+    created,
+    user: {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+    },
   });
 });
 
