@@ -78,6 +78,33 @@ export function BookDetailPage() {
     setShelf({ id: loadedId, status: next })
   }
 
+  /**
+   * A local copy of the related books, so shelving one from the rail updates
+   * that card immediately. `source` tracks which response the copy came from,
+   * so a fresh load replaces it while local edits survive re-renders.
+   */
+  const [relatedBooks, setRelatedBooks] = useState<{
+    source: Book[]
+    books: Book[]
+  } | null>(null)
+
+  if (related.status === 'ready' && related.data && relatedBooks?.source !== related.data) {
+    setRelatedBooks({ source: related.data, books: related.data })
+  }
+
+  function setRelatedStatus(bookId: string, next: ReadingStatus | null): void {
+    setRelatedBooks((current) =>
+      current === null
+        ? current
+        : {
+            ...current,
+            books: current.books.map((book) =>
+              book.id === bookId ? { ...book, libraryStatus: next } : book,
+            ),
+          },
+    )
+  }
+
   if (book.status === 'loading') {
     return (
       <AppShell>
@@ -103,7 +130,7 @@ export function BookDetailPage() {
             icon="book"
             title="We couldn't find that book"
             description="It may have been removed from the catalogue."
-            action={<ButtonLink to="/books">Back to books</ButtonLink>}
+            action={<ButtonLink to="/discover">Back to Discover</ButtonLink>}
           />
         ) : (
           <ErrorState message={book.error} onRetry={book.reload} />
@@ -117,7 +144,7 @@ export function BookDetailPage() {
   return (
     <AppShell>
       <nav className="crumbs" aria-label="Breadcrumb">
-        <Link to="/books">Books</Link>
+        <Link to="/discover">Books</Link>
         <Icon name="chevron-right" size="0.85em" />
         <span aria-current="page">{current.title}</span>
       </nav>
@@ -179,7 +206,7 @@ export function BookDetailPage() {
                   key={genre.id}
                   className="chip chip--genre chip--sm"
                   style={genreChipStyle(genre.hue) as CSSProperties}
-                  to={`/books?genre=${genre.id}`}
+                  to={`/discover?genre=${genre.id}`}
                 >
                   {genre.name}
                 </Link>
@@ -235,10 +262,14 @@ export function BookDetailPage() {
           </div>
         ) : related.status === 'error' ? (
           <ErrorState message={related.error} onRetry={related.reload} />
-        ) : related.data && related.data.length > 0 ? (
+        ) : relatedBooks && relatedBooks.books.length > 0 ? (
           <div className="rail__track">
-            {related.data.map((item) => (
-              <BookCard key={item.id} book={item} />
+            {relatedBooks.books.map((item) => (
+              <BookCard
+                key={item.id}
+                book={item}
+                onShelfChange={(next) => setRelatedStatus(item.id, next)}
+              />
             ))}
           </div>
         ) : (

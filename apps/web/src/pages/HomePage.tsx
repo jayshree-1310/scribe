@@ -1,39 +1,103 @@
+import { useState } from 'react'
 import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../lib/auth'
 import { formatCount, formatMinutes } from '../lib/format'
 import * as api from '../data/api'
+import * as books from '../data/books-api'
+import type { Book, Discover } from '../types/books'
 import { AppShell } from '../components/layout/AppShell'
 import { ButtonLink } from '../components/ui/Button'
 import { SectionHead } from '../components/ui/Card'
 import { Icon } from '../components/ui/Icon'
 import { EmptyState, ErrorState } from '../components/ui/States'
 import { ProgressBar } from '../components/ui/Progress'
-import { ContinueCard } from '../components/story/ContinueCard'
-import { StoryCard, StoryCardSkeleton } from '../components/story/StoryCard'
+import { BookCard, BookCardSkeleton } from '../components/books/BookCard'
 import { StoryShelf } from '../components/story/StoryShelf'
 import { ChallengeCard, ClubCard } from '../components/story/Cards'
 import './pages.css'
+import '../components/books/books.css'
 
 const WEEKLY_GOAL_MINUTES = 400
 
 export function HomePage() {
   const { session } = useAuth()
-  const favourites = session?.favoriteGenreIds ?? []
 
-  const continuing = useAsync(() => api.getContinueReading(4), [])
-  const recommended = useAsync(() => api.getRecommendedStories(favourites, 10), [favourites.join(',')])
-  const trending = useAsync(() => api.getTrendingStories(10), [])
+  // Books come from the catalogue API; clubs and challenges are still the
+  // mock data layer, which is a separate feature from the book shelves.
+  const discover = useAsync(() => books.getDiscover(), [])
+  const reading = useAsync(() => books.getLibrary({ status: 'READING' }), [])
   const clubs = useAsync(() => api.getClubs(), [])
   const challenges = useAsync(() => api.getChallenges(), [])
+
+  /**
+   * A local copy of the rails, so shelving a book updates its card straight
+   * away instead of waiting for a refetch. `source` records which response the
+   * copy came from, so a fresh load replaces it while edits survive renders.
+   */
+  const [rails, setRails] = useState<{
+    source: Discover
+    trending: Book[]
+    recommended: Book[]
+  } | null>(null)
+
+  if (discover.status === 'ready' && discover.data && rails?.source !== discover.data) {
+    setRails({
+      source: discover.data,
+      trending: discover.data.trending,
+      recommended: discover.data.recommended,
+    })
+  }
+
+  /** Reflects a shelf change on every rail the book appears in. */
+  function applyShelfChange(bookId: string, status: Book['libraryStatus']): void {
+    const update = (list: Book[]) =>
+      list.map((book) => (book.id === bookId ? { ...book, libraryStatus: status } : book))
+
+    setRails((current) =>
+      current === null
+        ? current
+        : {
+            ...current,
+            trending: update(current.trending),
+            recommended: update(current.recommended),
+          },
+    )
+
+    // The "currently reading" shelf is defined by status, so it has to reload.
+    reading.reload()
+  }
 
   const user = session?.user
   const firstName = user?.displayName.split(' ')[0] ?? 'there'
   const streak = user?.stats.readingStreakDays ?? 0
   const minutes = user?.stats.minutesReadThisWeek ?? 0
 
+  const inProgress = reading.data?.items ?? []
   const myClubs = clubs.data?.filter((club) => club.membership !== null) ?? []
   const suggestedClubs = clubs.data?.filter((club) => club.membership === null) ?? []
   const activeChallenges = challenges.data?.filter((item) => item.state === 'active') ?? []
+
+  /** Rail body: skeletons while loading, cards once there are any. */
+  function rail(label: string, items: Book[] | undefined) {
+    return (
+      <StoryShelf label={label}>
+        {items === undefined
+          ? Array.from({ length: 6 }, (_, index) => (
+              <li key={index}>
+                <BookCardSkeleton />
+              </li>
+            ))
+          : items.map((book) => (
+              <li key={book.id}>
+                <BookCard
+                  book={book}
+                  onShelfChange={(status) => applyShelfChange(book.id, status)}
+                />
+              </li>
+            ))}
+      </StoryShelf>
+    )
+  }
 
   return (
     <AppShell>
@@ -42,13 +106,13 @@ export function HomePage() {
         <div>
           <h1 className="page-head__title">Good to see you, {firstName}.</h1>
           <p className="page-head__sub">
-            {continuing.data?.length
-              ? `You have ${continuing.data.length} ${continuing.data.length === 1 ? 'story' : 'stories'} on the go.`
+            {inProgress.length
+              ? `You have ${inProgress.length} ${inProgress.length === 1 ? 'book' : 'books'} on the go.`
               : 'Nothing in progress — a good moment to start something.'}
           </p>
         </div>
         <ButtonLink to="/discover" variant="secondary" startIcon={<Icon name="compass" size="1em" />}>
-          Discover stories
+          Discover books
         </ButtonLink>
       </header>
 
@@ -83,90 +147,69 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* Continue reading ----------------------------------------------- */}
+      {/* Currently reading ---------------------------------------------- */}
       <section className="page-section">
-        <SectionHead title="Continue reading" to="/library" linkLabel="My library" />
+        <SectionHead title="Currently reading" to="/library" linkLabel="My library" />
 
-        {continuing.status === 'error' ? (
-          <ErrorState message={continuing.error} onRetry={continuing.reload} />
-        ) : continuing.status === 'loading' ? (
+        {reading.status === 'error' ? (
+          <ErrorState message={reading.error} onRetry={reading.reload} />
+        ) : reading.status === 'loading' ? (
           <div className="card-grid card-grid--wide">
             {Array.from({ length: 2 }, (_, index) => (
-              <div className="card card--padded" key={index}>
-                <StoryCardSkeleton variant="row" />
-              </div>
+              <BookCardSkeleton key={index} variant="row" />
             ))}
           </div>
-        ) : continuing.data?.length === 0 ? (
+        ) : inProgress.length === 0 ? (
           <EmptyState
             icon="book-open"
             size="sm"
-            title="No stories in progress"
-            description="Start one and it will appear here with your place saved."
+            title="No books in progress"
+            description="Move a book to your Reading shelf and it will be waiting here."
             action={
               <ButtonLink variant="primary" to="/discover">
-                Find a story
+                Find a book
               </ButtonLink>
             }
           />
         ) : (
           <div className="card-grid card-grid--wide">
-            {continuing.data?.map((entry) => (
-              <ContinueCard key={entry.history.id} entry={entry} />
+            {inProgress.slice(0, 4).map((entry) => (
+              <BookCard
+                key={entry.id}
+                book={entry.book}
+                variant="row"
+                onShelfChange={() => reading.reload()}
+              />
             ))}
           </div>
         )}
       </section>
 
-      {/* Recommended ---------------------------------------------------- */}
+      {/* Highly rated ---------------------------------------------------- */}
       <section className="page-section">
         <SectionHead
-          title="Recommended for you"
-          subtitle="Based on the genres you follow."
-          to="/discover?sort=recommended"
+          title="Highly rated"
+          subtitle="The books readers finish and then recommend."
+          to="/discover?sort=top-rated"
         />
-        {recommended.status === 'error' ? (
-          <ErrorState message={recommended.error} onRetry={recommended.reload} />
+        {discover.status === 'error' ? (
+          <ErrorState message={discover.error} onRetry={discover.reload} />
         ) : (
-          <StoryShelf label="Recommended stories">
-            {recommended.status === 'loading'
-              ? Array.from({ length: 6 }, (_, index) => (
-                  <li key={index}>
-                    <StoryCardSkeleton />
-                  </li>
-                ))
-              : recommended.data?.map((story) => (
-                  <li key={story.id}>
-                    <StoryCard story={story} />
-                  </li>
-                ))}
-          </StoryShelf>
+          rail('Highly rated books', rails?.recommended)
         )}
       </section>
 
-      {/* Trending ------------------------------------------------------- */}
+      {/* Trending -------------------------------------------------------- */}
       <section className="page-section">
         <SectionHead
-          title="Trending stories"
+          title="Trending books"
           subtitle="Most read across Scribe this week."
           to="/discover?sort=trending"
         />
-        {trending.status === 'error' ? (
-          <ErrorState message={trending.error} onRetry={trending.reload} />
+        {discover.status === 'error' ? (
+          <ErrorState message={discover.error} onRetry={discover.reload} />
         ) : (
-          <StoryShelf label="Trending stories">
-            {trending.status === 'loading'
-              ? Array.from({ length: 6 }, (_, index) => (
-                  <li key={index}>
-                    <StoryCardSkeleton />
-                  </li>
-                ))
-              : trending.data?.map((story, index) => (
-                  <li key={story.id}>
-                    <StoryCard story={story} rank={index + 1} />
-                  </li>
-                ))}
-          </StoryShelf>
+          rail('Trending books', rails?.trending)
         )}
       </section>
 

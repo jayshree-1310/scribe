@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { db } from "./db.js";
 
 const users = await db.orm.auth.User
   .where((u) => u.username.eq("testuser"))

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import type { MouseEvent, ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 
 interface DropdownMenuProps {
@@ -8,13 +8,26 @@ interface DropdownMenuProps {
     'aria-expanded': boolean
     'aria-haspopup': 'menu'
     id: string
-    onClick: () => void
+    onClick: (event: MouseEvent<HTMLElement>) => void
   }) => ReactNode
   children: ReactNode
   align?: 'start' | 'end'
+  /**
+   * Preferred vertical side. The menu flips to the opposite side when the
+   * preferred one cannot fit it on screen, so it is a preference, not a
+   * guarantee.
+   */
+  side?: 'bottom' | 'top'
   /** Accessible name for the menu itself. */
   label: string
 }
+
+/**
+ * Roughly how tall a menu gets. Used to decide which side to open on before
+ * the menu exists to be measured — close enough for the choice, and cheaper
+ * than rendering it offscreen first.
+ */
+const ESTIMATED_MENU_HEIGHT = 260
 
 /**
  * Small menu popover. Closes on outside click, on Esc, and when a menu item is
@@ -24,11 +37,43 @@ export function DropdownMenu({
   trigger,
   children,
   align = 'end',
+  side = 'bottom',
   label,
 }: DropdownMenuProps) {
   const [open, setOpen] = useState(false)
+  const [placement, setPlacement] = useState<'bottom' | 'top'>(side)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerId = useId()
+
+  /**
+   * Chooses the side to open on from where the trigger currently sits. Decided
+   * here rather than after mounting so the menu never appears in one place and
+   * jumps to another.
+   */
+  function toggle(event: MouseEvent<HTMLElement>): void {
+    if (open) {
+      setOpen(false)
+      return
+    }
+
+    // Measured from the event's own target rather than a ref, so this reads
+    // nothing during render and describes the trigger itself.
+    const rect = event.currentTarget.getBoundingClientRect()
+    const room = {
+      bottom: window.innerHeight - rect.bottom,
+      top: rect.top,
+    }
+    const opposite = side === 'bottom' ? 'top' : 'bottom'
+
+    // Keep the caller's preference unless it cannot fit and the other side
+    // genuinely has more room.
+    setPlacement(
+      room[side] < ESTIMATED_MENU_HEIGHT && room[opposite] > room[side]
+        ? opposite
+        : side,
+    )
+    setOpen(true)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -56,12 +101,16 @@ export function DropdownMenu({
         'aria-expanded': open,
         'aria-haspopup': 'menu',
         id: triggerId,
-        onClick: () => setOpen((current) => !current),
+        onClick: toggle,
       })}
 
       {open ? (
         <div
-          className={cn('dropdown__menu', `dropdown__menu--${align}`)}
+          className={cn(
+            'dropdown__menu',
+            `dropdown__menu--${align}`,
+            `dropdown__menu--${placement}`,
+          )}
           role="menu"
           aria-label={label}
           onClick={() => setOpen(false)}

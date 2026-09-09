@@ -10,6 +10,7 @@ export type ErrorCode =
   | "unauthorized"
   | "not_found"
   | "conflict"
+  | "too_many_requests"
   | "route_not_found"
   | "invalid_json"
   | "payload_too_large"
@@ -30,6 +31,8 @@ export class HttpError extends Error {
   readonly status: number;
   readonly code: ErrorCode;
   readonly details?: ErrorDetails;
+  /** Seconds a throttled caller should wait, surfaced as `Retry-After`. */
+  retryAfterSeconds?: number;
 
   constructor(
     status: number,
@@ -50,6 +53,16 @@ export class HttpError extends Error {
 
   static unauthorized(message: string): HttpError {
     return new HttpError(401, "unauthorized", message);
+  }
+
+  /**
+   * Carries `Retry-After` seconds so the error handler is not the only place
+   * that knows how to answer a throttled caller.
+   */
+  static tooManyRequests(message: string, retryAfterSeconds: number): HttpError {
+    const error = new HttpError(429, "too_many_requests", message);
+    error.retryAfterSeconds = retryAfterSeconds;
+    return error;
   }
 
   static notFound(message: string): HttpError {

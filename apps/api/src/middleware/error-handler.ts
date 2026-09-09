@@ -45,6 +45,10 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
     if (error.status >= 500) log.error({ err: error }, "Request failed");
     else log.warn({ err: error, code: error.code }, "Request rejected");
 
+    if (error.retryAfterSeconds !== undefined) {
+      res.setHeader("Retry-After", String(error.retryAfterSeconds));
+    }
+
     res.status(error.status).json(error.toBody());
     return;
   }

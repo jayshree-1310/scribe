@@ -970,7 +970,6 @@ textarea.field__control {
 
 .dropdown__menu {
   position: absolute;
-  top: calc(100% + var(--space-2));
   z-index: 50;
   min-width: 12rem;
   padding: var(--space-2);
@@ -983,6 +982,14 @@ textarea.field__control {
 
 .dropdown__menu--end { right: 0; }
 .dropdown__menu--start { left: 0; }
+
+/* Vertical side, chosen by the component from the room around the trigger.
+   Each direction grows out of the trigger rather than toward it. */
+.dropdown__menu--bottom { top: calc(100% + var(--space-2)); }
+.dropdown__menu--top {
+  bottom: calc(100% + var(--space-2));
+  animation-name: menu-in-up;
+}
 
 .dropdown__item {
   display: flex;
@@ -1013,6 +1020,10 @@ textarea.field__control {
 
 @keyframes menu-in {
   from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+}
+
+@keyframes menu-in-up {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
 }
 
 /* Tooltip ---------------------------------------------------------------- */

@@ -5,26 +5,31 @@ import { HttpError } from "../lib/http-error.js";
  * The single seam through which the Books + Library feature learns who is
  * asking.
  *
- * Authentication is being built separately, so this file deliberately contains
- * no token logic of its own. It reads `req.user.id` — the property an auth
- * middleware conventionally populates — and falls back, outside production
- * only, to an `X-Scribe-User-Id` header so the feature is usable end to end
- * before that middleware exists.
+ * `authenticate` populates `req.user.id` from a bearer access token, and this
+ * reads it back. The `X-Scribe-User-Id` header remains as a local development
+ * convenience, because the web app has not been wired to the auth endpoints
+ * yet — but it now requires `ALLOW_DEV_USER_HEADER=true` to be set explicitly.
+ * Keying it off `NODE_ENV !== "production"` meant any environment that simply
+ * had not set NODE_ENV — a staging box, a CI runner, a container missing one
+ * env var — would impersonate any user on request.
  *
- * When the real middleware lands, mount it ahead of these routes and delete
- * the development fallback below. Nothing else in the feature changes.
+ * Delete the fallback, and the flag from `.env`, once the web app signs in for
+ * real.
  */
 
-/** Shape an auth middleware is expected to attach to the request. */
+/** Shape `authenticate` attaches to the request. */
 interface RequestWithUser extends Request {
   user?: { id?: string } | undefined;
 }
 
-/** Header honoured only outside production, standing in for a real session. */
+/** Header honoured only on explicit opt-in, standing in for a real session. */
 export const DEV_USER_HEADER = "x-scribe-user-id";
 
 function devFallbackEnabled(): boolean {
-  return process.env.NODE_ENV !== "production";
+  return (
+    process.env.NODE_ENV !== "production" &&
+    process.env.ALLOW_DEV_USER_HEADER === "true"
+  );
 }
 
 /**

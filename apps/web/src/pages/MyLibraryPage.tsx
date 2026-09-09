@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { cn } from '../lib/cn'
 import { useAsync } from '../hooks/useAsync'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatRelative } from '../lib/format'
@@ -9,6 +10,7 @@ import {
   READING_STATUS_LABELS,
   authorName,
   type LibraryEntry,
+  type LibraryView,
   type ReadingStatus,
 } from '../types/books'
 import { AppShell } from '../components/layout/AppShell'
@@ -95,8 +97,29 @@ export function MyLibraryPage() {
     [shelf, debouncedSearch],
   )
 
-  const counts = library.data?.counts
-  const items = library.data?.items ?? []
+  /**
+   * Hold on to the last shelf that loaded.
+   *
+   * `useAsync` drops back to `loading` with no data the moment the tab
+   * changes, which would blank the page to skeletons and snap back — a jarring
+   * flash for a request that usually takes a few dozen milliseconds. Keeping
+   * the previous shelf on screen, dimmed, means switching tabs reads as a
+   * settle rather than a jump. Updated during render, the way `useAsync`
+   * resets itself, so a superseded response can never be shown.
+   */
+  const requestKey = `${shelf}:${debouncedSearch.trim()}`
+  const [loaded, setLoaded] = useState<{ key: string; view: LibraryView } | null>(null)
+
+  if (library.status === 'ready' && library.data && loaded?.view !== library.data) {
+    setLoaded({ key: requestKey, view: library.data })
+  }
+
+  const view = library.data ?? loaded?.view ?? null
+  // Showing the previous shelf while the next one is in flight.
+  const isStale = library.status === 'loading' && view !== null
+
+  const counts = view?.counts
+  const items = view?.items ?? []
   const searching = debouncedSearch.trim().length > 0
 
   const tabs = READING_STATUSES.map((status) => ({
@@ -115,7 +138,7 @@ export function MyLibraryPage() {
             everything you've finished.
           </p>
         </div>
-        <ButtonLink to="/books" startIcon={<Icon name="plus" size="1em" />}>
+        <ButtonLink to="/discover" startIcon={<Icon name="plus" size="1em" />}>
           Find books
         </ButtonLink>
       </header>
@@ -135,7 +158,7 @@ export function MyLibraryPage() {
         </div>
       </div>
 
-      {library.status === 'loading' ? (
+      {library.status === 'loading' && view === null ? (
         <div className="shelf-list" aria-busy="true">
           {Array.from({ length: 4 }, (_, index) => (
             <BookCardSkeleton key={index} variant="row" />
@@ -160,11 +183,17 @@ export function MyLibraryPage() {
             icon="library"
             title={EMPTY_COPY[shelf].title}
             description={EMPTY_COPY[shelf].description}
-            action={<ButtonLink to="/books">Browse books</ButtonLink>}
+            action={<ButtonLink to="/discover">Browse books</ButtonLink>}
           />
         )
       ) : (
-        <div className="shelf-list">
+        <div
+          className={cn('shelf-list', isStale && 'is-stale')}
+          // Re-keying on the shelf that actually loaded replays the entry
+          // animation once the new books are really there.
+          key={loaded?.key ?? requestKey}
+          aria-busy={isStale}
+        >
           {items.map((entry) => (
             <ShelfItem
               key={entry.id}

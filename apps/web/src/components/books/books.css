@@ -44,6 +44,9 @@
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
+  /* Fill the card so `margin-top: auto` on the shelf control can pin it to
+     the bottom edge. */
+  flex: 1;
 }
 
 .book-card__meta-top {
@@ -53,13 +56,22 @@
   min-height: 1.25rem;
 }
 
+/* Two lines, always: reserving the second line keeps the author, stats and
+   shelf button on the same baseline across a row, whatever a title's length.
+   Anything longer is clamped rather than allowed to push the card taller. */
 .book-card__title {
   margin: 0;
+  min-height: calc(2 * var(--leading-snug) * 1em);
   font-family: var(--font-display);
   font-size: var(--text-lg);
   font-weight: 500;
   line-height: var(--leading-snug);
   letter-spacing: var(--tracking-tight);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .book-card__title a {
@@ -80,6 +92,9 @@
   margin: 0;
   font-size: var(--text-sm);
   color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .book-card__blurb {
@@ -127,6 +142,8 @@
 .book-card--grid {
   flex-direction: column;
   gap: var(--space-3);
+  /* Stretch to the row's height so every card's button lands on one line. */
+  height: 100%;
 }
 
 .book-card--grid .book-card__cover-link {
@@ -313,6 +330,14 @@
   scroll-snap-align: start;
 }
 
+/* Book cards shown inside the shared `.shelf__track` (the home page rails).
+   That track sizes its columns `minmax(9.5rem, 1fr)`, so a shelf holding only
+   a couple of books would stretch each one across the page. Capping the card
+   keeps the cover sane without changing the track for story cards. */
+.shelf__track .book-card {
+  max-width: 12rem;
+}
+
 /* Detail ----------------------------------------------------------------- */
 
 .crumbs {
@@ -490,6 +515,24 @@
   display: flex;
   flex-direction: column;
   margin-top: var(--space-4);
+  /* Replays whenever a different shelf finishes loading, so switching tabs
+     settles in rather than snapping. */
+  animation: shelf-in var(--dur-slow) var(--ease-out);
+  transition: opacity var(--dur) var(--ease);
+}
+
+/* The previous shelf, held on screen while the next one loads. Dimmed so the
+   wait is legible, and inert so nothing is clicked as it changes underneath. */
+.shelf-list.is-stale {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+@keyframes shelf-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
 }
 
 .shelf-item {
@@ -605,6 +648,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .shelf-list {
+    animation: none;
+    transition: none;
+  }
+
   .book-card__cover-link,
   .featured__cover,
   .shelf-item__cover {

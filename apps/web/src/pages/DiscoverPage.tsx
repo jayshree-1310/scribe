@@ -1,92 +1,306 @@
-import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
-import { formatCount } from '../lib/format'
-import * as api from '../data/api'
+import { formatCount, formatDate, formatRating } from '../lib/format'
+import * as books from '../data/books-api'
 import {
-  DISCOVER_SORTS,
-  DISCOVER_SORT_LABELS,
-  type DiscoverSort,
-  type StoryStatus,
-} from '../types/domain'
+  BOOK_SORTS,
+  BOOK_SORT_LABELS,
+  authorName,
+  type Book,
+  type BookAvailability,
+  type BookSort,
+} from '../types/books'
 import { AppShell } from '../components/layout/AppShell'
-import { Button } from '../components/ui/Button'
+import { Button, ButtonLink } from '../components/ui/Button'
 import { SelectableChip } from '../components/ui/Chip'
 import { Icon } from '../components/ui/Icon'
 import { Select } from '../components/ui/Select'
-import { Switch } from '../components/ui/Checkbox'
 import { TextField } from '../components/ui/TextField'
+import { Stars } from '../components/ui/Rating'
 import { EmptyState, ErrorState } from '../components/ui/States'
-import { StoryCard, StoryCardSkeleton } from '../components/story/StoryCard'
+import { BookCard, BookCardSkeleton } from '../components/books/BookCard'
+import { BookCover } from '../components/books/BookCover'
+import { ShelfMenu } from '../components/books/ShelfMenu'
 import './pages.css'
+import '../components/books/books.css'
 
-const STATUS_OPTIONS: ReadonlyArray<{ value: StoryStatus | 'all'; label: string }> = [
-  { value: 'all', label: 'Any status' },
-  { value: 'ongoing', label: 'Ongoing' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'hiatus', label: 'On hiatus' },
+const AVAILABILITY_OPTIONS: ReadonlyArray<{
+  value: BookAvailability
+  label: string
+}> = [
+  { value: 'all', label: 'Any length' },
+  { value: 'completed', label: 'Complete' },
+  { value: 'ongoing', label: 'Still running' },
 ]
 
-const SORT_OPTIONS = DISCOVER_SORTS.map((sort) => ({
+const SORT_OPTIONS = BOOK_SORTS.map((sort) => ({
   value: sort,
-  label: DISCOVER_SORT_LABELS[sort],
+  label: BOOK_SORT_LABELS[sort],
 }))
 
-function isSort(value: string | null): value is DiscoverSort {
-  return value !== null && (DISCOVER_SORTS as readonly string[]).includes(value)
+const PAGE_SIZE = 12
+
+function isSort(value: string | null): value is BookSort {
+  return value !== null && (BOOK_SORTS as readonly string[]).includes(value)
 }
+
+function isAvailability(value: string | null): value is BookAvailability {
+  return value === 'all' || value === 'completed' || value === 'ongoing'
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Legacy slugs that do not simply slugify to a catalogue genre's name. The
+ * mock data this page used to read called science fiction "Sci-Fi".
+ */
+const LEGACY_GENRE_SLUGS: Record<string, string> = {
+  'sci-fi': 'science-fiction',
+}
+
+/** "Historical Fiction" -> "historical-fiction", to match legacy genre links. */
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+/* Featured -------------------------------------------------------------- */
+
+function FeaturedBook({
+  book,
+  onShelfChange,
+}: {
+  book: Book
+  onShelfChange: (status: Book['libraryStatus']) => void
+}) {
+  return (
+    <section className="featured" aria-labelledby="featured-title">
+      <Link className="featured__cover" to={`/book/${book.id}`} tabIndex={-1} aria-hidden="true">
+        <BookCover book={book} size="xl" />
+      </Link>
+
+      <div className="featured__body">
+        <p className="featured__eyebrow">Editor's pick</p>
+
+        <h2 className="featured__title" id="featured-title">
+          <Link to={`/book/${book.id}`}>{book.title}</Link>
+        </h2>
+
+        <p className="featured__author">{authorName(book.author)}</p>
+
+        {book.description ? (
+          <p className="featured__blurb">{book.description}</p>
+        ) : null}
+
+        <div className="featured__meta">
+          {book.ratingAverage === null ? null : (
+            <span className="featured__rating">
+              <Stars value={book.ratingAverage} size="0.9em" />
+              <strong>{formatRating(book.ratingAverage)}</strong>
+            </span>
+          )}
+          {book.pageCount ? <span>{formatCount(book.pageCount)} pages</span> : null}
+          {book.publishedAt ? <span>{formatDate(book.publishedAt)}</span> : null}
+        </div>
+
+        <div className="featured__actions">
+          <ShelfMenu
+            bookId={book.id}
+            status={book.libraryStatus}
+            size="md"
+            onChange={onShelfChange}
+          />
+          <ButtonLink
+            to={`/book/${book.id}`}
+            variant="ghost"
+            size="md"
+            endIcon={<Icon name="arrow-right" size="1em" />}
+          >
+            Read more
+          </ButtonLink>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* Rails ----------------------------------------------------------------- */
+
+function Rail({
+  title,
+  description,
+  items,
+  onShelfChange,
+}: {
+  title: string
+  description?: string
+  items: Book[]
+  onShelfChange: (bookId: string, status: Book['libraryStatus']) => void
+}) {
+  if (items.length === 0) return null
+
+  return (
+    <section className="rail">
+      <header className="rail__head">
+        <h2 className="rail__title">{title}</h2>
+        {description ? <p className="rail__desc">{description}</p> : null}
+      </header>
+
+      <div className="rail__track">
+        {items.map((book) => (
+          <BookCard
+            key={book.id}
+            book={book}
+            onShelfChange={(status) => onShelfChange(book.id, status)}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/* Page ------------------------------------------------------------------ */
 
 export function DiscoverPage() {
   const [params, setParams] = useSearchParams()
 
+  // Read once: these seed the initial state, and the effect below keeps the
+  // URL in step from then on.
+  const initialStatus = params.get('status')
+  const initialSort = params.get('sort')
+
+  const initialGenre = params.get('genre')
+
   const [search, setSearch] = useState(params.get('q') ?? '')
-  const [sort, setSort] = useState<DiscoverSort>(
-    isSort(params.get('sort')) ? (params.get('sort') as DiscoverSort) : 'trending',
+  const [genreId, setGenreId] = useState<string | null>(
+    initialGenre && UUID.test(initialGenre) ? initialGenre : null,
   )
-  const [status, setStatus] = useState<StoryStatus | 'all'>('all')
-  const [kidsOnly, setKidsOnly] = useState(false)
-  const [genreSlug, setGenreSlug] = useState<string | null>(params.get('genre'))
-  const [showFilters, setShowFilters] = useState(false)
-
-  const debouncedSearch = useDebouncedValue(search, 250)
-  const genres = useAsync(() => api.getGenres(), [])
-
-  const genreId = useMemo(
-    () => genres.data?.find((genre) => genre.slug === genreSlug)?.id ?? null,
-    [genres.data, genreSlug],
+  /**
+   * Genre chips elsewhere in the app link to `/discover?genre=<slug>`, from
+   * back when this page read the mock data. Hold the slug until the genre list
+   * arrives, then trade it for the real id — the URL sync below rewrites the
+   * query string to the id, so the link canonicalises itself on arrival.
+   */
+  const [pendingGenre, setPendingGenre] = useState<string | null>(
+    initialGenre && !UUID.test(initialGenre) ? initialGenre.toLowerCase() : null,
   )
-
-  const results = useAsync(
-    () =>
-      api.discoverStories({
-        search: debouncedSearch,
-        genreId,
-        sort,
-        status,
-        kidsOnly,
-      }),
-    [debouncedSearch, genreId, sort, status, kidsOnly],
+  const [availability, setAvailability] = useState<BookAvailability>(
+    isAvailability(initialStatus) ? initialStatus : 'all',
+  )
+  const [sort, setSort] = useState<BookSort>(
+    isSort(initialSort) ? initialSort : 'trending',
   )
 
-  /** Keeps the URL shareable as filters change. */
-  function syncParams(next: { q?: string; sort?: string; genre?: string | null }) {
-    const updated = new URLSearchParams(params)
-    for (const [key, value] of Object.entries(next)) {
-      if (value) updated.set(key, value)
-      else updated.delete(key)
-    }
-    setParams(updated, { replace: true })
+  const debouncedSearch = useDebouncedValue(search, 280)
+  const genres = useAsync(() => books.getGenres(), [])
+
+  if (pendingGenre !== null && genres.status !== 'loading') {
+    const wanted = LEGACY_GENRE_SLUGS[pendingGenre] ?? pendingGenre
+    const match = genres.data?.find((genre) => slugify(genre.name) === wanted)
+    setPendingGenre(null)
+    if (match) setGenreId(match.id)
   }
 
-  const activeFilterCount =
-    (genreSlug ? 1 : 0) + (status !== 'all' ? 1 : 0) + (kidsOnly ? 1 : 0)
+  // Browsing is the rail-led editorial view; the moment a reader narrows
+  // anything, the page becomes a straightforward result grid.
+  const isBrowsing =
+    debouncedSearch.trim() === '' &&
+    genreId === null &&
+    pendingGenre === null &&
+    availability === 'all'
 
-  function clearFilters() {
-    setGenreSlug(null)
-    setStatus('all')
-    setKidsOnly(false)
-    syncParams({ genre: null })
+  const discover = useAsync(
+    () => (isBrowsing ? books.getDiscover() : Promise.resolve(null)),
+    [isBrowsing],
+  )
+
+  useEffect(() => {
+    const next = new URLSearchParams()
+    if (debouncedSearch.trim()) next.set('q', debouncedSearch.trim())
+    if (genreId) next.set('genre', genreId)
+    if (availability !== 'all') next.set('status', availability)
+    if (!isBrowsing) next.set('sort', sort)
+    setParams(next, { replace: true })
+  }, [debouncedSearch, genreId, availability, sort, isBrowsing, setParams])
+
+  /* Paginated results, accumulated across "Load more". ------------------ */
+
+  const filterKey = JSON.stringify({ debouncedSearch, genreId, availability, sort })
+  const [query, setQuery] = useState({ key: filterKey, page: 1 })
+  const [results, setResults] = useState<Book[]>([])
+  const [resultMeta, setResultMeta] = useState<{ total: number; hasMore: boolean } | null>(
+    null,
+  )
+  const [listStatus, setListStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [listError, setListError] = useState<string | null>(null)
+
+  // Reset to the first page during render when the filters change, so a
+  // superseded page can never be appended to a fresh result set.
+  if (query.key !== filterKey) {
+    setQuery({ key: filterKey, page: 1 })
+    setResults([])
+    setResultMeta(null)
+    setListStatus('loading')
+    setListError(null)
+  }
+
+  useEffect(() => {
+    if (isBrowsing) return
+
+    let active = true
+
+    books
+      .listBooks({
+        search: debouncedSearch,
+        genreId,
+        status: availability,
+        sort,
+        page: query.page,
+        limit: PAGE_SIZE,
+      })
+      .then((page) => {
+        if (!active) return
+        setResults((current) =>
+          query.page === 1 ? page.items : [...current, ...page.items],
+        )
+        setResultMeta({ total: page.total, hasMore: page.hasMore })
+        setListStatus('ready')
+        setListError(null)
+      })
+      .catch((cause: unknown) => {
+        if (!active) return
+        setListStatus('error')
+        setListError(
+          cause instanceof Error ? cause.message : 'Those books did not load.',
+        )
+      })
+
+    return () => {
+      active = false
+    }
+    // `query` carries both the filter identity and the page number.
+  }, [query, isBrowsing, debouncedSearch, genreId, availability, sort])
+
+  /* Keeping shelf changes visible wherever the book appears ------------- */
+
+  function applyShelfChange(bookId: string, status: Book['libraryStatus']): void {
+    setResults((current) =>
+      current.map((book) =>
+        book.id === bookId ? { ...book, libraryStatus: status } : book,
+      ),
+    )
+    // The rails come from a cached response; reloading keeps them honest.
+    if (isBrowsing) discover.reload()
+  }
+
+  function clearFilters(): void {
+    setSearch('')
+    setGenreId(null)
+    setAvailability('all')
   }
 
   return (
@@ -95,135 +309,176 @@ export function DiscoverPage() {
         <div>
           <h1 className="page-head__title">Discover</h1>
           <p className="page-head__sub">
-            {formatCount(91400)} stories across {genres.data?.length ?? 10} genres.
+            Browse the shelves, follow a genre, and keep what you find.
           </p>
         </div>
       </header>
 
-      {/* Filter bar: one row above the results ------------------------- */}
       <div className="filters">
         <div className="filters__row">
           <TextField
-            label="Search stories"
+            label="Search books"
             hideLabel
-            type="search"
-            placeholder="Search titles, authors, genres…"
+            placeholder="Search by title or author…"
             value={search}
-            startIcon={<Icon name="search" size="1.05rem" />}
-            onChange={(event) => {
-              setSearch(event.target.value)
-              syncParams({ q: event.target.value })
-            }}
+            startIcon={<Icon name="search" size="1em" />}
+            onChange={(event) => setSearch(event.target.value)}
           />
-
           <Select
-            label="Sort by"
+            label="Sort"
             hideLabel
             value={sort}
             options={SORT_OPTIONS}
-            onChange={(next) => {
-              setSort(next)
-              syncParams({ sort: next })
-            }}
+            onChange={setSort}
           />
-
-          <Button
-            variant={activeFilterCount > 0 ? 'primary' : 'secondary'}
-            onClick={() => setShowFilters((open) => !open)}
-            aria-expanded={showFilters}
-            startIcon={<Icon name="sliders" size="1em" />}
-          >
-            Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-          </Button>
+          <Select
+            label="Availability"
+            hideLabel
+            value={availability}
+            options={AVAILABILITY_OPTIONS}
+            onChange={setAvailability}
+          />
         </div>
 
-        {showFilters ? (
+        {genres.status === 'ready' && genres.data ? (
           <div className="filters__panel">
-            <div className="filters__group">
-              <p className="filters__label">Genre</p>
-              <div className="chip-row">
-                {genres.data?.map((genre) => (
+            <span className="filters__label">Genres</span>
+            <div className="filters__group--inline">
+              {genres.data
+                .filter((genre) => genre.bookCount > 0)
+                .map((genre) => (
                   <SelectableChip
                     key={genre.id}
                     hue={genre.hue}
-                    selected={genreSlug === genre.slug}
-                    onToggle={() => {
-                      const next = genreSlug === genre.slug ? null : genre.slug
-                      setGenreSlug(next)
-                      syncParams({ genre: next })
-                    }}
+                    selected={genreId === genre.id}
+                    onToggle={() =>
+                      setGenreId((current) => (current === genre.id ? null : genre.id))
+                    }
                   >
                     {genre.name}
                   </SelectableChip>
                 ))}
-              </div>
-            </div>
-
-            <div className="filters__group filters__group--inline">
-              <Select
-                label="Status"
-                value={status}
-                options={STATUS_OPTIONS}
-                onChange={setStatus}
-                size="sm"
-              />
-              <Switch
-                checked={kidsOnly}
-                onChange={setKidsOnly}
-                label="Kid-appropriate only"
-              />
-              {activeFilterCount > 0 ? (
-                <Button variant="ghost" size="sm" onClick={clearFilters}>
-                  Clear filters
-                </Button>
-              ) : null}
             </div>
           </div>
         ) : null}
-
-        <p className="filters__summary" aria-live="polite">
-          {results.status === 'ready'
-            ? `${results.data?.length ?? 0} ${results.data?.length === 1 ? 'story' : 'stories'}`
-            : ''}
-        </p>
       </div>
 
-      {/* Results -------------------------------------------------------- */}
-      {results.status === 'error' ? (
-        <ErrorState message={results.error} onRetry={results.reload} />
-      ) : results.status === 'loading' ? (
-        <div className="story-grid">
-          {Array.from({ length: 10 }, (_, index) => (
-            <StoryCardSkeleton key={index} />
-          ))}
-        </div>
-      ) : results.data?.length === 0 ? (
-        <EmptyState
-          icon="search"
-          title="No stories match those filters"
-          description={
-            debouncedSearch.trim()
-              ? `Nothing for “${debouncedSearch.trim()}”. Try a different word or clear your filters.`
-              : 'Try widening your filters — there is plenty out there.'
-          }
-          action={
-            <Button
-              onClick={() => {
-                setSearch('')
-                clearFilters()
-                syncParams({ q: '' })
-              }}
-            >
-              Reset search
-            </Button>
-          }
-        />
+      {isBrowsing ? (
+        discover.status === 'loading' ? (
+          <div className="book-grid" aria-busy="true">
+            {Array.from({ length: 8 }, (_, index) => (
+              <BookCardSkeleton key={index} />
+            ))}
+          </div>
+        ) : discover.status === 'error' ? (
+          <ErrorState message={discover.error} onRetry={discover.reload} />
+        ) : discover.data ? (
+          <>
+            {discover.data.featured ? (
+              <FeaturedBook
+                book={discover.data.featured}
+                onShelfChange={(status) =>
+                  applyShelfChange(discover.data!.featured!.id, status)
+                }
+              />
+            ) : null}
+
+            <Rail
+              title="Trending now"
+              description="What people are opening this week."
+              items={discover.data.trending}
+              onShelfChange={applyShelfChange}
+            />
+            <Rail
+              title="Highly rated"
+              description="The books readers finish and then recommend."
+              items={discover.data.recommended}
+              onShelfChange={applyShelfChange}
+            />
+
+            {discover.data.sections.map((section) => (
+              <Rail
+                key={section.genre.id}
+                title={section.genre.name}
+                items={section.books}
+                onShelfChange={applyShelfChange}
+              />
+            ))}
+
+            {discover.data.featured === null &&
+            discover.data.trending.length === 0 ? (
+              <EmptyState
+                icon="book"
+                title="No books yet"
+                description="Seed the catalogue with `pnpm --filter api seed:books` to fill these shelves."
+              />
+            ) : null}
+          </>
+        ) : null
       ) : (
-        <div className="story-grid">
-          {results.data?.map((story) => (
-            <StoryCard key={story.id} story={story} />
-          ))}
-        </div>
+        <section className="results">
+          <p className="results__count" role="status">
+            {listStatus === 'loading' && results.length === 0
+              ? 'Searching…'
+              : resultMeta
+                ? `${formatCount(resultMeta.total)} ${resultMeta.total === 1 ? 'book' : 'books'}`
+                : ''}
+          </p>
+
+          {listStatus === 'error' ? (
+            <ErrorState
+              message={listError}
+              onRetry={() => {
+                setListStatus('loading')
+                setQuery((current) => ({ ...current }))
+              }}
+            />
+          ) : listStatus === 'loading' && results.length === 0 ? (
+            <div className="book-grid" aria-busy="true">
+              {Array.from({ length: 8 }, (_, index) => (
+                <BookCardSkeleton key={index} />
+              ))}
+            </div>
+          ) : results.length === 0 ? (
+            <EmptyState
+              icon="search"
+              title="Nothing matched"
+              description="Try a different title, author or genre."
+              action={
+                <Button variant="secondary" onClick={clearFilters}>
+                  Clear filters
+                </Button>
+              }
+            />
+          ) : (
+            <>
+              <div className="book-grid">
+                {results.map((book) => (
+                  <BookCard
+                    key={book.id}
+                    book={book}
+                    onShelfChange={(status) => applyShelfChange(book.id, status)}
+                  />
+                ))}
+              </div>
+
+              {resultMeta?.hasMore ? (
+                <div className="results__more">
+                  <Button
+                    variant="secondary"
+                    loading={listStatus === 'loading'}
+                    onClick={() => {
+                      setListStatus('loading')
+                      setQuery((current) => ({ ...current, page: current.page + 1 }))
+                    }}
+                  >
+                    Load more
+                  </Button>
+                </div>
+              ) : null}
+            </>
+          )}
+        </section>
       )}
     </AppShell>
   )

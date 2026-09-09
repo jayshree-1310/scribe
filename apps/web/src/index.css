@@ -310,6 +310,14 @@ hr {
 }
 
 .section-head__link {
+  /* The reset above makes every `svg` a block, so the trailing chevron would
+     drop onto its own line inside a plain inline link — `white-space` cannot
+     prevent that, since it is a block box rather than a text break. Laying the
+     link out as a flex row keeps label and icon together, the way every other
+     text-plus-icon pair in the app is built. */
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   flex: none;
   color: var(--brand);
   font-size: var(--text-base);

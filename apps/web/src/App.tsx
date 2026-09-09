@@ -13,7 +13,6 @@ import { ForWritersPage } from './pages/ForWritersPage'
 import { PrivacyPage, TermsPage } from './pages/LegalPage'
 import { HomePage } from './pages/HomePage'
 import { DiscoverPage } from './pages/DiscoverPage'
-import { BooksPage } from './pages/BooksPage'
 import { BookDetailPage } from './pages/BookDetailPage'
 import { StoryDetailPage } from './pages/StoryDetailPage'
 import { ReaderPage } from './pages/ReaderPage'
@@ -53,7 +52,6 @@ function App() {
 
                 {/* Browsing is open; reading a chapter is too. -------- */}
                 <Route path="/discover" element={<DiscoverPage />} />
-                <Route path="/books" element={<BooksPage />} />
                 <Route path="/book/:id" element={<BookDetailPage />} />
                 <Route path="/story/:slug" element={<StoryDetailPage />} />
                 <Route path="/read/:slug/:chapter" element={<ReaderPage />} />
@@ -151,6 +149,7 @@ function App() {
 
                 {/* Convenience redirects ---------------------------- */}
                 <Route path="/stories" element={<Navigate to="/discover" replace />} />
+                <Route path="/books" element={<Navigate to="/discover" replace />} />
 
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>

@@ -99,6 +99,10 @@ export function ShelfMenu({
   return (
     <DropdownMenu
       label="Reading status"
+      // The control sits at the foot of a card, so opening upward keeps the
+      // menu clear of the books below it. `DropdownMenu` flips back down if
+      // there is not enough room above.
+      side="top"
       trigger={(triggerProps) => (
         <Button
           {...triggerProps}
