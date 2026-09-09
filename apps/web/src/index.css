@@ -10,12 +10,12 @@
 :root {
   /* Type families ------------------------------------------------------- */
   --font-display:
-    'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia,
-    ui-serif, serif;
+    Newsreader, 'Iowan Old Style', 'Palatino Linotype', Palatino,
+    'Book Antiqua', Georgia, ui-serif, serif;
   --font-sans:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
-    Arial, sans-serif;
-  --font-reading: Charter, 'Iowan Old Style', Georgia, Cambria, serif;
+    Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --font-reading: Newsreader, Charter, 'Iowan Old Style', Georgia, Cambria, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* Type scale ---------------------------------------------------------- */
@@ -197,6 +197,7 @@ body {
   font-family: var(--font-sans);
   font-size: var(--text-md);
   line-height: var(--leading-normal);
+  font-feature-settings: 'cv05' 1, 'ss03' 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -234,6 +235,10 @@ h4 {
   font-weight: 600;
   line-height: var(--leading-tight);
   letter-spacing: var(--tracking-tight);
+  /* Newsreader is optically sized: let the browser pick the right cut per
+     size so display headings stay refined and small headings stay legible. */
+  font-optical-sizing: auto;
+  text-wrap: balance;
 }
 
 a {

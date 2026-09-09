@@ -6,6 +6,7 @@ import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { DropdownMenu, MenuItem, MenuSeparator } from '../ui/DropdownMenu'
 import { Icon } from '../ui/Icon'
+import { Logo } from './Logo'
 import { Tooltip } from '../ui/Tooltip'
 
 interface TopBarProps {
@@ -39,6 +40,10 @@ export function TopBar({ onOpenNav, title }: TopBarProps) {
         startIcon={<Icon name="menu" size="1.25rem" />}
       />
 
+      {/* The sidebar carries the full lockup from 64rem up; below that the
+          header would otherwise show no branding at all. */}
+      <Logo to="/home" size="sm" markOnly className="topbar__brand" />
+
       {title ? <h1 className="topbar__title">{title}</h1> : null}
 
       <form className="topbar__search" role="search" onSubmit={onSearch}>
@@ -56,7 +61,10 @@ export function TopBar({ onOpenNav, title }: TopBarProps) {
       </form>
 
       <div className="topbar__actions">
-        <Tooltip label={resolved === 'dark' ? 'Switch to light' : 'Switch to dark'}>
+        <Tooltip
+          placement="bottom"
+          label={resolved === 'dark' ? 'Switch to light' : 'Switch to dark'}
+        >
           <Button
             variant="ghost"
             iconOnly
@@ -66,7 +74,7 @@ export function TopBar({ onOpenNav, title }: TopBarProps) {
           />
         </Tooltip>
 
-        <Tooltip label="Notifications">
+        <Tooltip placement="bottom" label="Notifications">
           <Button
             variant="ghost"
             iconOnly

@@ -36,7 +36,7 @@
 }
 
 .btn:not(:disabled):active {
-  transform: scale(0.98);
+  transform: translateY(0) scale(0.98);
 }
 
 .btn--sm {
@@ -70,6 +70,8 @@
 
 .btn--primary:not(:disabled):hover {
   background-color: var(--brand-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .btn--secondary {
@@ -82,6 +84,7 @@
 .btn--secondary:not(:disabled):hover {
   background-color: var(--surface-hover);
   border-color: var(--text-muted);
+  transform: translateY(-1px);
 }
 
 .btn--subtle {
@@ -109,6 +112,8 @@
 
 .btn--danger:not(:disabled):hover {
   background-color: var(--danger-hover);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
 }
 
 .btn__label {

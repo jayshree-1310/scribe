@@ -20,6 +20,7 @@ export const READER_NAV: NavSection[] = [
     items: [
       { to: '/home', label: 'Home', icon: 'home', primary: true },
       { to: '/discover', label: 'Discover', icon: 'compass', primary: true },
+      { to: '/books', label: 'Books', icon: 'book' },
       { to: '/library', label: 'My Library', icon: 'library', primary: true },
     ],
   },

@@ -7,8 +7,7 @@ import { Checkbox } from '../components/ui/Checkbox'
 import { Icon } from '../components/ui/Icon'
 import { PasswordField, TextField } from '../components/ui/TextField'
 import { InlineNotice } from '../components/ui/States'
-import { AuthAside } from './AuthAside'
-import './auth.css'
+import { AuthLayout } from './AuthLayout'
 
 interface FieldErrors {
   email?: string
@@ -79,88 +78,76 @@ export function LoginPage() {
   }
 
   return (
-    <div className="auth">
-      <div className="auth__panel">
-        <div className="auth__form-wrap">
-          <Link className="auth__back" to="/">
-            <Icon name="arrow-left" size="0.9em" />
-            Back to Scribe
+    <AuthLayout
+      variant="login"
+      title="Welcome back"
+      subtitle="Your shelves, streaks and clubs are exactly where you left them."
+    >
+      {formError ? <InlineNotice tone="danger">{formError}</InlineNotice> : null}
+
+      <form className="auth__form" onSubmit={onSubmit} noValidate>
+        <TextField
+          label="Email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          error={errors.email}
+          disabled={submitting}
+          onChange={(event) => {
+            setEmail(event.target.value)
+            setErrors((current) => ({ ...current, email: undefined }))
+          }}
+        />
+
+        <PasswordField
+          label="Password"
+          autoComplete="current-password"
+          placeholder="Your password"
+          value={password}
+          error={errors.password}
+          disabled={submitting}
+          onChange={(event) => {
+            setPassword(event.target.value)
+            setErrors((current) => ({ ...current, password: undefined }))
+          }}
+        />
+
+        <div className="auth__row">
+          <Checkbox
+            checked={remember}
+            onChange={setRemember}
+            label="Remember me"
+            disabled={submitting}
+          />
+          <Link className="auth__link" to="/forgot-password">
+            Forgot password?
           </Link>
-
-          <header className="auth__head">
-            <h1>Welcome back</h1>
-            <p>Your shelves, streaks and clubs are exactly where you left them.</p>
-          </header>
-
-          {formError ? <InlineNotice tone="danger">{formError}</InlineNotice> : null}
-
-          <form className="auth__form" onSubmit={onSubmit} noValidate>
-            <TextField
-              label="Email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              value={email}
-              error={errors.email}
-              disabled={submitting}
-              onChange={(event) => {
-                setEmail(event.target.value)
-                setErrors((current) => ({ ...current, email: undefined }))
-              }}
-            />
-
-            <PasswordField
-              label="Password"
-              autoComplete="current-password"
-              placeholder="Your password"
-              value={password}
-              error={errors.password}
-              disabled={submitting}
-              onChange={(event) => {
-                setPassword(event.target.value)
-                setErrors((current) => ({ ...current, password: undefined }))
-              }}
-            />
-
-            <div className="auth__row">
-              <Checkbox
-                checked={remember}
-                onChange={setRemember}
-                label="Remember me"
-                disabled={submitting}
-              />
-              <Link className="auth__link" to="/forgot-password">
-                Forgot password?
-              </Link>
-            </div>
-
-            <Button variant="primary" size="lg" type="submit" fullWidth loading={submitting}>
-              Sign In
-            </Button>
-          </form>
-
-          <div className="auth__divider">
-            <span>or</span>
-          </div>
-
-          <Button
-            size="lg"
-            fullWidth
-            loading={googlePending}
-            onClick={onGoogle}
-            startIcon={<Icon name="google" size="1.1rem" />}
-          >
-            Continue with Google
-          </Button>
-
-          <p className="auth__alt">
-            New to Scribe? <Link to="/register">Create an account</Link>
-          </p>
         </div>
+
+        <Button variant="primary" size="lg" type="submit" fullWidth loading={submitting}>
+          Sign in
+        </Button>
+      </form>
+
+      <div className="auth__divider">
+        <span>or</span>
       </div>
 
-      <AuthAside variant="login" />
-    </div>
+      <Button
+        size="lg"
+        fullWidth
+        loading={googlePending}
+        onClick={onGoogle}
+        startIcon={<Icon name="google" size="1.1rem" />}
+      >
+        Continue with Google
+      </Button>
+
+      <p className="auth__alt">
+        New to Scribe? <Link to="/register">Create an account</Link>
+      </p>
+    </AuthLayout>
   )
 }

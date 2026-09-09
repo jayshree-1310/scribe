@@ -25,29 +25,51 @@
 .logo {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: 0.55em;
   font-family: var(--font-display);
   font-size: var(--text-xl);
   font-weight: 600;
-  letter-spacing: var(--tracking-tight);
+  letter-spacing: -0.025em;
   color: var(--text);
 }
 
 .logo--sm { font-size: var(--text-lg); }
 .logo--lg { font-size: var(--text-2xl); }
+.logo--xl { font-size: var(--text-3xl); }
 
 .logo__mark {
   display: grid;
   place-items: center;
-  width: 1.85em;
-  height: 1.85em;
-  padding: 0.36em;
-  border-radius: var(--radius-md);
+  flex: none;
+  width: 1.75em;
+  height: 1.75em;
+  padding: 0.3em;
+  border-radius: 0.5em;
   background-color: var(--brand);
   color: var(--brand-fg);
+  transition:
+    transform var(--dur) var(--ease-out),
+    box-shadow var(--dur) var(--ease-out);
 }
 
-.logo--sm .logo__mark { width: 1.7em; height: 1.7em; }
+.logo--sm .logo__mark { width: 1.65em; height: 1.65em; }
+
+/* The mark lifts a hair on hover — the whole interaction, nothing more. */
+a.logo:hover .logo__mark {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.logo__word {
+  /* Optical sizing pushes the wordmark toward the display cut of Newsreader
+     even at small chrome sizes, where the text cut would look too plain. */
+  font-optical-sizing: auto;
+  font-variation-settings: 'opsz' 48;
+}
+
+.logo--mark-only {
+  gap: 0;
+}
 
 /* Shell ------------------------------------------------------------------- */
 
@@ -104,6 +126,10 @@
   max-width: var(--container);
   margin-inline: auto;
   padding: var(--space-7) var(--space-6) var(--space-12);
+  animation: page-in var(--dur-slow) var(--ease-out);
+}
+
+.public__main {
   animation: page-in var(--dur-slow) var(--ease-out);
 }
 
@@ -236,6 +262,10 @@
   backdrop-filter: blur(10px);
 }
 
+.topbar__brand {
+  flex: none;
+}
+
 .topbar__title {
   font-size: var(--text-lg);
   white-space: nowrap;
@@ -289,8 +319,8 @@
 .topbar__bell::after {
   content: '';
   position: absolute;
-  top: 0.5rem;
-  right: 0.55rem;
+  top: 0.62rem;
+  right: 0.6rem;
   width: 0.4rem;
   height: 0.4rem;
   border-radius: var(--radius-full);
@@ -394,6 +424,10 @@
 
 /* Desktop: persistent sidebar. */
 @media (min-width: 64rem) {
+  .topbar__brand {
+    display: none;
+  }
+
   .shell {
     display: grid;
     grid-template-columns: var(--sidebar-width) minmax(0, 1fr);

@@ -67,6 +67,8 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
   body?: unknown
   query?: Record<string, string | undefined>
+  /** Extra request headers, merged after the JSON content type. */
+  headers?: Record<string, string>
   signal?: AbortSignal
 }
 
@@ -104,7 +106,7 @@ async function toApiError(response: Response): Promise<ApiError> {
 
 export async function request<T>(
   path: string,
-  { method = 'GET', body, query, signal }: RequestOptions = {},
+  { method = 'GET', body, query, headers, signal }: RequestOptions = {},
 ): Promise<T> {
   // Abort on timeout, but also stay responsive to a caller-supplied signal.
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
@@ -114,7 +116,10 @@ export async function request<T>(
   try {
     response = await fetch(buildUrl(path, query), {
       method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers: {
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        ...headers,
+      },
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: composed,
     })

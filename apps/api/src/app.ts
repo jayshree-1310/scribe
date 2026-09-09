@@ -5,6 +5,8 @@ import pinoHttp from "pino-http";
 import { logger } from "./lib/logger.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import authRouter from "./routes/auth.js";
+import booksRouter from "./routes/books.js";
+import libraryRouter from "./routes/library.js";
 
 const app = express();
 
@@ -30,6 +32,8 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRouter);
+app.use("/api/books", booksRouter);
+app.use("/api/library", libraryRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

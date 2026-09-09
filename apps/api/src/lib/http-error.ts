@@ -7,7 +7,9 @@
 /** Stable, machine-readable error identifiers returned to clients. */
 export type ErrorCode =
   | "validation_error"
+  | "unauthorized"
   | "not_found"
+  | "conflict"
   | "route_not_found"
   | "invalid_json"
   | "payload_too_large"
@@ -46,8 +48,16 @@ export class HttpError extends Error {
     return new HttpError(400, "validation_error", message, details);
   }
 
+  static unauthorized(message: string): HttpError {
+    return new HttpError(401, "unauthorized", message);
+  }
+
   static notFound(message: string): HttpError {
     return new HttpError(404, "not_found", message);
+  }
+
+  static conflict(message: string): HttpError {
+    return new HttpError(409, "conflict", message);
   }
 
   toBody(): ErrorResponseBody {

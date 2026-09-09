@@ -33,7 +33,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'61cd8b821c72071de38ad69cfea3f87d9c013f889c389c048eb92d83cec6878f'>;
+  StorageHashBase<'bcfb9f908288f90dba905a254470db0015a5dea566fbca1e8133c1793b926d1d'>;
 export type ExecutionHash =
   ExecutionHashBase<'2a8f10d344652873c2c64255cf26b8b7ef763928007ad7cae38f4ead2fc152a3'>;
 export type ProfileHash =
@@ -325,7 +325,6 @@ export type FieldOutputTypes = {
     readonly Genre: {
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly name: CodecTypes['pg/text@1']['output'];
-      readonly hue: CodecTypes['pg/int4@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
     readonly Multimedia: {
@@ -501,7 +500,6 @@ export type FieldInputTypes = {
     readonly Genre: {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'];
-      readonly hue: CodecTypes['pg/int4@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
     readonly Multimedia: {
@@ -676,7 +674,6 @@ export type StorageColumnTypes = {
     };
     readonly genre: {
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
-      readonly hue: CodecTypes['pg/int4@1']['output'];
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly name: CodecTypes['pg/text@1']['output'];
     };
@@ -852,7 +849,6 @@ export type StorageColumnInputTypes = {
     };
     readonly genre: {
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
-      readonly hue: CodecTypes['pg/int4@1']['input'];
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'];
     };
@@ -1602,15 +1598,6 @@ type ContractBase = Omit<
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
                   readonly nullable: false;
-                };
-                readonly hue: {
-                  readonly nativeType: 'int4';
-                  readonly codecId: 'pg/int4@1';
-                  readonly nullable: false;
-                  readonly default: {
-                    readonly kind: 'literal';
-                    readonly value: DefaultLiteralValue<'pg/int4@1', 268>;
-                  };
                 };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
@@ -3203,10 +3190,6 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
-              readonly hue: {
-                readonly nullable: false;
-                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
-              };
               readonly createdAt: {
                 readonly nullable: false;
                 readonly type: {
@@ -3234,7 +3217,6 @@ type ContractBase = Omit<
               readonly fields: {
                 readonly id: { readonly column: 'id' };
                 readonly name: { readonly column: 'name' };
-                readonly hue: { readonly column: 'hue' };
                 readonly createdAt: { readonly column: 'createdAt' };
               };
             };

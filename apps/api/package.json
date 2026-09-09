@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "postinstall": "prisma skills sync || exit 0",
-    "contract:emit": "prisma contract emit"
+    "contract:emit": "prisma contract emit",
+    "seed:books": "tsx src/scripts/seed-books.ts"
   },
   "keywords": [],
   "author": "",
@@ -28,6 +29,7 @@
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "redis": "^6.2.1",
+    "temporal-polyfill": "^1.0.4",
     "zod": "^4.5.4"
   },
   "devDependencies": {

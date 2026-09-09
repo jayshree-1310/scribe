@@ -1,49 +1,121 @@
 /* ==========================================================================
    Login and registration
+
+   Desktop is a two-part composition: an ink editorial panel on the left and
+   the form on paper to the right. The split collapses to a single paper
+   column below 64rem, where the panel is replaced by a compact brand header
+   inside the form column so the branding never disappears entirely.
    ========================================================================== */
 
 .auth {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   min-height: 100dvh;
+  background-color: var(--bg);
 }
+
+/* Form column -------------------------------------------------------------- */
 
 .auth__panel {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-8) var(--space-6);
+  padding: var(--space-12) var(--space-8);
 }
 
 .auth__form-wrap {
   width: 100%;
-  max-width: 25rem;
+  max-width: 24rem;
+  animation: auth-rise var(--dur-slow) var(--ease-out) both;
+}
+
+@keyframes auth-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+}
+
+/* Shown only once the ink panel is gone, so small screens keep the brand. */
+.auth__mobile-brand {
+  display: none;
+  margin-bottom: var(--space-8);
 }
 
 .auth__back {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  color: var(--text-secondary);
-  font-size: var(--text-base);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
   font-weight: 550;
+  transition: color var(--dur-fast) var(--ease);
 }
 
 .auth__back:hover {
   color: var(--brand);
 }
 
+.auth__back svg {
+  transition: transform var(--dur) var(--ease-out);
+}
+
+.auth__back:hover svg {
+  transform: translateX(-2px);
+}
+
+/* Login / signup switch ---------------------------------------------------- */
+
+.auth__switch {
+  display: grid;
+  grid-auto-flow: column;
+  justify-content: start;
+  width: fit-content;
+  gap: var(--space-1);
+  margin-top: var(--space-5);
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  background-color: var(--surface-3);
+}
+
+.auth__switch a {
+  padding: 0.4rem var(--space-4);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: center;
+  transition:
+    background-color var(--dur) var(--ease),
+    color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.auth__switch a:hover {
+  color: var(--text);
+}
+
+.auth__switch a[aria-current='page'] {
+  background-color: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
 .auth__head {
-  margin: var(--space-6) 0 var(--space-6);
+  margin: var(--space-6) 0;
 }
 
 .auth__head h1 {
   font-size: var(--text-3xl);
+  letter-spacing: -0.03em;
 }
 
 .auth__head p {
+  max-width: 32ch;
   margin-top: var(--space-2);
   color: var(--text-secondary);
+  font-size: var(--text-base);
+  text-wrap: pretty;
 }
 
 .auth__form {
@@ -62,13 +134,14 @@
 }
 
 .auth__link {
-  color: var(--brand);
-  font-size: var(--text-base);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
   font-weight: 600;
+  transition: color var(--dur-fast) var(--ease);
 }
 
 .auth__link:hover {
-  text-decoration: underline;
+  color: var(--brand);
 }
 
 .auth__divider {
@@ -77,7 +150,10 @@
   gap: var(--space-3);
   margin: var(--space-6) 0;
   color: var(--text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
 }
 
 .auth__divider::before,
@@ -90,8 +166,8 @@
 
 .auth__alt {
   margin-top: var(--space-6);
-  color: var(--text-secondary);
-  font-size: var(--text-base);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
   text-align: center;
 }
 
@@ -102,12 +178,13 @@
 
 .auth__alt a:hover {
   text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* Password strength ------------------------------------------------------- */
 
 .strength {
-  margin-top: var(--space-3);
+  margin-top: var(--space-1);
 }
 
 .strength__meter {
@@ -117,7 +194,7 @@
 
 .strength__step {
   flex: 1;
-  height: 0.25rem;
+  height: 0.1875rem;
   border-radius: var(--radius-full);
   background-color: var(--surface-3);
   transition: background-color var(--dur) var(--ease);
@@ -131,7 +208,7 @@
 .strength__label {
   margin-top: var(--space-2);
   color: var(--text-secondary);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 
@@ -148,77 +225,147 @@
   gap: var(--space-1);
   color: var(--text-muted);
   font-size: var(--text-xs);
+  transition: color var(--dur) var(--ease);
 }
 
 .strength__rules li.is-met {
   color: var(--success);
 }
 
-/* Editorial aside --------------------------------------------------------- */
+/* Editorial ink panel ------------------------------------------------------ */
 
 .auth__aside {
+  /* Scoped palette: the panel is ink in both themes, so it needs its own
+     foreground values rather than the surface-relative ones. */
+  --ink: #231c17;
+  --ink-text: #f3ede3;
+  --ink-muted: #a1948350;
+
   position: relative;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   overflow: hidden;
-  padding: var(--space-10);
-  background:
-    radial-gradient(80% 90% at 80% 8%, var(--brand-soft) 0%, transparent 60%),
-    linear-gradient(200deg, var(--bg-tint) 0%, var(--bg) 100%);
-  border-left: 1px solid var(--border);
+  padding: var(--space-12);
+  background-color: var(--ink);
+  color: var(--ink-text);
+}
+
+[data-theme='dark'] .auth__aside {
+  --ink: #100e0c;
+  border-right: 1px solid var(--border);
+}
+
+/* Ruled-paper texture, at the threshold of visibility. */
+.auth__aside::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    rgba(243, 237, 227, 0.05) 0 1px,
+    transparent 1px 2.25rem
+  );
+  pointer-events: none;
 }
 
 .auth__aside-inner {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  justify-content: space-between;
+  gap: var(--space-12);
   width: 100%;
-  max-width: 28rem;
+  max-width: 30rem;
   margin-inline: auto;
 }
 
-.auth__quote {
-  color: var(--text);
+.auth__aside-logo {
+  color: var(--ink-text);
 }
 
-.auth__quote > svg {
-  color: var(--brand);
-  opacity: 0.6;
+/* Statement --------------------------------------------------------------- */
+
+.auth__statement h2 {
+  max-width: 16ch;
+  font-size: clamp(1.75rem, 1rem + 2.2vw, 2.625rem);
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
 }
 
-.auth__quote p {
-  margin-top: var(--space-3);
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  line-height: var(--leading-snug);
-  letter-spacing: var(--tracking-tight);
-  text-wrap: balance;
+.auth__statement > p {
+  max-width: 42ch;
+  margin-top: var(--space-4);
+  color: rgba(243, 237, 227, 0.62);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  text-wrap: pretty;
 }
 
-.auth__quote footer {
-  margin-top: var(--space-3);
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
+/* Fanned covers ----------------------------------------------------------- */
 
 .auth__covers {
   display: flex;
-  justify-content: center;
-  gap: var(--space-4);
+  justify-content: flex-start;
+  gap: var(--space-3);
+  margin-top: var(--space-10);
+  padding-left: var(--space-2);
 }
 
 .auth__cover {
+  /* Narrower than the app's `lg` cover: three have to sit side by side in a
+     single column at any viewport without clipping each other's titles. */
+  --cover-w: clamp(4.5rem, 7.5vw, 8.5rem);
+
+  position: relative;
+  aspect-ratio: 2 / 3;
+  width: var(--cover-w);
+  flex: none;
   transition: transform var(--dur-slow) var(--ease-out);
 }
 
-.auth__cover[data-index='0'] { transform: rotate(-6deg) translateY(0.5rem); }
-.auth__cover[data-index='2'] { transform: rotate(6deg) translateY(0.5rem); }
+.auth__cover .cover {
+  --cover-w: 100%;
+}
 
-.auth__aside-foot {
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  text-align: center;
+/* A shallow fan, so the shelf reads as three real books rather than a grid. */
+.auth__cover[data-index='0'] { transform: rotate(-5deg) translateY(0.6rem); }
+.auth__cover[data-index='2'] { transform: rotate(5deg) translateY(0.6rem); }
+
+.auth__covers:hover .auth__cover[data-index='0'] { transform: rotate(-8deg) translateY(0.2rem); }
+.auth__covers:hover .auth__cover[data-index='1'] { transform: translateY(-0.4rem); }
+.auth__covers:hover .auth__cover[data-index='2'] { transform: rotate(8deg) translateY(0.2rem); }
+
+.auth__cover-skeleton {
+  display: block;
+  opacity: 0.14;
+}
+
+/* Pull quote -------------------------------------------------------------- */
+
+.auth__quote {
+  position: relative;
+  padding-left: var(--space-5);
+  border-left: 2px solid var(--brand);
+}
+
+.auth__quote blockquote {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-style: italic;
+  font-weight: 300;
+  line-height: var(--leading-snug);
+  color: rgba(243, 237, 227, 0.9);
+  text-wrap: pretty;
+}
+
+.auth__quote figcaption {
+  margin-top: var(--space-3);
+  color: rgba(243, 237, 227, 0.45);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
 }
 
 /* Responsive -------------------------------------------------------------- */
@@ -231,16 +378,31 @@
   .auth__aside {
     display: none;
   }
+
+  .auth__mobile-brand {
+    display: block;
+  }
+
+  .auth__panel {
+    align-items: flex-start;
+    padding: var(--space-10) var(--space-6);
+  }
 }
 
 @media (max-width: 40rem) {
   .auth__panel {
-    padding: var(--space-6) var(--space-4) var(--space-10);
-    align-items: flex-start;
+    padding: var(--space-8) var(--space-4) var(--space-12);
   }
 
   .auth__head h1 {
     font-size: var(--text-2xl);
+  }
+
+  .auth__switch {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    width: 100%;
   }
 
   .strength__rules {

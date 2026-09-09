@@ -13,8 +13,7 @@ import { Checkbox } from '../components/ui/Checkbox'
 import { Icon } from '../components/ui/Icon'
 import { PasswordField, TextField } from '../components/ui/TextField'
 import { InlineNotice } from '../components/ui/States'
-import { AuthAside } from './AuthAside'
-import './auth.css'
+import { AuthLayout } from './AuthLayout'
 
 interface FieldErrors {
   username?: string
@@ -100,149 +99,137 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="auth">
-      <div className="auth__panel">
-        <div className="auth__form-wrap">
-          <Link className="auth__back" to="/">
-            <Icon name="arrow-left" size="0.9em" />
-            Back to Scribe
-          </Link>
+    <AuthLayout
+      variant="register"
+      title="Create your account"
+      subtitle="Free to read, free to publish. No card, no catch."
+    >
+      {formError ? <InlineNotice tone="danger">{formError}</InlineNotice> : null}
 
-          <header className="auth__head">
-            <h1>Create your account</h1>
-            <p>Free to read, free to publish. No card, no catch.</p>
-          </header>
+      <form className="auth__form" onSubmit={onSubmit} noValidate>
+        <TextField
+          label="Username"
+          autoComplete="username"
+          placeholder="quietreader"
+          hint="This is how other readers will see you."
+          value={username}
+          error={errors.username}
+          disabled={submitting}
+          maxLength={24}
+          onChange={(event) => {
+            setUsername(event.target.value)
+            setErrors((current) => ({ ...current, username: undefined }))
+          }}
+        />
 
-          {formError ? <InlineNotice tone="danger">{formError}</InlineNotice> : null}
+        <TextField
+          label="Email"
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          placeholder="you@example.com"
+          value={email}
+          error={errors.email}
+          disabled={submitting}
+          onChange={(event) => {
+            setEmail(event.target.value)
+            setErrors((current) => ({ ...current, email: undefined }))
+          }}
+        />
 
-          <form className="auth__form" onSubmit={onSubmit} noValidate>
-            <TextField
-              label="Username"
-              autoComplete="username"
-              placeholder="quietreader"
-              hint="This is how other readers will see you."
-              value={username}
-              error={errors.username}
-              disabled={submitting}
-              maxLength={24}
-              onChange={(event) => {
-                setUsername(event.target.value)
-                setErrors((current) => ({ ...current, username: undefined }))
-              }}
-            />
+        <PasswordField
+          label="Password"
+          autoComplete="new-password"
+          placeholder="Choose a password"
+          value={password}
+          error={errors.password}
+          disabled={submitting}
+          onChange={(event) => {
+            setPassword(event.target.value)
+            setErrors((current) => ({ ...current, password: undefined }))
+          }}
+          footer={
+            <div className="strength">
+              <div className="strength__meter" aria-hidden="true">
+                {[1, 2, 3, 4].map((step) => (
+                  <span
+                    key={step}
+                    className={cn(
+                      'strength__step',
+                      strength.score >= step && `is-on is-level-${strength.score}`,
+                    )}
+                  />
+                ))}
+              </div>
+              <p className="strength__label" aria-live="polite">
+                {strength.label}
+              </p>
+              <ul className="strength__rules">
+                {PASSWORD_RULES.map((rule) => {
+                  const met = strength.passed.includes(rule.id)
+                  return (
+                    <li key={rule.id} className={cn(met && 'is-met')}>
+                      <Icon name={met ? 'check-circle' : 'minus'} size="0.85em" />
+                      {rule.label}
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          }
+        />
 
-            <TextField
-              label="Email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              placeholder="you@example.com"
-              value={email}
-              error={errors.email}
-              disabled={submitting}
-              onChange={(event) => {
-                setEmail(event.target.value)
-                setErrors((current) => ({ ...current, email: undefined }))
-              }}
-            />
+        <PasswordField
+          label="Confirm password"
+          autoComplete="new-password"
+          placeholder="Re-enter your password"
+          value={confirm}
+          error={errors.confirm}
+          disabled={submitting}
+          onChange={(event) => {
+            setConfirm(event.target.value)
+            setErrors((current) => ({ ...current, confirm: undefined }))
+          }}
+        />
 
-            <PasswordField
-              label="Password"
-              autoComplete="new-password"
-              placeholder="Choose a password"
-              value={password}
-              error={errors.password}
-              disabled={submitting}
-              onChange={(event) => {
-                setPassword(event.target.value)
-                setErrors((current) => ({ ...current, password: undefined }))
-              }}
-              footer={
-                <div className="strength">
-                  <div className="strength__meter" aria-hidden="true">
-                    {[1, 2, 3, 4].map((step) => (
-                      <span
-                        key={step}
-                        className={cn(
-                          'strength__step',
-                          strength.score >= step && `is-on is-level-${strength.score}`,
-                        )}
-                      />
-                    ))}
-                  </div>
-                  <p className="strength__label" aria-live="polite">
-                    {strength.label}
-                  </p>
-                  <ul className="strength__rules">
-                    {PASSWORD_RULES.map((rule) => {
-                      const met = strength.passed.includes(rule.id)
-                      return (
-                        <li key={rule.id} className={cn(met && 'is-met')}>
-                          <Icon name={met ? 'check-circle' : 'minus'} size="0.85em" />
-                          {rule.label}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </div>
-              }
-            />
+        <Checkbox
+          checked={accepted}
+          onChange={(next) => {
+            setAccepted(next)
+            setErrors((current) => ({ ...current, terms: undefined }))
+          }}
+          error={errors.terms}
+          disabled={submitting}
+          label={
+            <>
+              I agree to the <Link to="/terms">Terms</Link> and{' '}
+              <Link to="/privacy">Privacy Policy</Link>
+            </>
+          }
+        />
 
-            <PasswordField
-              label="Confirm password"
-              autoComplete="new-password"
-              placeholder="Re-enter your password"
-              value={confirm}
-              error={errors.confirm}
-              disabled={submitting}
-              onChange={(event) => {
-                setConfirm(event.target.value)
-                setErrors((current) => ({ ...current, confirm: undefined }))
-              }}
-            />
+        <Button variant="primary" size="lg" type="submit" fullWidth loading={submitting}>
+          Create account
+        </Button>
+      </form>
 
-            <Checkbox
-              checked={accepted}
-              onChange={(next) => {
-                setAccepted(next)
-                setErrors((current) => ({ ...current, terms: undefined }))
-              }}
-              error={errors.terms}
-              disabled={submitting}
-              label={
-                <>
-                  I agree to the <Link to="/terms">Terms</Link> and{' '}
-                  <Link to="/privacy">Privacy Policy</Link>
-                </>
-              }
-            />
-
-            <Button variant="primary" size="lg" type="submit" fullWidth loading={submitting}>
-              Create Account
-            </Button>
-          </form>
-
-          <div className="auth__divider">
-            <span>or</span>
-          </div>
-
-          <Button
-            size="lg"
-            fullWidth
-            loading={googlePending}
-            onClick={onGoogle}
-            startIcon={<Icon name="google" size="1.1rem" />}
-          >
-            Continue with Google
-          </Button>
-
-          <p className="auth__alt">
-            Already have an account? <Link to="/login">Sign in</Link>
-          </p>
-        </div>
+      <div className="auth__divider">
+        <span>or</span>
       </div>
 
-      <AuthAside variant="register" />
-    </div>
+      <Button
+        size="lg"
+        fullWidth
+        loading={googlePending}
+        onClick={onGoogle}
+        startIcon={<Icon name="google" size="1.1rem" />}
+      >
+        Continue with Google
+      </Button>
+
+      <p className="auth__alt">
+        Already have an account? <Link to="/login">Sign in</Link>
+      </p>
+    </AuthLayout>
   )
 }

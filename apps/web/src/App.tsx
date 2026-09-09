@@ -10,11 +10,14 @@ import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { ForWritersPage } from './pages/ForWritersPage'
+import { PrivacyPage, TermsPage } from './pages/LegalPage'
 import { HomePage } from './pages/HomePage'
 import { DiscoverPage } from './pages/DiscoverPage'
+import { BooksPage } from './pages/BooksPage'
+import { BookDetailPage } from './pages/BookDetailPage'
 import { StoryDetailPage } from './pages/StoryDetailPage'
 import { ReaderPage } from './pages/ReaderPage'
-import { LibraryPage } from './pages/LibraryPage'
+import { MyLibraryPage } from './pages/MyLibraryPage'
 import { ClubsPage } from './pages/ClubsPage'
 import { ClubDetailPage } from './pages/ClubDetailPage'
 import { ChallengesPage } from './pages/ChallengesPage'
@@ -45,9 +48,13 @@ function App() {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/onboarding" element={<OnboardingPage />} />
                 <Route path="/for-writers" element={<ForWritersPage />} />
+                <Route path="/terms" element={<TermsPage />} />
+                <Route path="/privacy" element={<PrivacyPage />} />
 
                 {/* Browsing is open; reading a chapter is too. -------- */}
                 <Route path="/discover" element={<DiscoverPage />} />
+                <Route path="/books" element={<BooksPage />} />
+                <Route path="/book/:id" element={<BookDetailPage />} />
                 <Route path="/story/:slug" element={<StoryDetailPage />} />
                 <Route path="/read/:slug/:chapter" element={<ReaderPage />} />
                 <Route path="/clubs" element={<ClubsPage />} />
@@ -71,7 +78,7 @@ function App() {
                   path="/library"
                   element={
                     <RequireAuth>
-                      <LibraryPage />
+                      <MyLibraryPage />
                     </RequireAuth>
                   }
                 />

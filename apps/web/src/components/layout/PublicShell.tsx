@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../lib/auth'
@@ -22,6 +22,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const { session } = useAuth()
   const { resolved, toggle } = useTheme()
+  const location = useLocation()
 
   return (
     <div className="public">
@@ -81,7 +82,9 @@ export function PublicShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main id="main">{children}</main>
+      <main className="public__main" id="main" key={location.pathname}>
+        {children}
+      </main>
 
       <footer className="public__footer">
         <div className="container public__footer-inner">

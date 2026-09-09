@@ -17,6 +17,14 @@ enum ClubRole {
   MEMBER
 }
 
+enum ReadingStatus {
+  @@type("pg/text@1")
+
+  WANT_TO_READ
+  READING
+  FINISHED
+}
+
 namespace auth {
   model User {
     id        String   @id @default(uuid())
@@ -58,6 +66,13 @@ namespace content {
     likeCount       Int      @default(0)
     ratingAverage   Decimal?
     kidsAppropriate Boolean  @default(false)
+
+    // Publication metadata. Optional: works serialised on Scribe have no
+    // publisher or ISBN, while catalogued editions do.
+    isbn            String?  @unique
+    publisher       String?
+    publishedAt     DateTime?
+    pageCount       Int?
 
     author           auth.User
       @relation(fields: [authorId], references: [id])
@@ -103,6 +118,8 @@ namespace content {
   model Genre {
     id        String   @id @default(uuid())
     name      String   @unique
+    // Base hue (0-359) the UI composes cover art and chips from.
+    hue       Int      @default(268)
     createdAt DateTime @default(now())
 
     stories StoryGenre[]
@@ -300,5 +317,33 @@ namespace channels {
 
     channel BroadcastChannel
       @relation(fields: [channelId], references: [id])
+  }
+}
+
+namespace library {
+  // A book a reader has put on one of their shelves.
+  //
+  // Distinct from engagement.ReadingHistory, which tracks *where* someone is
+  // inside a story. This records only the intent -- want to read, reading,
+  // finished -- so a book can sit on a shelf with no reading progress at all.
+  model LibraryEntry {
+    id      String        @id @default(uuid())
+    userId  String
+    storyId String
+    status  ReadingStatus @default(WANT_TO_READ)
+
+    addedAt   DateTime @default(now())
+    updatedAt DateTime @default(now())
+
+    user auth.User
+      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    story content.Story
+      @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+    // One shelf slot per reader per book.
+    @@unique([userId, storyId])
+    // The shelf tabs read by user, filtered by status, newest first.
+    @@index([userId, status, addedAt])
+    @@index([storyId])
   }
 }

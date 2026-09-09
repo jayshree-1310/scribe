@@ -44,6 +44,10 @@
       "model": "Genre",
       "namespace": "content"
     },
+    "libraryEntry": {
+      "model": "LibraryEntry",
+      "namespace": "library"
+    },
     "multimedia": {
       "model": "Multimedia",
       "namespace": "content"
@@ -93,7 +97,7 @@
               "createdAt": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/timestamptz-string@1",
+                  "codecId": "pg/timestamptz-temporal@1",
                   "kind": "scalar"
                 }
               },
@@ -142,7 +146,7 @@
               "updatedAt": {
                 "nullable": false,
                 "type": {
-                  "codecId": "pg/timestamptz-string@1",
+                  "codecId": "pg/timestamptz-temporal@1",
                   "kind": "scalar"
                 }
               },
@@ -1175,6 +1179,13 @@
                   "kind": "scalar"
                 }
               },
+              "hue": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -1211,6 +1222,9 @@
               "fields": {
                 "createdAt": {
                   "column": "createdAt"
+                },
+                "hue": {
+                  "column": "hue"
                 },
                 "id": {
                   "column": "id"
@@ -1360,6 +1374,13 @@
                   "kind": "scalar"
                 }
               },
+              "isbn": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "kidsAppropriate": {
                 "nullable": false,
                 "type": {
@@ -1371,6 +1392,27 @@
                 "nullable": false,
                 "type": {
                   "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "pageCount": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "publishedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "publisher": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
               },
@@ -1530,11 +1572,23 @@
                 "isCompleted": {
                   "column": "isCompleted"
                 },
+                "isbn": {
+                  "column": "isbn"
+                },
                 "kidsAppropriate": {
                   "column": "kidsAppropriate"
                 },
                 "likeCount": {
                   "column": "likeCount"
+                },
+                "pageCount": {
+                  "column": "pageCount"
+                },
+                "publishedAt": {
+                  "column": "publishedAt"
+                },
+                "publisher": {
+                  "column": "publisher"
                 },
                 "ratingAverage": {
                   "column": "ratingAverage"
@@ -2150,6 +2204,118 @@
           }
         }
       },
+      "library": {
+        "models": {
+          "LibraryEntry": {
+            "fields": {
+              "addedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ReadingStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "storyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "story": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "storyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Story",
+                  "namespace": "content"
+                }
+              },
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "addedAt": {
+                  "column": "addedAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "storyId": {
+                  "column": "storyId"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "library",
+              "table": "libraryEntry"
+            }
+          }
+        }
+      },
       "public": {
         "enum": {
           "ClubRole": {
@@ -2189,6 +2355,23 @@
                 "value": "LINK"
               }
             ]
+          },
+          "ReadingStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "WANT_TO_READ",
+                "value": "WANT_TO_READ"
+              },
+              {
+                "name": "READING",
+                "value": "READING"
+              },
+              {
+                "name": "FINISHED",
+                "value": "FINISHED"
+              }
+            ]
           }
         },
         "models": {}
@@ -2212,10 +2395,10 @@
                   "nullable": false
                 },
                 "createdAt": {
-                  "codecId": "pg/timestamptz-string@1",
+                  "codecId": "pg/timestamptz-temporal@1",
                   "default": {
-                    "kind": "literal",
-                    "value": "now()"
+                    "expression": "now()",
+                    "kind": "function"
                   },
                   "nativeType": "timestamptz",
                   "nullable": false
@@ -2263,10 +2446,10 @@
                   "nullable": false
                 },
                 "updatedAt": {
-                  "codecId": "pg/timestamptz-string@1",
+                  "codecId": "pg/timestamptz-temporal@1",
                   "default": {
-                    "kind": "literal",
-                    "value": "now()"
+                    "expression": "now()",
+                    "kind": "function"
                   },
                   "nativeType": "timestamptz",
                   "nullable": false
@@ -3033,6 +3216,15 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "hue": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 268
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
                 "id": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -3188,6 +3380,11 @@
                   "nativeType": "bool",
                   "nullable": false
                 },
+                "isbn": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "kidsAppropriate": {
                   "codecId": "pg/bool@1",
                   "default": {
@@ -3205,6 +3402,21 @@
                   },
                   "nativeType": "int4",
                   "nullable": false
+                },
+                "pageCount": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
+                "publishedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "publisher": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
                 },
                 "ratingAverage": {
                   "codecId": "pg/numeric@1",
@@ -3268,7 +3480,13 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "isbn"
+                  ]
+                }
+              ]
             },
             "storyGenre": {
               "columns": {
@@ -3889,6 +4107,150 @@
         "id": "gamification",
         "kind": "postgres-schema"
       },
+      "library": {
+        "entries": {
+          "table": {
+            "libraryEntry": {
+              "checks": [
+                {
+                  "expression": "\"status\" IN ('WANT_TO_READ', 'READING', 'FINISHED')",
+                  "name": "libraryEntry_status_check_f8242d24",
+                  "prefix": "libraryEntry_status_check"
+                }
+              ],
+              "columns": {
+                "addedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "WANT_TO_READ"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ReadingStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "storyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "userId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "library",
+                    "tableName": "libraryEntry"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "storyId"
+                    ],
+                    "namespaceId": "library",
+                    "tableName": "libraryEntry"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "story"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "storyId"
+                  ],
+                  "name": "libraryEntry_storyId_idx_cd452158",
+                  "prefix": "libraryEntry_storyId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "libraryEntry_userId_idx_a489d58a",
+                  "prefix": "libraryEntry_userId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId",
+                    "status",
+                    "addedAt"
+                  ],
+                  "name": "libraryEntry_userId_status_addedAt_idx_0db0014a",
+                  "prefix": "libraryEntry_userId_status_addedAt_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "userId",
+                    "storyId"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "id": "library",
+        "kind": "postgres-schema"
+      },
       "public": {
         "entries": {
           "table": {},
@@ -3909,6 +4271,14 @@
                 "VIDEO",
                 "LINK"
               ]
+            },
+            "ReadingStatus": {
+              "kind": "valueSet",
+              "values": [
+                "WANT_TO_READ",
+                "READING",
+                "FINISHED"
+              ]
             }
           }
         },
@@ -3916,10 +4286,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "0c91458dd2d2808faf0fa74c6d4e1237e2d5b807a70f921c9c9468d95244fa6a"
+    "storageHash": "61cd8b821c72071de38ad69cfea3f87d9c013f889c389c048eb92d83cec6878f"
   },
   "execution": {
-    "executionHash": "425c99011d9d835b84829b160e46fd423d7e95084a330acf88cfca2358840093",
+    "executionHash": "2a8f10d344652873c2c64255cf26b8b7ef763928007ad7cae38f4ead2fc152a3",
     "mutations": {
       "defaults": [
         {
@@ -4030,6 +4400,17 @@
             "column": "id",
             "namespace": "content",
             "table": "genre"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "library",
+            "table": "libraryEntry"
           }
         },
         {

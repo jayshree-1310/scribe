@@ -9,6 +9,20 @@
       content="Scribe is where stories are read chapter by chapter and written in public. Discover serials, join book clubs, and publish your own."
     />
     <meta name="color-scheme" content="light dark" />
+
+    <!--
+      Typography: Newsreader carries the editorial voice (headings, pull
+      quotes, long-form reading) and Inter handles UI chrome. Both are
+      variable fonts loaded as a single stylesheet; if the request fails the
+      stacks in index.css fall back to system serif / sans without reflowing
+      the layout.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..600&family=Inter:wght@400..700&display=swap"
+    />
     <title>Scribe — read, write and share stories</title>
     <script>
       // Apply the stored theme before first paint so there is no flash of the
