@@ -1,108 +1,103 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from "react";
 import {
   ACCEPTED_AVATAR_TYPES,
   MAX_AVATAR_BYTES,
-  removeAvatar,
-  uploadAvatar,
-  type AccountProfile,
-} from '../../data/account-api'
-import { ApiError } from '../../lib/api-client'
-import { useToast } from '../../lib/toast'
-import { Avatar } from '../ui/Avatar'
-import { Button } from '../ui/Button'
-import { Icon } from '../ui/Icon'
-import { Lightbox } from '../ui/Lightbox'
-import type { User } from '../../types/domain'
+} from "../../data/account-api";
+import { useObjectUrl } from "../../lib/object-url";
+import { Avatar } from "../ui/Avatar";
+import { AvatarCropper } from "./AvatarCropper";
+import { Button } from "../ui/Button";
+import { Icon } from "../ui/Icon";
+import { Lightbox } from "../ui/Lightbox";
+import type { User } from "../../types/domain";
+
+/**
+ * A picture change the reader has made but not yet saved: a new file to
+ * upload, or the removal of the one the account has. `null` means the saved
+ * picture stands.
+ */
+export type PendingAvatar =
+  { kind: "file"; file: File } | { kind: "remove" } | null;
 
 interface AvatarFieldProps {
-  user: User
-  /** Called with the profile the API returns, so the session stays in step. */
-  onChange: (profile: AccountProfile) => void
+  user: User;
+  /** The staged change, owned by the form so it saves with everything else. */
+  pending: PendingAvatar;
+  onPendingChange: (pending: PendingAvatar) => void;
+  /** Set while the form is saving, so the picture cannot be changed mid-save. */
+  disabled?: boolean;
 }
 
 function readableSize(bytes: number): string {
-  return `${Math.round(bytes / (1024 * 1024))} MB`
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
 /**
- * Profile picture: preview, upload, remove.
+ * Profile picture: preview, choose, remove.
  *
- * The preview is the picture the API has, not a local object URL of the chosen
- * file — a preview that swaps ahead of the response would claim a save that
- * may still fail. The one exception is the in-flight upload, where the file is
- * shown behind a spinner so the wait has something to look at.
+ * Nothing is uploaded here. A chosen picture is cropped and then held as a
+ * `PendingAvatar` for the profile form to save alongside the text fields, so
+ * "Save changes" means the whole panel and a picture picked by mistake is
+ * undone by leaving without saving — rather than the picture being the one
+ * field on the page that committed itself the moment it was touched.
  */
-export function AvatarField({ user, onChange }: AvatarFieldProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const { showToast } = useToast()
+export function AvatarField({
+  user,
+  pending,
+  onPendingChange,
+  disabled = false,
+}: AvatarFieldProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const [pending, setPending] = useState<'upload' | 'remove' | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
-  const [viewing, setViewing] = useState(false)
+  const [error, setError] = useState<string | null>(null);
+  const [viewing, setViewing] = useState(false);
+  const [cropping, setCropping] = useState<File | null>(null);
 
-  // Object URLs are a document-lifetime leak until revoked.
-  useEffect(() => {
-    if (!preview) return
-    return () => URL.revokeObjectURL(preview)
-  }, [preview])
+  // The staged file has no URL of its own — the pending change carries the
+  // file, and the preview URL is made and revoked alongside this component.
+  const previewUrl = useObjectUrl(
+    pending?.kind === "file" ? pending.file : null,
+  );
 
-  const shown = preview ?? user.avatarUrl ?? null
+  const shown =
+    pending?.kind === "file"
+      ? previewUrl
+      : pending?.kind === "remove"
+        ? null
+        : user.avatarUrl;
 
-  async function onPick(file: File | undefined) {
+  function onPick(file: File | undefined) {
     // Reset the input, or picking the same file twice fires no change event.
-    if (inputRef.current) inputRef.current.value = ''
-    if (!file || pending) return
+    if (inputRef.current) inputRef.current.value = "";
+    if (!file || disabled) return;
 
-    setError(null)
+    setError(null);
 
     if (!ACCEPTED_AVATAR_TYPES.includes(file.type)) {
-      setError('Use a PNG, JPEG, WebP or GIF image.')
-      return
+      setError("Use a PNG, JPEG, WebP or GIF image.");
+      return;
     }
 
     if (file.size > MAX_AVATAR_BYTES) {
-      setError(`That image is too large. Pick one under ${readableSize(MAX_AVATAR_BYTES)}.`)
-      return
-    }
-
-    const objectUrl = URL.createObjectURL(file)
-    setPreview(objectUrl)
-    setPending('upload')
-
-    try {
-      onChange(await uploadAvatar(file))
-      showToast({ message: 'Profile picture updated.' })
-    } catch (cause) {
       setError(
-        cause instanceof ApiError
-          ? (cause.fieldErrors['avatar'] ?? cause.message)
-          : "We couldn't upload that picture.",
-      )
-    } finally {
-      // Either way the API's copy is now the truth: on success it is the file
-      // just uploaded, on failure it is the old picture.
-      setPreview(null)
-      setPending(null)
+        `That image is too large. Pick one under ${readableSize(MAX_AVATAR_BYTES)}.`,
+      );
+      return;
     }
+
+    // A GIF redrawn to a canvas keeps only its first frame, so an animated
+    // picture is staged whole rather than silently flattened.
+    if (file.type === "image/gif") {
+      stage(file);
+      return;
+    }
+
+    setCropping(file);
   }
 
-  async function onRemove() {
-    if (pending) return
-
-    setError(null)
-    setPending('remove')
-
-    try {
-      onChange(await removeAvatar())
-      showToast({ message: 'Profile picture removed.' })
-    } catch (cause) {
-      setError(
-        cause instanceof ApiError ? cause.message : "We couldn't remove that picture.",
-      )
-    } finally {
-      setPending(null)
-    }
+  function stage(file: File) {
+    onPendingChange({ kind: "file", file });
+    setCropping(null);
   }
 
   return (
@@ -113,7 +108,6 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
           className="avatar-field__preview"
           onClick={() => setViewing(true)}
           aria-label="View your profile picture"
-          data-pending={pending === 'upload' ? '' : undefined}
         >
           <Avatar user={{ ...user, avatarUrl: shown }} size="xl" />
         </button>
@@ -123,29 +117,44 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
 
       <div className="avatar-field__body">
         <p className="avatar-field__hint">
-          A square image works best. PNG, JPEG, WebP or GIF, up to{' '}
+          A square image works best. PNG, JPEG, WebP or GIF, up to{" "}
           {readableSize(MAX_AVATAR_BYTES)}.
         </p>
 
         <div className="avatar-field__actions">
           <Button
             onClick={() => inputRef.current?.click()}
-            loading={pending === 'upload'}
-            disabled={pending !== null}
+            disabled={disabled}
             startIcon={<Icon name="upload" size="1em" />}
           >
-            {user.avatarUrl ? 'Change picture' : 'Upload picture'}
+            {shown ? "Change" : "Upload"}
           </Button>
 
-          {user.avatarUrl ? (
+          {shown ? (
             <Button
               variant="ghost"
-              onClick={onRemove}
-              loading={pending === 'remove'}
-              disabled={pending !== null}
+              onClick={() => {
+                setError(null);
+                onPendingChange({ kind: "remove" });
+              }}
+              disabled={disabled}
               startIcon={<Icon name="trash" size="1em" />}
             >
               Remove
+            </Button>
+          ) : null}
+
+          {pending ? (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setError(null);
+                onPendingChange(null);
+              }}
+              disabled={disabled}
+              startIcon={<Icon name="retry" size="1em" />}
+            >
+              Undo
             </Button>
           ) : null}
         </div>
@@ -161,11 +170,20 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
         ref={inputRef}
         type="file"
         className="visually-hidden"
-        accept={ACCEPTED_AVATAR_TYPES.join(',')}
+        accept={ACCEPTED_AVATAR_TYPES.join(",")}
         // Labelled by the button that opens it; the input itself is never seen.
         aria-label="Choose a profile picture"
-        onChange={(event) => void onPick(event.target.files?.[0])}
+        onChange={(event) => onPick(event.target.files?.[0])}
       />
+
+      {cropping ? (
+        <AvatarCropper
+          key={`${cropping.name}:${cropping.lastModified}`}
+          file={cropping}
+          onCancel={() => setCropping(null)}
+          onConfirm={stage}
+        />
+      ) : null}
 
       {shown ? (
         <Lightbox
@@ -176,5 +194,5 @@ export function AvatarField({ user, onChange }: AvatarFieldProps) {
         />
       ) : null}
     </div>
-  )
+  );
 }

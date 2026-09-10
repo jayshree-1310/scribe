@@ -4,13 +4,15 @@ import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../lib/auth'
 import { formatCount, formatDate, formatMinutes, formatRating, formatRelative } from '../lib/format'
 import * as api from '../data/api'
+import * as books from '../data/books-api'
+import * as storiesApi from '../data/stories-api'
+import { READING_STATUS_LABELS } from '../types/books'
 import { AppShell } from '../components/layout/AppShell'
 import { Avatar } from '../components/ui/Avatar'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Card, SectionHead, StatTile } from '../components/ui/Card'
 import { StatusBadge } from '../components/ui/Chip'
 import { Icon } from '../components/ui/Icon'
-import { ProgressBar } from '../components/ui/Progress'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Lightbox } from '../components/ui/Lightbox'
 import { Tabs, TabPanel } from '../components/ui/Tabs'
@@ -32,13 +34,22 @@ const TABS = [
 
 export function ProfilePage() {
   const { username = '' } = useParams()
-  const { session } = useAuth()
+  const { session, initialising } = useAuth()
 
   const authors = useAsync(() => api.getAuthors(), [])
   const badges = useAsync(() => api.getBadges(), [])
   const clubs = useAsync(() => api.getClubs(), [])
-  const completed = useAsync(() => api.getLibrary('completed'), [])
-  const reading = useAsync(() => api.getLibrary('reading'), [])
+  // The shelves are real: `library.LibraryEntry` records intent, so these are
+  // this reader's own books. Where they are *inside* a book is reading
+  // progress, which has no endpoint yet — hence no progress bars below.
+  const completed = useAsync(
+    () => books.getLibrary({ status: 'FINISHED' }).then((view) => view.items),
+    [],
+  )
+  const reading = useAsync(
+    () => books.getLibrary({ status: 'READING' }).then((view) => view.items),
+    [],
+  )
 
   const [tab, setTab] = useState<ProfileTab>('overview')
   const [following, setFollowing] = useState(false)
@@ -49,9 +60,19 @@ export function ProfilePage() {
     ? session?.user
     : authors.data?.find((author) => author.username === username)
 
+  /**
+   * This author's stories. Their drafts come back too when they are the
+   * caller, which is what makes the signed-in view of `/profile` differ from
+   * the public one without a second endpoint.
+   */
   const stories = useAsync(
-    () => (profile ? api.getAuthorStories(profile.id) : Promise.resolve([])),
-    [profile?.id],
+    () =>
+      profile && !initialising
+        ? storiesApi
+            .listStories({ authorId: profile.id, sort: 'newest', limit: 24 })
+            .then((page) => page.items)
+        : Promise.resolve([]),
+    [profile?.id, initialising],
   )
 
   if (!profile) {
@@ -224,11 +245,10 @@ export function ProfilePage() {
               <EmptyState size="sm" icon="book-open" title="Nothing in progress" />
             ) : (
               <ul className="mini-shelf">
-                {reading.data?.slice(0, 6).map(({ story, history }) => (
-                  <li key={story.id}>
-                    <Link to={`/story/${story.slug}`}>
-                      <StoryCover story={story} size="sm" />
-                      <ProgressBar value={history.storyProgress} label="Progress" />
+                {reading.data?.slice(0, 6).map((entry) => (
+                  <li key={entry.id}>
+                    <Link to={`/book/${entry.book.id}`}>
+                      <StoryCover story={entry.book} size="sm" />
                     </Link>
                   </li>
                 ))}
@@ -282,26 +302,25 @@ export function ProfilePage() {
         <TabPanel id="activity">
           <Card padded={false}>
             <ul className="activity">
-              {[...(reading.data ?? []), ...(completed.data ?? [])].map(
-                ({ history, story, chapter }) => (
-                  <li key={history.id}>
-                    <span className="activity__icon">
-                      <Icon
-                        name={history.storyProgress >= 1 ? 'check-circle' : 'book-open'}
-                        size="1rem"
-                      />
+              {[...(reading.data ?? []), ...(completed.data ?? [])].map((entry) => (
+                <li key={entry.id}>
+                  <span className="activity__icon">
+                    <Icon
+                      name={entry.status === 'FINISHED' ? 'check-circle' : 'book-open'}
+                      size="1rem"
+                    />
+                  </span>
+                  <span className="activity__body">
+                    <span>
+                      {READING_STATUS_LABELS[entry.status]}{' '}
+                      <Link to={`/book/${entry.book.id}`}>{entry.book.title}</Link>
                     </span>
-                    <span className="activity__body">
-                      <span>
-                        {history.storyProgress >= 1 ? 'Finished' : 'Read'}{' '}
-                        <Link to={`/story/${story.slug}`}>{story.title}</Link>
-                        {history.storyProgress < 1 ? ` — chapter ${chapter.number}` : ''}
-                      </span>
-                      <span className="activity__when">{formatRelative(history.lastReadAt)}</span>
+                    <span className="activity__when">
+                      {formatRelative(entry.updatedAt)}
                     </span>
-                  </li>
-                ),
-              )}
+                  </span>
+                </li>
+              ))}
             </ul>
           </Card>
         </TabPanel>

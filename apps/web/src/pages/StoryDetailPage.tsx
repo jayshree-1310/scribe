@@ -10,7 +10,12 @@ import {
   formatRating,
   formatRelative,
 } from '../lib/format'
-import * as api from '../data/api'
+import * as stories from '../data/stories-api'
+import {
+  STORY_STATUS_LABELS,
+  readingMinutes,
+  storyAuthorName,
+} from '../types/stories'
 import { AppShell } from '../components/layout/AppShell'
 import { Avatar } from '../components/ui/Avatar'
 import { Button, ButtonLink } from '../components/ui/Button'
@@ -23,8 +28,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Tabs, TabPanel } from '../components/ui/Tabs'
 import { TextField } from '../components/ui/TextField'
 import { EmptyState, ErrorState } from '../components/ui/States'
-import { RatingBars } from '../components/charts/RatingBars'
-import { StoryCard } from '../components/story/StoryCard'
+import { StoryCard, StoryCardSkeleton } from '../components/story/StoryCard'
 import { StoryCover } from '../components/story/StoryCover'
 import './pages.css'
 import './story-detail.css'
@@ -41,41 +45,32 @@ export function StoryDetailPage() {
   const { slug = '' } = useParams()
   const { showToast } = useToast()
 
-  const story = useAsync(() => api.getStory(slug), [slug])
+  const story = useAsync(() => stories.getStory(slug), [slug])
   const storyId = story.data?.id
 
   const chapters = useAsync(
-    () => (storyId ? api.getChapters(storyId) : Promise.resolve([])),
-    [storyId],
-  )
-  const comments = useAsync(
-    () => (storyId ? api.getComments(storyId) : Promise.resolve([])),
-    [storyId],
-  )
-  const reviews = useAsync(
-    () => (storyId ? api.getRatings(storyId) : Promise.resolve([])),
+    () => (storyId ? stories.getChapters(storyId) : Promise.resolve([])),
     [storyId],
   )
   const similar = useAsync(
-    () => (story.data ? api.getSimilarStories(story.data) : Promise.resolve([])),
-    [storyId],
-  )
-  const reading = useAsync(
-    () => (storyId ? api.getReadingEntryForStory(storyId) : Promise.resolve(null)),
+    () => (storyId ? stories.getRelatedStories(storyId) : Promise.resolve([])),
     [storyId],
   )
 
+  /**
+   * Comments and written reviews have no endpoints yet, so both tabs show an
+   * empty state and the two forms below report that rather than pretending to
+   * save. The rating *counts* in the header are real.
+   */
   const [tab, setTab] = useState<DetailTab>('chapters')
   const [inLibrary, setInLibrary] = useState(false)
   const [rateOpen, setRateOpen] = useState(false)
   const [score, setScore] = useState(0)
   const [review, setReview] = useState('')
   const [ratingError, setRatingError] = useState<string | null>(null)
-  const [savingRating, setSavingRating] = useState(false)
+  const [savingRating] = useState(false)
   const [commentBody, setCommentBody] = useState('')
   const [commentError, setCommentError] = useState<string | null>(null)
-  const [postingComment, setPostingComment] = useState(false)
-  const [localComments, setLocalComments] = useState<api.CommentWithUser[]>([])
 
   if (story.status === 'loading') {
     return (
@@ -107,53 +102,19 @@ export function StoryDetailPage() {
 
   const data = story.data
   const hue = data.genres[0]?.hue ?? 268
-  const breakdown = api.getRatingBreakdown(data)
-  const resumeChapter = reading.data?.chapter.number ?? 1
-  const allComments = [...localComments, ...(comments.data ?? [])]
+  const authorName = storyAuthorName(data.author)
 
-  async function onSaveRating() {
-    if (score === 0) {
-      setRatingError('Choose a star rating first.')
-      return
-    }
+  // No reading-progress endpoint yet, so every reader starts at the first
+  // chapter that exists rather than where they left off.
+  const firstChapter = chapters.data?.[0]?.number ?? 1
 
-    setSavingRating(true)
-    setRatingError(null)
-    try {
-      // Ratings post through the same path a real endpoint will use.
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      setRateOpen(false)
-      showToast({ message: `You rated “${data.title}” ${score} ${score === 1 ? 'star' : 'stars'}.` })
-    } catch {
-      setRatingError('We could not save your rating. Please try again.')
-    } finally {
-      setSavingRating(false)
-    }
+  function onSaveRating() {
+    setRatingError('Ratings cannot be saved yet — there is no endpoint behind this form.')
   }
 
-  async function onPostComment(event: React.FormEvent) {
+  function onPostComment(event: React.FormEvent) {
     event.preventDefault()
-    if (postingComment) return
-
-    if (commentBody.trim().length === 0) {
-      setCommentError('Write something before posting.')
-      return
-    }
-
-    setPostingComment(true)
-    setCommentError(null)
-    try {
-      const posted = await api.addComment(data.id, commentBody)
-      setLocalComments((current) => [posted, ...current])
-      setCommentBody('')
-      showToast({ message: 'Comment posted.' })
-    } catch (error) {
-      setCommentError(
-        error instanceof Error ? error.message : 'We could not post that. Please try again.',
-      )
-    } finally {
-      setPostingComment(false)
-    }
+    setCommentError('Comments cannot be posted yet — there is no endpoint behind this form.')
   }
 
   async function onShare() {
@@ -196,11 +157,13 @@ export function StoryDetailPage() {
                 <GenreChip key={genre.id} genre={genre} asLink />
               ))}
               {data.status === 'completed' ? (
-                <StatusBadge tone="success">Completed</StatusBadge>
-              ) : data.status === 'hiatus' ? (
-                <StatusBadge tone="warning">On hiatus</StatusBadge>
+                <StatusBadge tone="success">
+                  {STORY_STATUS_LABELS.completed}
+                </StatusBadge>
+              ) : data.status === 'draft' ? (
+                <StatusBadge tone="warning">{STORY_STATUS_LABELS.draft}</StatusBadge>
               ) : (
-                <StatusBadge tone="brand">Ongoing</StatusBadge>
+                <StatusBadge tone="brand">{STORY_STATUS_LABELS.ongoing}</StatusBadge>
               )}
               {data.kidsAppropriate ? (
                 <StatusBadge tone="neutral">Kid-friendly</StatusBadge>
@@ -212,20 +175,25 @@ export function StoryDetailPage() {
             <Link className="detail__author" to={`/profile/${data.author.username}`}>
               <Avatar user={data.author} size="sm" />
               <span>
-                by <strong>{data.author.displayName}</strong>
+                by <strong>{authorName}</strong>
               </span>
             </Link>
 
             <div className="detail__rating">
-              <Stars value={data.ratingAverage} size="1.1rem" />
-              <strong>{formatRating(data.ratingAverage)}</strong>
-              <span>
-                {formatCount(data.ratingCount)} ratings · {formatCount(data.commentCount)}{' '}
-                comments
-              </span>
+              <Stars value={data.ratingAverage ?? 0} size="1.1rem" />
+              <strong>
+                {data.ratingAverage === null
+                  ? 'Not rated yet'
+                  : formatRating(data.ratingAverage)}
+              </strong>
+              {data.ratingCount > 0 ? (
+                <span>{formatCount(data.ratingCount)} ratings</span>
+              ) : null}
             </div>
 
-            <p className="detail__synopsis">{data.synopsis}</p>
+            {data.description ? (
+              <p className="detail__synopsis">{data.description}</p>
+            ) : null}
 
             <dl className="detail__facts">
               <div>
@@ -242,7 +210,7 @@ export function StoryDetailPage() {
               </div>
               <div>
                 <dt>Length</dt>
-                <dd>{formatMinutes(data.wordCount / 220)}</dd>
+                <dd>{formatMinutes(readingMinutes(data.wordCount))}</dd>
               </div>
               <div>
                 <dt>Updated</dt>
@@ -251,16 +219,22 @@ export function StoryDetailPage() {
             </dl>
 
             <div className="detail__actions">
-              <ButtonLink
-                variant="primary"
-                size="lg"
-                to={`/read/${data.slug}/${resumeChapter}`}
-                startIcon={<Icon name="book-open" />}
-              >
-                {reading.data && reading.data.history.storyProgress > 0
-                  ? `Continue chapter ${resumeChapter}`
-                  : 'Read Now'}
-              </ButtonLink>
+              {/* A catalogue import has no chapters to open, and neither does
+                  a story whose author has not published one yet. */}
+              {data.chapterCount === 0 ? (
+                <Button variant="primary" size="lg" disabled startIcon={<Icon name="book-open" />}>
+                  No chapters yet
+                </Button>
+              ) : (
+                <ButtonLink
+                  variant="primary"
+                  size="lg"
+                  to={`/read/${data.slug}/${firstChapter}`}
+                  startIcon={<Icon name="book-open" />}
+                >
+                  Read Now
+                </ButtonLink>
+              )}
 
               <Button
                 size="lg"
@@ -297,8 +271,8 @@ export function StoryDetailPage() {
             item.id === 'chapters'
               ? { ...item, count: data.chapterCount }
               : item.id === 'comments'
-                ? { ...item, count: allComments.length }
-                : { ...item, count: reviews.data?.length },
+                ? { ...item, count: 0 }
+                : { ...item, count: data.ratingCount },
           )}
           active={tab}
           onChange={setTab}
@@ -308,7 +282,14 @@ export function StoryDetailPage() {
 
       {tab === 'chapters' ? (
         <TabPanel id="chapters">
-          {chapters.status === 'error' ? (
+          {chapters.status === 'ready' && chapters.data?.length === 0 ? (
+            <EmptyState
+              icon="book"
+              size="sm"
+              title="No chapters published yet"
+              description="Check back — the author has not posted a first chapter."
+            />
+          ) : chapters.status === 'error' ? (
             <ErrorState message={chapters.error} onRetry={chapters.reload} />
           ) : chapters.status === 'loading' ? (
             <ul className="chapter-list">
@@ -326,22 +307,12 @@ export function StoryDetailPage() {
                     <span className="chapter-row__number">{chapter.number}</span>
                     <span className="chapter-row__text">
                       <span className="chapter-row__title">{chapter.title}</span>
+                      {/* Attachments are deliberately absent: the chapter
+                          list endpoint returns no bodies and no media, so a
+                          count here would cost a request per row. */}
                       <span className="chapter-row__meta">
                         {chapter.publishedAt ? formatDate(chapter.publishedAt) : 'Unpublished'} ·{' '}
-                        {chapter.readingMinutes} min read
-                        {chapter.multimedia.length > 0 ? (
-                          <>
-                            {' · '}
-                            <span className="chapter-row__media">
-                              <Icon
-                                name={chapter.multimedia[0]!.kind === 'audio' ? 'audio' : 'image'}
-                                size="0.85em"
-                              />
-                              {chapter.multimedia.length} attachment
-                              {chapter.multimedia.length === 1 ? '' : 's'}
-                            </span>
-                          </>
-                        ) : null}
+                        {readingMinutes(chapter.wordCount)} min read
                       </span>
                     </span>
                     <Icon name="chevron-right" size="1rem" />
@@ -357,39 +328,29 @@ export function StoryDetailPage() {
         <TabPanel id="reviews">
           <div className="reviews">
             <Card className="reviews__summary">
-              <p className="reviews__score">{formatRating(data.ratingAverage)}</p>
-              <Stars value={data.ratingAverage} size="1.1rem" />
-              <p className="reviews__count">{formatCount(data.ratingCount)} ratings</p>
-              <RatingBars breakdown={breakdown} total={data.ratingCount} />
+              <p className="reviews__score">
+                {data.ratingAverage === null ? '—' : formatRating(data.ratingAverage)}
+              </p>
+              <Stars value={data.ratingAverage ?? 0} size="1.1rem" />
+              <p className="reviews__count">
+                {formatCount(data.ratingCount)}{' '}
+                {data.ratingCount === 1 ? 'rating' : 'ratings'}
+              </p>
+              {/* The score distribution bars used to be fabricated from
+                  hardcoded weights. Rendering them against a real rating count
+                  would be a lie, so they wait for a real breakdown endpoint. */}
               <Button fullWidth onClick={() => setRateOpen(true)} startIcon={<Icon name="star" />}>
                 Write a review
               </Button>
             </Card>
 
             <div className="reviews__list">
-              {reviews.status === 'error' ? (
-                <ErrorState message={reviews.error} onRetry={reviews.reload} />
-              ) : reviews.data?.length === 0 ? (
-                <EmptyState icon="star" size="sm" title="No written reviews yet" />
-              ) : (
-                reviews.data
-                  ?.filter((entry) => entry.review)
-                  .map((entry) => (
-                    <article className="review" key={entry.id}>
-                      <header>
-                        <Avatar user={entry.user} size="sm" />
-                        <div>
-                          <p className="review__name">{entry.user.displayName}</p>
-                          <p className="review__meta">
-                            <Stars value={entry.score} size="0.8em" />
-                            {formatRelative(entry.createdAt)}
-                          </p>
-                        </div>
-                      </header>
-                      <p className="review__body">{entry.review}</p>
-                    </article>
-                  ))
-              )}
+              <EmptyState
+                icon="star"
+                size="sm"
+                title="No written reviews yet"
+                description="Reviews arrive with the ratings endpoint."
+              />
             </div>
           </div>
         </TabPanel>
@@ -407,7 +368,6 @@ export function StoryDetailPage() {
               error={commentError ?? undefined}
               maxLength={1000}
               counterMax={1000}
-              disabled={postingComment}
               onChange={(event) => {
                 setCommentBody(event.target.value)
                 setCommentError(null)
@@ -417,7 +377,6 @@ export function StoryDetailPage() {
               <Button
                 variant="primary"
                 type="submit"
-                loading={postingComment}
                 startIcon={<Icon name="send" size="0.95em" />}
               >
                 Post comment
@@ -425,41 +384,12 @@ export function StoryDetailPage() {
             </div>
           </form>
 
-          {comments.status === 'error' ? (
-            <ErrorState message={comments.error} onRetry={comments.reload} />
-          ) : allComments.length === 0 ? (
-            <EmptyState
-              icon="comment"
-              size="sm"
-              title="No comments yet"
-              description="Be the first to say something about this story."
-            />
-          ) : (
-            <ul className="comment-list">
-              {allComments.map((comment) => (
-                <li className="comment" key={comment.id}>
-                  <Avatar user={comment.user} size="sm" />
-                  <div className="comment__body">
-                    <p className="comment__head">
-                      <strong>{comment.user.displayName}</strong>
-                      <span>{formatRelative(comment.createdAt)}</span>
-                    </p>
-                    <p className="comment__text">{comment.body}</p>
-                    <p className="comment__actions">
-                      <span>
-                        <Icon name="heart" size="0.9em" />
-                        {formatCount(comment.likeCount)}
-                      </span>
-                      <span>
-                        <Icon name="comment" size="0.9em" />
-                        {comment.replyCount} replies
-                      </span>
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+          <EmptyState
+            icon="comment"
+            size="sm"
+            title="No comments yet"
+            description="Commenting arrives with the comments endpoint."
+          />
         </TabPanel>
       ) : null}
 
@@ -470,25 +400,14 @@ export function StoryDetailPage() {
           <Avatar user={data.author} size="xl" />
           <div className="author-panel__body">
             <h3>
-              <Link to={`/profile/${data.author.username}`}>{data.author.displayName}</Link>
+              <Link to={`/profile/${data.author.username}`}>{authorName}</Link>
             </h3>
             <p className="author-panel__handle">@{data.author.username}</p>
-            <p className="author-panel__bio">{data.author.bio}</p>
-            <p className="author-panel__stats">
-              <span>
-                <Icon name="users" size="0.9em" />
-                {formatCount(data.author.followerCount)} followers
-              </span>
-              <span>
-                <Icon name="calendar" size="0.9em" />
-                Joined {formatDate(data.author.joinedAt)}
-              </span>
-            </p>
+            {/* Bio, follower count and join date come from the public profile
+                endpoint, which does not exist yet -- and a Follow button needs
+                a follow relationship, which the schema has no table for. */}
           </div>
           <div className="author-panel__actions">
-            <Button variant="primary" startIcon={<Icon name="user-plus" size="1em" />}>
-              Follow
-            </Button>
             <ButtonLink to={`/profile/${data.author.username}`}>View profile</ButtonLink>
           </div>
         </Card>
@@ -497,7 +416,15 @@ export function StoryDetailPage() {
       {/* Similar -------------------------------------------------------- */}
       <section className="page-section">
         <SectionHead title="Readers also enjoyed" />
-        {similar.data?.length === 0 ? (
+        {similar.status === 'error' ? (
+          <ErrorState message={similar.error} onRetry={similar.reload} />
+        ) : similar.status === 'loading' ? (
+          <div className="story-grid">
+            {Array.from({ length: 4 }, (_, index) => (
+              <StoryCardSkeleton key={index} />
+            ))}
+          </div>
+        ) : similar.data?.length === 0 ? (
           <EmptyState icon="book" size="sm" title="Nothing similar yet" />
         ) : (
           <div className="story-grid">

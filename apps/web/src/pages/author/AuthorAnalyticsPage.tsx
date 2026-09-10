@@ -1,70 +1,85 @@
 import { useState } from 'react'
 import { useAsync } from '../../hooks/useAsync'
 import { useAuth } from '../../lib/auth'
-import { formatCount, formatRating } from '../../lib/format'
-import * as api from '../../data/api'
+import { formatCount, formatRating, formatRelative } from '../../lib/format'
+import * as storiesApi from '../../data/stories-api'
+import { STORY_STATUS_LABELS, readingMinutes } from '../../types/stories'
 import { AppShell } from '../../components/layout/AppShell'
 import { Card, SectionHead, StatTile } from '../../components/ui/Card'
+import { StatusBadge } from '../../components/ui/Chip'
 import { Icon } from '../../components/ui/Icon'
 import { Select } from '../../components/ui/Select'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { EmptyState, ErrorState } from '../../components/ui/States'
-import { LineChart } from '../../components/charts/LineChart'
-import { RatingBars } from '../../components/charts/RatingBars'
 import { StoryCover } from '../../components/story/StoryCover'
 import '../pages.css'
 import './author.css'
 
-const RANGES = [
-  { value: '7', label: 'Last 7 days' },
-  { value: '30', label: 'Last 30 days' },
-]
-
+/**
+ * What this page can honestly show.
+ *
+ * `viewCount` and `likeCount` are lifetime counters on the story row; ratings
+ * are real rows. Nothing records *when* a view or a read happened, so there is
+ * no time series, no read count and no read-through rate here — all three used
+ * to be generated in the browser (reads were views × 0.46, and the traffic
+ * chart came from a random-walk generator). They come back with view and
+ * chapter-read events.
+ */
 export function AuthorAnalyticsPage() {
-  const { session } = useAuth()
-  const authorId = session?.user.id ?? 'u-me'
+  const { session, initialising } = useAuth()
+  const authorId = initialising ? undefined : session?.user.id
 
-  const overview = useAsync(() => api.getAuthorOverview(authorId), [authorId])
-  const [range, setRange] = useState('30')
+  const overview = useAsync(
+    () =>
+      authorId
+        ? storiesApi
+            .listStories({ authorId, sort: 'views', limit: 48 })
+            .then((page) => page.items)
+        : Promise.resolve([]),
+    [authorId],
+  )
+
   const [storyId, setStoryId] = useState('all')
 
-  const stories = overview.data?.stories ?? []
+  const stories = overview.data ?? []
   const selected = stories.find((story) => story.id === storyId) ?? null
+  const scope = selected ? [selected] : stories
 
-  const series = (() => {
-    const base = selected ? api.db.viewSeries(selected.id) : (overview.data?.series ?? [])
-    return range === '7' ? base.slice(-7) : base
-  })()
+  const totals = {
+    views: scope.reduce((sum, story) => sum + story.viewCount, 0),
+    likes: scope.reduce((sum, story) => sum + story.likeCount, 0),
+    chapters: scope.reduce((sum, story) => sum + story.chapterCount, 0),
+    words: scope.reduce((sum, story) => sum + story.wordCount, 0),
+    ratings: scope.reduce((sum, story) => sum + story.ratingCount, 0),
+  }
 
-  const totals = series.reduce(
-    (sum, point) => ({ views: sum.views + point.views, reads: sum.reads + point.reads }),
-    { views: 0, reads: 0 },
-  )
+  const rated = scope.filter((story) => story.ratingAverage !== null)
+  const averageRating =
+    rated.length === 0
+      ? null
+      : rated.reduce((sum, story) => sum + (story.ratingAverage ?? 0), 0) / rated.length
 
   return (
     <AppShell variant="author">
       <header className="page-head">
         <div>
           <h1 className="page-head__title">Analytics</h1>
-          <p className="page-head__sub">
-            What readers actually finish, and which chapter they stop at.
-          </p>
+          <p className="page-head__sub">How your stories are doing so far.</p>
         </div>
       </header>
 
       {overview.status === 'error' ? (
         <ErrorState message={overview.error} onRetry={overview.reload} />
-      ) : overview.status === 'loading' ? (
+      ) : overview.status === 'loading' || authorId === undefined ? (
         <Skeleton height="20rem" radius="var(--radius-lg)" />
       ) : stories.length === 0 ? (
         <EmptyState
           icon="trend"
-          title="No analytics yet"
-          description="Publish a chapter and numbers start arriving here within the hour."
+          title="No stories yet"
+          description="Publish a chapter and its figures will appear here."
         />
       ) : (
         <>
-          {/* Filters sit in one row above the charts. */}
           <div className="analytics__filters">
             <Select
               label="Story"
@@ -76,94 +91,87 @@ export function AuthorAnalyticsPage() {
               ]}
               size="sm"
             />
-            <Select label="Range" value={range} onChange={setRange} options={RANGES} size="sm" />
           </div>
 
           <div className="stat-row">
             <StatTile label="Views" value={formatCount(totals.views)} icon="eye" />
-            <StatTile label="Reads" value={formatCount(totals.reads)} icon="book-open" />
-            <StatTile
-              label="Read-through"
-              value={`${Math.round((totals.reads / (totals.views || 1)) * 100)}%`}
-              icon="target"
-            />
+            <StatTile label="Likes" value={formatCount(totals.likes)} icon="heart" />
             <StatTile
               label="Average rating"
-              value={
-                selected
-                  ? formatRating(selected.ratingAverage)
-                  : formatRating(overview.data?.averageRating ?? 0)
-              }
+              value={averageRating === null ? '—' : formatRating(averageRating)}
+              detail={`${formatCount(totals.ratings)} ${totals.ratings === 1 ? 'rating' : 'ratings'}`}
               icon="star"
+            />
+            <StatTile
+              label="Published"
+              value={formatCount(totals.chapters)}
+              detail={`${formatCount(totals.words)} words`}
+              icon="book-open"
             />
           </div>
 
           <section className="page-section">
             <SectionHead
-              title={selected ? `${selected.title} — traffic` : 'All stories — traffic'}
-              subtitle={`Views and reads, ${range === '7' ? 'last 7 days' : 'last 30 days'}.`}
+              title="Views and reads over time"
+              subtitle="Needs per-day figures, which are not recorded yet."
             />
             <Card>
-              <LineChart data={series} title="Views and reads over time" height={280} />
+              <EmptyState
+                size="sm"
+                icon="trend"
+                title="No day-by-day figures yet"
+                description="Views above are lifetime totals. A daily series, a read count and a read-through rate all need a story view and a chapter read to be recorded as events first."
+              />
             </Card>
           </section>
 
-          <div className="two-col">
-            <section className="page-section">
-              <SectionHead title="Ratings" subtitle="How readers scored the work." />
-              <Card>
-                {selected ? (
-                  <RatingBars
-                    breakdown={api.getRatingBreakdown(selected)}
-                    total={selected.ratingCount}
-                  />
-                ) : (
-                  <RatingBars
-                    breakdown={stories.reduce<Record<number, number>>((totalsByScore, story) => {
-                      const breakdown = api.getRatingBreakdown(story)
-                      for (const [score, count] of Object.entries(breakdown)) {
-                        const key = Number(score)
-                        totalsByScore[key] = (totalsByScore[key] ?? 0) + count
-                      }
-                      return totalsByScore
-                    }, {})}
-                    total={stories.reduce((sum, story) => sum + story.ratingCount, 0)}
-                  />
-                )}
-              </Card>
-            </section>
-
-            <section className="page-section">
-              <SectionHead title="Per story" subtitle="Ranked by views." />
-              <Card padded={false}>
-                <ul className="story-rows">
-                  {[...stories]
-                    .sort((a, b) => b.viewCount - a.viewCount)
-                    .map((story) => (
-                      <li key={story.id}>
-                        <button
-                          type="button"
-                          className="story-row story-row--button"
-                          onClick={() => setStoryId(story.id)}
-                        >
-                          <StoryCover story={story} size="xs" />
-                          <span className="story-row__main">
-                            <span className="story-row__title">{story.title}</span>
-                            <span className="story-row__meta">
-                              {story.chapterCount} chapters
-                            </span>
-                          </span>
-                          <span className="story-row__stat">
-                            <Icon name="eye" size="0.9em" />
-                            {formatCount(story.viewCount)}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                </ul>
-              </Card>
-            </section>
-          </div>
+          <section className="page-section">
+            <SectionHead title="Per story" subtitle="Ranked by views." />
+            <Card padded={false}>
+              <ul className="story-rows">
+                {stories.map((story) => (
+                  <li key={story.id}>
+                    <button
+                      type="button"
+                      className="story-row story-row--button"
+                      onClick={() => setStoryId(story.id)}
+                    >
+                      <StoryCover story={story} size="xs" />
+                      <span className="story-row__main">
+                        <span className="story-row__title">{story.title}</span>
+                        <span className="story-row__meta">
+                          {story.chapterCount} chapters ·{' '}
+                          {readingMinutes(story.wordCount)} min · updated{' '}
+                          {formatRelative(story.updatedAt)}
+                        </span>
+                      </span>
+                      <span className="story-row__stat">
+                        <Icon name="eye" size="0.9em" />
+                        {formatCount(story.viewCount)}
+                      </span>
+                      <span className="story-row__stat">
+                        <Icon name="star-filled" size="0.9em" />
+                        {story.ratingAverage === null
+                          ? '—'
+                          : formatRating(story.ratingAverage)}
+                      </span>
+                      <StatusBadge
+                        tone={
+                          story.status === 'completed'
+                            ? 'success'
+                            : story.status === 'draft'
+                              ? 'neutral'
+                              : 'brand'
+                        }
+                      >
+                        {STORY_STATUS_LABELS[story.status]}
+                      </StatusBadge>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </section>
         </>
       )}
     </AppShell>

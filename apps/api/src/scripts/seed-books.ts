@@ -9,12 +9,14 @@
 
 import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.js";
+import { uniqueSlug } from "../lib/slug.js";
 import { deleteAll } from "../prisma/delete-all.js";
 import {
   DEMO_READER_ID,
   DEMO_READER_USERNAME,
   fetchCatalogue,
   type RawBook,
+  type RawChapter,
 } from "../data/catalogue-source.js";
 
 /**
@@ -56,6 +58,24 @@ async function upsertGenre(name: string, hue: number): Promise<string> {
   return created.id;
 }
 
+/**
+ * A slug for a catalogue title that no other story has taken.
+ *
+ * Catalogue rows are addressed by id on the web app's `/book/:id` route, but
+ * the column is NOT NULL and shared with authored stories, so imports need one
+ * too -- and it makes `/story/:slug` work for an imported edition.
+ */
+async function catalogueSlug(title: string, storyId: string | null): Promise<string> {
+  return uniqueSlug(title, async (candidate) => {
+    const clash = await db.orm.content.Story.select("id")
+      .where((story) => story.slug.eq(candidate))
+      .first();
+
+    // Re-seeding an existing book must not treat its own slug as taken.
+    return clash !== undefined && clash !== null && clash.id !== storyId;
+  });
+}
+
 async function upsertBook(
   book: RawBook,
   authorId: string,
@@ -64,6 +84,7 @@ async function upsertBook(
   const fields = {
     authorId,
     title: book.title,
+    source: "CATALOGUE" as const,
     description: book.description,
     publisher: book.publisher,
     publishedAt: Temporal.Instant.from(`${book.publishedAt}T00:00:00Z`),
@@ -89,10 +110,16 @@ async function upsertBook(
         await db.orm.content.Story.create({
           ...fields,
           isbn: book.isbn,
+          slug: await catalogueSlug(book.title, null),
+          // An import is readable the moment it lands; only stories written on
+          // Scribe pass through a draft state.
+          listedAt: Temporal.Now.instant(),
           // Covers are generated from the book's own data by the web app.
           coverUrl: null,
         })
       ).id;
+
+  await upsertChapters(storyId, book.chapters ?? []);
 
   // Rewrite the genre links so a changed genre list in the source converges.
   await deleteAll(() =>
@@ -103,6 +130,47 @@ async function upsertBook(
   }
 
   return existing ? "updated" : "created";
+}
+
+/** Words, counted the way a reader would: runs of non-space characters. */
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * Writes the book's sample chapters, so a catalogue title can be opened in the
+ * reader rather than only shelved. Matched on chapter number, so re-seeding
+ * rewrites in place.
+ */
+async function upsertChapters(
+  storyId: string,
+  chapters: RawChapter[],
+): Promise<void> {
+  for (const [index, chapter] of chapters.entries()) {
+    const content = chapter.paragraphs.join("\n\n");
+    const chapterNumber = index + 1;
+
+    const fields = {
+      title: chapter.title,
+      content,
+      wordCount: countWords(content),
+      publishedAt: Temporal.Now.instant(),
+      updatedAt: Temporal.Now.instant(),
+    };
+
+    const existing = await db.orm.content.Chapter.select("id")
+      .where((item) => item.storyId.eq(storyId))
+      .where((item) => item.chapterNumber.eq(chapterNumber))
+      .first();
+
+    if (existing) {
+      await db.orm.content.Chapter.where((item) => item.id.eq(existing.id)).update(
+        fields,
+      );
+    } else {
+      await db.orm.content.Chapter.create({ ...fields, storyId, chapterNumber });
+    }
+  }
 }
 
 /** A real row for the web app to act as before authentication is wired up. */

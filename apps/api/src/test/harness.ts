@@ -1,5 +1,5 @@
 /**
- * Integration-test harness for the Books + Library routes.
+ * Integration-test harness for the Books, Library and Stories routes.
  *
  * The suites run against the development Postgres (`docker compose up
  * postgres`). Everything a suite creates is namespaced by a per-run prefix and
@@ -14,6 +14,7 @@ import app from "../app.js";
 import { db } from "../prisma/db.js";
 import { deleteAll } from "../prisma/delete-all.js";
 import { DEV_USER_HEADER } from "../middleware/current-user.js";
+import { slugify } from "../lib/slug.js";
 
 export interface ApiResponse<T = any> {
   status: number;
@@ -31,6 +32,8 @@ export class TestApi {
   private readonly created = {
     entries: [] as string[],
     links: [] as { storyId: string; genreId: string }[],
+    multimedia: [] as string[],
+    chapters: [] as string[],
     stories: [] as string[],
     genres: [] as string[],
     users: [] as string[],
@@ -125,6 +128,12 @@ export class TestApi {
       authorId: input.authorId,
       title: input.title,
       description: `${input.title} — fixture`,
+      // Unique per run, and never a slugified title: a fixture must not be
+      // able to collide with a seeded story's slug.
+      slug: `${this.runId}-${slugify(input.title)}`.slice(0, 80),
+      source: "CATALOGUE",
+      // Catalogue imports are readable the moment they land.
+      listedAt: Temporal.Now.instant(),
       isbn: input.isbn ?? `${this.runId}-${input.title}`.slice(0, 40),
       publisher: input.publisher ?? "Fixture Press",
       publishedAt: Temporal.Instant.from(
@@ -148,9 +157,108 @@ export class TestApi {
     return story.id;
   }
 
+  /**
+   * An authored story -- `source = SCRIBE`, addressed by slug, chaptered.
+   *
+   * Listed by default; pass `listed: false` for a draft, which only its author
+   * may see.
+   */
+  async createStory(input: {
+    title: string;
+    authorId: string;
+    genreIds?: string[];
+    slug?: string;
+    listed?: boolean;
+    isCompleted?: boolean;
+    ratingAverage?: number | null;
+    viewCount?: number;
+    likeCount?: number;
+  }): Promise<{ id: string; slug: string }> {
+    const slug = `${this.runId}-${input.slug ?? slugify(input.title)}`.slice(0, 80);
+
+    const story = await db.orm.content.Story.select("id").create({
+      authorId: input.authorId,
+      title: input.title,
+      description: `${input.title} — fixture`,
+      slug,
+      source: "SCRIBE",
+      listedAt: input.listed === false ? null : Temporal.Now.instant(),
+      isCompleted: input.isCompleted ?? false,
+      ratingAverage:
+        input.ratingAverage === null ? null : String(input.ratingAverage ?? 4),
+      viewCount: input.viewCount ?? 0,
+      likeCount: input.likeCount ?? 0,
+    });
+
+    this.created.stories.push(story.id);
+
+    for (const genreId of input.genreIds ?? []) {
+      await db.orm.content.StoryGenre.create({ storyId: story.id, genreId });
+      this.created.links.push({ storyId: story.id, genreId });
+    }
+
+    return { id: story.id, slug };
+  }
+
+  /** A chapter of an authored story. Published unless told otherwise. */
+  async createChapter(input: {
+    storyId: string;
+    number: number;
+    title?: string;
+    content?: string;
+    wordCount?: number;
+    published?: boolean;
+  }): Promise<string> {
+    const content = input.content ?? `Body of chapter ${input.number}.`;
+
+    const chapter = await db.orm.content.Chapter.select("id").create({
+      storyId: input.storyId,
+      chapterNumber: input.number,
+      title: input.title ?? `Chapter ${input.number}`,
+      content,
+      wordCount: input.wordCount ?? content.trim().split(/\s+/).length,
+      publishedAt:
+        input.published === false ? null : Temporal.Now.instant(),
+    });
+
+    this.created.chapters.push(chapter.id);
+    return chapter.id;
+  }
+
+  /** A media attachment on a chapter. */
+  async createMultimedia(input: {
+    chapterId: string;
+    type?: "IMAGE" | "AUDIO" | "VIDEO" | "LINK";
+    url?: string;
+    displayOrder?: number;
+  }): Promise<string> {
+    const item = await db.orm.content.Multimedia.select("id").create({
+      chapterId: input.chapterId,
+      type: input.type ?? "IMAGE",
+      url: input.url ?? "https://example.invalid/fixture.png",
+      displayOrder: input.displayOrder ?? 0,
+    });
+
+    this.created.multimedia.push(item.id);
+    return item.id;
+  }
+
   /** Records a shelf row this run caused, so teardown can remove it. */
   track(entryId: string): void {
     this.created.entries.push(entryId);
+  }
+
+  /** A reader's rating of a story, for the aggregate paths. */
+  async createRating(input: {
+    userId: string;
+    storyId: string;
+    rating: number;
+  }): Promise<void> {
+    await db.orm.engagement.Rating.create({
+      userId: input.userId,
+      storyId: input.storyId,
+      rating: String(input.rating),
+    });
   }
 
   /* Teardown -------------------------------------------------------------- */
@@ -162,7 +270,16 @@ export class TestApi {
         db.orm.library.LibraryEntry.where((entry) => entry.userId.eq(userId)),
       );
     }
+    for (const chapterId of this.created.chapters) {
+      await deleteAll(() =>
+        db.orm.content.Multimedia.where((item) => item.chapterId.eq(chapterId)),
+      );
+      await db.orm.content.Chapter.where((item) => item.id.eq(chapterId)).delete();
+    }
     for (const storyId of this.created.stories) {
+      await deleteAll(() =>
+        db.orm.engagement.Rating.where((rating) => rating.storyId.eq(storyId)),
+      );
       await deleteAll(() =>
         db.orm.library.LibraryEntry.where((entry) => entry.storyId.eq(storyId)),
       );

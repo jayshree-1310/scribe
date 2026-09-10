@@ -4,7 +4,7 @@ import { useAsync } from '../../hooks/useAsync'
 import { cn } from '../../lib/cn'
 import { useToast } from '../../lib/toast'
 import { formatCount, readingMinutes } from '../../lib/format'
-import * as api from '../../data/api'
+import * as storiesApi from '../../data/stories-api'
 import type { MultimediaKind, StoryStatus } from '../../types/domain'
 import { AppShell } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
@@ -66,13 +66,29 @@ export function StoryEditorPage() {
   const { showToast } = useToast()
 
   const existing = useAsync(
-    () => (isNew ? Promise.resolve(null) : api.getStory(slug)),
+    () => (isNew || !slug ? Promise.resolve(null) : storiesApi.getStory(slug)),
     [slug],
   )
-  const genres = useAsync(() => api.getGenres(), [])
+  // Genres are real rows in `content.Genre`, served with story counts.
+  const genres = useAsync(() => storiesApi.getGenres(), [])
+
+  /**
+   * Chapter *bodies*, which the list endpoint deliberately omits — it returns
+   * summaries so a chapter list costs one query. The editor is the one place
+   * that needs the prose, so it asks for each chapter it is going to show.
+   */
   const existingChapters = useAsync(
-    () =>
-      existing.data ? api.getChapters(existing.data.id) : Promise.resolve([]),
+    async () => {
+      const storySlug = existing.data?.slug
+      if (!storySlug) return []
+
+      const summaries = await storiesApi.getChapters(storySlug)
+      return Promise.all(
+        summaries
+          .slice(0, 6)
+          .map((summary) => storiesApi.getChapter(storySlug, summary.number)),
+      )
+    },
     [existing.data?.id],
   )
 
@@ -108,16 +124,16 @@ export function StoryEditorPage() {
   if (!seeded && existing.data) {
     setSeeded(true)
     setTitle(existing.data.title)
-    setSynopsis(existing.data.synopsis)
-    setGenreIds(existing.data.genreIds)
+    setSynopsis(existing.data.description ?? '')
+    setGenreIds(existing.data.genres.map((genre) => genre.id))
     setKidsAppropriate(existing.data.kidsAppropriate)
     setStatus(existing.data.status)
   }
   if (!seeded && existingChapters.data && existingChapters.data.length > 0) {
-    const loaded = existingChapters.data.slice(0, 6).map((chapter) => ({
+    const loaded = existingChapters.data.map((chapter) => ({
       id: chapter.id,
       title: chapter.title,
-      body: chapter.paragraphs.join('\n\n'),
+      body: chapter.content,
       published: chapter.publishedAt !== null,
     }))
     setChapters(loaded)

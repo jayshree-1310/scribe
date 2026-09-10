@@ -54,6 +54,15 @@ export function coverArt(seed: string, hue: number): CoverArt {
 }
 
 /** Soft tint used behind a story's detail header. */
+/**
+ * A stable hue for anything that has no hue of its own — an account from the
+ * API, which has no `avatarHue` column. Deterministic per seed, so a person's
+ * monogram is the same colour everywhere it appears.
+ */
+export function hueFor(seed: string): number {
+  return hashOf(seed) % 360
+}
+
 export function coverWash(hue: number): string {
   return `linear-gradient(180deg, hsl(${hue} 40% 30% / 0.55) 0%, hsl(${hue} 34% 18% / 0.18) 62%, transparent 100%)`
 }

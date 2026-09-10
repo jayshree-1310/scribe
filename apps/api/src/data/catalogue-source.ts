@@ -9,6 +9,8 @@
  * only `fetchCatalogue`.
  */
 
+import { SAMPLE_CHAPTERS } from "./catalogue-chapters.js";
+
 export interface RawAuthor {
   /** Natural key. Becomes `auth.User.username`. */
   handle: string;
@@ -19,6 +21,11 @@ export interface RawGenre {
   name: string;
   /** Base hue (0-359) the UI composes cover art and chips from. */
   hue: number;
+}
+
+export interface RawChapter {
+  title: string;
+  paragraphs: string[];
 }
 
 export interface RawBook {
@@ -36,6 +43,12 @@ export interface RawBook {
   likeCount: number;
   isCompleted: boolean;
   kidsAppropriate: boolean;
+  /**
+   * Sample chapters, attached by `fetchCatalogue` from `SAMPLE_CHAPTERS`.
+   * Absent for a book nobody has written an opening for yet, which the reader
+   * handles: a book with no chapters offers no way in.
+   */
+  chapters?: RawChapter[];
 }
 
 export interface RawCatalogue {
@@ -502,5 +515,12 @@ const BOOKS: RawBook[] = [
  * shape — and the seed script keeps working unchanged.
  */
 export function fetchCatalogue(): Promise<RawCatalogue> {
-  return Promise.resolve({ authors: AUTHORS, genres: GENRES, books: BOOKS });
+  // Chapters live in their own module and are matched by title here, so the
+  // catalogue above stays a flat list of records.
+  const books = BOOKS.map((book) => {
+    const chapters = SAMPLE_CHAPTERS[book.title];
+    return chapters ? { ...book, chapters } : book;
+  });
+
+  return Promise.resolve({ authors: AUTHORS, genres: GENRES, books });
 }

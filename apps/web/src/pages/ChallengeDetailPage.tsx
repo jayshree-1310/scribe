@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
+import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
 import { daysUntil, formatCount, formatDate } from '../lib/format'
 import * as api from '../data/api'
+import * as storiesApi from '../data/stories-api'
 import { AppShell } from '../components/layout/AppShell'
 import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
@@ -23,6 +25,8 @@ const TONE = { active: 'success', upcoming: 'brand', completed: 'neutral' } as c
 export function ChallengeDetailPage() {
   const { slug = '' } = useParams()
   const { showToast } = useToast()
+  const { session, initialising } = useAuth()
+  const authorId = initialising ? undefined : session?.user.id
 
   const challenge = useAsync(() => api.getChallenge(slug), [slug])
   const challengeId = challenge.data?.id
@@ -30,7 +34,16 @@ export function ChallengeDetailPage() {
     () => (challengeId ? api.getChallengeLeaderboard(challengeId) : Promise.resolve([])),
     [challengeId],
   )
-  const myStories = useAsync(() => api.getMyStories(), [])
+  // The entry picker needs the caller's own stories, drafts included.
+  const myStories = useAsync(
+    () =>
+      authorId
+        ? storiesApi
+            .listStories({ authorId, sort: 'newest', limit: 48 })
+            .then((page) => page.items)
+        : Promise.resolve([]),
+    [authorId],
+  )
 
   const [submitOpen, setSubmitOpen] = useState(false)
   const [storyId, setStoryId] = useState('')
@@ -165,11 +178,11 @@ export function ChallengeDetailPage() {
                     {row.rank}
                   </span>
                   <Avatar user={row.user} size="sm" />
+                  {/* The entry's story is not resolved: entries point at a
+                      story id, and there is no challenges API to join it. */}
                   <span className="leaderboard__body">
-                    <Link className="leaderboard__story" to={`/story/${row.story.slug}`}>
-                      {row.story.title}
-                    </Link>
-                    <span className="leaderboard__author">{row.user.displayName}</span>
+                    <span className="leaderboard__story">{row.user.displayName}</span>
+                    <span className="leaderboard__author">@{row.user.username}</span>
                   </span>
                   <span className="leaderboard__votes">
                     <Icon name="heart" size="0.9em" />

@@ -16,6 +16,7 @@ import accountRouter from "./routes/account.js";
 import authRouter from "./routes/auth.js";
 import booksRouter from "./routes/books.js";
 import libraryRouter from "./routes/library.js";
+import storiesRouter from "./routes/stories.js";
 import { UPLOAD_ROOT, UPLOAD_URL_PREFIX } from "./lib/storage.js";
 
 const app = express();
@@ -92,6 +93,7 @@ app.use("/api/account", accountRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/books", booksRouter);
 app.use("/api/library", libraryRouter);
+app.use("/api/stories", storiesRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

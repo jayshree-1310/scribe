@@ -7,6 +7,7 @@
  */
 
 import { request } from '../lib/api-client'
+import { getAccessToken } from '../lib/access-token'
 import type {
   Book,
   BookAvailability,
@@ -32,7 +33,17 @@ const DEV_READER_ID =
   import.meta.env.VITE_DEV_USER_ID ?? '00000000-0000-4000-8000-000000000001'
 
 function readerHeaders(): Record<string, string> {
-  return import.meta.env.PROD ? {} : { 'X-Scribe-User-Id': DEV_READER_ID }
+  if (import.meta.env.PROD) return {}
+
+  /**
+   * Never alongside a real session. The API prefers the bearer token when both
+   * are present, but sending both means a request made before the token has
+   * been restored is attributed to the demo reader rather than to the person
+   * signed in — which silently hides their own drafts.
+   */
+  if (getAccessToken() !== null) return {}
+
+  return { 'X-Scribe-User-Id': DEV_READER_ID }
 }
 
 /* Catalogue ------------------------------------------------------------- */

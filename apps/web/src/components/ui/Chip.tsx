@@ -2,10 +2,20 @@ import type { CSSProperties, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import { genreChipStyle } from '../../lib/cover'
-import type { Genre } from '../../types/domain'
+/**
+ * A genre only needs a name and a hue to render, and either a slug or an id to
+ * link by — Discover accepts both. Kept structural so mock genres (which carry
+ * a slug) and API genres (which carry an id) both fit.
+ */
+interface ChipGenre {
+  id?: string
+  name: string
+  hue: number
+  slug?: string
+}
 
 interface GenreChipProps {
-  genre: Genre
+  genre: ChipGenre
   /** Renders as a link into Discover filtered by this genre. */
   asLink?: boolean
   size?: 'sm' | 'md'
@@ -17,7 +27,11 @@ export function GenreChip({ genre, asLink = false, size = 'sm' }: GenreChipProps
 
   if (asLink) {
     return (
-      <Link className={className} style={style} to={`/discover?genre=${genre.slug}`}>
+      <Link
+        className={className}
+        style={style}
+        to={`/discover?genre=${genre.slug ?? genre.id ?? ''}`}
+      >
         {genre.name}
       </Link>
     )

@@ -31,6 +31,8 @@ export const READING_STATUS_LABELS: Record<ReadingStatus, string> = {
 
 export interface Book {
   id: string
+  /** Addresses the same row in the reader, which routes by slug. */
+  slug: string
   title: string
   description: string | null
   coverUrl: string | null
@@ -43,6 +45,8 @@ export interface Book {
   viewCount: number
   likeCount: number
   ratingAverage: number | null
+  /** Zero means there is nothing to open; the read action hides itself. */
+  chapterCount: number
   createdAt: string
   updatedAt: string
   author: BookAuthor

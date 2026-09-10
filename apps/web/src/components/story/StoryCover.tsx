@@ -1,12 +1,21 @@
 import type { CSSProperties } from 'react'
 import { cn } from '../../lib/cn'
 import { coverArt } from '../../lib/cover'
-import type { StoryWithMeta } from '../../types/domain'
+
+/**
+ * Only what the art needs. Structural rather than tied to one story type,
+ * because covers are drawn for both the mock stories the app still reads and
+ * the real ones from `types/stories.ts` — whose `displayName` can be null.
+ */
+interface CoverStory {
+  id: string
+  title: string
+  genres: Array<{ hue: number }>
+  author: { displayName?: string | null; username?: string }
+}
 
 interface StoryCoverProps {
-  story: Pick<StoryWithMeta, 'id' | 'title' | 'genres'> & {
-    author: Pick<StoryWithMeta['author'], 'displayName'>
-  }
+  story: CoverStory
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }
@@ -35,7 +44,9 @@ export function StoryCover({ story, size = 'md', className }: StoryCoverProps) {
       <span className="cover__spine" />
       <span className="cover__rule" />
       <span className="cover__title">{story.title}</span>
-      <span className="cover__author">{story.author.displayName}</span>
+      <span className="cover__author">
+        {story.author.displayName || story.author.username}
+      </span>
     </div>
   )
 }

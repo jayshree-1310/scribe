@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom'
 import { useAsync } from '../../hooks/useAsync'
 import { useToast } from '../../lib/toast'
 import { formatCount, formatRating, formatRelative } from '../../lib/format'
-import * as api from '../../data/api'
-import type { StoryWithMeta } from '../../types/domain'
+import { useAuth } from '../../lib/auth'
+import * as storiesApi from '../../data/stories-api'
+import { STORY_STATUS_LABELS, type Story } from '../../types/stories'
 import { AppShell } from '../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
@@ -19,10 +20,26 @@ import '../pages.css'
 import './author.css'
 
 export function AuthorStoriesPage() {
-  const stories = useAsync(() => api.getMyStories(), [])
+  const { session, initialising } = useAuth()
+  const authorId = initialising ? undefined : session?.user.id
+
+  /**
+   * The caller's own stories, drafts included — the visibility rule on
+   * `/api/stories` returns a caller their own unlisted work, so asking for
+   * your own id is "my stories".
+   */
+  const stories = useAsync(
+    () =>
+      authorId
+        ? storiesApi
+            .listStories({ authorId, sort: 'newest', limit: 48 })
+            .then((page) => page.items)
+        : Promise.resolve([]),
+    [authorId],
+  )
   const { showToast } = useToast()
 
-  const [pendingDelete, setPendingDelete] = useState<StoryWithMeta | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Story | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [removed, setRemoved] = useState<Set<string>>(new Set())
 
@@ -61,7 +78,7 @@ export function AuthorStoriesPage() {
 
       {stories.status === 'error' ? (
         <ErrorState message={stories.error} onRetry={stories.reload} />
-      ) : stories.status === 'loading' ? (
+      ) : stories.status === 'loading' || authorId === undefined ? (
         <Skeleton height="16rem" radius="var(--radius-lg)" />
       ) : shown.length === 0 ? (
         <EmptyState
@@ -108,8 +125,16 @@ export function AuthorStoriesPage() {
                     </Link>
                   </td>
                   <td data-label="Status">
-                    <StatusBadge tone={story.status === 'completed' ? 'success' : 'brand'}>
-                      {story.status}
+                    <StatusBadge
+                      tone={
+                        story.status === 'completed'
+                          ? 'success'
+                          : story.status === 'draft'
+                            ? 'neutral'
+                            : 'brand'
+                      }
+                    >
+                      {STORY_STATUS_LABELS[story.status]}
                     </StatusBadge>
                   </td>
                   <td data-label="Chapters">{story.chapterCount}</td>
@@ -117,7 +142,9 @@ export function AuthorStoriesPage() {
                   <td data-label="Rating">
                     <span className="data-table__rating">
                       <Icon name="star-filled" size="0.85em" />
-                      {formatRating(story.ratingAverage)}
+                      {story.ratingAverage === null
+                        ? '—'
+                        : formatRating(story.ratingAverage)}
                     </span>
                   </td>
                   <td data-label="Updated">{formatRelative(story.updatedAt)}</td>

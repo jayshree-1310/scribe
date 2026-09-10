@@ -1,8 +1,16 @@
 import type { CSSProperties } from 'react'
 import { cn } from '../../lib/cn'
-import type { User } from '../../types/domain'
+import { hueFor } from '../../lib/cover'
 
-type AvatarUser = Pick<User, 'displayName' | 'avatarHue' | 'username'> & {
+/**
+ * `avatarHue` is a mock-only field: `auth.User` has no such column, so accounts
+ * that come from the API derive one from the username instead. Kept optional
+ * rather than required so both shapes fit.
+ */
+type AvatarUser = {
+  username: string
+  displayName?: string | null
+  avatarHue?: number
   avatarUrl?: string | null
 }
 
@@ -26,12 +34,14 @@ function initials(name: string): string {
  * instead of a broken-image icon.
  */
 export function Avatar({ user, size = 'md', className }: AvatarProps) {
+  const hue = user.avatarHue ?? hueFor(user.username)
+
   return (
     <span
       className={cn('avatar', `avatar--${size}`, className)}
       style={{
-        '--avatar-bg': `hsl(${user.avatarHue} 44% 32%)`,
-        '--avatar-fg': `hsl(${user.avatarHue} 60% 92%)`,
+        '--avatar-bg': `hsl(${hue} 44% 32%)`,
+        '--avatar-fg': `hsl(${hue} 60% 92%)`,
       } as CSSProperties}
       aria-hidden="true"
     >

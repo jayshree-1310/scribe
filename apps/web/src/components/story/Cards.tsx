@@ -32,15 +32,30 @@ export function AuthorCard({ author }: { author: User }) {
 
 /* Genre --------------------------------------------------------------- */
 
-export function GenreCard({ genre }: { genre: { name: string; slug: string; hue: number; storyCount: number; description: string } }) {
+/**
+ * Structural, like `GenreChip`: mock genres carry a slug and a blurb, API
+ * genres carry an id and neither. Discover accepts either as its filter.
+ */
+interface CardGenre {
+  id?: string
+  name: string
+  hue: number
+  storyCount: number
+  slug?: string
+  description?: string
+}
+
+export function GenreCard({ genre }: { genre: CardGenre }) {
   return (
     <Link
       className="genre-card"
-      to={`/discover?genre=${genre.slug}`}
+      to={`/discover?genre=${genre.slug ?? genre.id ?? ''}`}
       style={{ '--genre-hue': genre.hue } as CSSProperties}
     >
       <span className="genre-card__name">{genre.name}</span>
-      <span className="genre-card__desc">{genre.description}</span>
+      {genre.description ? (
+        <span className="genre-card__desc">{genre.description}</span>
+      ) : null}
       <span className="genre-card__count">{formatCount(genre.storyCount)} stories</span>
     </Link>
   )

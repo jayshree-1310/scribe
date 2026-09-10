@@ -103,14 +103,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // No stored session means nothing to revalidate — an anonymous visitor
     // must not have a session minted for them from a stale cookie.
+    // `initialising` already starts false in that case, so there is nothing
+    // to clear here.
     if (session === null) return
 
-    let cancelled = false
-
+    /**
+     * Deliberately no cancellation flag.
+     *
+     * The ref above already guarantees this runs once, which means the one run
+     * has to be allowed to finish. Under StrictMode's development double-mount
+     * the first pass would be cancelled by its own cleanup and the second would
+     * return early at the guard, leaving `initialising` true for the life of
+     * the page — so nothing that waits for the access token ever proceeds.
+     */
     void (async () => {
       try {
         const accessToken = await restoreSession()
-        if (cancelled) return
 
         if (!accessToken) {
           setSession(null)
@@ -119,7 +127,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         const profile = await getMyAccount()
-        if (cancelled) return
 
         setSession((current) => {
           // Onboarding state is local for now, so it is carried across rather
@@ -141,13 +148,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // it would sign people out every time the network hiccups — so the
         // cached session stands until a request actually comes back 401.
       } finally {
-        if (!cancelled) setInitialising(false)
+        setInitialising(false)
       }
     })()
 
-    return () => {
-      cancelled = true
-    }
     // Runs once; `session` is read for its initial value only, and the ref
     // above keeps a re-run from re-checking.
     // eslint-disable-next-line react-hooks/exhaustive-deps

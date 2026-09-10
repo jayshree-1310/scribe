@@ -78,6 +78,28 @@ describe.skipIf(!available)("GET /api/books", () => {
     expect(secondIds.some((id: string) => firstIds.includes(id))).toBe(false);
   });
 
+  it("carries a slug and a count of readable chapters", async () => {
+    const authorId2 = await api.createUser("chapterer");
+    const readable = await api.createBook({
+      title: "A Book With Chapters",
+      authorId: authorId2,
+    });
+    await api.createChapter({ storyId: readable, number: 1 });
+    await api.createChapter({ storyId: readable, number: 2 });
+    // Unpublished, so it must not make the book look openable.
+    await api.createChapter({ storyId: readable, number: 3, published: false });
+
+    const { body } = await api.request(`/api/books/${readable}`);
+
+    expect(body.book.slug).toMatch(/a-book-with-chapters$/);
+    expect(body.book.chapterCount).toBe(2);
+  });
+
+  it("reports no chapters for a book nobody has written an opening for", async () => {
+    const { body } = await api.request(`/api/books/${ids["footnote"]}`);
+    expect(body.book.chapterCount).toBe(0);
+  });
+
   it("carries the joined author, genres and publication details", async () => {
     const { body } = await api.request(
       `/api/books?search=${encodeURIComponent("An Atlas of Missing Coastlines")}`,

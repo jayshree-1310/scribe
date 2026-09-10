@@ -12,10 +12,15 @@ import {
   READING_WIDTH_LABELS,
   useReaderPrefs,
 } from '../lib/reader-prefs'
-import { formatCount, formatDuration, formatRelative } from '../lib/format'
+import { formatCount, formatRelative } from '../lib/format'
 import { coverArt } from '../lib/cover'
-import * as api from '../data/api'
-import { Avatar } from '../components/ui/Avatar'
+import * as stories from '../data/stories-api'
+import {
+  paragraphsOf,
+  readingMinutes,
+  storyAuthorName,
+  type ChapterMedia,
+} from '../types/stories'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
 import { SegmentedControl } from '../components/ui/Tabs'
@@ -24,14 +29,20 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Switch } from '../components/ui/Checkbox'
 import { ErrorState } from '../components/ui/States'
 import { Dialog } from '../components/ui/Dialog'
-import type { Multimedia } from '../types/domain'
 import './reader.css'
 
-/** Media attached to a chapter. Rendered as styled placeholders for now. */
-function ChapterMedia({ item, hue }: { item: Multimedia; hue: number }) {
+/**
+ * Media attached to a chapter. Rendered as styled placeholders: the URLs point
+ * at files nothing uploads yet, and a broken <img> or <audio> reads worse than
+ * a deliberate placeholder.
+ *
+ * `content.Multimedia` has no caption or duration column, so neither is shown
+ * — the type and its position are all the record carries.
+ */
+function ChapterAttachment({ item, hue }: { item: ChapterMedia; hue: number }) {
   const art = coverArt(item.id, hue)
 
-  if (item.kind === 'audio') {
+  if (item.type === 'AUDIO') {
     return (
       <figure className="media media--audio">
         <div className="media__player">
@@ -41,30 +52,27 @@ function ChapterMedia({ item, hue }: { item: Multimedia; hue: number }) {
           <span className="media__track">
             <span className="media__bar" />
           </span>
-          <span className="media__time">
-            {formatDuration(item.durationSeconds ?? 0)}
-          </span>
         </div>
         <figcaption>
           <Icon name="audio" size="0.9em" />
-          {item.caption}
+          Audio attachment
         </figcaption>
       </figure>
     )
   }
 
   return (
-    <figure className={cn('media', `media--${item.kind}`)}>
+    <figure className={cn('media', `media--${item.type.toLowerCase()}`)}>
       <div className="media__plate" style={{ background: art.background }}>
-        {item.kind === 'video' ? (
+        {item.type === 'VIDEO' ? (
           <span className="media__play media__play--overlay">
             <Icon name="play" size="1.3rem" />
           </span>
         ) : null}
       </div>
       <figcaption>
-        <Icon name={item.kind === 'video' ? 'video' : 'image'} size="0.9em" />
-        {item.caption}
+        <Icon name={item.type === 'VIDEO' ? 'video' : 'image'} size="0.9em" />
+        {item.type === 'VIDEO' ? 'Video attachment' : 'Image attachment'}
       </figcaption>
     </figure>
   )
@@ -77,21 +85,19 @@ export function ReaderPage() {
   const { showToast } = useToast()
   const { preferences, update } = useReaderPrefs()
 
-  const story = useAsync(() => api.getStory(slug), [slug])
+  const story = useAsync(() => stories.getStory(slug), [slug])
   const storyId = story.data?.id
 
   const chapters = useAsync(
-    () => (storyId ? api.getChapters(storyId) : Promise.resolve([])),
+    () => (storyId ? stories.getChapters(storyId) : Promise.resolve([])),
     [storyId],
   )
   const chapter = useAsync(
-    () => (storyId ? api.getChapter(storyId, chapterNumber) : Promise.resolve(null)),
+    () =>
+      storyId ? stories.getChapter(storyId, chapterNumber) : Promise.resolve(null),
     [storyId, chapterNumber],
   )
-  const comments = useAsync(
-    () => (storyId ? api.getComments(storyId) : Promise.resolve([])),
-    [storyId],
-  )
+
 
   const [progress, setProgress] = useState(0)
   const [focusMode, setFocusMode] = useState(false)
@@ -100,16 +106,21 @@ export function ReaderPage() {
   const [showComments, setShowComments] = useState(false)
 
   const total = chapters.data?.length ?? 0
-  const hasPrev = chapterNumber > 1
-  const hasNext = chapterNumber < total
+  /**
+   * Chapter numbers need not be contiguous — an unpublished chapter in the
+   * middle is invisible to a reader — so the neighbours come from the API
+   * rather than from `chapterNumber ± 1`.
+   */
+  const previousNumber = chapter.data?.previousNumber ?? null
+  const nextNumber = chapter.data?.nextNumber ?? null
 
   const goToChapter = useCallback(
-    (next: number) => {
-      if (next < 1 || (total > 0 && next > total)) return
+    (next: number | null) => {
+      if (next === null) return
       navigate(`/read/${slug}/${next}`)
       window.scrollTo({ top: 0 })
     },
-    [navigate, slug, total],
+    [navigate, slug],
   )
 
   // Scroll-linked reading progress.
@@ -136,15 +147,15 @@ export function ReaderPage() {
       const target = event.target as HTMLElement | null
       if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return
 
-      if (event.key === 'ArrowRight') goToChapter(chapterNumber + 1)
-      else if (event.key === 'ArrowLeft') goToChapter(chapterNumber - 1)
+      if (event.key === 'ArrowRight') goToChapter(nextNumber)
+      else if (event.key === 'ArrowLeft') goToChapter(previousNumber)
       else if (event.key.toLowerCase() === 'f') setFocusMode((current) => !current)
       else if (event.key === 'Escape') setFocusMode(false)
     }
 
     document.addEventListener('keydown', onKeyDown)
     return () => document.removeEventListener('keydown', onKeyDown)
-  }, [chapterNumber, goToChapter])
+  }, [goToChapter, nextNumber, previousNumber])
 
   if (story.status === 'error' || chapter.status === 'error') {
     return (
@@ -244,42 +255,46 @@ export function ReaderPage() {
         ) : (
           <article className="reader__article">
             <p className="reader__eyebrow">
-              Chapter {current.number} of {total} · {current.readingMinutes} min read
+              Chapter {current.number}
+              {total > 0 ? ` of ${total}` : ''} ·{' '}
+              {readingMinutes(current.wordCount)} min read
             </p>
             <h1 className="reader__title">{current.title}</h1>
             <p className="reader__byline">
-              {data?.author.displayName}
+              {data ? storyAuthorName(data.author) : ''}
               {current.publishedAt ? ` · ${formatRelative(current.publishedAt)}` : ''}
             </p>
 
             <div className="reader__prose">
-              {current.paragraphs.map((paragraph, index) => (
+              {paragraphsOf(current.content).map((paragraph, index) => (
                 <p key={index}>{paragraph}</p>
               ))}
 
               {current.multimedia.map((item) => (
-                <ChapterMedia key={item.id} item={item} hue={hue} />
+                <ChapterAttachment key={item.id} item={item} hue={hue} />
               ))}
             </div>
 
             {/* Chapter footer ------------------------------------------- */}
             <footer className="reader__footer">
               <div className="reader__reactions">
+                {/* Likes are a story-level counter today; there is no
+                    per-chapter reaction to show or to post. */}
                 <Button startIcon={<Icon name="heart" size="1em" />}>
-                  {formatCount(current.viewCount / 12)}
+                  {formatCount(data?.likeCount ?? 0)}
                 </Button>
                 <Button
                   onClick={() => setShowComments((open) => !open)}
                   startIcon={<Icon name="comment" size="1em" />}
                 >
-                  {comments.data?.length ?? 0} comments
+                  Comments
                 </Button>
               </div>
 
               <nav className="reader__pager" aria-label="Chapter navigation">
                 <Button
-                  disabled={!hasPrev}
-                  onClick={() => goToChapter(chapterNumber - 1)}
+                  disabled={previousNumber === null}
+                  onClick={() => goToChapter(previousNumber)}
                   startIcon={<Icon name="chevron-left" size="1em" />}
                 >
                   Previous
@@ -299,8 +314,8 @@ export function ReaderPage() {
 
                 <Button
                   variant="primary"
-                  disabled={!hasNext}
-                  onClick={() => goToChapter(chapterNumber + 1)}
+                  disabled={nextNumber === null}
+                  onClick={() => goToChapter(nextNumber)}
                   endIcon={<Icon name="chevron-right" size="1em" />}
                 >
                   Next chapter
@@ -317,24 +332,11 @@ export function ReaderPage() {
             {showComments ? (
               <section className="reader__comments" aria-label="Chapter comments">
                 <h2>Comments</h2>
-                {comments.data?.length === 0 ? (
-                  <p className="reader__no-comments">No comments on this story yet.</p>
-                ) : (
-                  <ul>
-                    {comments.data?.slice(0, 5).map((comment) => (
-                      <li key={comment.id}>
-                        <Avatar user={comment.user} size="sm" />
-                        <div>
-                          <p className="reader__comment-head">
-                            <strong>{comment.user.displayName}</strong>
-                            <span>{formatRelative(comment.createdAt)}</span>
-                          </p>
-                          <p>{comment.body}</p>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                {/* No comments endpoint yet; the panel keeps its place so the
+                    reader's layout does not shift when one arrives. */}
+                <p className="reader__no-comments">
+                  Comments are not available yet.
+                </p>
                 <ButtonLink to={`/story/${slug}`} variant="ghost">
                   See all comments on the story page
                 </ButtonLink>

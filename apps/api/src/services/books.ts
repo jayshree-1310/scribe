@@ -26,6 +26,8 @@ export interface BookGenre {
 
 export interface Book {
   id: string;
+  /** Addresses the same row in the reader, which routes by slug. */
+  slug: string;
   title: string;
   description: string | null;
   coverUrl: string | null;
@@ -38,6 +40,11 @@ export interface Book {
   viewCount: number;
   likeCount: number;
   ratingAverage: number | null;
+  /**
+   * Sample chapters exist for the catalogue titles, so a book can be opened
+   * rather than only shelved. Zero means there is nothing to read.
+   */
+  chapterCount: number;
   createdAt: string;
   updatedAt: string;
   author: BookAuthor;
@@ -100,6 +107,7 @@ function toIso(value: unknown): string | null {
 
 interface StoryRow {
   id: string;
+  slug: string;
   title: string;
   description: string | null;
   coverUrl: string | null;
@@ -121,9 +129,11 @@ function toBook(
   row: StoryRow,
   author: BookAuthor,
   genres: BookGenre[],
+  chapterCount: number,
 ): Book {
   return {
     id: row.id,
+    slug: row.slug,
     title: row.title,
     description: row.description,
     coverUrl: row.coverUrl,
@@ -136,6 +146,7 @@ function toBook(
     viewCount: row.viewCount,
     likeCount: row.likeCount,
     ratingAverage: toRating(row.ratingAverage),
+    chapterCount,
     createdAt: toIso(row.createdAt) ?? new Date(0).toISOString(),
     updatedAt: toIso(row.updatedAt) ?? new Date(0).toISOString(),
     author,
@@ -156,11 +167,17 @@ async function hydrate(rows: StoryRow[]): Promise<Book[]> {
   const storyIds = rows.map((row) => row.id);
   const authorIds = [...new Set(rows.map((row) => row.authorId))];
 
-  const [authors, links] = await Promise.all([
+  const [authors, links, chapters] = await Promise.all([
     db.orm.auth.User.select("id", "username")
       .where((user) => user.id.in(authorIds))
       .all(),
     db.orm.content.StoryGenre.where((link) => link.storyId.in(storyIds)).all(),
+    // Published chapters only: an unpublished one is not readable, so it must
+    // not make a book look openable.
+    db.orm.content.Chapter.where((chapter) => chapter.storyId.in(storyIds))
+      .where((chapter) => chapter.publishedAt.isNotNull())
+      .groupBy("storyId")
+      .aggregate((aggregate) => ({ total: aggregate.count() })),
   ]);
 
   const genreIds = [...new Set(links.map((link) => link.genreId))];
@@ -173,6 +190,9 @@ async function hydrate(rows: StoryRow[]): Promise<Book[]> {
 
   const authorById = new Map(authors.map((author) => [author.id, author]));
   const genreById = new Map(genres.map((genre) => [genre.id, genre]));
+  const chaptersByStory = new Map(
+    chapters.map((group) => [group.storyId, group.total]),
+  );
 
   const genresByStory = new Map<string, BookGenre[]>();
   for (const link of links) {
@@ -192,6 +212,7 @@ async function hydrate(rows: StoryRow[]): Promise<Book[]> {
       row,
       authorById.get(row.authorId) ?? { id: row.authorId, username: "unknown" },
       genresByStory.get(row.id) ?? [],
+      chaptersByStory.get(row.id) ?? 0,
     ),
   );
 }
@@ -231,6 +252,7 @@ type StoryCollection = ReturnType<typeof storiesBase>;
 function storiesBase() {
   return db.orm.content.Story.select(
     "id",
+    "slug",
     "title",
     "description",
     "coverUrl",
@@ -250,6 +272,15 @@ function storiesBase() {
 }
 
 /**
+ * The catalogue half of `content.Story`. See `docs/content-model.md`: one
+ * table holds both imported editions and stories written on Scribe, and
+ * `source` is the only thing that separates them.
+ */
+function catalogueOnly(collection: StoryCollection): StoryCollection {
+  return collection.where((story) => story.source.eq("CATALOGUE"));
+}
+
+/**
  * Narrows a catalogue query down to the rows it should consider. Returns
  * `null` when the filters cannot match anything — an unknown genre — letting
  * callers skip the round trip entirely.
@@ -258,7 +289,7 @@ async function applyFilters(
   collection: StoryCollection,
   query: Pick<BookQuery, "search" | "genreId" | "completed" | "sort">,
 ): Promise<StoryCollection | null> {
-  let current = collection;
+  let current = catalogueOnly(collection);
 
   if (query.genreId) {
     const ids = await storyIdsInGenre(query.genreId);
@@ -361,7 +392,9 @@ export async function listBooks(query: BookQuery): Promise<Page<Book>> {
 }
 
 export async function getBook(id: string): Promise<Book> {
-  const row = await storiesBase().where((story) => story.id.eq(id)).first();
+  const row = await catalogueOnly(storiesBase())
+    .where((story) => story.id.eq(id))
+    .first();
   if (!row) throw HttpError.notFound("That book could not be found.");
 
   const [book] = await hydrate([row as StoryRow]);
@@ -380,7 +413,7 @@ export async function getBook(id: string): Promise<Book> {
 export async function getBooksByIds(ids: string[]): Promise<Map<string, Book>> {
   if (ids.length === 0) return new Map();
 
-  const rows = await storiesBase()
+  const rows = await catalogueOnly(storiesBase())
     .where((story) => story.id.in([...new Set(ids)]))
     .all();
 
@@ -411,7 +444,7 @@ export async function getRelatedBooks(id: string, limit = 6): Promise<Book[]> {
 
   if (candidateIds.length === 0) return [];
 
-  const rows = await storiesBase()
+  const rows = await catalogueOnly(storiesBase())
     .where((story) => story.id.in(candidateIds))
     .orderBy([(story) => story.viewCount.desc(), (story) => story.id.desc()])
     .limit(limit)
@@ -425,15 +458,23 @@ export interface GenreSummary extends BookGenre {
 }
 
 export async function listGenres(): Promise<GenreSummary[]> {
-  const [genres, links] = await Promise.all([
+  const [genres, links, catalogue] = await Promise.all([
     db.orm.content.Genre.select("id", "name", "hue")
       .orderBy((genre) => genre.name.asc())
       .all(),
-    db.orm.content.StoryGenre.select("genreId").all(),
+    db.orm.content.StoryGenre.select("storyId", "genreId").all(),
+    db.orm.content.Story.select("id")
+      .where((story) => story.source.eq("CATALOGUE"))
+      .all(),
   ]);
+
+  // Count only what browsing this genre would actually turn up: a genre whose
+  // stories are all authored belongs to `/api/stories/genres`, not here.
+  const catalogueIds = new Set(catalogue.map((story) => story.id));
 
   const counts = new Map<string, number>();
   for (const link of links) {
+    if (!catalogueIds.has(link.storyId)) continue;
     counts.set(link.genreId, (counts.get(link.genreId) ?? 0) + 1);
   }
 

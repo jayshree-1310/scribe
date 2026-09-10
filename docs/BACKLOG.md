@@ -4,6 +4,9 @@ Derived from the gap between the frontend surface (`apps/web/src/pages`, still
 mostly served by the mock `data/api.ts` + `mock-db.ts`) and the API
 (`apps/api/src/routes`, currently auth + books + library only).
 
+GenAI features are tracked separately in `AI-BACKLOG.md`, which notes which of
+the tasks below it depends on.
+
 ## House rules every task inherits
 
 Paste this block at the top of any task prompt below.
@@ -29,78 +32,10 @@ Paste this block at the top of any task prompt below.
 >   Follow the shape of `books-api.ts`. Delete the mock functions you replace
 >   from `data/api.ts` and prune `mock-db.ts` once nothing imports them.
 > - Match the surrounding comment style: comments explain *why*, not *what*.
-
----
-
-## Task 0 — Decide: books vs stories (blocker for Tasks 1–5)
-
-The app has two content models. `books` is real: an external catalogue
-(`data/catalogue-source.ts`), seeded, with working routes and a `/book/:id`
-page. `stories` is mock-only: user-authored, chaptered, with `/story/:slug` and
-`/read/:slug/:chapter`. `content.Story` exists in the contract, `Book` does not
-(books live in the seeded catalogue tables).
-
-Nothing downstream should be built until this is settled.
-
-**Prompt:**
-
-> Read `apps/api/src/data/catalogue-source.ts`, `apps/api/src/services/books.ts`,
-> `apps/api/src/prisma/contract.prisma` (namespaces `content` and `library`), and
-> the frontend `apps/web/src/types/books.ts` and `apps/web/src/types/domain.ts`.
->
-> The app currently has two parallel content concepts: catalogue `books` (real,
-> external, working endpoints) and authored `stories` (mock-only, chaptered,
-> the whole reader and author experience is built on them). `library.LibraryEntry`
-> points at books; `engagement.ReadingHistory` points at stories.
->
-> Write `docs/content-model.md` comparing three options: (a) keep them fully
-> separate with distinct routes and shelves, (b) unify behind one polymorphic
-> `Work` entity with a source discriminator, (c) treat catalogue books as
-> read-only imported stories. For each: schema changes required, blast radius
-> across existing routes and FE pages, and migration cost given `LibraryEntry`
-> already has production-shaped data. Recommend one and justify it. Do not
-> change any code yet.
-
----
-
-## Task 1 — Stories & Chapters read API + Reader
-
-Unblocks the largest number of pages. Models `content.Story`, `Chapter`,
-`Multimedia`, `Genre`, `StoryGenre` already exist; there are zero routes.
-
-**Prompt:**
-
-> Implement the read side of stories and chapters in the API and switch the FE
-> off the mock for it.
->
-> API — new `apps/api/src/services/stories.ts` + `routes/stories.ts`, mounted at
-> `/api/stories`:
-> - `GET /` — list/discover with `search`, `genre`, `sort`
->   (trending|newest|rating|views), cursor or page pagination. Mirror the query
->   and page shape of `services/books.ts` so the FE list components stay uniform.
-> - `GET /genres` — genres with story counts.
-> - `GET /:slug` — story by slug **or** id (the mock accepts both; keep that),
->   including author summary, genres, chapter count, rating average/count.
-> - `GET /:slug/chapters` — ordered chapter summaries (id, number, title, word
->   count, publishedAt). No bodies.
-> - `GET /:slug/chapters/:number` — one chapter with body and its `Multimedia`,
->   plus prev/next chapter numbers for the reader's navigation.
-> - `GET /:slug/related` — similar stories by shared genre, same contract as
->   `GET /api/books/:id/related`.
->
-> Only published stories are visible to anonymous callers and to readers who are
-> not the author; the author sees their own drafts. `content.Story` has no
-> `slug` or publish state today — add whatever the contract is missing
-> (unique slug, `publishedAt`) plus a migration, and backfill slugs from titles.
->
-> FE — new `apps/web/src/data/stories-api.ts` following `books-api.ts`. Rewire
-> `pages/StoryDetailPage.tsx`, `pages/ReaderPage.tsx`, `pages/DiscoverPage.tsx`
-> story sections, and `components/story/Cards.tsx` onto it, removing the
-> corresponding functions from `data/api.ts`. Keep loading and empty states
-> working via `hooks/useAsync.ts`.
->
-> Tests: `routes/stories.test.ts` covering slug-or-id lookup, draft visibility
-> rules, chapter ordering, prev/next edges (first and last chapter), and 404s.
+> - Content model: there is one work entity, `content.Story`; catalogue books are
+>   `Story` rows with `isbn` set and no chapters. See `docs/content-model.md` for
+>   the decision and the contract additions (`slug`, `source`, publish state)
+>   that Task 1 owns.
 
 ---
 
@@ -144,8 +79,17 @@ The Home page's core loop. `engagement.ReadingHistory` exists, no routes.
 
 ## Task 3 — Comments & ratings
 
-`engagement.Comment` and `engagement.Rating` exist, no routes. Note the FE
-currently fabricates the rating histogram client-side.
+`engagement.Comment` and `engagement.Rating` exist, no routes.
+
+**Since the stories task landed:** `getRatingBreakdown` is no longer rendered on
+`StoryDetailPage` — it invented a histogram from hardcoded weights, which would
+have been a lie next to a real rating count — so `components/charts/RatingBars.tsx`
+is currently unused and waits for a real breakdown. `Story.ratingCount` still
+does not exist as a column; the stories service computes count and average from
+`Rating` rows and falls back to the denormalised `Story.ratingAverage` only when
+there are none. Deciding whether to add `ratingCount` and make the columns
+authoritative is part of this task. `getComments` / `getRatings` are still called
+from `StoryDetailPage` and `ReaderPage`, returning nothing for a real story id.
 
 **Prompt:**
 
@@ -263,6 +207,15 @@ nowhere to save.
 
 > Implement the author-side write API and wire the existing editor to it.
 > Depends on the read endpoints from the stories task.
+>
+> Note `pages/author/StoryEditorPage.tsx` is the only remaining caller of
+> `getStory` / `getChapters` in `data/api.ts` — everything else moved to
+> `data/stories-api.ts`. Those two mock functions go when this page is wired up.
+> Slug generation and uniqueness already exist in `apps/api/src/lib/slug.ts`;
+> reuse `uniqueSlug` rather than writing a second derivation. Publication state
+> is `Story.listedAt` (null means draft) and chapter-level `Chapter.publishedAt`;
+> `Chapter.wordCount` is denormalised and every content write must maintain it,
+> because the chapter list and reading-time estimates read it.
 >
 > API — `services/authoring.ts` + `routes/authoring.ts` at `/api/author`, all
 > behind `requireUser`, every handler asserting the caller owns the story:
@@ -596,6 +549,15 @@ Depends on Tasks 3 and 9.
 ## Task 17 — Retire the mock layer
 
 Final cleanup. Do last.
+
+**Half done already.** The story, chapter, book, shelf, comment, rating and
+reading-history fixtures are gone from `mock-db.ts` (832 lines down to ~400),
+along with the author aggregates that invented view series and read counts.
+What remains is the data whose features have no endpoints: clubs, channels,
+challenges, badges, and the author directory (`db.authors`) — plus `db.currentUser`,
+which `AuthProvider` still uses for the presentational half of a session
+(avatar hue, follower counts, reading stats) that `auth.User` has no columns
+for. Each goes with its own task; this one is the final sweep.
 
 **Prompt:**
 

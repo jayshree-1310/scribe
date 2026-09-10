@@ -4,6 +4,7 @@ import { useAsync } from '../hooks/useAsync'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatCount, formatDate, formatRating } from '../lib/format'
 import * as books from '../data/books-api'
+import * as storiesApi from '../data/stories-api'
 import {
   BOOK_SORTS,
   BOOK_SORT_LABELS,
@@ -12,6 +13,7 @@ import {
   type BookAvailability,
   type BookSort,
 } from '../types/books'
+import type { Story } from '../types/stories'
 import { AppShell } from '../components/layout/AppShell'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { SelectableChip } from '../components/ui/Chip'
@@ -23,6 +25,9 @@ import { EmptyState, ErrorState } from '../components/ui/States'
 import { BookCard, BookCardSkeleton } from '../components/books/BookCard'
 import { BookCover } from '../components/books/BookCover'
 import { ShelfMenu } from '../components/books/ShelfMenu'
+import { StoryCard, StoryCardSkeleton } from '../components/story/StoryCard'
+import { StoryShelf } from '../components/story/StoryShelf'
+import '../components/story/story.css'
 import './pages.css'
 import '../components/books/books.css'
 
@@ -163,6 +168,63 @@ function Rail({
   )
 }
 
+/**
+ * Stories written on Scribe, as opposed to the imported editions the rest of
+ * this page lists. They are the only things with chapters to read, so this rail
+ * is the way into `/story/:slug` and the reader.
+ */
+function StoryRail({
+  status,
+  error,
+  stories,
+  onRetry,
+}: {
+  status: 'loading' | 'ready' | 'error'
+  error: string | null
+  stories: Story[] | null
+  onRetry: () => void
+}) {
+  if (status === 'error') {
+    return (
+      <section className="rail">
+        <header className="rail__head">
+          <h2 className="rail__title">Written on Scribe</h2>
+        </header>
+        <ErrorState message={error} onRetry={onRetry} />
+      </section>
+    )
+  }
+
+  // Nothing to show and nothing coming: no rail at all, rather than an empty
+  // heading. The catalogue rails below still fill the page.
+  if (status === 'ready' && (stories === null || stories.length === 0)) return null
+
+  return (
+    <section className="rail">
+      <header className="rail__head">
+        <h2 className="rail__title">Written on Scribe</h2>
+        <p className="rail__desc">
+          Serialised by members, a chapter at a time — these you can read here.
+        </p>
+      </header>
+
+      <StoryShelf label="Stories written on Scribe">
+        {status === 'loading'
+          ? Array.from({ length: 5 }, (_, index) => (
+              <li key={index}>
+                <StoryCardSkeleton />
+              </li>
+            ))
+          : (stories ?? []).map((story) => (
+              <li key={story.id}>
+                <StoryCard story={story} />
+              </li>
+            ))}
+      </StoryShelf>
+    </section>
+  )
+}
+
 /* Page ------------------------------------------------------------------ */
 
 export function DiscoverPage() {
@@ -197,6 +259,23 @@ export function DiscoverPage() {
 
   const debouncedSearch = useDebouncedValue(search, 280)
   const genres = useAsync(() => books.getGenres(), [])
+
+  /**
+   * Authored stories, filtered by the same search box as the books below so one
+   * query searches everything a reader can open.
+   */
+  const stories = useAsync(
+    () =>
+      storiesApi
+        .listStories({
+          search: debouncedSearch,
+          genreId,
+          sort: 'trending',
+          limit: 10,
+        })
+        .then((page) => page.items),
+    [debouncedSearch, genreId],
+  )
 
   if (pendingGenre !== null && genres.status !== 'loading') {
     const wanted = LEGACY_GENRE_SLUGS[pendingGenre] ?? pendingGenre
@@ -374,6 +453,13 @@ export function DiscoverPage() {
           <ErrorState message={discover.error} onRetry={discover.reload} />
         ) : discover.data ? (
           <>
+            <StoryRail
+              status={stories.status}
+              error={stories.error}
+              stories={stories.data}
+              onRetry={stories.reload}
+            />
+
             {discover.data.featured ? (
               <FeaturedBook
                 book={discover.data.featured}
@@ -417,6 +503,13 @@ export function DiscoverPage() {
         ) : null
       ) : (
         <section className="results">
+          <StoryRail
+            status={stories.status}
+            error={stories.error}
+            stories={stories.data}
+            onRetry={stories.reload}
+          />
+
           <p className="results__count" role="status">
             {listStatus === 'loading' && results.length === 0
               ? 'Searching…'

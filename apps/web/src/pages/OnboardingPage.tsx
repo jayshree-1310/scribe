@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth'
 import { cn } from '../lib/cn'
 import { formatCount } from '../lib/format'
 import * as api from '../data/api'
+import * as storiesApi from '../data/stories-api'
 import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
 import { SelectableChip } from '../components/ui/Chip'
@@ -38,7 +39,8 @@ export function OnboardingPage() {
   const { completeOnboarding } = useAuth()
   const navigate = useNavigate()
 
-  const genres = useAsync(() => api.getGenres(), [])
+  // Genres are real rows in `content.Genre`, served with story counts.
+  const genres = useAsync(() => storiesApi.getGenres(), [])
   const authors = useAsync(() => api.getAuthors(), [])
 
   const [step, setStep] = useState(0)
@@ -71,27 +73,41 @@ export function OnboardingPage() {
     setStep((current) => Math.min(current + 1, STEPS.length - 1))
   }
 
-  function finish() {
-    if (writing === null) {
-      setError('Choose one option to continue.')
-      return
-    }
-
+  function submit(wantsToWrite: boolean) {
     setSubmitting(true)
     completeOnboarding({
       favoriteGenreIds: genreIds,
       followedAuthorIds: authorIds,
       interests,
-      wantsToWrite: writing === 'yes',
+      wantsToWrite,
     })
     navigate('/home', { replace: true })
+  }
+
+  function finish() {
+    if (writing === null) {
+      setError('Choose one option to continue.')
+      return
+    }
+    setError(null)
+    submit(writing === 'yes')
+  }
+
+  function skip() {
+    setError(null)
+    submit(writing === 'yes')
   }
 
   return (
     <div className="onboarding">
       <header className="onboarding__header">
         <Logo to="/" />
-        <button className="onboarding__skip" type="button" onClick={finish}>
+        <button
+          className="onboarding__skip"
+          type="button"
+          disabled={submitting}
+          onClick={skip}
+        >
           Skip for now
         </button>
       </header>

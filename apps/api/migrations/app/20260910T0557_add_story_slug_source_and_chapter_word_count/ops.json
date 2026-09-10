@@ -1,0 +1,365 @@
+[
+  {
+    "id": "column.content.chapter.wordCount",
+    "label": "Add column \"wordCount\" to \"chapter\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "column",
+        "name": "wordCount",
+        "table": "chapter"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"wordCount\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "chapter",
+          "wordCount"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"wordCount\"",
+        "sql": "ALTER TABLE \"content\".\"chapter\" ADD COLUMN \"wordCount\" int4 DEFAULT 0 NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"wordCount\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "chapter",
+          "wordCount"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.content.story.listedAt",
+    "label": "Add column \"listedAt\" to \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "column",
+        "name": "listedAt",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"listedAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "listedAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"listedAt\"",
+        "sql": "ALTER TABLE \"content\".\"story\" ADD COLUMN \"listedAt\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"listedAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "listedAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.content.story.source",
+    "label": "Add column \"source\" to \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "column",
+        "name": "source",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"source\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "source"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"source\"",
+        "sql": "ALTER TABLE \"content\".\"story\" ADD COLUMN \"source\" text DEFAULT 'SCRIBE' NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"source\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "source"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.content.story.slug",
+    "label": "Add column \"slug\" to \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "column",
+        "name": "slug",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"slug\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "slug"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"slug\"",
+        "sql": "ALTER TABLE \"content\".\"story\" ADD COLUMN \"slug\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"slug\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "slug"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data.content.story.backfill-slug",
+    "label": "Backfill content.story.slug from titles",
+    "operationClass": "data",
+    "target": {
+      "id": "content.story",
+      "details": {
+        "schema": "content",
+        "name": "story",
+        "objectType": "table"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Derive a unique slug per story from its title",
+        "sql": "UPDATE content.\"story\" AS s\n                     SET \"slug\" = candidate.slug\n                    FROM (\n                          SELECT id,\n                                 base || CASE WHEN rn = 1 THEN '' ELSE '-' || rn::text END AS slug\n                            FROM (\n                                  SELECT id,\n                                         base,\n                                         row_number() OVER (PARTITION BY base ORDER BY \"createdAt\", id) AS rn\n                                    FROM (\n                                          SELECT id,\n                                                 \"createdAt\",\n                                                 COALESCE(\n                                                   NULLIF(\n                                                     trim(BOTH '-' FROM regexp_replace(lower(title), '[^a-z0-9]+', '-', 'g')),\n                                                     ''\n                                                   ),\n                                                   'story'\n                                                 ) AS base\n                                            FROM content.\"story\"\n                                           WHERE \"slug\" IS NULL\n                                         ) AS slugged\n                                 ) AS numbered\n                         ) AS candidate\n                   WHERE s.id = candidate.id\n                     AND s.\"slug\" IS NULL"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "data.content.story.backfill-source",
+    "label": "Mark existing rows with an ISBN as catalogue imports",
+    "operationClass": "data",
+    "target": {
+      "id": "content.story",
+      "details": {
+        "schema": "content",
+        "name": "story",
+        "objectType": "table"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Set source = CATALOGUE where an ISBN is present",
+        "sql": "UPDATE content.\"story\"\n                     SET \"source\" = 'CATALOGUE'\n                   WHERE \"isbn\" IS NOT NULL"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "data.content.story.backfill-listed-at",
+    "label": "Treat every pre-existing story as listed",
+    "operationClass": "data",
+    "target": {
+      "id": "content.story",
+      "details": {
+        "schema": "content",
+        "name": "story",
+        "objectType": "table"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Set listedAt = createdAt for rows that predate the column",
+        "sql": "UPDATE content.\"story\"\n                     SET \"listedAt\" = \"createdAt\"\n                   WHERE \"listedAt\" IS NULL"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "alterNullability.setNotNull.story.slug",
+    "label": "Set NOT NULL on \"story\".\"slug\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "column",
+        "name": "slug",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"slug\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "slug"
+        ]
+      },
+      {
+        "description": "ensure no NULL values in \"slug\"",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"content\".\"story\" WHERE \"slug\" IS NULL) AS \"result\"",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"slug\"",
+        "sql": "ALTER TABLE \"content\".\"story\" ALTER COLUMN \"slug\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"slug\" is NOT NULL",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "slug",
+          "NO"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.story.story_source_check_9abb51b8",
+    "label": "Add check constraint \"story_source_check_9abb51b8\" on \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "checkConstraint",
+        "name": "story_source_check_9abb51b8",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"story_source_check_9abb51b8\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "story_source_check_9abb51b8",
+          "content",
+          "\"content\".\"story\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"story_source_check_9abb51b8\"",
+        "sql": "ALTER TABLE \"content\".\"story\" ADD CONSTRAINT \"story_source_check_9abb51b8\" CHECK (\"source\" IN ('SCRIBE', 'CATALOGUE'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"story_source_check_9abb51b8\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "story_source_check_9abb51b8",
+          "content",
+          "\"content\".\"story\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.story.story_slug_key",
+    "label": "Add unique constraint on \"story\" (slug)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "unique",
+        "name": "story_slug_key",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"story_slug_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "story_slug_key",
+          "content",
+          "\"content\".\"story\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"story_slug_key\"",
+        "sql": "ALTER TABLE \"content\".\"story\" ADD CONSTRAINT \"story_slug_key\" UNIQUE (\"slug\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"story_slug_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "story_slug_key",
+          "content",
+          "\"content\".\"story\""
+        ]
+      }
+    ]
+  }
+]

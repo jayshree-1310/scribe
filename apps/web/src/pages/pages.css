@@ -807,6 +807,11 @@
 .profile__picture {
   position: relative;
   flex: none;
+  /* As with the settings field: strip the UA button chrome from what is only
+     a hit target around the picture. */
+  padding: 0;
+  border: 0;
+  background: none;
   border-radius: var(--radius-full);
   cursor: zoom-in;
 }
@@ -993,14 +998,13 @@
 
 .avatar-field__preview {
   flex: none;
+  /* A bare <button> keeps the UA's own face and border, which showed as a pale
+     ring around the circle; the button is only a hit target here. */
+  padding: 0;
+  border: 0;
+  background: none;
   border-radius: var(--radius-full);
   cursor: zoom-in;
-}
-
-/* The picture stays visible while its upload is in flight, dimmed so the
-   wait is legible without swapping in a placeholder. */
-.avatar-field__preview[data-pending] {
-  opacity: 0.55;
 }
 
 .avatar-field__body {
@@ -1241,4 +1245,73 @@
   .channel-hero__actions .btn--lg {
     flex: 1;
   }
+}
+
+/* Avatar cropper ---------------------------------------------------------- */
+
+.cropper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.cropper__frame {
+  position: relative;
+  width: min(20rem, 100%);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+  cursor: grab;
+  touch-action: none;
+  /* The picture is dragged, not selected, and the wheel zooms rather than
+     scrolling the dialog behind it. */
+  user-select: none;
+  overscroll-behavior: contain;
+}
+
+.cropper__frame:active {
+  cursor: grabbing;
+}
+
+.cropper__frame:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+
+.cropper__image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: none;
+  transform-origin: 0 0;
+}
+
+/* The circle the crop will become, drawn over the picture so the framing is
+   the framing that gets saved. */
+.cropper__mask {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--border-strong);
+  pointer-events: none;
+}
+
+.cropper__zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: min(20rem, 100%);
+}
+
+.cropper__slider {
+  flex: 1;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.cropper__slider:disabled {
+  cursor: default;
+  opacity: 0.5;
 }

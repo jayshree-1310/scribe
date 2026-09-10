@@ -153,6 +153,21 @@ export function BookDetailPage() {
         <aside className="book-detail__aside">
           <BookCover book={current} size="xl" className="book-detail__cover" />
 
+          {/* A catalogue title has sample chapters seeded, so it can be read
+              here as well as shelved. Zero chapters means no way in, and the
+              action hides rather than dead-ending. */}
+          {current.chapterCount > 0 ? (
+            <ButtonLink
+              variant="primary"
+              size="md"
+              fullWidth
+              to={`/read/${current.slug}/1`}
+              startIcon={<Icon name="book-open" size="1em" />}
+            >
+              Read now
+            </ButtonLink>
+          ) : null}
+
           <ShelfMenu
             bookId={current.id}
             status={status}

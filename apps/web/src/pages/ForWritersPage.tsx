@@ -1,32 +1,32 @@
-import { PublicShell } from '../components/layout/PublicShell'
-import { ButtonLink } from '../components/ui/Button'
-import { Card } from '../components/ui/Card'
-import { Icon, type IconName } from '../components/ui/Icon'
-import './landing.css'
-import './pages.css'
+import { PublicShell } from "../components/layout/PublicShell";
+import { ButtonLink } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
+import { Icon, type IconName } from "../components/ui/Icon";
+import "./landing.css";
+import "./pages.css";
 
 const STEPS: Array<{ icon: IconName; title: string; body: string }> = [
   {
-    icon: 'pen',
-    title: 'Write a chapter at a time',
-    body: 'No need for a finished manuscript. Publish chapter one, see who turns up, keep going.',
+    icon: "pen",
+    title: "Write a chapter at a time",
+    body: "No need for a finished manuscript. Publish chapter one, see who turns up, keep going.",
   },
   {
-    icon: 'users',
-    title: 'Build an audience that waits for you',
-    body: 'Readers follow serials. A broadcast channel keeps them close between updates.',
+    icon: "users",
+    title: "Build an audience that waits for you",
+    body: "Readers follow serials. A broadcast channel keeps them close between updates.",
   },
   {
-    icon: 'trend',
-    title: 'See what actually landed',
-    body: 'Views, read-through and ratings per chapter — so you know where readers stopped.',
+    icon: "trend",
+    title: "See what actually landed",
+    body: "Views, read-through and ratings per chapter — so you know where readers stopped.",
   },
   {
-    icon: 'trophy',
-    title: 'Finish things with challenges',
-    body: 'A prompt and a deadline beats waiting for inspiration. Most writers finish their first story in one.',
+    icon: "trophy",
+    title: "Finish things with challenges",
+    body: "A prompt and a deadline beats waiting for inspiration. Most writers finish their first story in one.",
   },
-]
+];
 
 export function ForWritersPage() {
   return (
@@ -38,16 +38,27 @@ export function ForWritersPage() {
               <Icon name="pen" size="0.95em" />
               For writers
             </p>
-            <h1 className="hero__title">Publish the way people actually read.</h1>
+
+            <h1 className="hero__title">
+              Publish the way people actually read.
+            </h1>
+
             <p className="hero__lede">
               Scribe is built for serials: one chapter at a time, in front of
               readers who came back for the next one. Free to publish, yours to
               keep.
             </p>
+
             <div className="hero__actions">
-              <ButtonLink variant="primary" size="lg" to="/author/stories/new" startIcon={<Icon name="plus" />}>
+              <ButtonLink
+                variant="primary"
+                size="lg"
+                to="/author/stories/new"
+                startIcon={<Icon name="plus" />}
+              >
                 Start a story
               </ButtonLink>
+
               <ButtonLink variant="secondary" size="lg" to="/author">
                 Open the author studio
               </ButtonLink>
@@ -63,6 +74,7 @@ export function ForWritersPage() {
               <span className="writers__icon">
                 <Icon name={step.icon} size="1.3rem" />
               </span>
+
               <h2 className="writers__title">{step.title}</h2>
               <p className="writers__body">{step.body}</p>
             </Card>
@@ -79,6 +91,7 @@ export function ForWritersPage() {
               readers. Delete it whenever you want.
             </p>
           </div>
+
           <div className="cta__actions">
             <ButtonLink variant="primary" size="lg" to="/register">
               Create your account
@@ -87,5 +100,5 @@ export function ForWritersPage() {
         </div>
       </section>
     </PublicShell>
-  )
+  );
 }

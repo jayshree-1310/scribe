@@ -1,35 +1,25 @@
-import { Link } from 'react-router-dom'
-import { useAsync } from '../hooks/useAsync'
-import { useAuth } from '../lib/auth'
-import { formatCount } from '../lib/format'
-import * as api from '../data/api'
-import { PublicShell } from '../components/layout/PublicShell'
-import { ButtonLink } from '../components/ui/Button'
-import { Icon } from '../components/ui/Icon'
-import { SectionHead } from '../components/ui/Card'
-import { ErrorState } from '../components/ui/States'
-import { StoryCard, StoryCardSkeleton } from '../components/story/StoryCard'
-import { StoryCover } from '../components/story/StoryCover'
-import { StoryShelf } from '../components/story/StoryShelf'
-import { ContinueCard } from '../components/story/ContinueCard'
-import { AuthorCard, ChallengeCard, ClubCard, GenreCard } from '../components/story/Cards'
-import './landing.css'
+import { Link } from "react-router-dom";
+import { useAsync } from "../hooks/useAsync";
+import { useAuth } from "../lib/auth";
+import { formatCount } from "../lib/format";
+import * as stories from "../data/stories-api";
+import { PublicShell } from "../components/layout/PublicShell";
+import { ButtonLink } from "../components/ui/Button";
+import { Icon } from "../components/ui/Icon";
+import { StoryCover } from "../components/story/StoryCover";
+import "./landing.css";
 
 export function LandingPage() {
-  const { session } = useAuth()
+  const { session } = useAuth();
 
-  const trending = useAsync(() => api.getTrendingStories(10), [])
-  const genres = useAsync(() => api.getGenres(), [])
-  const authors = useAsync(() => api.getAuthors(), [])
-  const challenges = useAsync(() => api.getChallenges(), [])
-  const clubs = useAsync(() => api.getClubs(), [])
-  const continuing = useAsync(
-    () => (session ? api.getContinueReading(3) : Promise.resolve([])),
-    [session?.user.id],
-  )
-
-  const heroStories = trending.data?.slice(0, 4) ?? []
-  const activeChallenges = challenges.data?.filter((item) => item.state === 'active') ?? []
+  const trending = useAsync(
+    () =>
+      stories
+        .listStories({ sort: "trending", limit: 10 })
+        .then((page) => page.items),
+    [],
+  );
+  const heroStories = trending.data?.slice(0, 4) ?? [];
 
   return (
     <PublicShell>
@@ -56,12 +46,17 @@ export function LandingPage() {
               <ButtonLink
                 variant="primary"
                 size="lg"
-                to={session ? '/home' : '/register'}
+                to={session ? "/home" : "/register"}
                 startIcon={<Icon name="book-open" />}
               >
                 Start Reading
               </ButtonLink>
-              <ButtonLink variant="secondary" size="lg" to="/for-writers" startIcon={<Icon name="pen" />}>
+              <ButtonLink
+                variant="secondary"
+                size="lg"
+                to="/for-writers"
+                startIcon={<Icon name="pen" />}
+              >
                 Start Writing
               </ButtonLink>
             </div>
@@ -87,7 +82,11 @@ export function LandingPage() {
             {heroStories.length > 0 ? (
               <div className="hero__fan">
                 {heroStories.map((story, index) => (
-                  <div className="hero__fan-item" key={story.id} data-index={index}>
+                  <div
+                    className="hero__fan-item"
+                    key={story.id}
+                    data-index={index}
+                  >
                     <StoryCover story={story} size="lg" />
                   </div>
                 ))}
@@ -99,105 +98,9 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* Continue reading ------------------------------------------------ */}
-      {session && (continuing.data?.length ?? 0) > 0 ? (
-        <section className="container section">
-          <SectionHead
-            title="Continue reading"
-            subtitle="Pick up exactly where you stopped."
-            to="/library"
-            linkLabel="Your library"
-          />
-          <div className="card-grid card-grid--wide">
-            {continuing.data?.map((entry) => (
-              <ContinueCard key={entry.history.id} entry={entry} />
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {/* Trending -------------------------------------------------------- */}
-      <section className="container section">
-        <SectionHead
-          title="Trending this week"
-          subtitle="What the most readers are reading right now."
-          to="/discover?sort=trending"
-        />
-
-        {trending.status === 'error' ? (
-          <ErrorState message={trending.error} onRetry={trending.reload} />
-        ) : (
-          <StoryShelf label="Trending stories">
-            {trending.status === 'loading'
-              ? Array.from({ length: 6 }, (_, index) => (
-                  <li key={index}>
-                    <StoryCardSkeleton />
-                  </li>
-                ))
-              : trending.data?.map((story, index) => (
-                  <li key={story.id}>
-                    <StoryCard story={story} rank={index + 1} />
-                  </li>
-                ))}
-          </StoryShelf>
-        )}
-      </section>
-
-      {/* Genres ---------------------------------------------------------- */}
-      <section className="container section">
-        <SectionHead title="Featured genres" subtitle="Start somewhere you already love." to="/discover" />
-        <div className="card-grid card-grid--tight">
-          {genres.data?.slice(0, 8).map((genre) => (
-            <GenreCard key={genre.id} genre={genre} />
-          ))}
-        </div>
-      </section>
-
-      {/* Authors --------------------------------------------------------- */}
-      <section className="section section--tint">
-        <div className="container">
-          <SectionHead
-            title="Popular authors"
-            subtitle="Writers publishing chapter by chapter, in public."
-          />
-          <div className="card-grid card-grid--tight">
-            {authors.data?.slice(0, 5).map((author) => (
-              <AuthorCard key={author.id} author={author} />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Challenges ------------------------------------------------------ */}
-      <section className="container section">
-        <SectionHead
-          title="Active writing challenges"
-          subtitle="A prompt, a deadline, and a few thousand people writing alongside you."
-          to="/challenges"
-        />
-        <div className="card-grid">
-          {activeChallenges.slice(0, 3).map((challenge) => (
-            <ChallengeCard key={challenge.id} challenge={challenge} />
-          ))}
-        </div>
-      </section>
-
-      {/* Clubs ----------------------------------------------------------- */}
-      <section className="container section">
-        <SectionHead
-          title="Popular book clubs"
-          subtitle="Read the same story at the same time as everyone else."
-          to="/clubs"
-        />
-        <div className="card-grid card-grid--wide">
-          {clubs.data
-            ?.filter((club) => !club.isPrivate)
-            .slice(0, 3)
-            .map((club) => (
-              <ClubCard key={club.id} club={club} />
-            ))}
-        </div>
-      </section>
+      {/* Continue reading is absent until reading progress is recorded --
+          there is no endpoint for a resume point yet, and the shelf used to be
+          filled from invented history. */}
 
       {/* Closing CTA ----------------------------------------------------- */}
       <section className="container section">
@@ -206,7 +109,8 @@ export function LandingPage() {
             <h2>Your first chapter is the hardest. Then it's just Tuesdays.</h2>
             <p>
               Publish a chapter at a time, build a channel your readers actually
-              subscribe to, and see exactly which chapter they couldn't put down.
+              subscribe to, and see exactly which chapter they couldn't put
+              down.
             </p>
           </div>
           <div className="cta__actions">
@@ -226,5 +130,5 @@ export function LandingPage() {
         {formatCount(2400000)} readers · free to read · free to publish
       </p>
     </PublicShell>
-  )
+  );
 }

@@ -450,3 +450,13 @@
     padding: var(--space-3) var(--space-4);
   }
 }
+
+/**
+ * The sections below the tabs are the page's first `.page-section`, which is
+ * styled with no top margin for pages that open with one. Here a tab panel
+ * sits above it, so the heading would butt against the end of the panel --
+ * visible whenever the chapter list is short.
+ */
+[role='tabpanel'] + .page-section {
+  margin-top: var(--space-10);
+}

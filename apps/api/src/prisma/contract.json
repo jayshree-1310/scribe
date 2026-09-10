@@ -1125,6 +1125,13 @@
                   "codecId": "pg/timestamptz-temporal@1",
                   "kind": "scalar"
                 }
+              },
+              "wordCount": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
               }
             },
             "relations": {
@@ -1214,6 +1221,9 @@
                 },
                 "updatedAt": {
                   "column": "updatedAt"
+                },
+                "wordCount": {
+                  "column": "wordCount"
                 }
               },
               "namespaceId": "content",
@@ -1445,6 +1455,13 @@
                   "kind": "scalar"
                 }
               },
+              "listedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
               "pageCount": {
                 "nullable": true,
                 "type": {
@@ -1471,6 +1488,26 @@
                 "type": {
                   "codecId": "pg/numeric@1",
                   "kind": "scalar"
+                }
+              },
+              "slug": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "source": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ContentSource",
+                  "namespaceId": "public",
+                  "plane": "domain"
                 }
               },
               "title": {
@@ -1631,6 +1668,9 @@
                 "likeCount": {
                   "column": "likeCount"
                 },
+                "listedAt": {
+                  "column": "listedAt"
+                },
                 "pageCount": {
                   "column": "pageCount"
                 },
@@ -1642,6 +1682,12 @@
                 },
                 "ratingAverage": {
                   "column": "ratingAverage"
+                },
+                "slug": {
+                  "column": "slug"
+                },
+                "source": {
+                  "column": "source"
                 },
                 "title": {
                   "column": "title"
@@ -2382,6 +2428,19 @@
               {
                 "name": "MEMBER",
                 "value": "MEMBER"
+              }
+            ]
+          },
+          "ContentSource": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "SCRIBE",
+                "value": "SCRIBE"
+              },
+              {
+                "name": "CATALOGUE",
+                "value": "CATALOGUE"
               }
             ]
           },
@@ -3245,6 +3304,15 @@
                   },
                   "nativeType": "timestamptz",
                   "nullable": false
+                },
+                "wordCount": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
                 }
               },
               "foreignKeys": [
@@ -3425,6 +3493,13 @@
               "uniques": []
             },
             "story": {
+              "checks": [
+                {
+                  "expression": "\"source\" IN ('SCRIBE', 'CATALOGUE')",
+                  "name": "story_source_check_9abb51b8",
+                  "prefix": "story_source_check"
+                }
+              ],
               "columns": {
                 "authorId": {
                   "codecId": "pg/text@1",
@@ -3487,6 +3562,11 @@
                   "nativeType": "int4",
                   "nullable": false
                 },
+                "listedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
                 "pageCount": {
                   "codecId": "pg/int4@1",
                   "nativeType": "int4",
@@ -3506,6 +3586,26 @@
                   "codecId": "pg/numeric@1",
                   "nativeType": "numeric",
                   "nullable": true
+                },
+                "slug": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "source": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "SCRIBE"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ContentSource",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
                 },
                 "title": {
                   "codecId": "pg/text@1",
@@ -3565,6 +3665,11 @@
                 ]
               },
               "uniques": [
+                {
+                  "columns": [
+                    "slug"
+                  ]
+                },
                 {
                   "columns": [
                     "isbn"
@@ -4347,6 +4452,13 @@
                 "MEMBER"
               ]
             },
+            "ContentSource": {
+              "kind": "valueSet",
+              "values": [
+                "SCRIBE",
+                "CATALOGUE"
+              ]
+            },
             "MultimediaType": {
               "kind": "valueSet",
               "values": [
@@ -4370,7 +4482,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "3dc2d7db681b6f876555fe26b14e0f97bf3bbb59361460e0564296eda9bfea21"
+    "storageHash": "f3ad3aa752ccc8276d2e5a845eab61c409f5440c1d95b60b03935f5367e3a34a"
   },
   "execution": {
     "executionHash": "2a8f10d344652873c2c64255cf26b8b7ef763928007ad7cae38f4ead2fc152a3",

@@ -12,7 +12,8 @@
     "test": "vitest run",
     "postinstall": "prisma skills sync || exit 0",
     "contract:emit": "prisma contract emit",
-    "seed:books": "tsx src/scripts/seed-books.ts"
+    "seed:books": "tsx src/scripts/seed-books.ts",
+    "seed:stories": "tsx src/scripts/seed-stories.ts"
   },
   "keywords": [],
   "author": "",

@@ -1,9 +1,9 @@
-import { useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useBlocker, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
 import { ApiError } from '../lib/api-client'
-import { updateMyAccount } from '../data/account-api'
+import { removeAvatar, updateMyAccount, uploadAvatar } from '../data/account-api'
 import { THEME_PREFERENCES, useTheme, type ThemePreference } from '../lib/theme'
 import {
   FONT_SIZES,
@@ -16,10 +16,10 @@ import {
 } from '../lib/reader-prefs'
 import { isValidEmail, isValidUsername } from '../lib/auth'
 import { AppShell } from '../components/layout/AppShell'
-import { AvatarField } from '../components/settings/AvatarField'
+import { AvatarField, type PendingAvatar } from '../components/settings/AvatarField'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
-import { ConfirmDialog } from '../components/ui/Dialog'
+import { ConfirmDialog, Dialog } from '../components/ui/Dialog'
 import { Icon, type IconName } from '../components/ui/Icon'
 import { Select } from '../components/ui/Select'
 import { Switch } from '../components/ui/Checkbox'
@@ -128,6 +128,7 @@ export function SettingsPage() {
   const [username, setUsername] = useState(session?.user.username ?? '')
   const [email, setEmail] = useState(session?.user.email ?? '')
   const [bio, setBio] = useState(session?.user.bio ?? '')
+  const [pendingAvatar, setPendingAvatar] = useState<PendingAvatar>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [savingAccount, setSavingAccount] = useState(false)
 
@@ -156,9 +157,40 @@ export function SettingsPage() {
     setErrors((current) => ({ ...current, [field]: '' }))
   }
 
-  async function onSaveAccount(event: React.FormEvent) {
-    event.preventDefault()
-    if (savingAccount || !session) return
+  /**
+   * True when the profile panel holds anything the API has not been told
+   * about. Only this panel is tracked: the other sections either write to the
+   * server as they are switched or are device-local preferences.
+   */
+  const dirty =
+    pendingAvatar !== null ||
+    (session != null &&
+      (displayName !== (session.user.displayName ?? '') ||
+        username !== session.user.username ||
+        email !== session.user.email ||
+        bio !== (session.user.bio ?? '')))
+
+  /** Puts every field back to what the session holds, dropping the edits. */
+  function resetAccountForm() {
+    setDisplayName(session?.user.displayName ?? '')
+    setUsername(session?.user.username ?? '')
+    setEmail(session?.user.email ?? '')
+    setBio(session?.user.bio ?? '')
+    setPendingAvatar(null)
+    setErrors({})
+  }
+
+  /**
+   * Saves the whole profile panel: the picture and the text fields in one
+   * action. The picture goes first, since it has its own endpoint and its own
+   * ways to fail — a rejected upload should not leave the name saved and the
+   * picture silently dropped.
+   *
+   * Returns whether everything saved, so a navigation held for unsaved changes
+   * knows whether it may continue.
+   */
+  async function saveAccount(): Promise<boolean> {
+    if (savingAccount || !session) return false
 
     // Checked here as well as server-side so an obviously wrong field is
     // reported without a round trip; the API's own rules are the authority.
@@ -166,10 +198,20 @@ export function SettingsPage() {
     if (!isValidUsername(username)) next.username = '3–24 letters, numbers or underscores.'
     if (!isValidEmail(email)) next.email = 'That email address does not look right.'
     setErrors(next)
-    if (Object.keys(next).length > 0) return
+    if (Object.keys(next).length > 0) {
+      showToast({ tone: 'error', message: 'Some of the details need fixing.' })
+      return false
+    }
 
     setSavingAccount(true)
     try {
+      if (pendingAvatar?.kind === 'file') {
+        adoptProfile(await uploadAvatar(pendingAvatar.file))
+      } else if (pendingAvatar?.kind === 'remove') {
+        adoptProfile(await removeAvatar())
+      }
+      setPendingAvatar(null)
+
       const profile = await updateMyAccount({
         displayName: displayName.trim(),
         username: username.trim().toLowerCase(),
@@ -188,6 +230,7 @@ export function SettingsPage() {
       setBio(profile.bio ?? '')
 
       showToast({ message: 'Profile saved.' })
+      return true
     } catch (cause) {
       if (cause instanceof ApiError) {
         setErrors(cause.fieldErrors)
@@ -201,9 +244,48 @@ export function SettingsPage() {
       } else {
         showToast({ tone: 'error', message: 'We could not save those changes.' })
       }
+      return false
     } finally {
       setSavingAccount(false)
     }
+  }
+
+  async function onSaveAccount(event: React.FormEvent) {
+    event.preventDefault()
+    await saveAccount()
+  }
+
+  /**
+   * Holds a navigation away from Settings while there are unsaved changes.
+   * Switching sections is a search-param change on the same route, so the
+   * blocker compares pathnames rather than whole locations — otherwise the
+   * prompt would appear on every click in the section nav.
+   */
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      dirty && currentLocation.pathname !== nextLocation.pathname,
+  )
+
+  // The blocker covers navigation inside the app; a reload or a closed tab is
+  // the browser's own prompt, which is all a page is allowed to ask for.
+  useEffect(() => {
+    if (!dirty) return
+
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault()
+    }
+
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [dirty])
+
+  async function onSaveAndLeave() {
+    if (await saveAccount()) blocker.proceed?.()
+  }
+
+  function onDiscardAndLeave() {
+    resetAccountForm()
+    blocker.proceed?.()
   }
 
   async function onChangePassword(event: React.FormEvent) {
@@ -229,6 +311,9 @@ export function SettingsPage() {
     setDeleting(true)
     try {
       await new Promise((resolve) => setTimeout(resolve, 700))
+      // Nothing left to save once the account is gone; clearing the form first
+      // keeps the unsaved-changes prompt out of the way of the redirect.
+      resetAccountForm()
       signOut()
       navigate('/', { replace: true })
     } finally {
@@ -270,7 +355,12 @@ export function SettingsPage() {
           {active.id === 'account' ? (
             session ? (
               <>
-                <AvatarField user={session.user} onChange={adoptProfile} />
+                <AvatarField
+                  user={session.user}
+                  pending={pendingAvatar}
+                  onPendingChange={setPendingAvatar}
+                  disabled={savingAccount}
+                />
 
                 <hr className="settings__rule" />
 
@@ -330,9 +420,23 @@ export function SettingsPage() {
                     }}
                   />
                   <div className="settings__actions">
-                    <Button variant="primary" type="submit" loading={savingAccount}>
+                    <Button
+                      variant="primary"
+                      type="submit"
+                      loading={savingAccount}
+                      disabled={!dirty}
+                    >
                       Save changes
                     </Button>
+                    {dirty ? (
+                      <Button
+                        variant="ghost"
+                        onClick={() => resetAccountForm()}
+                        disabled={savingAccount}
+                      >
+                        Discard
+                      </Button>
+                    ) : null}
                   </div>
                 </form>
               </>
@@ -517,6 +621,39 @@ export function SettingsPage() {
           ) : null}
         </Card>
       </div>
+
+      <Dialog
+        open={blocker.state === 'blocked'}
+        onClose={() => blocker.reset?.()}
+        title="Save your changes?"
+        description="You have unsaved changes to your profile."
+        size="sm"
+        dismissible={!savingAccount}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => onDiscardAndLeave()}
+              disabled={savingAccount}
+            >
+              Discard changes
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => void onSaveAndLeave()}
+              loading={savingAccount}
+            >
+              Save and leave
+            </Button>
+          </>
+        }
+      >
+        <p className="settings__desc">
+          {pendingAvatar
+            ? 'Your profile details and picture will be lost if you leave without saving.'
+            : 'Your profile details will be lost if you leave without saving.'}
+        </p>
+      </Dialog>
 
       <ConfirmDialog
         open={confirmDelete}

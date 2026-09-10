@@ -1,5 +1,5 @@
 import { useAsync } from '../hooks/useAsync'
-import * as api from '../data/api'
+import * as storiesApi from '../data/stories-api'
 import { Logo } from '../components/layout/Logo'
 import { StoryCover } from '../components/story/StoryCover'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -27,7 +27,11 @@ const COPY = {
  * illustration — the first screen should already look like the product.
  */
 export function AuthAside({ variant }: { variant: keyof typeof COPY }) {
-  const stories = useAsync(() => api.getTrendingStories(3), [])
+  const stories = useAsync(
+    () =>
+      storiesApi.listStories({ sort: 'trending', limit: 3 }).then((page) => page.items),
+    [],
+  )
   const copy = COPY[variant]
 
   return (

@@ -9,6 +9,17 @@ enum MultimediaType {
   LINK
 }
 
+/// Where a work came from. Scribe has one work entity, `content.Story`;
+/// this is what separates a member's own serialised writing from an imported
+/// catalogue edition, which is read-only and has no chapters. See
+/// `docs/content-model.md`.
+enum ContentSource {
+  @@type("pg/text@1")
+
+  SCRIBE
+  CATALOGUE
+}
+
 enum ClubRole {
   @@type("pg/text@1")
 
@@ -78,6 +89,23 @@ namespace content {
     id              String   @id @default(uuid())
     authorId        String
     title           String
+
+    /// Stable, URL-safe identity. Every reader-facing route addresses a story
+    /// by this rather than by id, so it is generated once from the title and
+    /// then survives a rename.
+    slug            String   @unique
+
+    source          ContentSource @default(SCRIBE)
+
+    /// When the story became visible on Scribe. Null means draft: only the
+    /// author can see it.
+    ///
+    /// Deliberately *not* `publishedAt` below, which is the edition's own
+    /// publication date -- a catalogue import carries 1937 there while
+    /// becoming visible on Scribe the day it was imported, and a draft would
+    /// otherwise be indistinguishable from an import with an unknown date.
+    listedAt        DateTime?
+
     coverUrl        String?
     description     String?
     createdAt       DateTime @default(now())
@@ -111,6 +139,10 @@ namespace content {
     title         String
     content       String
     chapterNumber Int
+
+    /// Denormalised so the chapter list can show a length without loading
+    /// every body. Written by the authoring endpoints on every content edit.
+    wordCount     Int      @default(0)
     createdAt     DateTime @default(now())
     updatedAt     DateTime @default(now())
     publishedAt   DateTime?
