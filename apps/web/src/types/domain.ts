@@ -15,6 +15,8 @@ export interface User {
   displayName: string
   email: string
   bio: string
+  /** Uploaded picture; null falls the UI back to the generated monogram. */
+  avatarUrl?: string | null
   avatarHue: number
   joinedAt: string
   isAuthor: boolean

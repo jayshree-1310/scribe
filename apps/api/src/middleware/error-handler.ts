@@ -59,7 +59,7 @@ export const errorHandler: ErrorRequestHandler = (error, req, res, next) => {
       error: tooLarge
         ? {
             code: "payload_too_large",
-            message: "That note is too large to save.",
+            message: "That upload is too large.",
           }
         : {
             code: "invalid_json",

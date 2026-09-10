@@ -56,6 +56,10 @@ services:
     environment:
       DATABASE_URL: postgresql://scribe:scribe_dev_password@postgres:5432/scribe
       REDIS_URL: redis://redis:6379
+      # Uploads go to a volume rather than the bind-mounted source tree: the
+      # container writes as root, and files it left in the working tree would
+      # then be unwritable by anything running on the host (`pnpm test`).
+      UPLOAD_DIR: /var/lib/scribe/uploads
     ports:
       - "1303:1303"
     volumes:
@@ -65,6 +69,7 @@ services:
       - ./apps/api:/app/apps/api
       - /app/node_modules
       - /app/apps/api/node_modules
+      - api_uploads:/var/lib/scribe/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -118,3 +123,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  api_uploads:

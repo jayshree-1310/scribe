@@ -35,6 +35,40 @@ function adopt(response: AuthResponse): AuthResult {
   return { user: response.user, created: response.created ?? false }
 }
 
+/** Signs in with an email and password. */
+export async function signInWithPassword(input: {
+  email: string
+  password: string
+}): Promise<AuthResult> {
+  return adopt(
+    await request<AuthResponse>('/auth/login', {
+      method: 'POST',
+      body: input,
+    }),
+  )
+}
+
+/**
+ * Creates an account. Signup does not issue a session — the API answers 201
+ * with the new user and nothing else — so this signs in straight afterwards
+ * with the same credentials, and reports the account as newly created so the
+ * caller can route it into onboarding.
+ */
+export async function registerWithPassword(input: {
+  username: string
+  email: string
+  password: string
+}): Promise<AuthResult> {
+  await request('/auth/signup', { method: 'POST', body: input })
+
+  const result = await signInWithPassword({
+    email: input.email,
+    password: input.password,
+  })
+
+  return { ...result, created: true }
+}
+
 /** Exchanges a Google ID token for a Scribe session. */
 export async function signInWithGoogleIdToken(idToken: string): Promise<AuthResult> {
   return adopt(

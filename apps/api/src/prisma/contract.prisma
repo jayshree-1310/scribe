@@ -49,6 +49,10 @@ namespace auth {
     displayName String?
     avatarUrl   String?
 
+    /// Free text the profile page renders. Null and empty mean the same thing
+    /// to the UI, so the API normalises a cleared bio to null.
+    bio         String?
+
     isAuthor      Boolean @default(false)
     readingStreak Int     @default(0)
     authorLevel   Int     @default(1)

@@ -804,6 +804,33 @@
   min-width: 0;
 }
 
+.profile__picture {
+  position: relative;
+  flex: none;
+  border-radius: var(--radius-full);
+  cursor: zoom-in;
+}
+
+.profile__picture:hover .profile__picture-hint,
+.profile__picture:focus-visible .profile__picture-hint {
+  opacity: 1;
+}
+
+/* Sits over the picture rather than beside it: the hint is only meaningful
+   while the pointer is on the avatar, and reserving layout space for it would
+   shift the header. */
+.profile__picture-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background-color: rgba(28, 24, 21, 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
 .profile__name-row {
   display: flex;
   align-items: center;
@@ -925,30 +952,79 @@
   top: calc(var(--topbar-height) + var(--space-5));
 }
 
-.settings__nav a {
+.settings__nav button {
   display: flex;
   align-items: center;
   gap: var(--space-3);
+  width: 100%;
   padding: var(--space-2) var(--space-3);
+  border: 0;
   border-radius: var(--radius-md);
+  background: none;
   color: var(--text-secondary);
+  font: inherit;
   font-size: var(--text-base);
   font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease);
 }
 
-.settings__nav a:hover {
+.settings__nav button:hover {
   background-color: var(--surface-3);
   color: var(--text);
 }
 
-.settings__panels {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
+.settings__nav button[aria-current='page'] {
+  background-color: var(--surface-3);
+  color: var(--brand);
 }
 
-.settings__card {
-  scroll-margin-top: calc(var(--topbar-height) + var(--space-5));
+/* Avatar field ------------------------------------------------------------ */
+
+.avatar-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.avatar-field__preview {
+  flex: none;
+  border-radius: var(--radius-full);
+  cursor: zoom-in;
+}
+
+/* The picture stays visible while its upload is in flight, dimmed so the
+   wait is legible without swapping in a placeholder. */
+.avatar-field__preview[data-pending] {
+  opacity: 0.55;
+}
+
+.avatar-field__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 14rem;
+}
+
+.avatar-field__hint {
+  max-width: 44ch;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.avatar-field__actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.avatar-field__error {
+  color: var(--danger);
+  font-size: var(--text-sm);
 }
 
 .settings__title {
@@ -1074,7 +1150,8 @@
     padding-bottom: var(--space-2);
   }
 
-  .settings__nav a {
+  .settings__nav button {
+    width: auto;
     white-space: nowrap;
     border: 1px solid var(--border);
   }

@@ -183,6 +183,16 @@ currently fabricates the rating histogram client-side.
 
 Small, self-contained, and the forms already exist with no handler behind them.
 
+**Partly done.** `GET /api/account/me`, `PATCH /api/account/me` (displayName,
+username, email, bio — with `emailVerified` reset on an email change) and the
+avatar routes exist in `routes/account.ts` + `services/account.ts`, tested in
+`routes/account.test.ts`, and the settings Profile section is wired to them.
+Still outstanding here: `POST /change-password`, `POST /set-password` for
+Google-only accounts, and `DELETE /me`. The change-password form in
+`SettingsPage.tsx` is still the placeholder that resolves after a timeout —
+wiring it needs the session-revocation helpers in `routes/auth.ts` extracted so
+a password change can reuse them rather than reimplement them.
+
 **Prompt:**
 
 > `apps/web/src/pages/SettingsPage.tsx` has an account form (line ~168) and a
@@ -286,6 +296,13 @@ nowhere to save.
 ## Task 7 — File uploads (covers, avatars, multimedia)
 
 Blocks the polish on Tasks 4 and 6.
+
+**Avatars done.** `lib/storage.ts` (local filesystem, one seam for an
+S3-compatible backend) and `lib/image.ts` (signature sniffing) exist, and
+`POST /api/account/avatar` takes the image as the raw request body with a 2 MB
+cap and a per-user rate limit. Still outstanding: story covers and chapter
+multimedia, which need a general `POST /api/uploads` accepting audio and video
+as well — reuse both libs rather than adding a second storage path.
 
 **Prompt:**
 

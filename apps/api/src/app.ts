@@ -12,9 +12,11 @@ import pinoHttp from "pino-http";
 import { logger } from "./lib/logger.js";
 import { authenticate } from "./middleware/authenticate.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
+import accountRouter from "./routes/account.js";
 import authRouter from "./routes/auth.js";
 import booksRouter from "./routes/books.js";
 import libraryRouter from "./routes/library.js";
+import { UPLOAD_ROOT, UPLOAD_URL_PREFIX } from "./lib/storage.js";
 
 const app = express();
 
@@ -65,6 +67,28 @@ app.get("/health", (_req, res) => {
   });
 });
 
+/**
+ * Uploaded files (avatars today, covers and chapter media later). Served from
+ * this app so local development needs no object store, and behind
+ * `helmet`'s defaults plus these two headers: a stored file must never be
+ * *rendered* by the browser, only downloaded or drawn as an image, because
+ * anything served from our own origin runs with our origin's privileges.
+ */
+app.use(
+  UPLOAD_URL_PREFIX,
+  express.static(UPLOAD_ROOT, {
+    index: false,
+    // Uploads are content-addressed by a random name, so a URL's bytes never
+    // change and a long cache is safe.
+    maxAge: "1y",
+    setHeaders: (response) => {
+      response.setHeader("X-Content-Type-Options", "nosniff");
+      response.setHeader("Content-Security-Policy", "default-src 'none'");
+    },
+  }),
+);
+
+app.use("/api/account", accountRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/books", booksRouter);
 app.use("/api/library", libraryRouter);

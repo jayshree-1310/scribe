@@ -101,6 +101,13 @@
                   "kind": "scalar"
                 }
               },
+              "bio": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "createdAt": {
                 "nullable": false,
                 "type": {
@@ -330,6 +337,9 @@
                 },
                 "avatarUrl": {
                   "column": "avatarUrl"
+                },
+                "bio": {
+                  "column": "bio"
                 },
                 "createdAt": {
                   "column": "createdAt"
@@ -2439,6 +2449,11 @@
                   "nativeType": "text",
                   "nullable": true
                 },
+                "bio": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "createdAt": {
                   "codecId": "pg/timestamptz-temporal@1",
                   "default": {
@@ -4355,7 +4370,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "28de4e98f951d4018265faec4e326b9f947b47f9ae6763498eed0838cd22fc9b"
+    "storageHash": "3dc2d7db681b6f876555fe26b14e0f97bf3bbb59361460e0564296eda9bfea21"
   },
   "execution": {
     "executionHash": "2a8f10d344652873c2c64255cf26b8b7ef763928007ad7cae38f4ead2fc152a3",

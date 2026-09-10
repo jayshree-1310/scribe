@@ -1,4 +1,4 @@
-import { redis } from "./redis.js";
+import { connectRedis, redis } from "./redis.js";
 
 type RateLimitStatus = {
   limited: boolean;
@@ -14,6 +14,11 @@ export async function isRateLimited(
   key: string,
   limit: number,
 ): Promise<RateLimitStatus> {
+  // `server.ts` connects on boot, but anything that starts the app without it
+  // — the integration harness, a script — would otherwise fail every limited
+  // route with a 500. Connecting here is idempotent.
+  await connectRedis();
+
   const replies = await redis.multi().get(key).ttl(key).exec();
 
   const count = Number(replies[0] ?? 0);
@@ -39,5 +44,7 @@ export async function recordAttempt(
   key: string,
   windowSeconds: number,
 ): Promise<void> {
+  await connectRedis();
+
   await redis.multi().incr(key).expire(key, windowSeconds, "NX").exec();
 }

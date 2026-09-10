@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
+import { ApiError } from '../lib/api-client'
+import { updateMyAccount } from '../data/account-api'
 import { THEME_PREFERENCES, useTheme, type ThemePreference } from '../lib/theme'
 import {
   FONT_SIZES,
@@ -14,23 +16,69 @@ import {
 } from '../lib/reader-prefs'
 import { isValidEmail, isValidUsername } from '../lib/auth'
 import { AppShell } from '../components/layout/AppShell'
+import { AvatarField } from '../components/settings/AvatarField'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { ConfirmDialog } from '../components/ui/Dialog'
-import { Icon } from '../components/ui/Icon'
+import { Icon, type IconName } from '../components/ui/Icon'
 import { Select } from '../components/ui/Select'
 import { Switch } from '../components/ui/Checkbox'
 import { SegmentedControl } from '../components/ui/Tabs'
 import { PasswordField, TextField } from '../components/ui/TextField'
-import { InlineNotice } from '../components/ui/States'
+import { EmptyState } from '../components/ui/States'
 import './pages.css'
 
-const SECTIONS = [
-  { id: 'account', label: 'Account', icon: 'user' as const },
-  { id: 'appearance', label: 'Appearance', icon: 'sun' as const },
-  { id: 'reading', label: 'Reading', icon: 'book-open' as const },
-  { id: 'notifications', label: 'Notifications', icon: 'bell' as const },
-  { id: 'privacy', label: 'Privacy', icon: 'shield' as const },
+interface Section {
+  id: string
+  label: string
+  icon: IconName
+  title: string
+  description: string
+}
+
+const SECTIONS: Section[] = [
+  {
+    id: 'account',
+    label: 'Profile',
+    icon: 'user',
+    title: 'Profile',
+    description: 'How you appear to other readers.',
+  },
+  {
+    id: 'security',
+    label: 'Sign-in & security',
+    icon: 'lock',
+    title: 'Sign-in & security',
+    description: 'Your password, and closing your account.',
+  },
+  {
+    id: 'appearance',
+    label: 'Appearance',
+    icon: 'sun',
+    title: 'Appearance',
+    description: 'Applies across all of Scribe and is remembered on this device.',
+  },
+  {
+    id: 'reading',
+    label: 'Reading',
+    icon: 'book-open',
+    title: 'Reading',
+    description: 'Defaults for the reader. You can also change these while reading.',
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    icon: 'bell',
+    title: 'Notifications',
+    description: "Choose what's worth interrupting you for.",
+  },
+  {
+    id: 'privacy',
+    label: 'Privacy',
+    icon: 'shield',
+    title: 'Privacy',
+    description: 'You decide how much of your reading is public.',
+  },
 ]
 
 const THEME_ICONS = { light: 'sun', dark: 'moon', system: 'monitor' } as const
@@ -47,18 +95,41 @@ const VISIBILITY_OPTIONS = [
 ]
 
 export function SettingsPage() {
-  const { session, signOut } = useAuth()
+  const { session, adoptProfile, signOut } = useAuth()
   const { preference, setPreference } = useTheme()
   const { preferences, update } = useReaderPrefs()
   const { showToast } = useToast()
   const navigate = useNavigate()
 
+  /**
+   * The open section lives in the URL, so "Edit profile" can link straight to
+   * it, the back button steps between sections, and a reload stays put. One
+   * section is shown at a time: the six panels stacked made a page nobody
+   * could find anything in without scrolling past everything else.
+   */
+  const [params, setParams] = useSearchParams()
+  const requested = params.get('section')
+  const active = SECTIONS.find((section) => section.id === requested) ?? SECTIONS[0]!
+
+  function openSection(id: string) {
+    setParams(
+      (current) => {
+        const next = new URLSearchParams(current)
+        next.set('section', id)
+        return next
+      },
+      // Pushed rather than replaced, so the back button steps back through
+      // the sections the reader opened instead of leaving Settings entirely.
+      { replace: false },
+    )
+  }
+
+  const [displayName, setDisplayName] = useState(session?.user.displayName ?? '')
   const [username, setUsername] = useState(session?.user.username ?? '')
   const [email, setEmail] = useState(session?.user.email ?? '')
   const [bio, setBio] = useState(session?.user.bio ?? '')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [savingAccount, setSavingAccount] = useState(false)
-  const [savedNotice, setSavedNotice] = useState(false)
 
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -81,24 +152,55 @@ export function SettingsPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  function clearError(field: string) {
+    setErrors((current) => ({ ...current, [field]: '' }))
+  }
+
   async function onSaveAccount(event: React.FormEvent) {
     event.preventDefault()
-    if (savingAccount) return
+    if (savingAccount || !session) return
 
+    // Checked here as well as server-side so an obviously wrong field is
+    // reported without a round trip; the API's own rules are the authority.
     const next: Record<string, string> = {}
     if (!isValidUsername(username)) next.username = '3–24 letters, numbers or underscores.'
     if (!isValidEmail(email)) next.email = 'That email address does not look right.'
     setErrors(next)
-    setSavedNotice(false)
     if (Object.keys(next).length > 0) return
 
     setSavingAccount(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600))
-      setSavedNotice(true)
-      showToast({ message: 'Account details saved.' })
-    } catch {
-      showToast({ tone: 'error', message: 'We could not save those changes.' })
+      const profile = await updateMyAccount({
+        displayName: displayName.trim(),
+        username: username.trim().toLowerCase(),
+        email: email.trim().toLowerCase(),
+        bio: bio.trim(),
+      })
+
+      adoptProfile(profile)
+
+      // The API normalises what it stores — a lower-cased username, a trimmed
+      // bio — so the form is refilled from the response rather than from what
+      // was typed.
+      setDisplayName(profile.displayName ?? '')
+      setUsername(profile.username)
+      setEmail(profile.email)
+      setBio(profile.bio ?? '')
+
+      showToast({ message: 'Profile saved.' })
+    } catch (cause) {
+      if (cause instanceof ApiError) {
+        setErrors(cause.fieldErrors)
+        showToast({
+          tone: 'error',
+          message:
+            Object.keys(cause.fieldErrors).length > 0
+              ? 'Some of the details need fixing.'
+              : cause.message,
+        })
+      } else {
+        showToast({ tone: 'error', message: 'We could not save those changes.' })
+      }
     } finally {
       setSavingAccount(false)
     }
@@ -145,120 +247,155 @@ export function SettingsPage() {
       </header>
 
       <div className="settings">
-        {/* In-page navigation ---------------------------------------- */}
+        {/* Section navigation ---------------------------------------- */}
         <nav className="settings__nav" aria-label="Settings sections">
           {SECTIONS.map((section) => (
-            <a key={section.id} href={`#${section.id}`}>
+            <button
+              key={section.id}
+              type="button"
+              onClick={() => openSection(section.id)}
+              aria-current={section.id === active.id ? 'page' : undefined}
+            >
               <Icon name={section.icon} size="1rem" />
               {section.label}
-            </a>
+            </button>
           ))}
         </nav>
 
-        <div className="settings__panels">
-          {/* Account ------------------------------------------------- */}
-          <Card as="section" className="settings__card" id="account">
-            <h2 className="settings__title">Account</h2>
-            <p className="settings__desc">How you appear to other readers.</p>
+        <Card as="section" className="settings__card" aria-label={active.title}>
+          <h2 className="settings__title">{active.title}</h2>
+          <p className="settings__desc">{active.description}</p>
 
-            {savedNotice ? (
-              <InlineNotice tone="success">Your changes have been saved.</InlineNotice>
-            ) : null}
+          {/* Profile ------------------------------------------------- */}
+          {active.id === 'account' ? (
+            session ? (
+              <>
+                <AvatarField user={session.user} onChange={adoptProfile} />
 
-            <form className="settings__form" onSubmit={onSaveAccount} noValidate>
-              <TextField
-                label="Username"
-                value={username}
-                error={errors.username}
-                maxLength={24}
-                disabled={savingAccount}
-                onChange={(event) => {
-                  setUsername(event.target.value)
-                  setErrors((current) => ({ ...current, username: '' }))
-                }}
+                <hr className="settings__rule" />
+
+                <form className="settings__form" onSubmit={onSaveAccount} noValidate>
+                  <TextField
+                    label="Display name"
+                    value={displayName}
+                    error={errors['displayName']}
+                    maxLength={60}
+                    hint="Shown on your profile and next to anything you post. Leave it empty to use your username."
+                    disabled={savingAccount}
+                    onChange={(event) => {
+                      setDisplayName(event.target.value)
+                      clearError('displayName')
+                    }}
+                  />
+                  <TextField
+                    label="Username"
+                    value={username}
+                    error={errors['username']}
+                    maxLength={24}
+                    hint="Your profile lives at /profile/your-username."
+                    disabled={savingAccount}
+                    onChange={(event) => {
+                      setUsername(event.target.value)
+                      clearError('username')
+                    }}
+                  />
+                  <TextField
+                    label="Email"
+                    type="email"
+                    value={email}
+                    error={errors['email']}
+                    hint={
+                      session.user.email === email
+                        ? undefined
+                        : "You'll need to verify a new address."
+                    }
+                    disabled={savingAccount}
+                    onChange={(event) => {
+                      setEmail(event.target.value)
+                      clearError('email')
+                    }}
+                  />
+                  <TextField
+                    multiline
+                    label="Bio"
+                    rows={3}
+                    value={bio}
+                    error={errors['bio']}
+                    maxLength={280}
+                    counterMax={280}
+                    disabled={savingAccount}
+                    onChange={(event) => {
+                      setBio(event.target.value)
+                      clearError('bio')
+                    }}
+                  />
+                  <div className="settings__actions">
+                    <Button variant="primary" type="submit" loading={savingAccount}>
+                      Save changes
+                    </Button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <EmptyState
+                icon="user"
+                title="Sign in to edit your profile"
+                size="sm"
               />
-              <TextField
-                label="Email"
-                type="email"
-                value={email}
-                error={errors.email}
-                disabled={savingAccount}
-                onChange={(event) => {
-                  setEmail(event.target.value)
-                  setErrors((current) => ({ ...current, email: '' }))
-                }}
-              />
-              <TextField
-                multiline
-                label="Bio"
-                rows={3}
-                value={bio}
-                maxLength={280}
-                counterMax={280}
-                disabled={savingAccount}
-                onChange={(event) => setBio(event.target.value)}
-              />
+            )
+          ) : null}
+
+          {/* Sign-in & security -------------------------------------- */}
+          {active.id === 'security' ? (
+            <>
+              <h3 className="settings__subtitle">Password</h3>
+              <form className="settings__form" onSubmit={onChangePassword} noValidate>
+                <PasswordField
+                  label="Current password"
+                  autoComplete="current-password"
+                  value={currentPassword}
+                  error={errors['currentPassword']}
+                  disabled={savingPassword}
+                  onChange={(event) => {
+                    setCurrentPassword(event.target.value)
+                    clearError('currentPassword')
+                  }}
+                />
+                <PasswordField
+                  label="New password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  error={errors['newPassword']}
+                  disabled={savingPassword}
+                  onChange={(event) => {
+                    setNewPassword(event.target.value)
+                    clearError('newPassword')
+                  }}
+                />
+                <div className="settings__actions">
+                  <Button type="submit" loading={savingPassword}>
+                    Update password
+                  </Button>
+                </div>
+              </form>
+
+              <hr className="settings__rule" />
+
+              <h3 className="settings__subtitle settings__subtitle--danger">Delete account</h3>
+              <p className="settings__desc">
+                This removes your profile, stories, comments and reading history.
+                It cannot be undone.
+              </p>
               <div className="settings__actions">
-                <Button variant="primary" type="submit" loading={savingAccount}>
-                  Save changes
+                <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+                  Delete my account
                 </Button>
               </div>
-            </form>
-
-            <hr className="settings__rule" />
-
-            <h3 className="settings__subtitle">Password</h3>
-            <form className="settings__form" onSubmit={onChangePassword} noValidate>
-              <PasswordField
-                label="Current password"
-                autoComplete="current-password"
-                value={currentPassword}
-                error={errors.currentPassword}
-                disabled={savingPassword}
-                onChange={(event) => {
-                  setCurrentPassword(event.target.value)
-                  setErrors((current) => ({ ...current, currentPassword: '' }))
-                }}
-              />
-              <PasswordField
-                label="New password"
-                autoComplete="new-password"
-                value={newPassword}
-                error={errors.newPassword}
-                disabled={savingPassword}
-                onChange={(event) => {
-                  setNewPassword(event.target.value)
-                  setErrors((current) => ({ ...current, newPassword: '' }))
-                }}
-              />
-              <div className="settings__actions">
-                <Button type="submit" loading={savingPassword}>
-                  Update password
-                </Button>
-              </div>
-            </form>
-
-            <hr className="settings__rule" />
-
-            <h3 className="settings__subtitle settings__subtitle--danger">Delete account</h3>
-            <p className="settings__desc">
-              This removes your profile, stories, comments and reading history.
-              It cannot be undone.
-            </p>
-            <div className="settings__actions">
-              <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-                Delete my account
-              </Button>
-            </div>
-          </Card>
+            </>
+          ) : null}
 
           {/* Appearance --------------------------------------------- */}
-          <Card as="section" className="settings__card" id="appearance">
-            <h2 className="settings__title">Appearance</h2>
-            <p className="settings__desc">
-              Applies across all of Scribe and is remembered on this device.
-            </p>
-
+          {active.id === 'appearance' ? (
             <SegmentedControl
               label="Theme"
               value={preference}
@@ -269,13 +406,10 @@ export function SettingsPage() {
                 icon: <Icon name={THEME_ICONS[value]} size="1rem" />,
               }))}
             />
-          </Card>
+          ) : null}
 
           {/* Reading ------------------------------------------------- */}
-          <Card as="section" className="settings__card" id="reading">
-            <h2 className="settings__title">Reading</h2>
-            <p className="settings__desc">Defaults for the reader. You can also change these while reading.</p>
-
+          {active.id === 'reading' ? (
             <div className="settings__stack">
               <div>
                 <p className="settings__label">Font size</p>
@@ -320,13 +454,10 @@ export function SettingsPage() {
                 description="Play chapter audio and video automatically."
               />
             </div>
-          </Card>
+          ) : null}
 
           {/* Notifications ------------------------------------------ */}
-          <Card as="section" className="settings__card" id="notifications">
-            <h2 className="settings__title">Notifications</h2>
-            <p className="settings__desc">Choose what's worth interrupting you for.</p>
-
+          {active.id === 'notifications' ? (
             <div className="settings__switches">
               <Switch
                 checked={notifications.comments}
@@ -359,13 +490,10 @@ export function SettingsPage() {
                 description="New chapters and channel posts from authors you follow."
               />
             </div>
-          </Card>
+          ) : null}
 
           {/* Privacy ------------------------------------------------- */}
-          <Card as="section" className="settings__card" id="privacy">
-            <h2 className="settings__title">Privacy</h2>
-            <p className="settings__desc">You decide how much of your reading is public.</p>
-
+          {active.id === 'privacy' ? (
             <div className="settings__stack">
               <Select
                 label="Who can see your profile"
@@ -386,8 +514,8 @@ export function SettingsPage() {
                 description="Let club members see what you're reading along with them."
               />
             </div>
-          </Card>
-        </div>
+          ) : null}
+        </Card>
       </div>
 
       <ConfirmDialog

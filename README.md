@@ -268,6 +268,20 @@ POST /api/auth/refresh
 POST /api/auth/logout
 ```
 
+### Account
+
+The signed-in reader's own profile. Implemented and wired to the settings page.
+
+```text
+GET    /api/account/me
+PATCH  /api/account/me      # displayName, username, email, bio
+POST   /api/account/avatar  # the image bytes as the request body
+DELETE /api/account/avatar
+```
+
+Avatars are stored by `apps/api/src/lib/storage.ts` and served from
+`/uploads/...`; set `UPLOAD_DIR` to choose where they land.
+
 ### Users
 
 ```text

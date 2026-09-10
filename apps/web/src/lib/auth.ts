@@ -1,12 +1,13 @@
 /**
  * Client-side session state.
  *
- * Scribe's auth endpoints are still being built, so this validates and stores
- * a session locally. `signIn` / `register` are async and can fail, so the real
- * forms exercise their loading and error states exactly as they will later.
+ * Sign-in, registration and the profile the session carries all come from the
+ * API; what is still local is the onboarding answers and the presentational
+ * fields the mock supplies (`AuthProvider` explains which).
  */
 
 import { createContext, useContext } from 'react'
+import type { AccountProfile } from '../data/account-api'
 import type { Session, User } from '../types/domain'
 
 export const SESSION_STORAGE_KEY = 'scribe:session'
@@ -36,6 +37,12 @@ export interface AuthContextValue {
   }) => Promise<User>
   signInWithGoogle: () => Promise<GoogleSignInResult>
   completeOnboarding: (answers: OnboardingAnswers) => void
+  /**
+   * Folds a freshly saved profile back into the session, so the avatar in the
+   * top bar and the name on the profile page change the moment settings are
+   * saved rather than on the next reload.
+   */
+  adoptProfile: (profile: AccountProfile) => void
   signOut: () => void
 }
 

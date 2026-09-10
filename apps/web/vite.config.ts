@@ -14,6 +14,12 @@ export default defineConfig(({ mode }) => {
           target: env.VITE_API_PROXY_TARGET || 'http://localhost:1303',
           changeOrigin: true,
         },
+        // Uploaded avatars are stored by the API and referenced by
+        // root-relative URLs, so they have to reach it too.
+        '/uploads': {
+          target: env.VITE_API_PROXY_TARGET || 'http://localhost:1303',
+          changeOrigin: true,
+        },
       },
     },
   }

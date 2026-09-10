@@ -61,6 +61,11 @@ services:
       # nginx is the single hop in front of the API, so one forwarded address
       # can be trusted for rate-limit bucketing.
       TRUST_PROXY: "1"
+      UPLOAD_DIR: /var/lib/scribe/uploads
+    volumes:
+      # Uploaded avatars live on disk, so they must outlive the container the
+      # way the database does.
+      - api_uploads:/var/lib/scribe/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,3 +105,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  api_uploads:

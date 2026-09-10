@@ -63,6 +63,10 @@ COPY apps/api/package.json ./apps/api/package.json
 # migrate` can be run against a deployed release.
 COPY apps/api/prisma.config.ts ./apps/api/prisma.config.ts
 COPY apps/api/migrations ./apps/api/migrations
+# Uploads are written at runtime by the unprivileged user, and a volume
+# mounted here inherits this ownership — without it the first avatar upload
+# fails on a root-owned directory.
+RUN mkdir -p /var/lib/scribe/uploads && chown -R node:node /var/lib/scribe
 USER node
 WORKDIR /app/apps/api
 EXPOSE 3000

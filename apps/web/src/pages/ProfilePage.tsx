@@ -12,6 +12,7 @@ import { StatusBadge } from '../components/ui/Chip'
 import { Icon } from '../components/ui/Icon'
 import { ProgressBar } from '../components/ui/Progress'
 import { Skeleton } from '../components/ui/Skeleton'
+import { Lightbox } from '../components/ui/Lightbox'
 import { Tabs, TabPanel } from '../components/ui/Tabs'
 import { EmptyState, ErrorState } from '../components/ui/States'
 import { BadgeTile, ClubCard } from '../components/story/Cards'
@@ -41,6 +42,7 @@ export function ProfilePage() {
 
   const [tab, setTab] = useState<ProfileTab>('overview')
   const [following, setFollowing] = useState(false)
+  const [viewingPicture, setViewingPicture] = useState(false)
 
   const isMe = !username || username === session?.user.username
   const profile = isMe
@@ -75,7 +77,23 @@ export function ProfilePage() {
       {/* Header --------------------------------------------------------- */}
       <header className="profile">
         <div className="profile__identity">
-          <Avatar user={profile} size="xl" />
+          {profile.avatarUrl ? (
+            /* A picture is worth opening at full size; a generated monogram
+               is not, so only the former becomes a button. */
+            <button
+              type="button"
+              className="profile__picture"
+              onClick={() => setViewingPicture(true)}
+              aria-label={`View ${isMe ? 'your' : `${profile.displayName}'s`} profile picture`}
+            >
+              <Avatar user={profile} size="xl" />
+              <span className="profile__picture-hint" aria-hidden="true">
+                <Icon name="maximize" size="1.1rem" />
+              </span>
+            </button>
+          ) : (
+            <Avatar user={profile} size="xl" />
+          )}
           <div className="profile__ident-text">
             <div className="profile__name-row">
               <h1>{profile.displayName}</h1>
@@ -103,7 +121,10 @@ export function ProfilePage() {
         <div className="profile__actions">
           {isMe ? (
             <>
-              <ButtonLink to="/settings" startIcon={<Icon name="settings" size="1em" />}>
+              <ButtonLink
+                to="/settings?section=account"
+                startIcon={<Icon name="settings" size="1em" />}
+              >
                 Edit profile
               </ButtonLink>
               <ButtonLink variant="primary" to="/author" startIcon={<Icon name="pen" size="1em" />}>
@@ -294,6 +315,24 @@ export function ProfilePage() {
             ))}
           </div>
         </TabPanel>
+      ) : null}
+
+      {profile.avatarUrl ? (
+        <Lightbox
+          open={viewingPicture}
+          onClose={() => setViewingPicture(false)}
+          src={profile.avatarUrl}
+          alt={`${profile.displayName}'s profile picture`}
+        >
+          {isMe ? (
+            <ButtonLink
+              to="/settings?section=account"
+              startIcon={<Icon name="image" size="1em" />}
+            >
+              Change picture
+            </ButtonLink>
+          ) : null}
+        </Lightbox>
       ) : null}
 
       {tab === 'clubs' ? (

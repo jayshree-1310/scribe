@@ -59,16 +59,23 @@ export class TestApi {
       body?: unknown;
       /** Omit to make the request anonymously. */
       as?: string;
+      /** Sends bytes verbatim instead of JSON, for the avatar upload route. */
+      raw?: { data: Buffer; contentType: string };
     } = {},
   ): Promise<ApiResponse<T>> {
     const headers: Record<string, string> = {};
     if (options.body !== undefined) headers["Content-Type"] = "application/json";
+    if (options.raw) headers["Content-Type"] = options.raw.contentType;
     if (options.as) headers[DEV_USER_HEADER] = options.as;
 
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: options.method ?? "GET",
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.raw
+        ? new Uint8Array(options.raw.data)
+        : options.body === undefined
+          ? undefined
+          : JSON.stringify(options.body),
     });
 
     return {

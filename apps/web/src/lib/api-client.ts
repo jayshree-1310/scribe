@@ -67,6 +67,11 @@ const REQUEST_TIMEOUT_MS = 15_000
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  /**
+   * Serialised as JSON, unless it is binary — a `File`, `Blob` or buffer —
+   * in which case it is sent verbatim. The avatar endpoint takes the image
+   * bytes as the whole body, so nothing here may re-encode them.
+   */
   body?: unknown
   query?: Record<string, string | undefined>
   /** Extra request headers, merged after the JSON content type. */
@@ -106,6 +111,14 @@ async function toApiError(response: Response): Promise<ApiError> {
   })
 }
 
+function isBinary(body: unknown): body is Blob | ArrayBuffer | ArrayBufferView {
+  return (
+    body instanceof Blob ||
+    body instanceof ArrayBuffer ||
+    ArrayBuffer.isView(body)
+  )
+}
+
 export async function request<T>(
   path: string,
   { method = 'GET', body, query, headers, signal }: RequestOptions = {},
@@ -117,16 +130,26 @@ export async function request<T>(
   let response: Response
   try {
     const accessToken = getAccessToken()
+    const binary = isBinary(body)
 
     response = await fetch(buildUrl(path, query), {
       method,
       headers: {
-        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        // A `File` carries its own type, which `fetch` sets for us; declaring
+        // it here would send a second, possibly wrong, header.
+        ...(body === undefined || binary
+          ? {}
+          : { 'Content-Type': 'application/json' }),
         // Attached here rather than per call site, so no request can forget it.
         ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
         ...headers,
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body:
+        body === undefined
+          ? undefined
+          : binary
+            ? (body as BodyInit)
+            : JSON.stringify(body),
       /**
        * The refresh token is an HttpOnly cookie. Same-origin is the default,
        * and the dev server proxies `/api`, but a deployed build pointed at
