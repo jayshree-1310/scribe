@@ -67,6 +67,28 @@ export function formatDuration(seconds: number): string {
   return `${minutes}:${rest.toString().padStart(2, '0')}`
 }
 
+/**
+ * "512 KB" / "1.4 MB" — file sizes, for a picked file and for the caps the
+ * upload endpoints enforce.
+ *
+ * One decimal below 10 and none above, so a size stays the same width as it
+ * grows and a cap reads as the round number it is.
+ */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+
+  const units = ['KB', 'MB', 'GB']
+  let size = bytes / 1024
+  let unit = 0
+
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024
+    unit += 1
+  }
+
+  return `${size < 10 ? Number(size.toFixed(1)) : Math.round(size)} ${units[unit]}`
+}
+
 /** Whole days between now and an ISO date; negative once past. */
 export function daysUntil(iso: string): number {
   return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000)

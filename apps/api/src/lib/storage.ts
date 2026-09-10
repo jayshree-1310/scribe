@@ -9,8 +9,11 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { createWriteStream } from "node:fs";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
+import type { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 
 export interface StoredFile {
   /** Opaque key the storage backend addresses the file by. */
@@ -27,6 +30,22 @@ export interface Storage {
     extension: string;
     contentType: string;
   }): Promise<StoredFile>;
+
+  /**
+   * Writes a file the caller is still reading, for uploads too large to hold
+   * in memory — a chapter's video, mostly.
+   *
+   * Any failure while reading leaves nothing behind: the partial file is
+   * removed and the error rethrown, so a caller that aborts the stream to
+   * enforce a size cap does not have to know a file was started.
+   */
+  putStream(input: {
+    /** The source, as a stream or as anything else that yields its bytes. */
+    data: Readable | AsyncIterable<Buffer>;
+    prefix: string;
+    extension: string;
+    contentType: string;
+  }): Promise<StoredFile & { bytes: number }>;
 
   /**
    * Deletes by the URL that `put` returned, since that is what rows store.
@@ -68,6 +87,43 @@ function localStorageBackend(): Storage {
       const key = `${prefix}/${name}`;
 
       return { key, url: `${PUBLIC_BASE_URL}${UPLOAD_URL_PREFIX}/${key}` };
+    },
+
+    async putStream({ prefix, data, extension }) {
+      const name = `${randomUUID()}${extension}`;
+      const directory = path.join(UPLOAD_ROOT, prefix);
+
+      await mkdir(directory, { recursive: true });
+
+      const target = path.join(directory, name);
+      let bytes = 0;
+
+      // Counted inside the pipeline rather than from a `data` listener: a
+      // listener would put the source into flowing mode before the write end
+      // was attached, and the first chunks would go nowhere.
+      async function* counting(source: AsyncIterable<Buffer>) {
+        for await (const chunk of source) {
+          bytes += chunk.length;
+          yield chunk;
+        }
+      }
+
+      try {
+        await pipeline(data, counting, createWriteStream(target));
+      } catch (error) {
+        // `pipeline` has already destroyed both ends; what is left is the
+        // truncated file on disk, which nothing will ever hold a URL for.
+        await unlink(target).catch(() => {});
+        throw error;
+      }
+
+      const key = `${prefix}/${name}`;
+
+      return {
+        key,
+        bytes,
+        url: `${PUBLIC_BASE_URL}${UPLOAD_URL_PREFIX}/${key}`,
+      };
     },
 
     async remove(url) {

@@ -81,17 +81,11 @@ export interface Story {
   tagline: string
 }
 
-export type MultimediaKind = 'image' | 'audio' | 'video'
-
-export interface Multimedia {
-  id: string
-  chapterId: string
-  kind: MultimediaKind
-  caption: string
-  /** Duration in seconds for audio/video. */
-  durationSeconds?: number
-}
-
+/**
+ * Only `ReadingEntry` still refers to this. The reader's chapter types live in
+ * `types/stories.ts` and an author's in `data/authoring-api.ts`; the mock
+ * `Multimedia` that used to sit here went with the real attachment types.
+ */
 export interface Chapter {
   id: string
   storyId: string
@@ -103,7 +97,6 @@ export interface Chapter {
   wordCount: number
   readingMinutes: number
   viewCount: number
-  multimedia: Multimedia[]
 }
 
 /* engagement ---------------------------------------------------------- */

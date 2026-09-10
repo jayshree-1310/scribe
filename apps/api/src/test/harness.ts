@@ -26,7 +26,12 @@ const UNUSABLE_PASSWORD_HASH = "!test-fixture-no-login";
 
 export class TestApi {
   private server: Server | undefined;
-  private baseUrl = "";
+  /**
+   * Where the test app is listening. Public so a test can fetch something the
+   * `request` helper does not model — a stored upload's URL, say, which has to
+   * be reached the way a browser would.
+   */
+  baseUrl = "";
 
   /** Every id this run created, so teardown removes exactly its own rows. */
   private readonly created = {

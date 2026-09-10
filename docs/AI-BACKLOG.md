@@ -1053,7 +1053,7 @@ measure with. Each is a comparison, and without an eval each is an opinion.
 - Different embedding models and chunk sizes, measured on retrieval precision.
 - A reranker between retrieval and generation.
 - Semantic caching — answer a question already answered in different words.
-- Multimodal: AI cover concepts, which would use `lib/storage.ts` and the upload
-  path from `BACKLOG.md` Task 7.
+- Multimodal: AI cover concepts, which would use `lib/storage.ts` and the
+  `POST /api/uploads` path already built for covers and chapter media.
 - Audio: text-to-speech chapter playback, which `content.Multimedia` already has
   an `AUDIO` type for.

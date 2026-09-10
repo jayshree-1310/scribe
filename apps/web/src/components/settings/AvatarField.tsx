@@ -3,6 +3,7 @@ import {
   ACCEPTED_AVATAR_TYPES,
   MAX_AVATAR_BYTES,
 } from "../../data/account-api";
+import { formatFileSize } from "../../lib/format";
 import { useObjectUrl } from "../../lib/object-url";
 import { Avatar } from "../ui/Avatar";
 import { AvatarCropper } from "./AvatarCropper";
@@ -26,10 +27,6 @@ interface AvatarFieldProps {
   onPendingChange: (pending: PendingAvatar) => void;
   /** Set while the form is saving, so the picture cannot be changed mid-save. */
   disabled?: boolean;
-}
-
-function readableSize(bytes: number): string {
-  return `${Math.round(bytes / (1024 * 1024))} MB`;
 }
 
 /**
@@ -80,7 +77,7 @@ export function AvatarField({
 
     if (file.size > MAX_AVATAR_BYTES) {
       setError(
-        `That image is too large. Pick one under ${readableSize(MAX_AVATAR_BYTES)}.`,
+        `That image is too large. Pick one under ${formatFileSize(MAX_AVATAR_BYTES)}.`,
       );
       return;
     }
@@ -118,7 +115,7 @@ export function AvatarField({
       <div className="avatar-field__body">
         <p className="avatar-field__hint">
           A square image works best. PNG, JPEG, WebP or GIF, up to{" "}
-          {readableSize(MAX_AVATAR_BYTES)}.
+          {formatFileSize(MAX_AVATAR_BYTES)}.
         </p>
 
         <div className="avatar-field__actions">

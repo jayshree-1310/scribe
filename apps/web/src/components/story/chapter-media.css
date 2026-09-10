@@ -1,0 +1,48 @@
+/*
+ * Chapter attachments, shared by the reader and the editor's preview.
+ *
+ * The `--read-*` variables exist only inside the reader's theme, so every use
+ * of one carries the app-wide equivalent as a fallback.
+ */
+
+.media {
+  margin: var(--space-8) 0;
+}
+
+.media__image,
+.media__video {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+/* Keeps a video from collapsing to nothing before its metadata arrives. */
+.media__video {
+  aspect-ratio: 16 / 9;
+}
+
+.media__audio {
+  display: block;
+  width: 100%;
+}
+
+.media__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.media figcaption {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--read-ink-soft, var(--text-muted));
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  text-indent: 0;
+}

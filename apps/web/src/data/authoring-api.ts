@@ -32,6 +32,11 @@ export interface AuthoredChapter {
   publishedAt: string | null
   createdAt: string
   updatedAt: string
+  /**
+   * The chapter's attachments, so the editor can show what is attached
+   * without a request per chapter.
+   */
+  multimedia: AuthoredMedia[]
 }
 
 export interface AuthoredMedia {

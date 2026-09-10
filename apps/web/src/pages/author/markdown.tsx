@@ -1,11 +1,14 @@
 import type { ReactNode } from 'react'
+import { ChapterAttachment } from '../../components/story/ChapterAttachment'
+import { withoutMediaTokens } from '../../lib/chapter-media'
+import type { ChapterMedia } from '../../types/stories'
 
 /**
  * Minimal block + inline renderer for the chapter editor's preview.
  *
  * Deliberately builds React elements rather than setting innerHTML, so author
  * text can never inject markup. Supports headings, blockquotes, bullet lists,
- * media placeholders, and inline bold/italic.
+ * attachments, and inline bold/italic.
  */
 
 function inline(text: string, keyPrefix: string): ReactNode[] {
@@ -32,9 +35,25 @@ function inline(text: string, keyPrefix: string): ReactNode[] {
   return nodes
 }
 
-const MEDIA_PATTERN = /^\[(image|audio|video):\s*(.*)\]$/i
+/**
+ * A `[media:<id>]` line. Matched here as well as in `lib/chapter-media.ts`
+ * because this renderer works line by line rather than by paragraph — but the
+ * meaning of the token, and what happens to one whose row is gone, is that
+ * module's decision and this follows it.
+ */
+const MEDIA_TOKEN = /^\[media:([\w-]+)\]$/
 
-export function renderMarkdown(source: string): ReactNode[] {
+/**
+ * Renders the chapter as the reader will see it, attachments included, so the
+ * preview is a preview rather than a description of one.
+ */
+export function renderMarkdown(
+  source: string,
+  media: readonly ChapterMedia[] = [],
+): ReactNode[] {
+  const byId = new Map(media.map((item) => [item.id, item]))
+  const placed = new Set<string>()
+
   const blocks: ReactNode[] = []
   const lines = source.split('\n')
   let listBuffer: string[] = []
@@ -60,14 +79,16 @@ export function renderMarkdown(source: string): ReactNode[] {
       return
     }
 
-    const media = MEDIA_PATTERN.exec(line.trim())
-    if (media) {
+    const token = MEDIA_TOKEN.exec(line.trim())
+    if (token) {
       flushList()
-      blocks.push(
-        <p className="preview__media" key={key}>
-          {media[1]!.toLowerCase()} — {media[2]}
-        </p>,
-      )
+
+      const item = byId.get(token[1]!)
+      // A token whose attachment is gone renders as nothing, not as plumbing.
+      if (!item) return
+
+      placed.add(item.id)
+      blocks.push(<ChapterAttachment key={key} item={item} />)
       return
     }
 
@@ -99,12 +120,20 @@ export function renderMarkdown(source: string): ReactNode[] {
   })
 
   flushList()
+
+  // Same fallback as the reader: an attachment the prose never places follows
+  // the text, so nothing the author uploaded is invisible here either.
+  for (const item of media) {
+    if (!placed.has(item.id)) {
+      blocks.push(<ChapterAttachment key={`t-${item.id}`} item={item} />)
+    }
+  }
+
   return blocks
 }
 
 export function countWords(source: string): number {
-  const text = source
-    .replace(MEDIA_PATTERN, '')
+  const text = withoutMediaTokens(source)
     .replace(/[#>*-]/g, ' ')
     .trim()
   return text.length === 0 ? 0 : text.split(/\s+/).length

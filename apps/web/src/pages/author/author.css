@@ -400,20 +400,6 @@
   margin-top: var(--space-1);
 }
 
-.preview__media {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 8rem;
-  margin: var(--space-5) 0;
-  border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-md);
-  background-color: var(--surface-3);
-  color: var(--text-muted);
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-}
-
 .preview__empty {
   color: var(--text-muted);
   font-family: var(--font-sans);
@@ -575,6 +561,58 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* Chapter attachments ---------------------------------------------------- */
+
+.editor__media {
+  margin-top: var(--space-5);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.editor__media-head {
+  margin: 0 0 var(--space-3);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.editor__media-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editor__media-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+
+/* The file name takes the slack so the type and the remove button stay put. */
+.editor__media-list a {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.editor__media-type {
+  flex: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
 }
 
 /* Author posts ----------------------------------------------------------- */

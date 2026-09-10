@@ -219,3 +219,166 @@ describe.skipIf(!available)("story covers", () => {
     ).rejects.toThrow();
   });
 });
+
+/* Chapter media: the streaming path, over HTTP ---------------------------- */
+
+/** A minimal MP3 — an ID3 tag padded past the bytes the sniffer reads. */
+const MP3 = Buffer.concat([Buffer.from("ID3 ", "ascii"), Buffer.alloc(128)]);
+
+function uploadMedia(data: Buffer, contentType = "audio/mpeg", as = authorId) {
+  return api.request("/api/uploads?kind=media", {
+    method: "POST",
+    as,
+    raw: { data, contentType },
+  });
+}
+
+describe.skipIf(!available)("POST /api/uploads?kind=media", () => {
+  it("stores audio and returns a URL that resolves to those bytes", async () => {
+    const { status, body } = await uploadMedia(MP3);
+
+    expect(status).toBe(201);
+    expect(body.url).toMatch(/^\/uploads\/media\/.+\.mp3$/);
+    expect(body.contentType).toBe("audio/mpeg");
+    expect(body.multimediaType).toBe("AUDIO");
+    expect(body.bytes).toBe(MP3.length);
+    writtenUrls.push(body.url);
+
+    // The URL is served by this app, so a reader's player really can fetch it.
+    const served = await fetch(`${api.baseUrl}${body.url}`);
+    expect(served.status).toBe(200);
+    expect(Buffer.from(await served.arrayBuffer()).equals(MP3)).toBe(true);
+  });
+
+  it("rejects a non-media body wearing a media content type", async () => {
+    const { status, body } = await uploadMedia(
+      Buffer.from("<script>alert(1)</script>".padEnd(128), "utf8"),
+      "video/mp4",
+    );
+
+    expect(status).toBe(400);
+    expect(body.error.details.file).toBeTruthy();
+  });
+
+  it("still refuses a non-image body under the cover kind", async () => {
+    // `kind=cover` takes images only; audio arriving there is a client bug,
+    // not a stream to buffer.
+    const { status } = await api.request("/api/uploads?kind=cover", {
+      method: "POST",
+      as: authorId,
+      raw: { data: MP3, contentType: "audio/mpeg" },
+    });
+
+    expect(status).toBe(400);
+  });
+
+  it("takes an image under the media kind, into the media prefix", async () => {
+    // A chapter can be given an image as well as audio, and it belongs
+    // alongside the other attachments rather than with the story covers.
+    const { status, body } = await uploadMedia(PNG, "image/png");
+
+    expect(status).toBe(201);
+    expect(body.url).toMatch(/^\/uploads\/media\/.+\.png$/);
+    expect(body.multimediaType).toBe("IMAGE");
+    writtenUrls.push(body.url);
+  });
+
+  it("requires a signed-in caller", async () => {
+    const { status } = await api.request("/api/uploads?kind=media", {
+      method: "POST",
+      raw: { data: MP3, contentType: "audio/mpeg" },
+    });
+
+    expect(status).toBe(401);
+  });
+});
+
+describe.skipIf(!available)("chapter attachments", () => {
+  it("attaches an upload to a chapter and removes the file when detached", async () => {
+    const story = await api.request("/api/author/stories", {
+      method: "POST",
+      as: authorId,
+      body: { title: `Scored ${api.runId}` },
+    });
+
+    const storyId = story.body.story.id;
+
+    const chapter = await api.request(
+      `/api/author/stories/${storyId}/chapters`,
+      { method: "POST", as: authorId, body: { title: "One", content: "Hi." } },
+    );
+
+    const chapterId = chapter.body.chapter.id;
+    const uploaded = await uploadMedia(MP3);
+
+    const attached = await api.request(
+      `/api/author/chapters/${chapterId}/multimedia`,
+      {
+        method: "POST",
+        as: authorId,
+        body: {
+          type: uploaded.body.multimediaType,
+          url: uploaded.body.url,
+        },
+      },
+    );
+
+    expect(attached.status).toBe(201);
+    expect(attached.body.multimedia.type).toBe("AUDIO");
+
+    // The editor reads attachments off the chapter list rather than asking per
+    // chapter, so they have to come back with it.
+    const listed = await api.request(
+      `/api/author/stories/${storyId}/chapters`,
+      { as: authorId },
+    );
+
+    expect(listed.body.chapters[0].multimedia).toEqual([
+      attached.body.multimedia,
+    ]);
+
+    await api.request(
+      `/api/author/multimedia/${attached.body.multimedia.id}`,
+      { method: "DELETE", as: authorId },
+    );
+
+    // Detaching is the only chance to reclaim the file: nothing else holds the
+    // URL once the row is gone.
+    await expect(
+      readFile(path.join(UPLOAD_ROOT, keyOf(uploaded.body.url))),
+    ).rejects.toThrow();
+  });
+
+  it("removes attachment files when the story is deleted", async () => {
+    const story = await api.request("/api/author/stories", {
+      method: "POST",
+      as: authorId,
+      body: { title: `Silenced ${api.runId}` },
+    });
+
+    const chapter = await api.request(
+      `/api/author/stories/${story.body.story.id}/chapters`,
+      { method: "POST", as: authorId, body: { title: "One", content: "Hi." } },
+    );
+
+    const uploaded = await uploadMedia(MP3);
+
+    await api.request(
+      `/api/author/chapters/${chapter.body.chapter.id}/multimedia`,
+      {
+        method: "POST",
+        as: authorId,
+        body: { type: "AUDIO", url: uploaded.body.url },
+      },
+    );
+
+    await api.request(`/api/author/stories/${story.body.story.id}`, {
+      method: "DELETE",
+      as: authorId,
+    });
+
+    await expect(
+      readFile(path.join(UPLOAD_ROOT, keyOf(uploaded.body.url))),
+    ).rejects.toThrow();
+  });
+});

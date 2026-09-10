@@ -13,14 +13,9 @@ import {
   useReaderPrefs,
 } from '../lib/reader-prefs'
 import { formatCount, formatRelative } from '../lib/format'
-import { coverArt } from '../lib/cover'
+import { chapterBlocks } from '../lib/chapter-media'
 import * as stories from '../data/stories-api'
-import {
-  paragraphsOf,
-  readingMinutes,
-  storyAuthorName,
-  type ChapterMedia,
-} from '../types/stories'
+import { readingMinutes, storyAuthorName } from '../types/stories'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
 import { SegmentedControl } from '../components/ui/Tabs'
@@ -29,54 +24,8 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Switch } from '../components/ui/Checkbox'
 import { ErrorState } from '../components/ui/States'
 import { Dialog } from '../components/ui/Dialog'
+import { ChapterAttachment } from '../components/story/ChapterAttachment'
 import './reader.css'
-
-/**
- * Media attached to a chapter. Rendered as styled placeholders: the URLs point
- * at files nothing uploads yet, and a broken <img> or <audio> reads worse than
- * a deliberate placeholder.
- *
- * `content.Multimedia` has no caption or duration column, so neither is shown
- * — the type and its position are all the record carries.
- */
-function ChapterAttachment({ item, hue }: { item: ChapterMedia; hue: number }) {
-  const art = coverArt(item.id, hue)
-
-  if (item.type === 'AUDIO') {
-    return (
-      <figure className="media media--audio">
-        <div className="media__player">
-          <span className="media__play">
-            <Icon name="play" size="1.1rem" />
-          </span>
-          <span className="media__track">
-            <span className="media__bar" />
-          </span>
-        </div>
-        <figcaption>
-          <Icon name="audio" size="0.9em" />
-          Audio attachment
-        </figcaption>
-      </figure>
-    )
-  }
-
-  return (
-    <figure className={cn('media', `media--${item.type.toLowerCase()}`)}>
-      <div className="media__plate" style={{ background: art.background }}>
-        {item.type === 'VIDEO' ? (
-          <span className="media__play media__play--overlay">
-            <Icon name="play" size="1.3rem" />
-          </span>
-        ) : null}
-      </div>
-      <figcaption>
-        <Icon name={item.type === 'VIDEO' ? 'video' : 'image'} size="0.9em" />
-        {item.type === 'VIDEO' ? 'Video attachment' : 'Image attachment'}
-      </figcaption>
-    </figure>
-  )
-}
 
 export function ReaderPage() {
   const { slug = '', chapter: chapterParam = '1' } = useParams()
@@ -265,14 +214,20 @@ export function ReaderPage() {
               {current.publishedAt ? ` · ${formatRelative(current.publishedAt)}` : ''}
             </p>
 
+            {/*
+              Prose and attachments interleaved, in the order the chapter's
+              own text puts them: an attachment sits where the author placed
+              it, and one they never placed follows the text. See
+              `lib/chapter-media.ts`.
+            */}
             <div className="reader__prose">
-              {paragraphsOf(current.content).map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
-              ))}
-
-              {current.multimedia.map((item) => (
-                <ChapterAttachment key={item.id} item={item} hue={hue} />
-              ))}
+              {chapterBlocks(current.content, current.multimedia).map((block) =>
+                block.kind === 'media' ? (
+                  <ChapterAttachment key={block.key} item={block.item} hue={hue} />
+                ) : (
+                  <p key={block.key}>{block.text}</p>
+                ),
+              )}
             </div>
 
             {/* Chapter footer ------------------------------------------- */}

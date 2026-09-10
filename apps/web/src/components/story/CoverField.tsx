@@ -5,6 +5,7 @@ import {
   uploadImage,
 } from '../../data/uploads-api'
 import { ApiError } from '../../lib/api-client'
+import { formatFileSize } from '../../lib/format'
 import { useObjectUrl } from '../../lib/object-url'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
@@ -32,10 +33,6 @@ interface CoverFieldProps {
   disabled?: boolean
 }
 
-function readableSize(bytes: number): string {
-  return `${Math.round(bytes / (1024 * 1024))} MB`
-}
-
 /**
  * A story's cover: preview, choose, remove.
  *
@@ -47,6 +44,18 @@ function readableSize(bytes: number): string {
  *
  * The local file is shown the moment it is picked, so the preview does not
  * wait on the round trip; it is dropped once the saved URL comes back.
+ *
+ * Kept separate from `settings/AvatarField.tsx` on purpose. The two look like
+ * the same picker-preview-upload job, but the commit rule above is only the
+ * first of the differences: the avatar runs a chosen file through
+ * `AvatarCropper`, offers a `Lightbox` and an Undo of the staged change, and
+ * previews an `Avatar`, where a cover previews a `StoryCover` and falls back
+ * to generated art. Folding them together turns every one of those into a
+ * prop and leaves perhaps twenty shared lines — a hidden input and two
+ * guards — behind an interface wider than either component. What they do
+ * share is the validation data, and that already lives in one place:
+ * `data/uploads-api.ts` and `data/account-api.ts` own the caps and the
+ * accepted types, and `lib/format.ts` formats them.
  */
 export function CoverField({ story, onChange, disabled = false }: CoverFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -72,7 +81,7 @@ export function CoverField({ story, onChange, disabled = false }: CoverFieldProp
 
     if (file.size > MAX_IMAGE_BYTES) {
       setError(
-        `That image is too large. Pick one under ${readableSize(MAX_IMAGE_BYTES)}.`,
+        `That image is too large. Pick one under ${formatFileSize(MAX_IMAGE_BYTES)}.`,
       )
       return
     }
@@ -80,7 +89,7 @@ export function CoverField({ story, onChange, disabled = false }: CoverFieldProp
     setPicked(file)
     setBusy('uploading')
     try {
-      const stored = await uploadImage(file, 'cover')
+      const stored = await uploadImage(file)
       await onChange(stored.url)
     } catch (cause) {
       // The local preview would otherwise keep showing a cover that was never
@@ -159,7 +168,7 @@ export function CoverField({ story, onChange, disabled = false }: CoverFieldProp
         </div>
 
         <p className="cover-field__hint">
-          PNG, JPEG, WebP or GIF, up to {readableSize(MAX_IMAGE_BYTES)}. Portrait
+          PNG, JPEG, WebP or GIF, up to {formatFileSize(MAX_IMAGE_BYTES)}. Portrait
           artwork at 2:3 fits the frame without cropping.
         </p>
 

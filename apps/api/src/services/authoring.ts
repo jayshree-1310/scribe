@@ -50,6 +50,12 @@ export interface AuthoredChapter {
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * The chapter's attachments, so the editor can show what is attached
+   * without a request per chapter. Same rows the reader gets from
+   * `services/stories.ts`.
+   */
+  multimedia: AuthoredMedia[];
 }
 
 export interface AuthoredMedia {
@@ -198,7 +204,9 @@ function toChapter(row: {
   publishedAt: unknown;
   createdAt: unknown;
   updatedAt: unknown;
-}): AuthoredChapter {
+},
+  media: AuthoredMedia[] = [],
+): AuthoredChapter {
   return {
     id: row.id,
     storyId: row.storyId,
@@ -209,7 +217,42 @@ function toChapter(row: {
     publishedAt: toIso(row.publishedAt),
     createdAt: toIso(row.createdAt) ?? new Date(0).toISOString(),
     updatedAt: toIso(row.updatedAt) ?? new Date(0).toISOString(),
+    multimedia: media,
   };
+}
+
+const MEDIA_COLUMNS = [
+  "id",
+  "chapterId",
+  "type",
+  "url",
+  "displayOrder",
+] as const;
+
+/**
+ * Attachments for a set of chapters, grouped by chapter.
+ *
+ * One query for the whole story rather than one per chapter: the editor loads
+ * every chapter at once, and this is the shape `toChapter` wants.
+ */
+async function mediaByChapter(
+  chapterIds: string[],
+): Promise<Map<string, AuthoredMedia[]>> {
+  const grouped = new Map<string, AuthoredMedia[]>();
+  if (chapterIds.length === 0) return grouped;
+
+  const rows = await db.orm.content.Multimedia.select(...MEDIA_COLUMNS)
+    .where((item) => item.chapterId.in(chapterIds))
+    .orderBy((item) => item.displayOrder.asc())
+    .all();
+
+  for (const row of rows) {
+    const list = grouped.get(row.chapterId) ?? [];
+    list.push(toMedia(row));
+    grouped.set(row.chapterId, list);
+  }
+
+  return grouped;
 }
 
 const CHAPTER_COLUMNS = [
@@ -462,12 +505,15 @@ export async function deleteStory(
   storyId: string,
 ): Promise<void> {
   let cover: string | null = null;
+  const media: string[] = [];
 
   await db.transaction(async (tx) => {
     const story = await ownedStory(tx, storyId, userId);
     cover = story.coverUrl;
 
     const chapterIds = await chapterIdsInOrder(tx, storyId);
+
+    media.push(...(await mediaUrls(tx, chapterIds)));
 
     for (const chapterId of chapterIds) {
       await deleteAll(() =>
@@ -500,8 +546,9 @@ export async function deleteStory(
     await tx.orm.content.Story.where((story) => story.id.eq(storyId)).delete();
   });
 
-  // Nothing references the cover now.
+  // Nothing references the cover or the chapter attachments now.
   await discardUpload(cover);
+  await discardUploads(media);
 }
 
 /* Publication ------------------------------------------------------------ */
@@ -625,7 +672,9 @@ async function loadChapter(chapterId: string): Promise<AuthoredChapter> {
 
   if (!row) throw HttpError.notFound(CHAPTER_NOT_FOUND);
 
-  return toChapter(row);
+  const media = await mediaByChapter([row.id]);
+
+  return toChapter(row, media.get(row.id) ?? []);
 }
 
 /**
@@ -646,7 +695,9 @@ export async function listMyChapters(
     .orderBy((chapter) => chapter.chapterNumber.asc())
     .all();
 
-  return rows.map(toChapter);
+  const media = await mediaByChapter(rows.map((row) => row.id));
+
+  return rows.map((row) => toChapter(row, media.get(row.id) ?? []));
 }
 
 /** Appends a chapter, as an unpublished draft, after the last one. */
@@ -726,9 +777,12 @@ export async function deleteChapter(
   chapterId: string,
 ): Promise<AuthoredChapter[]> {
   const timestamp = now();
+  const media: string[] = [];
 
   const storyId = await db.transaction(async (tx) => {
     const { chapter } = await ownedChapter(tx, chapterId, userId);
+
+    media.push(...(await mediaUrls(tx, [chapterId])));
 
     await deleteAll(() =>
       tx.orm.content.Multimedia.where((item) => item.chapterId.eq(chapterId)),
@@ -749,6 +803,8 @@ export async function deleteChapter(
 
     return chapter.storyId;
   });
+
+  await discardUploads(media);
 
   return listMyChapters(userId, storyId);
 }
@@ -796,6 +852,22 @@ export async function reorderChapters(
 }
 
 /* Multimedia ------------------------------------------------------------- */
+
+/** The stored URLs of some chapters' attachments, for cleanup after a delete. */
+async function mediaUrls(tx: Tx, chapterIds: string[]): Promise<string[]> {
+  if (chapterIds.length === 0) return [];
+
+  const rows = await tx.orm.content.Multimedia.select("url")
+    .where((item) => item.chapterId.in(chapterIds))
+    .all();
+
+  return rows.map((row) => row.url);
+}
+
+/** Best-effort cleanup of the files whose rows have just gone. */
+async function discardUploads(urls: string[]): Promise<void> {
+  await Promise.all(urls.map((url) => discardUpload(url)));
+}
 
 function toMedia(row: {
   id: string;
@@ -870,9 +942,14 @@ export async function removeMultimedia(
   mediaId: string,
 ): Promise<void> {
   const timestamp = now();
+  let url: string | null = null;
 
   await db.transaction(async (tx) => {
-    const item = await tx.orm.content.Multimedia.select("id", "chapterId")
+    const item = await tx.orm.content.Multimedia.select(
+      "id",
+      "chapterId",
+      "url",
+    )
       .where((row) => row.id.eq(mediaId))
       .first();
 
@@ -882,5 +959,11 @@ export async function removeMultimedia(
 
     await tx.orm.content.Multimedia.where((row) => row.id.eq(mediaId)).delete();
     await touchStory(tx, chapter.storyId, timestamp);
+
+    url = item.url;
   });
+
+  // After the commit, and only for a file this backend wrote — `discardUpload`
+  // ignores anything else, so a LINK attachment costs nothing here.
+  await discardUpload(url);
 }

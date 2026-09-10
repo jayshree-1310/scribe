@@ -5,10 +5,22 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { cn } from '../../lib/cn'
 import { useToast } from '../../lib/toast'
 import { ApiError } from '../../lib/api-client'
-import { formatCount, readingMinutes } from '../../lib/format'
+import { formatCount, formatFileSize, readingMinutes } from '../../lib/format'
+import {
+  insertMediaToken,
+  mediaToken,
+  removeMediaToken,
+} from '../../lib/chapter-media'
 import * as storiesApi from '../../data/stories-api'
 import * as authoringApi from '../../data/authoring-api'
-import type { MultimediaKind } from '../../types/domain'
+import type { AuthoredMedia } from '../../data/authoring-api'
+import {
+  ACCEPTED_IMAGE_TYPES,
+  ACCEPTED_MEDIA_TYPES,
+  MAX_IMAGE_BYTES,
+  MAX_MEDIA_BYTES,
+  uploadMedia,
+} from '../../data/uploads-api'
 import { AppShell } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
@@ -41,6 +53,12 @@ interface DraftChapter {
   body: string
   published: boolean
   dirty: boolean
+  /**
+   * Attachments as they stand on the server. Unlike the prose these are never
+   * dirty: attaching and detaching are their own requests, because a file
+   * cannot be held in a debounced autosave.
+   */
+  media: AuthoredMedia[]
 }
 
 let localKeys = 0
@@ -54,6 +72,7 @@ function blankChapter(number: number): DraftChapter {
     body: '',
     published: false,
     dirty: true,
+    media: [],
   }
 }
 
@@ -74,29 +93,42 @@ const TOOLBAR: ToolbarButton[] = [
   { icon: 'columns', label: 'Block quote', prefix: '> ' },
 ]
 
-const MEDIA_KINDS: ReadonlyArray<{ kind: MultimediaKind; icon: IconName; label: string }> = [
-  { kind: 'image', icon: 'image', label: 'Image' },
-  { kind: 'audio', icon: 'audio', label: 'Audio' },
-  { kind: 'video', icon: 'video', label: 'Video' },
+/** The attachment types an author can upload. `LINK` is not a file. */
+type MediaKind = Extract<AuthoredMedia['type'], 'IMAGE' | 'AUDIO' | 'VIDEO'>
+
+const MEDIA_KINDS: ReadonlyArray<{ kind: MediaKind; icon: IconName; label: string }> = [
+  { kind: 'IMAGE', icon: 'image', label: 'Image' },
+  { kind: 'AUDIO', icon: 'audio', label: 'Audio' },
+  { kind: 'VIDEO', icon: 'video', label: 'Video' },
 ]
 
-/** What the file picker offers for each media kind. */
-const MEDIA_ACCEPT: Record<MultimediaKind, string> = {
-  image: 'image/*',
-  audio: 'audio/*',
-  video: 'video/*',
+/**
+ * What the file picker offers for each kind.
+ *
+ * A filter, not a rule: the API decides an attachment's type from the file's
+ * signature, so a video dragged onto the audio tab is attached as a video
+ * rather than refused. The picker is here to save the author scrolling past
+ * every file on their disk.
+ */
+const MEDIA_ACCEPT: Record<MediaKind, string> = {
+  IMAGE: ACCEPTED_IMAGE_TYPES.join(','),
+  AUDIO: ACCEPTED_MEDIA_TYPES.filter((type) => type.startsWith('audio/')).join(','),
+  VIDEO: ACCEPTED_MEDIA_TYPES.filter((type) => type.startsWith('video/')).join(','),
 }
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  const units = ['KB', 'MB', 'GB']
-  let size = bytes / 1024
-  let unit = 0
-  while (size >= 1024 && unit < units.length - 1) {
-    size /= 1024
-    unit += 1
-  }
-  return `${size < 10 ? size.toFixed(1) : Math.round(size)} ${units[unit]}`
+/** The icon each attachment type is listed with. */
+const MEDIA_ICONS: Record<AuthoredMedia['type'], IconName> = {
+  IMAGE: 'image',
+  AUDIO: 'audio',
+  VIDEO: 'video',
+  LINK: 'link',
+}
+
+/** The API's cap for each kind, checked here so an oversize file costs no upload. */
+const MEDIA_CAP: Record<MediaKind, number> = {
+  IMAGE: MAX_IMAGE_BYTES,
+  AUDIO: MAX_MEDIA_BYTES,
+  VIDEO: MAX_MEDIA_BYTES,
 }
 
 /** How long typing has to settle before a draft is saved. */
@@ -151,9 +183,16 @@ export function StoryEditorPage() {
   const [dirty, setDirty] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [mediaOpen, setMediaOpen] = useState(false)
-  const [mediaKind, setMediaKind] = useState<MultimediaKind>('image')
-  const [mediaCaption, setMediaCaption] = useState('')
+  const [mediaKind, setMediaKind] = useState<MediaKind>('IMAGE')
   const [mediaFile, setMediaFile] = useState<File | null>(null)
+  /**
+   * Where in the prose the attachment goes: the caret as it stood when the
+   * dialog was opened. Captured then rather than read on attach, because by
+   * then focus has been in the dialog and the author may have scrolled.
+   */
+  const [mediaAt, setMediaAt] = useState(0)
+  const [mediaBusy, setMediaBusy] = useState(false)
+  const [detaching, setDetaching] = useState<string | null>(null)
   const [dropping, setDropping] = useState(false)
   const [confirmPublish, setConfirmPublish] = useState(false)
 
@@ -182,6 +221,7 @@ export function StoryEditorPage() {
             body: chapter.content,
             published: chapter.publishedAt !== null,
             dirty: false,
+            media: chapter.multimedia,
           }))
         : [blankChapter(1)]
 
@@ -398,18 +438,27 @@ export function StoryEditorPage() {
   }
 
   /**
-   * Takes the picked or dropped file. The upload endpoint does not exist yet,
-   * so the file is only held here and named back to the author — the caption
-   * and placement are what actually get saved with the draft.
+   * Takes the picked or dropped file.
+   *
+   * Only the size is checked here, and only to save an author the wait on an
+   * upload that would be refused anyway. What the file *is* is decided by the
+   * API from its signature — see `MEDIA_ACCEPT`.
    */
   function chooseMediaFile(file: File | null) {
     if (!file) return
+
+    if (file.size > MEDIA_CAP[mediaKind]) {
+      const cap = formatFileSize(MEDIA_CAP[mediaKind])
+      setMediaFile(null)
+      setErrors((current) => ({
+        ...current,
+        media: `That file is too large. Pick one under ${cap}.`,
+      }))
+      return
+    }
+
     setMediaFile(file)
     setErrors((current) => ({ ...current, media: '' }))
-    // Offer the file name as a caption when there isn't one yet.
-    if (mediaCaption.trim().length === 0) {
-      setMediaCaption(file.name.replace(/\.[^.]+$/, '').slice(0, 160))
-    }
   }
 
   /** Clears the dialog's own state so the next open starts fresh. */
@@ -420,17 +469,125 @@ export function StoryEditorPage() {
     setErrors((current) => ({ ...current, media: '' }))
   }
 
-  function insertMedia() {
-    if (mediaCaption.trim().length === 0) {
-      setErrors((current) => ({ ...current, media: 'Add a caption so readers know what it is.' }))
+  /**
+   * Uploads the chosen file and attaches it to the current chapter.
+   *
+   * Two requests, because the upload does not know what it is for: the bytes
+   * are stored first and the row that points at them is written second. An
+   * upload whose attach fails leaks the file, which is the same trade the
+   * cover upload makes.
+   *
+   * The chapter has to exist on the server before anything can hang off it, so
+   * a pending draft is saved first — the same rule as publishing a chapter.
+   *
+   * The attachment is then placed where the caret was, as a `[media:<id>]`
+   * token in the prose — a real reference to the row, which the reader
+   * resolves and renders in place. The token can only be written after the
+   * attach, because it is the row's id that goes into it.
+   *
+   * That token is a normal prose edit, so it saves on the next autosave rather
+   * than in a third request here. An author who reloads inside that window
+   * sees the attachment after the text instead of at the caret — the fallback
+   * in `lib/chapter-media.ts` — rather than losing it.
+   *
+   * There is no caption: `content.Multimedia` has no column for one.
+   */
+  async function attachMedia() {
+    if (!mediaFile) {
+      setErrors((current) => ({ ...current, media: 'Choose a file to attach.' }))
       return
     }
 
-    const token = `\n\n[${mediaKind}: ${mediaCaption.trim()}]\n\n`
-    patchChapter(active.key, { body: `${active.body}${token}` })
-    setMediaCaption('')
-    closeMedia()
-    showToast({ message: `${mediaKind} placeholder added to the chapter.` })
+    setMediaBusy(true)
+    try {
+      let id = active.id
+
+      if (id === null || active.dirty || dirty) {
+        const result = await save({ silent: true })
+
+        // `save` refuses an untitled story and says so on the title field;
+        // without this the dialog would just close on nothing happening.
+        if (result === null) {
+          setErrors((current) => ({
+            ...current,
+            media: 'Give your story a title and save it first.',
+          }))
+          return
+        }
+
+        id = result.chapters.find((entry) => entry.key === active.key)?.id ?? id
+      }
+
+      if (id === null) return
+
+      const stored = await uploadMedia(mediaFile)
+
+      // `stored.multimediaType` rather than `mediaKind`: the API sniffed the
+      // bytes, and the tab the author happened to be on did not.
+      const attached = await authoringApi.addMultimedia(id, {
+        type: stored.multimediaType,
+        url: stored.url,
+      })
+
+      setChapters((current) =>
+        current.map((chapter) =>
+          chapter.key === active.key
+            ? {
+                ...chapter,
+                media: [...chapter.media, attached],
+                body: insertMediaToken(chapter.body, mediaAt, attached.id),
+                dirty: true,
+              }
+            : chapter,
+        ),
+      )
+      setDirty(true)
+
+      closeMedia()
+      showToast({ message: 'Attachment added where your cursor was.' })
+    } catch (cause) {
+      setErrors((current) => ({
+        ...current,
+        media:
+          cause instanceof ApiError
+            ? (cause.fieldErrors.file ?? cause.message)
+            : 'We could not attach that file.',
+      }))
+    } finally {
+      setMediaBusy(false)
+    }
+  }
+
+  /**
+   * Detaches an attachment. The API deletes the stored file with the row, and
+   * the token that placed it comes out of the prose with it.
+   */
+  async function detachMedia(item: AuthoredMedia) {
+    setDetaching(item.id)
+    try {
+      await authoringApi.removeMultimedia(item.id)
+
+      setDirty(true)
+      setChapters((current) =>
+        current.map((chapter) =>
+          chapter.id === item.chapterId
+            ? {
+                ...chapter,
+                media: chapter.media.filter((entry) => entry.id !== item.id),
+                body: removeMediaToken(chapter.body, item.id),
+                dirty: true,
+              }
+            : chapter,
+        ),
+      )
+    } catch (cause) {
+      showToast({
+        tone: 'error',
+        message: messageFor(cause, 'We could not remove that attachment.'),
+      })
+    } finally {
+      setDetaching(null)
+    }
   }
 
   function addChapter() {
@@ -773,6 +930,9 @@ export function StoryEditorPage() {
                   size="sm"
                   aria-label={`Insert ${media.label.toLowerCase()}`}
                   onClick={() => {
+                    // In preview mode there is no textarea to ask, so the
+                    // attachment goes to the end of the chapter.
+                    setMediaAt(bodyRef.current?.selectionStart ?? active.body.length)
                     setMediaKind(media.kind)
                     setMediaOpen(true)
                   }}
@@ -806,10 +966,54 @@ export function StoryEditorPage() {
                 {active.body.trim().length === 0 ? (
                   <p className="preview__empty">Nothing to preview yet.</p>
                 ) : (
-                  renderMarkdown(active.body)
+                  renderMarkdown(active.body, active.media)
                 )}
               </div>
             )}
+
+            {/*
+              Attachments belong to the chapter rather than to a position in
+              the prose, which is how the reader renders them: after the text,
+              in `displayOrder`. Shown here so an author can see what is
+              attached and take it off again.
+            */}
+            {active.media.length > 0 ? (
+              <section className="editor__media" aria-label="Attachments">
+                <h3 className="editor__media-head">
+                  Attachments ({active.media.length})
+                </h3>
+                <ul className="editor__media-list">
+                  {active.media.map((item) => (
+                    <li key={item.id}>
+                      <Icon name={MEDIA_ICONS[item.type]} size="1rem" />
+                      <a href={item.url} target="_blank" rel="noreferrer">
+                        {item.url.split('/').pop()}
+                      </a>
+                      {/*
+                        Says whether the prose places this one or whether it
+                        falls to the end, which is the difference the author
+                        cares about and cannot otherwise see.
+                      */}
+                      <span className="editor__media-type">
+                        {active.body.includes(mediaToken(item.id))
+                          ? 'in the text'
+                          : 'at the end'}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
+                        aria-label={`Remove ${item.type.toLowerCase()} attachment`}
+                        title="Remove"
+                        loading={detaching === item.id}
+                        onClick={() => void detachMedia(item)}
+                        startIcon={<Icon name="trash" size="0.95rem" />}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
 
             <footer className="editor__foot">
               <span>
@@ -997,18 +1201,25 @@ export function StoryEditorPage() {
         </aside>
       </div>
 
-      {/* Insert media -------------------------------------------------- */}
+      {/* Attach media -------------------------------------------------- */}
       <Dialog
         open={mediaOpen}
         onClose={closeMedia}
-        title={`Insert ${mediaKind}`}
-        description="Attach media to this chapter. Readers see it inline while reading."
+        title="Attach media"
+        description="Readers see it in the chapter, where your cursor is."
         size="sm"
         footer={
           <>
-            <Button onClick={closeMedia}>Cancel</Button>
-            <Button variant="primary" onClick={insertMedia}>
-              Insert
+            <Button onClick={closeMedia} disabled={mediaBusy}>
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              loading={mediaBusy}
+              disabled={mediaFile === null}
+              onClick={() => void attachMedia()}
+            >
+              Attach
             </Button>
           </>
         }
@@ -1020,6 +1231,7 @@ export function StoryEditorPage() {
             onChange={(kind) => {
               setMediaKind(kind)
               setMediaFile(null)
+              setErrors((current) => ({ ...current, media: '' }))
             }}
             items={MEDIA_KINDS.map((media) => ({
               value: media.kind,
@@ -1046,6 +1258,7 @@ export function StoryEditorPage() {
               className="visually-hidden"
               type="file"
               accept={MEDIA_ACCEPT[mediaKind]}
+              aria-label="Choose a file to attach"
               onChange={(event) => {
                 chooseMediaFile(event.target.files?.[0] ?? null)
                 // Reset, so picking the same file twice still fires a change.
@@ -1062,32 +1275,37 @@ export function StoryEditorPage() {
               <p>Drag a file here, or choose one from your device</p>
             )}
             <div className="editor__upload-actions">
-              <Button size="sm" onClick={() => mediaInputRef.current?.click()}>
+              <Button
+                size="sm"
+                disabled={mediaBusy}
+                onClick={() => mediaInputRef.current?.click()}
+              >
                 {mediaFile ? 'Choose a different file' : 'Choose file'}
               </Button>
               {mediaFile ? (
-                <Button size="sm" variant="ghost" onClick={() => setMediaFile(null)}>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={mediaBusy}
+                  onClick={() => setMediaFile(null)}
+                >
                   Remove
                 </Button>
               ) : null}
             </div>
           </div>
 
-          <TextField
-            label="Caption"
-            placeholder="Chapter plate — the coast at low water"
-            value={mediaCaption}
-            error={errors.media}
-            maxLength={160}
-            onChange={(event) => {
-              setMediaCaption(event.target.value)
-              setErrors((current) => ({ ...current, media: '' }))
-            }}
-          />
+          {errors.media ? (
+            <p className="editor__error" role="alert">
+              {errors.media}
+            </p>
+          ) : null}
 
           <InlineNotice>
-            The caption and placement are saved with your draft now; the file
-            itself attaches once uploads are connected.
+            {mediaKind === 'IMAGE'
+              ? `PNG, JPEG, WebP or GIF, up to ${formatFileSize(MAX_IMAGE_BYTES)}.`
+              : `MP3, MP4, WebM, OGG or WAV, up to ${formatFileSize(MAX_MEDIA_BYTES)}.`}{' '}
+            Attaching saves your draft first, so the chapter exists to attach to.
           </InlineNotice>
         </div>
       </Dialog>
