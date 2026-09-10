@@ -14,9 +14,11 @@ import { authenticate } from "./middleware/authenticate.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import accountRouter from "./routes/account.js";
 import authRouter from "./routes/auth.js";
+import authoringRouter from "./routes/authoring.js";
 import booksRouter from "./routes/books.js";
 import libraryRouter from "./routes/library.js";
 import storiesRouter from "./routes/stories.js";
+import uploadsRouter from "./routes/uploads.js";
 import { UPLOAD_ROOT, UPLOAD_URL_PREFIX } from "./lib/storage.js";
 
 const app = express();
@@ -91,9 +93,11 @@ app.use(
 
 app.use("/api/account", accountRouter);
 app.use("/api/auth", authRouter);
+app.use("/api/author", authoringRouter);
 app.use("/api/books", booksRouter);
 app.use("/api/library", libraryRouter);
 app.use("/api/stories", storiesRouter);
+app.use("/api/uploads", uploadsRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

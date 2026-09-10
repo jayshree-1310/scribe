@@ -10,31 +10,23 @@ interface BookCoverProps {
 }
 
 /**
- * A book's cover.
- *
- * Uses the artwork when a book has some; otherwise composes one from the
- * book's own title, author and primary genre through the same `coverArt`
- * helper the rest of Scribe uses, so a catalogue with no imagery still reads
- * as a shelf rather than a list of grey boxes.
+ * A book's cover — the same frame `StoryCover` draws, over the same
+ * `content.Story` table. Artwork where the edition has some, generated art
+ * from the title, author and primary genre where it does not, so a catalogue
+ * with patchy imagery still reads as a shelf rather than a list of grey boxes.
  */
 export function BookCover({ book, size = 'md', className }: BookCoverProps) {
   const hue = book.genres[0]?.hue ?? 268
   const art = coverArt(book.id, hue)
 
-  if (book.coverUrl) {
-    return (
-      <img
-        className={cn('cover', 'cover--image', `cover--${size}`, className)}
-        src={book.coverUrl}
-        alt=""
-        loading="lazy"
-      />
-    )
-  }
-
   return (
     <div
-      className={cn('cover', `cover--${size}`, `cover--v${art.variant}`, className)}
+      className={cn(
+        'cover',
+        `cover--${size}`,
+        book.coverUrl ? 'cover--photo' : `cover--v${art.variant}`,
+        className,
+      )}
       style={
         {
           '--cover-bg': art.background,
@@ -45,7 +37,11 @@ export function BookCover({ book, size = 'md', className }: BookCoverProps) {
       aria-hidden="true"
     >
       <span className="cover__spine" />
-      <span className="cover__rule" />
+      {book.coverUrl ? (
+        <img className="cover__art" src={book.coverUrl} alt="" loading="lazy" />
+      ) : (
+        <span className="cover__rule" />
+      )}
       <span className="cover__title">{book.title}</span>
       <span className="cover__author">{authorName(book.author)}</span>
     </div>

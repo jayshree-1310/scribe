@@ -10,6 +10,8 @@ import { coverArt } from '../../lib/cover'
 interface CoverStory {
   id: string
   title: string
+  /** Uploaded artwork, when the author has any. */
+  coverUrl?: string | null
   genres: Array<{ hue: number }>
   author: { displayName?: string | null; username?: string }
 }
@@ -21,9 +23,14 @@ interface StoryCoverProps {
 }
 
 /**
- * Generated cover art. Scribe has no uploaded artwork yet and stock imagery
- * would misrepresent real books, so each cover is composed from the story's
- * own title, author and primary genre — deterministic and unique per story.
+ * A story's cover.
+ *
+ * Both variants — uploaded artwork and generated art — are the same frame in
+ * the same palette, drawn from the story's primary genre hue: art sits above
+ * the title and author rather than replacing them, so a shelf mixing the two
+ * still reads as a shelf. Uploaded artwork is never stretched; it fills the
+ * panel and crops, because an author's 4:3 photograph distorted to 2:3 looks
+ * worse than a crop of it.
  */
 export function StoryCover({ story, size = 'md', className }: StoryCoverProps) {
   const hue = story.genres[0]?.hue ?? 268
@@ -31,7 +38,12 @@ export function StoryCover({ story, size = 'md', className }: StoryCoverProps) {
 
   return (
     <div
-      className={cn('cover', `cover--${size}`, `cover--v${art.variant}`, className)}
+      className={cn(
+        'cover',
+        `cover--${size}`,
+        story.coverUrl ? 'cover--photo' : `cover--v${art.variant}`,
+        className,
+      )}
       style={
         {
           '--cover-bg': art.background,
@@ -42,7 +54,11 @@ export function StoryCover({ story, size = 'md', className }: StoryCoverProps) {
       aria-hidden="true"
     >
       <span className="cover__spine" />
-      <span className="cover__rule" />
+      {story.coverUrl ? (
+        <img className="cover__art" src={story.coverUrl} alt="" loading="lazy" />
+      ) : (
+        <span className="cover__rule" />
+      )}
       <span className="cover__title">{story.title}</span>
       <span className="cover__author">
         {story.author.displayName || story.author.username}

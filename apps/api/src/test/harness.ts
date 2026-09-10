@@ -1,5 +1,5 @@
 /**
- * Integration-test harness for the Books, Library and Stories routes.
+ * Integration-test harness for the Books, Library, Stories and Author routes.
  *
  * The suites run against the development Postgres (`docker compose up
  * postgres`). Everything a suite creates is namespaced by a per-run prefix and
@@ -264,19 +264,50 @@ export class TestApi {
   /* Teardown -------------------------------------------------------------- */
 
   private async cleanup(): Promise<void> {
+    /**
+     * Rows a suite created *through the API* -- an authored story, its
+     * chapters, an attachment -- carry no fixture id, so tracking alone would
+     * leave them behind and the story delete below would then fail on a
+     * foreign key. Everything authored by a fixture user is swept up instead;
+     * the usernames are unique per run, so this can only reach this run's own
+     * rows.
+     */
+    for (const userId of this.created.users) {
+      const authored = await db.orm.content.Story.select("id")
+        .where((story) => story.authorId.eq(userId))
+        .all();
+
+      for (const story of authored) {
+        if (!this.created.stories.includes(story.id)) {
+          this.created.stories.push(story.id);
+        }
+      }
+    }
+
     // Shelf rows first: they reference both users and stories.
     for (const userId of this.created.users) {
       await deleteAll(() =>
         db.orm.library.LibraryEntry.where((entry) => entry.userId.eq(userId)),
       );
     }
-    for (const chapterId of this.created.chapters) {
-      await deleteAll(() =>
-        db.orm.content.Multimedia.where((item) => item.chapterId.eq(chapterId)),
-      );
-      await db.orm.content.Chapter.where((item) => item.id.eq(chapterId)).delete();
-    }
+
     for (const storyId of this.created.stories) {
+      const chapters = await db.orm.content.Chapter.select("id")
+        .where((chapter) => chapter.storyId.eq(storyId))
+        .all();
+
+      for (const chapter of chapters) {
+        await deleteAll(() =>
+          db.orm.content.Multimedia.where((item) => item.chapterId.eq(chapter.id)),
+        );
+      }
+
+      await deleteAll(() =>
+        db.orm.engagement.Comment.where((row) => row.storyId.eq(storyId)),
+      );
+      await deleteAll(() =>
+        db.orm.engagement.ReadingHistory.where((row) => row.storyId.eq(storyId)),
+      );
       await deleteAll(() =>
         db.orm.engagement.Rating.where((rating) => rating.storyId.eq(storyId)),
       );
@@ -286,8 +317,13 @@ export class TestApi {
       await deleteAll(() =>
         db.orm.content.StoryGenre.where((link) => link.storyId.eq(storyId)),
       );
+      await deleteAll(() =>
+        db.orm.content.Chapter.where((chapter) => chapter.storyId.eq(storyId)),
+      );
+
       await db.orm.content.Story.where((story) => story.id.eq(storyId)).delete();
     }
+
     for (const genreId of this.created.genres) {
       await db.orm.content.Genre.where((genre) => genre.id.eq(genreId)).delete();
     }

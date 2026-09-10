@@ -7,7 +7,11 @@
  */
 
 import { request } from '../lib/api-client'
-import { setAccessToken } from '../lib/access-token'
+import {
+  refreshAccessToken,
+  registerTokenRefresher,
+  setAccessToken,
+} from '../lib/access-token'
 
 /** The user fields the auth endpoints return. */
 export interface AuthUser {
@@ -80,11 +84,15 @@ export async function signInWithGoogleIdToken(idToken: string): Promise<AuthResu
 }
 
 /**
- * Restores a session on page load from the refresh cookie. Returns null when
- * there is no live session, which is the ordinary signed-out case rather than
- * an error.
+ * Exchanges the refresh cookie for a new access token. Returns null when there
+ * is no live session, which is the ordinary signed-out case rather than an
+ * error.
+ *
+ * Registered with the token store below so that `api-client` can drive it —
+ * on a cold load, and again whenever a request comes back 401 — without this
+ * module and that one importing each other.
  */
-export async function restoreSession(): Promise<string | null> {
+async function requestRefresh(): Promise<string | null> {
   try {
     const response = await request<{ accessToken: string }>('/auth/refresh', {
       method: 'POST',
@@ -95,6 +103,17 @@ export async function restoreSession(): Promise<string | null> {
     setAccessToken(null)
     return null
   }
+}
+
+registerTokenRefresher(requestRefresh)
+
+/**
+ * Restores a session on page load. Goes through the shared, de-duplicated
+ * refresh so that this and the app's first authed requests — which fire at the
+ * same moment — cost one call between them rather than one each.
+ */
+export async function restoreSession(): Promise<string | null> {
+  return refreshAccessToken()
 }
 
 /** Ends the session server-side and clears the refresh cookie. */

@@ -27,11 +27,13 @@ import type {
  *
  * It matters more here than for books: the author of a draft is the only person
  * who can see it, so who the API thinks is calling decides what comes back.
+ * `data/authoring-api.ts` shares it for the same reason -- every write it makes
+ * is attributed to whoever the API thinks is calling.
  */
 const DEV_READER_ID =
   import.meta.env.VITE_DEV_USER_ID ?? '00000000-0000-4000-8000-000000000001'
 
-function readerHeaders(): Record<string, string> {
+export function readerHeaders(): Record<string, string> {
   if (import.meta.env.PROD) return {}
 
   /**

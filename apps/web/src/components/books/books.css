@@ -6,16 +6,8 @@
    rules instead of boxes, and colour carried almost entirely by the covers.
    ========================================================================== */
 
-/* Cover artwork, where a book has some ---------------------------------- */
-
-.cover--image {
-  display: block;
-  width: var(--cover-w);
-  aspect-ratio: 2 / 3;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-cover);
-}
+/* Cover artwork lives in `story.css` alongside the generated art: stories
+   have uploaded covers now too, and a story page does not load this file. */
 
 /* Card ------------------------------------------------------------------- */
 

@@ -6,7 +6,7 @@
  * message that is safe to show a person.
  */
 
-import { getAccessToken } from './access-token'
+import { ensureAccessToken, refreshAccessToken } from './access-token'
 
 /** Error envelope returned by the API (`apps/api/src/lib/http-error.ts`). */
 interface ApiErrorBody {
@@ -119,9 +119,36 @@ function isBinary(body: unknown): body is Blob | ArrayBuffer | ArrayBufferView {
   )
 }
 
+/**
+ * Auth endpoints mint and clear the session themselves, so they must not be
+ * routed through the token bootstrap or the refresh-and-replay below — doing
+ * so would have `/auth/refresh` recurse into itself.
+ */
+function isAuthEndpoint(path: string): boolean {
+  return path.startsWith('/auth/')
+}
+
 export async function request<T>(
   path: string,
   { method = 'GET', body, query, headers, signal }: RequestOptions = {},
+): Promise<T> {
+  /**
+   * Waiting for the token rather than reading whatever is in memory right now
+   * is what keeps a cold page load from firing its first authed requests
+   * anonymously: the access token lives in memory only, so on every reload it
+   * is null until `/auth/refresh` answers, and a request that went out in that
+   * window came back 401 with the API's "Sign in to use your library."
+   */
+  const bootstrapped = isAuthEndpoint(path) ? null : await ensureAccessToken()
+
+  return send<T>(path, { method, body, query, headers, signal }, bootstrapped)
+}
+
+async function send<T>(
+  path: string,
+  { method = 'GET', body, query, headers, signal }: RequestOptions,
+  accessToken: string | null,
+  retried = false,
 ): Promise<T> {
   // Abort on timeout, but also stay responsive to a caller-supplied signal.
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
@@ -129,7 +156,6 @@ export async function request<T>(
 
   let response: Response
   try {
-    const accessToken = getAccessToken()
     const binary = isBinary(body)
 
     response = await fetch(buildUrl(path, query), {
@@ -169,6 +195,20 @@ export async function request<T>(
         : "We couldn't reach the server. Please check your connection and try again.",
       { code: timedOut ? 'request_timeout' : 'network_error', cause },
     )
+  }
+
+  /**
+   * A 401 on an authed call means the access token expired mid-session. The
+   * refresh cookie usually outlives it, so mint a new token and replay once;
+   * only if that fails is the caller genuinely signed out. `retried` bounds
+   * this to a single attempt, and the refresh itself is de-duplicated, so a
+   * page whose requests all 401 at once shares one refresh between them.
+   */
+  if (response.status === 401 && !retried && !isAuthEndpoint(path)) {
+    const renewed = await refreshAccessToken()
+    if (renewed) {
+      return send<T>(path, { method, body, query, headers, signal }, renewed, true)
+    }
   }
 
   if (!response.ok) throw await toApiError(response)

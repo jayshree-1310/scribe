@@ -4,8 +4,8 @@ Companion to `BACKLOG.md`, derived from `scribe-genai-roadmap.md`. Same format:
 each task is a self-contained prompt you can hand to an implementer, grounded in
 what this repo actually has rather than in the abstract.
 
-The roadmap's 20 phases collapse into 20 tasks here, in the order the roadmap
-recommends. Every task states what already exists, because most of them build on
+The roadmap's 20 phases collapse into 21 tasks here (AI 0 – AI 20), in the order
+the roadmap recommends. Every task states what already exists, because most of them build on
 code that is already in the tree.
 
 **Learning is the point.** Each task carries a `Learn:` line naming the concepts
@@ -69,26 +69,168 @@ block plus the AI-specific rules.
 
 ## Provider decision
 
-These tasks assume **Claude via the official SDK** (`@anthropic-ai/sdk`), model
-`claude-opus-5`, because that is what this project has access to. Two details
-that are easy to get wrong from memory:
+The tasks are written provider-agnostically because Task AI 0 puts every model
+call behind one interface. Two implementations are worth having, and **the free
+one comes first** — see the next section.
 
-- Model IDs carry **no date suffix** — `claude-opus-5`, not
-  `claude-opus-5-20260401`. Cheaper siblings for bulk work are `claude-sonnet-5`
-  and `claude-haiku-4-5`.
-- Structured output is `output_config: { format: {...} }` (or
-  `client.messages.parse()`), **not** the deprecated `output_format`. Thinking is
-  `thinking: { type: "adaptive" }` with depth via `output_config.effort` —
-  `budget_tokens` is rejected on current models.
-
-The abstraction in Task AI 0 exists so a second provider is a new file rather
-than a rewrite — but write one real implementation first. A two-provider
-abstraction built before either provider works is a guess about a shape you have
-not learned yet.
+**Hosted (paid), when you want quality:** Claude via `@anthropic-ai/sdk`, model
+`claude-opus-5`. Two details that are easy to get wrong from memory: model IDs
+carry **no date suffix** (`claude-opus-5`, not `claude-opus-5-20260401`), and
+structured output is `output_config: { format: {...} }` — **not** the deprecated
+`output_format`. Thinking is `thinking: { type: "adaptive" }` with depth via
+`output_config.effort`; `budget_tokens` is rejected on current models. Cheaper
+siblings for bulk work: `claude-sonnet-5`, `claude-haiku-4-5`.
 
 **Embeddings are a separate decision** and Task AI 7 makes it. Do not assume the
-chat provider also serves embeddings; pick a model, write down the dimension, and
+chat provider also serves embeddings; pick a model, write down its dimension, and
 note that changing it later means re-embedding the whole corpus.
+
+---
+
+## Running it for free
+
+**Every task in this backlog can be built with no API key and no spend.** The
+provider seam in Task AI 0 exists precisely for this: build against a local
+model, and swapping to a hosted one later is a new file plus a config change,
+not a rewrite. Learning the concepts does not require paying for the best model —
+and a free model you can call ten thousand times is *better* for learning
+retrieval and evaluation than a paid one you ration.
+
+### The local stack
+
+- **Chat / generation — [Ollama](https://ollama.com).** An HTTP server on
+  `localhost:11434`, no key, no account. It streams (so Task AI 2 works
+  unchanged), accepts a **JSON schema** for constrained output (Task AI 4), and
+  supports tool calling on the models that implement it (Task AI 15). Point
+  `AI_BASE_URL` at it.
+- **Embeddings — `nomic-embed-text` via Ollama** (768 dimensions), or
+  transformers.js (`@huggingface/transformers`, formerly `@xenova/transformers`)
+  running an ONNX model **in-process** with no server at all — e.g.
+  `all-MiniLM-L6-v2` at 384 dimensions. Confirm the current package name and the
+  dimension before you write it into the contract.
+- **Vector storage — pgvector.** Free and self-hosted; the only change is the
+  Postgres image (Task AI 7).
+
+Ollama is open source and needs no account. **It also needs no root**, provided
+you run it the way this repo runs everything else — as a container. The official
+`install.sh` wants sudo (it writes to `/usr/local/bin` and installs a systemd
+unit); the container does not.
+
+A gated `ollama` service is already in `docker-compose.yml`, on the `ai` profile
+so a plain `docker compose up` never pulls several GB of weights you did not ask
+for:
+
+```bash
+docker compose --profile ai up -d ollama
+
+docker compose exec ollama ollama pull llama3.2:3b        # ~2 GB   — fast, for building and tests
+docker compose exec ollama ollama pull nomic-embed-text   # ~275 MB — embeddings (Task AI 7)
+docker compose exec ollama ollama pull qwen2.5:7b         # ~4.7 GB — better prose, slower on CPU
+
+# Smoke test from the host: no key, no account, no sudo.
+curl http://localhost:11434/api/chat -d '{
+  "model": "llama3.2:3b",
+  "messages": [{ "role": "user", "content": "Say hello in five words." }],
+  "stream": false
+}'
+```
+
+Set `AI_BASE_URL` to match where the API is running: `http://ollama:11434` from
+inside the compose network, `http://localhost:11434` when you run the API on the
+host with `pnpm dev`. Weights live in the `ollama_data` volume and survive a
+rebuild; `docker compose --profile ai down -v` is what reclaims the disk.
+
+Pull only `llama3.2:3b` and `nomic-embed-text` to begin — the 7B model is worth
+having once Task AI 3 starts producing prose an author would read.
+
+**Two other routes that need no root**, if you would rather not run a container:
+
+- **Ollama from the release tarball into your home directory.** The binary has no
+  privileged dependencies: extract `ollama-linux-amd64.tgz` under `~/.local` and
+  run `~/.local/bin/ollama serve` yourself. You lose the systemd unit, so it runs
+  only while that process does.
+- **No server at all, for embeddings.** transformers.js runs an ONNX model
+  in-process — a `pnpm add` and nothing else, no daemon, no port. That is enough
+  for Tasks AI 7 and AI 8 (embeddings, semantic and hybrid search), which is the
+  half of the roadmap that needs no chat model. Worth knowing: you can build all
+  of retrieval before you can run a single generation.
+
+Everything else in this backlog — chunking, retrieval, ranking, hybrid search,
+citations, validation, jobs, metrics, the eval harness — is your own code and
+costs nothing to run against any provider.
+
+### What this machine can realistically run
+
+No GPU, 8 CPU cores, ~14 GB free. That is fine, with expectations set:
+
+| Job | Model | Notes |
+| --- | --- | --- |
+| Fast iteration, plumbing, tests | `llama3.2:3b` | Snappy on CPU. Use it while building Tasks AI 0–2. |
+| Prose and answers | `qwen2.5:7b` or `llama3.1:8b` (Q4) | Noticeably slower on CPU — seconds to first token, and a long chapter rewrite will take a while. Streaming stops that from feeling broken, which is the honest reason Task AI 2 comes early. |
+| Embeddings | `nomic-embed-text` | 137M parameters; fast on CPU. Embedding all 72 seeded chapters is a one-off of minutes, not hours. |
+
+### What is genuinely worse locally, and where
+
+Be honest about this rather than discovering it as a bug:
+
+- **Structured extraction and continuity checking (Tasks AI 13, AI 14)** are the
+  weakest. A 3–8B model produces schema-valid JSON with mediocre judgment about
+  what is a *contradiction* versus a deliberate reveal. Build the plumbing, keep
+  the confidence threshold high, and expect to re-tune when you can run a
+  stronger model.
+- **Tool calling (Task AI 15)** works on tool-capable local models but is
+  flakier — expect more invalid arguments. Good news for the task: your zod
+  validation and loop caps get exercised for real.
+- **Long context (Task AI 6).** Local context windows are smaller, so
+  map-reduce summarisation is not an optimisation but a requirement. That makes
+  the task teach its concept better, not worse.
+- **Prompt caching (Task AI 18)** is provider-specific. Anthropic's
+  `cache_control` prefix caching and the half-price Batches API have no local
+  equivalent, so those two levers wait for a hosted provider. Everything else in
+  that task — token accounting, per-user budgets, result caching by input hash,
+  right-sizing the model per feature, latency measurement — works locally and
+  matters more, because on CPU your scarce resource is time rather than money.
+
+### Free-tier hosted alternatives
+
+If local inference is too slow for a task, several providers have free tiers that
+need an account but no payment (Google AI Studio, Groq, OpenRouter's free
+models). These still mean a key and a rate limit, and they are **not** zero-cost
+in the sense of "no signup" — but they are a middle option when a 7B model on CPU
+is not good enough. If you use one, it is a second implementation behind the same
+Task AI 0 interface; nothing else changes.
+
+### Task-by-task cost
+
+| Task | Free? |
+| --- | --- |
+| AI 0 Provider seam | **Free** — build the Ollama implementation first; add a hosted one later as a second file |
+| AI 1 First endpoint | **Free** |
+| AI 2 Streaming | **Free** — Ollama streams |
+| AI 3 Writing assistant | **Free** — quality is the limit, not access |
+| AI 4 Structured outputs | **Free** — Ollama takes a JSON schema |
+| AI 5 Story generation | **Free** |
+| AI 6 Summarization | **Free** — smaller context makes map-reduce mandatory |
+| AI 7 Embeddings | **Free** — `nomic-embed-text` or transformers.js, plus pgvector |
+| AI 8 Semantic + hybrid search | **Free** — embeddings and SQL only |
+| AI 9 Ask This Book (RAG) | **Free** — the whole flagship feature |
+| AI 10 Conversational assistant | **Free** |
+| AI 11 Recommendations | **Free** — embeddings plus scoring, mostly SQL |
+| AI 12 Moderation | **Free** — small models classify acceptably; keep a human in the loop regardless |
+| AI 13 Story bible | **Free**, weakest locally |
+| AI 14 Continuity checker | **Free**, weakest locally |
+| AI 15 Tool calling | **Free** on a tool-capable model; expect flakiness |
+| AI 16 Evaluation | **Free — and better free.** Unmetered runs mean you can iterate on prompts properly. Use a local judge. |
+| AI 17 Prompt management | **Free** — pure code |
+| AI 18 Cost & performance | **Mostly free** — prompt caching and Batches need a hosted provider; everything else applies |
+| AI 19 Security hardening | **Free** — pure code, and prompt injection is provider-independent |
+| AI 20 Production infrastructure | **Free** — jobs, metrics, degradation |
+
+**One extra rule while you are local-only:** keep `AI_BASE_URL` and the model
+name in config from the first commit, and never let a provider-specific field
+leak into a service signature. The day you add a hosted provider, the diff should
+touch `services/ai/provider.ts`, `config.ts` and nothing else. That is the
+property Task AI 0 is really testing.
 
 ---
 
@@ -103,13 +245,20 @@ getting right before the first feature.
 > product feature in this task.
 >
 > - `apps/api/src/services/ai/provider.ts` — a narrow interface (`complete`,
->   `stream`, later `embed`) plus one Claude implementation using
->   `@anthropic-ai/sdk`. The interface takes system text, messages, a model, a
->   token cap and an abort signal; it returns text plus a usage record. Keep
->   provider types out of the interface so a caller never sees an SDK shape.
-> - `apps/api/src/services/ai/config.ts` — reads `ANTHROPIC_API_KEY`,
->   `AI_MODEL` (default `claude-opus-5`), `AI_MAX_TOKENS`, `AI_TIMEOUT_MS` and a
->   per-user daily cap. Add them to `apps/api/.env.example` with comments. The
+>   `stream`, later `embed`) plus **one** implementation. Write the local one
+>   first — an Ollama HTTP client, no SDK, no key (see *Running it for free*) —
+>   because it costs nothing to call while you are getting the seam right. The
+>   interface takes system text, messages, a model, a token cap and an abort
+>   signal; it returns text plus a usage record. Keep provider types out of the
+>   interface so a caller never sees an SDK shape, and resist adding a second
+>   provider until the first one works: an abstraction over two things you have
+>   not built yet is a guess.
+> - `apps/api/src/services/ai/config.ts` — reads `AI_PROVIDER`
+>   (`ollama` | `anthropic`, default `ollama`), `AI_BASE_URL` (`http://ollama:11434`
+>   inside the compose network, `http://localhost:11434` from the host — Compose
+>   overrides it for the api container the way it already does for
+>   `DATABASE_URL`), `AI_MODEL`, `AI_API_KEY` (unused locally), `AI_MAX_TOKENS`,
+>   `AI_TIMEOUT_MS` and a per-user daily cap. Add them to `apps/api/.env.example` with comments. The
 >   module must **not** throw at import time when the key is missing the way
 >   `lib/jwt.ts` does — the app has to boot without AI configured, and AI routes
 >   answer 503 until it is.
@@ -117,14 +266,22 @@ getting right before the first feature.
 >   "the model provider failed". Add one (`upstream_error`, 502) and map the
 >   SDK's typed errors onto it — `RateLimitError` to 429 with `Retry-After`,
 >   `AuthenticationError` to a 503 that says AI is not configured rather than
->   leaking why, everything else to `upstream_error`. Never surface a provider
+>   leaking why, everything else to `upstream_error`. A refused connection —
+>   Ollama not running, the common local case — must be a 503 saying the model
+>   server is unreachable, not a 500. Never surface a provider
 >   message verbatim; it can contain prompt content.
 > - Timeouts and retries: one place, wrapping the provider. Retry only
 >   transient failures, cap the attempts, and never retry a request that has
->   already streamed bytes to the client.
+>   already streamed bytes to the client. Set the default timeout for local
+>   inference, not for a hosted API — a 7B model on CPU can take tens of seconds
+>   to finish a long rewrite, and a 10-second default would make every
+>   interesting call look like a failure.
 > - Usage logging: a single `logAiUsage` writing feature name, model, input and
 >   output tokens, duration and outcome through `lib/logger.ts`. Tokens come from
->   the response's usage field — do not estimate by counting characters.
+>   the response's own counts — do not estimate by counting characters. Both
+>   providers report them under different names (Ollama's `prompt_eval_count` /
+>   `eval_count`), so normalise in the provider implementation and keep one usage
+>   shape above it.
 > - **The test fake.** Export a provider implementation the suite injects: it
 >   records the exact system text and messages it was called with, and returns a
 >   scripted reply. Every later AI test asserts on what was sent and how the

@@ -6,7 +6,8 @@
  * `services/books.ts` serves imported catalogue editions over the same table.
  * `Story.source` is what separates them; see `docs/content-model.md`.
  *
- * Nothing here writes. The author-side mutations are a separate task.
+ * Nothing here writes: the author-side mutations live in
+ * `services/authoring.ts`, which delegates its reads back to this module.
  */
 
 import { or } from "@prisma/orm-postgres/orm-client";
@@ -138,7 +139,7 @@ function toRating(value: unknown): number | null {
  * API speaks ISO-8601 strings, and `Instant.toString()` already emits one, so
  * normalise through the string rather than depending on the exact class.
  */
-function toIso(value: unknown): string | null {
+export function toIso(value: unknown): string | null {
   if (value === null || value === undefined) return null;
   if (value instanceof Date) return value.toISOString();
 

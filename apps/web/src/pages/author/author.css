@@ -65,13 +65,37 @@
 
 /* Responsive data table -------------------------------------------------- */
 
+/*
+  Not `overflow: hidden` — the row action menus are absolutely positioned
+  inside their cell, and clipping the card would cut them off. The corners are
+  kept round by rounding the cells that sit in them instead.
+*/
 .table-card {
-  overflow: hidden;
+  overflow: visible;
+}
+
+.data-table thead th:first-child {
+  border-top-left-radius: calc(var(--radius-lg) - 1px);
+}
+
+.data-table thead th:last-child {
+  border-top-right-radius: calc(var(--radius-lg) - 1px);
+}
+
+.data-table tbody tr:last-child td:first-child {
+  border-bottom-left-radius: calc(var(--radius-lg) - 1px);
+}
+
+.data-table tbody tr:last-child td:last-child {
+  border-bottom-right-radius: calc(var(--radius-lg) - 1px);
 }
 
 .data-table {
   width: 100%;
-  border-collapse: collapse;
+  /* `separate` (with no spacing) rather than `collapse`, so the corner cells
+     can carry the card's border radius. */
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: var(--text-base);
 }
 
@@ -520,6 +544,37 @@
   color: var(--text-secondary);
   text-align: center;
   font-size: var(--text-base);
+  transition:
+    border-color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease);
+}
+
+.editor__upload.is-dropping {
+  border-color: var(--brand);
+  background-color: var(--surface);
+}
+
+.editor__upload-file {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.editor__upload-file strong {
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+
+.editor__upload-file span {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.editor__upload-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 /* Author posts ----------------------------------------------------------- */

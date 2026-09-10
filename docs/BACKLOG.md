@@ -198,94 +198,68 @@ a password change can reuse them rather than reimplement them.
 
 ---
 
-## Task 6 — Authoring: story & chapter CRUD
+## Task 7 — File uploads: chapter multimedia
 
-Depends on Task 1. This is the biggest FE-side gap — the editor exists with
-nowhere to save.
+**Images are done.** The pipeline exists end to end and only audio and video
+are left:
 
-**Prompt:**
+- `lib/storage.ts` (local filesystem, one seam for an S3-compatible backend)
+  and `lib/image.ts` (signature sniffing) are shared by every upload path.
+- `POST /api/account/avatar` takes an avatar as the raw request body, 2 MB cap,
+  per-user rate limit.
+- `POST /api/uploads?kind=cover` (`routes/uploads.ts` + `services/uploads.ts`)
+  stores an image and returns `{ url, contentType, bytes }`, 5 MB cap, per-user
+  rate limit. `UPLOAD_KINDS` is the enum to extend.
+- Story covers are wired: `components/story/CoverField.tsx` uploads and saves,
+  `StoryCover` prefers `coverUrl` over its generated art, and the authoring
+  service removes the file a replaced or cleared cover leaves behind.
 
-> Implement the author-side write API and wire the existing editor to it.
-> Depends on the read endpoints from the stories task.
->
-> Note `pages/author/StoryEditorPage.tsx` is the only remaining caller of
-> `getStory` / `getChapters` in `data/api.ts` — everything else moved to
-> `data/stories-api.ts`. Those two mock functions go when this page is wired up.
-> Slug generation and uniqueness already exist in `apps/api/src/lib/slug.ts`;
-> reuse `uniqueSlug` rather than writing a second derivation. Publication state
-> is `Story.listedAt` (null means draft) and chapter-level `Chapter.publishedAt`;
-> `Chapter.wordCount` is denormalised and every content write must maintain it,
-> because the chapter list and reading-time estimates read it.
->
-> API — `services/authoring.ts` + `routes/authoring.ts` at `/api/author`, all
-> behind `requireUser`, every handler asserting the caller owns the story:
-> - `GET /stories` — the caller's own stories, drafts included, with counts.
-> - `POST /stories`, `PATCH /stories/:id`, `DELETE /stories/:id` — title,
->   description, coverUrl, genres (replace the `StoryGenre` set atomically).
->   Slug generated from the title on create, kept stable on rename unless the
->   story is still a draft.
-> - `POST /stories/:id/chapters`, `PATCH /chapters/:id`, `DELETE /chapters/:id`,
->   and `POST /stories/:id/chapters/reorder` taking an ordered id list.
-> - `POST /stories/:id/publish` and `/unpublish`; same per chapter.
-> - `POST /chapters/:id/multimedia` and `DELETE /multimedia/:id`.
->
-> Chapter `number` must stay contiguous and gap-free after any insert, delete or
-> reorder — do it in one transaction and test it hard.
->
-> Also add a way for a user to become an author: nothing currently ever sets
-> `auth.User.isAuthor`. Either flip it on first story creation or add an explicit
-> endpoint; pick one, comment why.
->
-> FE — `data/authoring-api.ts`; wire `pages/author/StoryEditorPage.tsx`
-> (autosave drafts on a debounce, explicit publish action, unsaved-changes
-> guard) and `pages/author/AuthorStoriesPage.tsx`. Remove `getMyStories` and
-> friends from `data/api.ts`.
->
-> Tests: ownership 403s on every write, chapter numbering after reorder and
-> mid-list delete, publish/unpublish visibility against the public read routes.
-
----
-
-## Task 7 — File uploads (covers, avatars, multimedia)
-
-Blocks the polish on Tasks 4 and 6.
-
-**Avatars done.** `lib/storage.ts` (local filesystem, one seam for an
-S3-compatible backend) and `lib/image.ts` (signature sniffing) exist, and
-`POST /api/account/avatar` takes the image as the raw request body with a 2 MB
-cap and a per-user rate limit. Still outstanding: story covers and chapter
-multimedia, which need a general `POST /api/uploads` accepting audio and video
-as well — reuse both libs rather than adding a second storage path.
+Still outstanding: chapter multimedia. `content.Multimedia` and the API for it
+(`POST /api/author/chapters/:id/multimedia`, `DELETE /api/author/multimedia/:id`)
+already exist and take a URL — what is missing is an upload that can produce
+one for audio and video, and a media dialog that uses it. The editor's insert-media
+dialog is still a placeholder that writes a `[image: caption]` token into the
+prose and says so.
 
 **Prompt:**
 
-> There is no upload path anywhere in the repo, but avatars, story covers and
-> chapter multimedia all need one.
+> Extend uploads to the audio and video `content.Multimedia` needs, then wire
+> the story editor's insert-media dialog to it.
 >
-> Design and implement it: `POST /api/uploads` behind `requireUser`, accepting
-> images (and audio/video for `content.Multimedia`), with a size cap, real
-> content-type sniffing rather than trusting the declared MIME type or the
-> extension, and a per-user rate limit. Note `express.json({ limit: "256kb" })`
-> in `app.ts` — multipart needs its own middleware and its own separate limit.
+> API — extend `services/uploads.ts` rather than adding a second path: a new
+> `UPLOAD_KINDS` member (`media`), its own much larger size cap, and signature
+> sniffing for the container formats you accept (MP3, MP4, WebM, OGG at least)
+> alongside the existing image sniffer in `lib/image.ts`. Note
+> `express.json({ limit: "256kb" })` in `app.ts` — the raw body parser in
+> `routes/uploads.ts` already carries its own limit, and a media cap needs its
+> own again. Keep the per-user rate limit.
 >
-> Storage: define a small `lib/storage.ts` interface with a local-filesystem
-> implementation for dev (served statically) and one clearly marked seam for an
-> S3-compatible backend. Do not add a cloud SDK dependency.
+> A file large enough for video should stream to storage rather than being
+> buffered whole in memory; if you keep buffering, say why and cap accordingly.
 >
-> Return a stable URL that can be stored in `User.avatarUrl`, `Story.coverUrl`,
-> and `Multimedia.url`.
+> FE — replace the placeholder in `StoryEditorPage.tsx`'s media dialog with a
+> real picker that uploads, then calls the `addMultimedia` /
+> `removeMultimedia` already sitting in `data/authoring-api.ts`, and render the
+> attachments on the chapter so an author can see and remove what is attached.
+> Decide how a media attachment relates to the `[image: caption]` token the
+> dialog writes into the prose today — either make the token a real reference
+> to the `Multimedia` row or drop it.
 >
-> FE: a reusable upload component with preview and progress, used by the settings
-> avatar field and the story editor cover field.
+> Also consider consolidating `components/settings/AvatarField.tsx` and
+> `components/story/CoverField.tsx`: they are now two components doing the same
+> picker-preview-upload job with different commit rules (the avatar stages for
+> the profile form, the cover commits immediately). One component with a
+> `commit` strategy may or may not be worth it — say which you chose.
 >
-> Tests: oversize rejection, disguised-extension rejection, and that the returned
-> URL actually resolves.
+> Tests: oversize rejection, disguised-extension rejection for the new
+> formats, and that the returned URL actually resolves.
 
 ---
 
 ## Task 8 — Author analytics
 
-Depends on Task 6. Currently synthesised from mock view counts.
+Depends on the authoring task, which has landed. Currently synthesised from
+mock view counts.
 
 **Prompt:**
 

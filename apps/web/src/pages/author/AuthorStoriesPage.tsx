@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAsync } from '../../hooks/useAsync'
 import { useToast } from '../../lib/toast'
+import { ApiError } from '../../lib/api-client'
 import { formatCount, formatRating, formatRelative } from '../../lib/format'
-import { useAuth } from '../../lib/auth'
-import * as storiesApi from '../../data/stories-api'
+import * as authoringApi from '../../data/authoring-api'
 import { STORY_STATUS_LABELS, type Story } from '../../types/stories'
 import { AppShell } from '../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../components/ui/Button'
@@ -20,22 +20,15 @@ import '../pages.css'
 import './author.css'
 
 export function AuthorStoriesPage() {
-  const { session, initialising } = useAuth()
-  const authorId = initialising ? undefined : session?.user.id
-
   /**
-   * The caller's own stories, drafts included — the visibility rule on
-   * `/api/stories` returns a caller their own unlisted work, so asking for
-   * your own id is "my stories".
+   * `/api/author/stories` is the caller's own work, drafts included. It reads
+   * the author from the session rather than from a query parameter, so this
+   * page no longer has to wait for the session to know whose stories to ask
+   * for.
    */
   const stories = useAsync(
-    () =>
-      authorId
-        ? storiesApi
-            .listStories({ authorId, sort: 'newest', limit: 48 })
-            .then((page) => page.items)
-        : Promise.resolve([]),
-    [authorId],
+    () => authoringApi.listMyStories().then((page) => page.items),
+    [],
   )
   const { showToast } = useToast()
 
@@ -49,12 +42,20 @@ export function AuthorStoriesPage() {
     if (!pendingDelete) return
     setDeleting(true)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      await authoringApi.deleteStory(pendingDelete.id)
+      // Hidden locally rather than reloading the list: the row is gone for
+      // certain, and a refetch would blank the table for a beat.
       setRemoved((current) => new Set(current).add(pendingDelete.id))
       showToast({ message: `“${pendingDelete.title}” deleted.` })
       setPendingDelete(null)
-    } catch {
-      showToast({ tone: 'error', message: 'We could not delete that story.' })
+    } catch (cause) {
+      showToast({
+        tone: 'error',
+        message:
+          cause instanceof ApiError
+            ? cause.message
+            : 'We could not delete that story.',
+      })
     } finally {
       setDeleting(false)
     }
@@ -78,7 +79,7 @@ export function AuthorStoriesPage() {
 
       {stories.status === 'error' ? (
         <ErrorState message={stories.error} onRetry={stories.reload} />
-      ) : stories.status === 'loading' || authorId === undefined ? (
+      ) : stories.status === 'loading' ? (
         <Skeleton height="16rem" radius="var(--radius-lg)" />
       ) : shown.length === 0 ? (
         <EmptyState

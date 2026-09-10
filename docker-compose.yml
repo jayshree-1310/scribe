@@ -56,6 +56,10 @@ services:
     environment:
       DATABASE_URL: postgresql://scribe:scribe_dev_password@postgres:5432/scribe
       REDIS_URL: redis://redis:6379
+      # Inside the network the model server answers on its service name. Left
+      # to `apps/api/.env` this would point at the container's own localhost,
+      # where nothing is listening.
+      AI_BASE_URL: http://ollama:11434
       # Uploads go to a volume rather than the bind-mounted source tree: the
       # container writes as root, and files it left in the working tree would
       # then be unwritable by anything running on the host (`pnpm test`).
@@ -120,7 +124,38 @@ services:
       postgres:
         condition: service_healthy
 
+  # Local model server for the GenAI backlog (docs/AI-BACKLOG.md). Free, needs
+  # no API key, and no root on the host -- which the Ollama install script does
+  # require, so this is the way in on a machine without sudo.
+  #
+  # Not started by `docker compose up`: the image plus model weights run to
+  # several GB, so it is opt-in.
+  #
+  #   docker compose --profile ai up -d ollama
+  #   docker compose exec ollama ollama pull llama3.2:3b       # ~2 GB
+  #   docker compose exec ollama ollama pull nomic-embed-text  # ~275 MB
+  #
+  # Reachable as http://ollama:11434 from the api container, and
+  # http://localhost:11434 from the host.
+  ollama:
+    profiles: ["ai"]
+    image: ollama/ollama:latest
+    container_name: scribe-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      # Weights are gigabytes and must survive a container rebuild, so they go
+      # in a named volume rather than the working tree.
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
   redis_data:
   api_uploads:
+  ollama_data:
