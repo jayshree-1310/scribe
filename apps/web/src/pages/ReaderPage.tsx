@@ -16,9 +16,17 @@ import {
 import { formatCount, formatRelative } from '../lib/format'
 import { renderChapter } from '../lib/chapter-markdown'
 import * as stories from '../data/stories-api'
+import * as engagement from '../data/engagement-api'
 import { readingMinutes, storyAuthorName } from '../types/stories'
+import {
+  COMMENT_MAX_LENGTH,
+  commentUserName,
+} from '../types/engagement'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
+import { Avatar } from '../components/ui/Avatar'
+import { TextField } from '../components/ui/TextField'
+import { EmptyState } from '../components/ui/States'
 import { SegmentedControl } from '../components/ui/Tabs'
 import { Select } from '../components/ui/Select'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -64,6 +72,59 @@ export function ReaderPage() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)
   const [showComments, setShowComments] = useState(false)
+
+  const chapterId = chapter.data?.id
+
+  /**
+   * Scoped to this chapter rather than the whole story: the panel sits inside
+   * a chapter, and a reader on chapter two should not be shown chapter nine's
+   * spoilers. The story page's Comments tab is the unscoped view.
+   *
+   * Only requested once the panel is open, so a reader who never opens it
+   * pays nothing for it.
+   */
+  const comments = useAsync(
+    () =>
+      storyId && chapterId && showComments
+        ? engagement.listComments(storyId, { chapterId, limit: 20 })
+        : Promise.resolve(null),
+    [storyId, chapterId, showComments],
+  )
+
+  const [commentBody, setCommentBody] = useState('')
+  const [commentError, setCommentError] = useState<string | undefined>()
+  const [posting, setPosting] = useState(false)
+
+  const postComment = useCallback(
+    async (event: React.FormEvent) => {
+      event.preventDefault()
+      if (!storyId || !chapterId) return
+
+      const trimmed = commentBody.trim()
+      if (trimmed.length === 0) {
+        setCommentError('Write something before posting.')
+        return
+      }
+
+      setPosting(true)
+      try {
+        await engagement.postComment(storyId, { content: trimmed, chapterId })
+
+        setCommentBody('')
+        setCommentError(undefined)
+        comments.reload()
+      } catch (cause) {
+        setCommentError(
+          cause instanceof Error
+            ? cause.message
+            : 'We could not post that comment.',
+        )
+      } finally {
+        setPosting(false)
+      }
+    },
+    [storyId, chapterId, commentBody, comments],
+  )
 
   const total = chapters.data?.length ?? 0
   /**
@@ -295,12 +356,70 @@ export function ReaderPage() {
             {/* Comments ------------------------------------------------- */}
             {showComments ? (
               <section className="reader__comments" aria-label="Chapter comments">
-                <h2>Comments</h2>
-                {/* No comments endpoint yet; the panel keeps its place so the
-                    reader's layout does not shift when one arrives. */}
-                <p className="reader__no-comments">
-                  Comments are not available yet.
-                </p>
+                <h2>Comments on this chapter</h2>
+
+                <form className="reader__comment-form" onSubmit={postComment}>
+                  <TextField
+                    multiline
+                    hideLabel
+                    label="Add a comment on this chapter"
+                    placeholder="Share what you thought — no spoilers past this chapter."
+                    rows={3}
+                    value={commentBody}
+                    error={commentError}
+                    maxLength={COMMENT_MAX_LENGTH}
+                    disabled={posting}
+                    onChange={(event) => {
+                      setCommentBody(event.target.value)
+                      setCommentError(undefined)
+                    }}
+                  />
+                  <div className="reader__comment-actions">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      type="submit"
+                      loading={posting}
+                      startIcon={<Icon name="send" size="0.95em" />}
+                    >
+                      Post comment
+                    </Button>
+                  </div>
+                </form>
+
+                {comments.status === 'error' ? (
+                  <p className="reader__no-comments">{comments.error}</p>
+                ) : comments.status === 'loading' ? (
+                  <Skeleton height="5rem" radius="var(--radius-md)" />
+                ) : (comments.data?.items.length ?? 0) === 0 ? (
+                  <EmptyState
+                    icon="comment"
+                    size="sm"
+                    title="No comments on this chapter yet"
+                    description="Be the first to say something."
+                  />
+                ) : (
+                  <ul>
+                    {comments.data?.items.map((comment) => (
+                      <li key={comment.id}>
+                        <Avatar user={comment.user} size="sm" />
+                        <div>
+                          <p className="reader__comment-head">
+                            <strong>{commentUserName(comment.user)}</strong>
+                            <span>{formatRelative(comment.createdAt)}</span>
+                          </p>
+                          <p>{comment.content}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/*
+                  Replies live on the story page. The panel deliberately stays
+                  a flat, chapter-scoped list: a thread expanded mid-chapter
+                  pushes the text the reader is in the middle of off-screen.
+                */}
                 <ButtonLink to={`/story/${slug}`} variant="ghost">
                   See all comments on the story page
                 </ButtonLink>

@@ -1,0 +1,167 @@
+[
+  {
+    "id": "column.content.story.ratingCount",
+    "label": "Add column \"ratingCount\" to \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "column",
+        "name": "ratingCount",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"ratingCount\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "ratingCount"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"ratingCount\"",
+        "sql": "ALTER TABLE \"content\".\"story\" ADD COLUMN \"ratingCount\" int4 DEFAULT 0 NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"ratingCount\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "ratingCount"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.engagement.comment.parentId",
+    "label": "Add column \"parentId\" to \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "column",
+        "name": "parentId",
+        "table": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"parentId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "engagement",
+          "comment",
+          "parentId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"parentId\"",
+        "sql": "ALTER TABLE \"engagement\".\"comment\" ADD COLUMN \"parentId\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"parentId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "engagement",
+          "comment",
+          "parentId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.comment.comment_parentId_idx_6a68f597",
+    "label": "Create index \"comment_parentId_idx_6a68f597\" on \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "comment_parentId_idx_6a68f597",
+        "table": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"comment_parentId_idx_6a68f597\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"comment_parentId_idx_6a68f597\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"comment_parentId_idx_6a68f597\"",
+        "sql": "CREATE INDEX \"comment_parentId_idx_6a68f597\" ON \"engagement\".\"comment\" (\"parentId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"comment_parentId_idx_6a68f597\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"comment_parentId_idx_6a68f597\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.comment.comment_parentId_fkey",
+    "label": "Add foreign key \"comment_parentId_fkey\" on \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "comment_parentId_fkey",
+        "table": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"comment_parentId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "comment_parentId_fkey",
+          "engagement",
+          "\"engagement\".\"comment\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"comment_parentId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"comment\"\nADD CONSTRAINT \"comment_parentId_fkey\"\nFOREIGN KEY (\"parentId\")\nREFERENCES \"engagement\".\"comment\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"comment_parentId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "comment_parentId_fkey",
+          "engagement",
+          "\"engagement\".\"comment\""
+        ]
+      }
+    ]
+  }
+]

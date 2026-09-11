@@ -43,30 +43,29 @@ Paste this block at the top of any task prompt below.
 
 **Landed:** auth + account, books + library, stories/chapters + the reader,
 authoring, uploads + chapter multimedia, reading progress + streak, book clubs
-+ broadcast channels.
++ broadcast channels, comments + ratings.
 
 Tasks are numbered by when they were written down, not by when to do them. This
 is the order to do them in, and the reason for each position.
 
 | # | Task | Why here |
 |---|---|---|
-| 1 | **3** — comments & ratings | The only remaining task that unblocks others (14, 15). Purely additive on the FE. Reuse the thread shape 9 established for `ClubDiscussion` rather than inventing a second one — see the note below. |
-| 2 | **13** — public profiles & follows | With 3 done this closes all four of 14's dependencies. Also the payoff for the author summaries clubs, channels and comments all render: `/profile/:username` is a live route in `App.tsx` with no endpoint behind it. |
-| 3 | **11** — challenges & leaderboard | Owns the admin/moderator role decision. 15 reuses it, so this comes first. |
-| 4 | **8** — author analytics | Introduces the view / chapter-read event log. Independent of everything above, but it must precede 12. |
-| 5 | **12** — badges & levels | A pure consumer once 8 lands: streak and words written exist, comments and ratings come from 3, and "chapters read" is only countable from 8's event log — `ReadingHistory` keeps current position per story, not a count. Doing 12 before 8 means either inventing that metric or building it twice. |
-| 6 | **14** — notifications | Needs 3, 9, 10, 13 — 9 and 10 have landed. |
-| 7 | **15** — moderation & reporting | Needs 3 for content to moderate (9's discussions are already there), and 11's role for a moderator to be. |
-| 8 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed) and ratings (3). Late because a recommender is worth building once there is signal to rank on. |
-| 9 | **17** — retire the mock layer | Last by definition. |
+| 1 | **13** — public profiles & follows | With 3 landed this closes all four of 14's dependencies. Also the payoff for the author summaries clubs, channels and comments all render: `/profile/:username` is a live route in `App.tsx` with no endpoint behind it. |
+| 2 | **11** — challenges & leaderboard | Owns the admin/moderator role decision. 15 reuses it, so this comes first. |
+| 3 | **8** — author analytics | Introduces the view / chapter-read event log. Independent of everything above, but it must precede 12. |
+| 4 | **12** — badges & levels | A pure consumer once 8 lands: streak and words written exist, comments and ratings now come from 3, and "chapters read" is only countable from 8's event log — `ReadingHistory` keeps current position per story, not a count. Doing 12 before 8 means either inventing that metric or building it twice. |
+| 5 | **14** — notifications | Needs 3, 9, 10, 13 — only 13 is outstanding. `engagement.Comment.parentId` is what makes "a reply to your comment" expressible for stories, the way `ClubDiscussion.parentId` does for clubs. |
+| 6 | **15** — moderation & reporting | Needs 11's role for a moderator to be. The content to moderate is all there now: 3's comments join 9's discussions and 10's posts. |
+| 7 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed) and ratings (landed with 3). Late because a recommender is worth building once there is signal to rank on. |
+| 8 | **17** — retire the mock layer | Last by definition. |
 
 **One shared decision, taken once — now settled.** Clubs' discussions,
 channels' posts and stories' comments are three spellings of the same thing:
 user-written text, paginated newest-first, with an author summary, a
 rate-limited create and a delete only the author or an admin may perform. 9 got
-there first and 10 followed it, so **Task 3 follows the same shape** rather than
-inventing a third. Concretely, as `services/clubs.ts` and `services/channels.ts`
-now spell it:
+there first, 10 followed it, and **3 followed it too** rather than inventing a
+third. Concretely, as `services/clubs.ts`, `services/channels.ts` and
+`services/engagement.ts` now spell it:
 
 - A `Page<T>` of `{ items, page, limit, total, totalPages, hasMore }`, newest
   first with `id` as the tie-breaker so pagination cannot repeat a row.
@@ -85,54 +84,52 @@ exactly where a moderation bug hides.
 
 ---
 
-## Task 3 — Comments & ratings
+## Task 3 — Comments & ratings — **landed**
 
-`engagement.Comment` and `engagement.Rating` exist, no routes.
+`services/engagement.ts` + `routes/engagement.ts`, mounted at `/api` rather
+than under the stories router, because the resource set spans both
+`/api/stories/:id/...` and `/api/comments/:id`; splitting that across two
+routers would put one service behind two files. `app.ts` mounts it after the
+stories router, which matches none of those paths.
 
-**Since the stories task landed:** `getRatingBreakdown` is no longer rendered on
-`StoryDetailPage` — it invented a histogram from hardcoded weights, which would
-have been a lie next to a real rating count — so `components/charts/RatingBars.tsx`
-is currently unused and waits for a real breakdown. `Story.ratingCount` still
-does not exist as a column; the stories service computes count and average from
-`Rating` rows and falls back to the denormalised `Story.ratingAverage` only when
-there are none. Deciding whether to add `ratingCount` and make the columns
-authoritative is part of this task.
+Endpoints: `GET`/`POST /api/stories/:storyId/comments`, `DELETE
+/api/comments/:id`, `PUT`/`DELETE /api/stories/:storyId/rating`, `GET
+/api/stories/:storyId/ratings`.
 
-The mock comment and rating functions are **already gone** from `data/api.ts` —
-there is nothing to unwire. `StoryDetailPage` simply renders no comments, the
-reader's comment panel says "Comments are not available yet" in so many words,
-and `components/charts/RatingBars.tsx` is imported nowhere. So this task is
-purely additive on the frontend.
+**The decisions this task owned.**
 
-**Prompt:**
+- **`ratingCount` was added as a column**, and both it and `ratingAverage` are
+  recomputed inside the same transaction as every rating write. They are *not*
+  the read path — `services/stories.ts` still computes both from `Rating` rows
+  and falls back to the column only when there are none — but `sort=rating`
+  orders in SQL over the story table, so a stale column silently mis-sorts the
+  catalogue. `ratingAverage` is set back to null, not 0, when the last rating
+  goes.
+- **Delete is the comment's author alone.** The shared shape says
+  "author-or-moderator, resolved from the membership row", but a story has no
+  membership table, so there is no moderator to resolve. The story's author is
+  deliberately *not* given the power — that is a moderation rule, and Task 15
+  owns the role decision that would justify it. A test pins this, so changing
+  it is a deliberate act.
+- **Comments carry `parentId`**, one level deep, with `createComment`
+  re-pointing a reply-to-a-reply at its thread — the same table and the same
+  rule as `clubs.ClubDiscussion`. A reply inherits its thread's `chapterId`
+  rather than taking the caller's, so a reply cannot hide from the chapter
+  panel its thread is showing in.
+- **Comments are chapter-scopable.** `engagement.Comment.chapterId` already
+  existed; the reader's panel filters on it, the story page's tab does not.
 
-> Implement comments and ratings for stories.
->
-> API — `services/engagement.ts` + `routes/engagement.ts`, or mount under the
-> stories router, your call — but be consistent and say which in the PR body:
-> - `GET /api/stories/:storyId/comments` — paginated, newest first, each with
->   its author summary. Public.
-> - `POST /api/stories/:storyId/comments` — body 1–2000 chars, trimmed,
->   rejected if empty after trimming. Requires auth. Rate-limit it with
->   `lib/rate-limit.ts`.
-> - `DELETE /api/comments/:id` — author of the comment only; 403 otherwise.
-> - `PUT /api/stories/:storyId/rating` — upsert the caller's 1–5 rating.
-> - `DELETE /api/stories/:storyId/rating`.
-> - `GET /api/stories/:storyId/ratings` — returns `{ average, count,
->   breakdown: { 1..5 -> count }, mine }`, computed from real rows.
->
-> `Story.ratingAverage` / `ratingCount` are denormalised — recompute them inside
-> the same transaction as any rating write so they cannot drift.
->
-> FE — a new `data/engagement-api.ts`; there are no mock functions left to
-> replace. Wire `pages/StoryDetailPage.tsx` and the currently-unused
-> `components/charts/RatingBars.tsx` to the real breakdown,
-> `components/ui/Rating.tsx` to submit, and replace the reader's
-> "Comments are not available yet" panel with the real thread.
->
-> Tests: comment validation and ownership on delete, rating upsert replaces
-> rather than duplicates, denormalised average matches a recomputed one after a
-> series of writes.
+**What this removed rather than faked.** The rating dialog's "Review
+(optional)" textarea is gone: `engagement.Rating` stores a score and no body,
+so every word typed into it was discarded on save. Written reviews are a column
+and a migration, not a UI change — the Reviews tab now says so. The
+`RatingBars` chart is wired to the real breakdown and is no longer unused.
+
+**Unseen in a browser:** a thread with its replies expanded on
+`StoryDetailPage` at phone width; the reader's comment panel with enough
+comments to scroll; and the Delete action, which reads `session.user.id` and so
+is hidden in local development where `readerHeaders()` identifies the caller by
+header instead — the same gap clubs and channels have.
 
 ---
 
@@ -266,10 +263,11 @@ that would make a series real, not to replace a fake one.
 
 ## Task 14 — Notifications
 
-Depends on Tasks 3, 9, 10, 13. **9 and 10 have landed**, so a new club
-discussion and a new channel post are both real events to fan out from now;
-`clubs.ClubDiscussion.parentId` is what makes "a reply to your comment"
-expressible for club threads.
+Depends on Tasks 3, 9, 10, 13. **3, 9 and 10 have landed**, so a new club
+discussion, a new channel post and a new story comment are all real events to
+fan out from now; `clubs.ClubDiscussion.parentId` and
+`engagement.Comment.parentId` are what make "a reply to your comment"
+expressible for club threads and for story comments respectively.
 
 **Prompt:**
 
@@ -297,11 +295,13 @@ expressible for club threads.
 
 ## Task 15 — Moderation & reporting
 
-Depends on Tasks 3 and 9. **9 and 10 have landed**, so club discussions and
-channel posts already exist as user-generated content with no reporting path —
-their public read paths are `listDiscussions` in `services/clubs.ts` and
-`listPosts` in `services/channels.ts`, and both need auditing for hidden
-content when this lands.
+Depends on Tasks 3 and 9, **both landed**, so comments, club discussions and
+channel posts all exist as user-generated content with no reporting path. Their
+public read paths are `listComments` in `services/engagement.ts`,
+`listDiscussions` in `services/clubs.ts` and `listPosts` in
+`services/channels.ts` — all three need auditing for hidden content when this
+lands. `services/engagement.ts` is also where the story-author-as-moderator
+question was deferred to; answering it is part of this task's role decision.
 
 **Prompt:**
 

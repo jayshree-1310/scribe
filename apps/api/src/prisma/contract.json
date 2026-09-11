@@ -1731,6 +1731,13 @@
                   "kind": "scalar"
                 }
               },
+              "ratingCount": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "slug": {
                 "nullable": false,
                 "type": {
@@ -1939,6 +1946,9 @@
                 "ratingAverage": {
                   "column": "ratingAverage"
                 },
+                "ratingCount": {
+                  "column": "ratingCount"
+                },
                 "slug": {
                   "column": "slug"
                 },
@@ -2055,6 +2065,13 @@
                   "kind": "scalar"
                 }
               },
+              "parentId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "storyId": {
                 "nullable": false,
                 "type": {
@@ -2091,6 +2108,36 @@
                 "to": {
                   "model": "Chapter",
                   "namespace": "content"
+                }
+              },
+              "parent": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "parentId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Comment",
+                  "namespace": "engagement"
+                }
+              },
+              "replies": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "parentId"
+                  ]
+                },
+                "to": {
+                  "model": "Comment",
+                  "namespace": "engagement"
                 }
               },
               "story": {
@@ -2137,6 +2184,9 @@
                 },
                 "id": {
                   "column": "id"
+                },
+                "parentId": {
+                  "column": "parentId"
                 },
                 "storyId": {
                   "column": "storyId"
@@ -4062,6 +4112,15 @@
                   "nativeType": "numeric",
                   "nullable": true
                 },
+                "ratingCount": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
                 "slug": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -4259,6 +4318,11 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "parentId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "storyId": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -4327,6 +4391,22 @@
                     "namespaceId": "content",
                     "tableName": "chapter"
                   }
+                },
+                {
+                  "source": {
+                    "columns": [
+                      "parentId"
+                    ],
+                    "namespaceId": "engagement",
+                    "tableName": "comment"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "engagement",
+                    "tableName": "comment"
+                  }
                 }
               ],
               "indexes": [
@@ -4336,6 +4416,14 @@
                   ],
                   "name": "comment_chapterId_idx_411dd3d6",
                   "prefix": "comment_chapterId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "parentId"
+                  ],
+                  "name": "comment_parentId_idx_6a68f597",
+                  "prefix": "comment_parentId_idx",
                   "unique": false
                 },
                 {
@@ -4966,7 +5054,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "d7f3d5ce2f31e0ce355c371c9b81727e91d49585529c768d0616b3b594470d70"
+    "storageHash": "bec91705027d519b853ac1db47e1bc3e0cbce132a72233a50519629b230f299a"
   },
   "execution": {
     "executionHash": "483770b6c0065f49d672438a713821d2685c115dc0ce6ef27b121fbf47c04b2f",

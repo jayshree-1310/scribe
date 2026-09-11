@@ -307,6 +307,16 @@
   font-size: var(--text-xs);
 }
 
+.reader__comment-form {
+  margin: var(--space-5) 0;
+}
+
+.reader__comment-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-3);
+}
+
 .reader__no-comments {
   margin: var(--space-5) 0;
   color: var(--read-ink-soft);

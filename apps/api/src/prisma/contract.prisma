@@ -127,7 +127,14 @@ namespace content {
     isCompleted     Boolean  @default(false)
     viewCount       Int      @default(0)
     likeCount       Int      @default(0)
+
+    /// Denormalised from `engagement.Rating`, recomputed inside the same
+    /// transaction as every rating write so the two cannot drift. They exist
+    /// because `sort=rating` orders in SQL over the story table -- an average
+    /// gathered per page could not be sorted on -- and because a seeded
+    /// catalogue edition carries an average with no `Rating` rows behind it.
     ratingAverage   Decimal?
+    ratingCount     Int      @default(0)
     kidsAppropriate Boolean  @default(false)
 
     // Publication metadata. Optional: works serialised on Scribe have no
@@ -208,11 +215,21 @@ namespace content {
 }
 
 namespace engagement {
+  /// A reader's comment on a story, or on one chapter of it when `chapterId`
+  /// is set -- the reader's comment panel is chapter-scoped, the story page's
+  /// thread is not.
+  ///
+  /// Threads and replies share this table, told apart by `parentId`, the same
+  /// way `clubs.ClubDiscussion` and for the same reason: one read path, so
+  /// there is a single place to audit when moderation lands. Replies are
+  /// capped at one level deep by `createComment`, which re-points a reply to a
+  /// reply at its thread.
   model Comment {
     id        String   @id @default(uuid())
     userId    String
     storyId   String
     chapterId String?
+    parentId  String?
     content   String
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now())
@@ -223,6 +240,9 @@ namespace engagement {
       @relation(fields: [storyId], references: [id])
     chapter content.Chapter?
       @relation(fields: [chapterId], references: [id])
+    parent  Comment?
+      @relation("CommentReplies", fields: [parentId], references: [id])
+    replies Comment[] @relation("CommentReplies")
   }
 
   model Rating {

@@ -387,6 +387,25 @@ export class TestApi {
     });
   }
 
+  /** A comment on a story, or a reply to one when `parentId` is given. */
+  async createComment(input: {
+    storyId: string;
+    userId: string;
+    content?: string;
+    chapterId?: string | null;
+    parentId?: string | null;
+  }): Promise<string> {
+    const row = await db.orm.engagement.Comment.select("id").create({
+      storyId: input.storyId,
+      userId: input.userId,
+      content: input.content ?? "Fixture comment.",
+      chapterId: input.chapterId ?? null,
+      parentId: input.parentId ?? null,
+    });
+
+    return row.id;
+  }
+
   /** A reader's rating of a story, for the aggregate paths. */
   async createRating(input: {
     userId: string;
@@ -398,6 +417,31 @@ export class TestApi {
       storyId: input.storyId,
       rating: String(input.rating),
     });
+  }
+
+  /**
+   * A story's denormalised rating columns as stored, for asserting that a
+   * rating write kept them in step with the `Rating` rows behind them.
+   */
+  async readStoryRating(
+    storyId: string,
+  ): Promise<{ average: number | null; count: number }> {
+    const story = await db.orm.content.Story.select(
+      "ratingAverage",
+      "ratingCount",
+    )
+      .where((row) => row.id.eq(storyId))
+      .first();
+
+    if (!story) throw new Error(`no such fixture story: ${storyId}`);
+
+    return {
+      average:
+        story.ratingAverage === null || story.ratingAverage === undefined
+          ? null
+          : Number(story.ratingAverage),
+      count: story.ratingCount,
+    };
   }
 
   /**
@@ -553,6 +597,31 @@ export class TestApi {
       await deleteAll(() =>
         db.orm.engagement.ReadingHistory.where((row) => row.userId.eq(userId)),
       );
+      await deleteAll(() =>
+        db.orm.engagement.Rating.where((row) => row.userId.eq(userId)),
+      );
+    }
+
+    /**
+     * Comments a fixture user left on a *seeded* story, which the per-story
+     * sweep below never visits.
+     *
+     * Two passes over the whole set of users rather than replies-then-threads
+     * per user: one reader's reply routinely hangs off another's thread, so
+     * finishing one user at a time deletes a thread whose reply is still
+     * pointing at it and breaches `comment_parentId_fkey`.
+     */
+    for (const userId of this.created.users) {
+      await deleteAll(() =>
+        db.orm.engagement.Comment.where((row) => row.userId.eq(userId)).where(
+          (row) => row.parentId.isNotNull(),
+        ),
+      );
+    }
+    for (const userId of this.created.users) {
+      await deleteAll(() =>
+        db.orm.engagement.Comment.where((row) => row.userId.eq(userId)),
+      );
     }
 
     for (const storyId of this.created.stories) {
@@ -566,6 +635,12 @@ export class TestApi {
         );
       }
 
+      // Replies before threads: `Comment.parentId` points into this same table.
+      await deleteAll(() =>
+        db.orm.engagement.Comment.where((row) => row.storyId.eq(storyId)).where(
+          (row) => row.parentId.isNotNull(),
+        ),
+      );
       await deleteAll(() =>
         db.orm.engagement.Comment.where((row) => row.storyId.eq(storyId)),
       );

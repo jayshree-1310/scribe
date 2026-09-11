@@ -603,6 +603,24 @@ async function findStoryRow(
 
 const NOT_FOUND = "That story could not be found.";
 
+/**
+ * The id of the story `slugOrId` names, or null when there is none the caller
+ * may see.
+ *
+ * Exported for `services/engagement.ts`, which has to answer "may this caller
+ * see this story?" before listing its comments or accepting a rating. Going
+ * through `findStoryRow` rather than re-implementing the check is the point:
+ * `visibleTo` is the one place a draft is hidden, and a second copy of that
+ * rule is exactly how a draft's comments would leak.
+ */
+export async function findVisibleStoryId(
+  slugOrId: string,
+  viewerId: string | null,
+): Promise<string | null> {
+  const row = await findStoryRow(slugOrId, viewerId);
+  return row?.id ?? null;
+}
+
 export async function getStory(
   slugOrId: string,
   viewerId: string | null,

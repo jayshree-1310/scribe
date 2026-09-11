@@ -432,6 +432,28 @@ POST   /api/author/chapters/:id/multimedia   # takes a URL, not a file
 DELETE /api/author/multimedia/:id
 ```
 
+### Comments & ratings — `routes/engagement.ts`
+
+Reading is public; writing needs a signed-in user. Mounted at `/api` rather
+than under the stories router, because the paths span both `/api/stories/:id/…`
+and `/api/comments/:id`.
+
+```text
+GET    /api/stories/:storyId/comments   # ?parentId lists a thread's replies,
+                                        # ?chapterId narrows to one chapter
+POST   /api/stories/:storyId/comments   # 1–2000 chars, trimmed, rate-limited
+DELETE /api/comments/:id                # the comment's author only
+
+GET    /api/stories/:storyId/ratings    # average, count, 1–5 breakdown, mine
+PUT    /api/stories/:storyId/rating     # upsert a whole-star 1–5 score
+DELETE /api/stories/:storyId/rating
+```
+
+Comments are one table for threads and replies, capped at one level deep — the
+same shape as a club's discussions. `content.Story.ratingAverage` and
+`ratingCount` are denormalised and recomputed inside the same transaction as
+every rating write, because `sort=rating` orders in SQL over that table.
+
 ### Health
 
 ```text
@@ -471,8 +493,9 @@ docker compose exec api pnpm --filter api test
 docker compose exec api pnpm --filter api test routes/authoring
 ```
 
-Covered today: auth (incl. Google), account, books, library, stories, authoring
-and uploads, plus the AI provider seam. The web app has no test suite yet.
+Covered today: auth (incl. Google), account, books, library, stories, authoring,
+uploads, reading progress, clubs, channels, and comments + ratings, plus the AI
+provider seam. The web app has no test suite yet.
 
 ## 📌 Development Roadmap
 
@@ -512,9 +535,9 @@ and uploads, plus the AI provider seam. The web app has no test suite yet.
 
 ### Phase 4 — Social Features
 
-- [ ] Comments
-- [ ] Ratings
-- [ ] Reading history & progress
+- [x] Comments
+- [x] Ratings
+- [x] Reading history & progress
 - [ ] Follows
 - [ ] Notifications
 

@@ -19,6 +19,7 @@ import authoringRouter from "./routes/authoring.js";
 import booksRouter from "./routes/books.js";
 import channelsRouter from "./routes/channels.js";
 import clubsRouter from "./routes/clubs.js";
+import engagementRouter from "./routes/engagement.js";
 import libraryRouter from "./routes/library.js";
 import readingRouter from "./routes/reading.js";
 import storiesRouter from "./routes/stories.js";
@@ -108,6 +109,12 @@ app.use("/api/library", libraryRouter);
 app.use("/api/reading", readingRouter);
 app.use("/api/stories", storiesRouter);
 app.use("/api/uploads", uploadsRouter);
+/**
+ * Comments and ratings, mounted at the root because their paths span both
+ * `/api/stories/:id/...` and `/api/comments/:id`. After the stories router,
+ * which matches none of them; see the header of `routes/engagement.ts`.
+ */
+app.use("/api", engagementRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
