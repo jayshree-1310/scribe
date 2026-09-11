@@ -621,6 +621,29 @@ export async function findVisibleStoryId(
   return row?.id ?? null;
 }
 
+/**
+ * How many of one author's stories the caller may see.
+ *
+ * Exported for `services/users.ts`, whose profile header would otherwise be
+ * free to disagree with the story list beside it. It counts exactly what
+ * `listStories` pages through for the same author -- `visibleTo`, so a
+ * stranger is counted the published stories and an author viewing their own
+ * profile is counted their drafts too, *and* `source = SCRIBE`, because a
+ * catalogue edition bearing somebody's name is not a story they serialised
+ * here and `listStories` has always excluded it.
+ */
+export async function countVisibleStoriesBy(
+  authorId: string,
+  viewerId: string | null,
+): Promise<number> {
+  const totals = await visibleTo(storiesBase(), viewerId)
+    .where((story) => story.source.eq("SCRIBE"))
+    .where((story) => story.authorId.eq(authorId))
+    .aggregate((aggregate) => ({ total: aggregate.count() }));
+
+  return totals.total;
+}
+
 export async function getStory(
   slugOrId: string,
   viewerId: string | null,

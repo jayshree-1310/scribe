@@ -361,6 +361,29 @@ POST   /api/account/avatar  # the image bytes as the request body
 DELETE /api/account/avatar
 ```
 
+### Public profiles & follows — `routes/users.ts`
+
+What anybody may see about anybody, as against `/api/account` above, which
+serves the caller *their own* account. A profile is written out field by field
+in `services/users.ts`, so `email`, `passwordHash` and `googleId` have no path
+out — a test pins the exact key set.
+
+```text
+GET    /api/users/:username             # profile + the caller's follow state
+GET    /api/users/:username/stories     # their stories, paginated, newest first
+GET    /api/users/:username/followers
+GET    /api/users/:username/following
+POST   /api/users/:username/follow      # idempotent, rate-limited, no self-follow
+DELETE /api/users/:username/follow      # idempotent
+```
+
+Reading is public; the two writes need a signed-in user. Follower counts are
+computed from `engagement.Follow` on every read rather than denormalised:
+nothing sorts or filters on one, so a column would only be something that can
+drift. `storyCount` and the story list share `listStories`' visibility rule, so
+the profile header cannot disagree with the Stories tab — including for an
+author looking at their own drafts.
+
 ### Uploads — `routes/uploads.ts`
 
 ```text
@@ -494,8 +517,9 @@ docker compose exec api pnpm --filter api test routes/authoring
 ```
 
 Covered today: auth (incl. Google), account, books, library, stories, authoring,
-uploads, reading progress, clubs, channels, and comments + ratings, plus the AI
-provider seam. The web app has no test suite yet.
+uploads, reading progress, clubs, channels, comments + ratings, and public
+profiles + follows, plus the AI provider seam. The web app has no test suite
+yet.
 
 ## 📌 Development Roadmap
 

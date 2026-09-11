@@ -46,6 +46,9 @@ export class TestApi {
     users: [] as string[],
   };
 
+  /** Usernames by id, so a suite can address a fixture account by handle. */
+  private readonly usernames = new Map<string, string>();
+
   readonly runId = `test-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
   async start(): Promise<void> {
@@ -96,16 +99,46 @@ export class TestApi {
 
   /* Fixtures ------------------------------------------------------------- */
 
-  async createUser(label: string): Promise<string> {
+  /**
+   * A fixture account. The optional profile fields exist for the public
+   * profile suite, which has to assert that a display name and a bio come
+   * back and that an email never does.
+   */
+  async createUser(
+    label: string,
+    profile: {
+      displayName?: string;
+      bio?: string;
+      isAuthor?: boolean;
+    } = {},
+  ): Promise<string> {
     const username = `${this.runId}-${label}`.slice(0, 30);
     const user = await db.orm.auth.User.select("id").create({
       username,
       email: `${username}@fixtures.invalid`,
       passwordHash: UNUSABLE_PASSWORD_HASH,
+      displayName: profile.displayName ?? null,
+      bio: profile.bio ?? null,
+      isAuthor: profile.isAuthor ?? false,
     });
 
     this.created.users.push(user.id);
+    this.usernames.set(user.id, username);
     return user.id;
+  }
+
+  /**
+   * The username `createUser` minted for a fixture account.
+   *
+   * Public profiles are addressed by handle, not by id, so a suite holding
+   * only the id cannot build the URL without this -- and recomputing the
+   * `runId` prefix in the test would duplicate the truncation rule above.
+   */
+  usernameOf(userId: string): string {
+    const username = this.usernames.get(userId);
+    if (!username) throw new Error(`no such fixture user: ${userId}`);
+
+    return username;
   }
 
   async createGenre(name: string, hue = 200): Promise<string> {
@@ -406,6 +439,33 @@ export class TestApi {
     return row.id;
   }
 
+  /**
+   * One reader following another.
+   *
+   * Not tracked in `created`: a follow has no identity of its own worth
+   * recording, and the per-user sweep in `cleanup` reaches every row this run
+   * can produce -- including the ones a suite made through `POST
+   * /api/users/:username/follow`, which no fixture ever saw.
+   */
+  async createFollow(input: {
+    followerId: string;
+    followingId: string;
+  }): Promise<void> {
+    await db.orm.engagement.Follow.create({
+      followerId: input.followerId,
+      followingId: input.followingId,
+    });
+  }
+
+  /** How many followers a fixture user has, for asserting what a write did. */
+  async countFollowers(userId: string): Promise<number> {
+    const totals = await db.orm.engagement.Follow.where((row) =>
+      row.followingId.eq(userId),
+    ).aggregate((aggregate) => ({ total: aggregate.count() }));
+
+    return totals.total;
+  }
+
   /** A reader's rating of a story, for the aggregate paths. */
   async createRating(input: {
     userId: string;
@@ -584,6 +644,20 @@ export class TestApi {
       );
       await deleteAll(() =>
         db.orm.channels.ChannelSubscriber.where((row) => row.userId.eq(userId)),
+      );
+    }
+
+    /**
+     * Both ends of the follow graph. Swept by user rather than by tracked id:
+     * a fixture user can follow, or be followed by, a *seeded* account, and
+     * only one of the two columns names a row this run created.
+     */
+    for (const userId of this.created.users) {
+      await deleteAll(() =>
+        db.orm.engagement.Follow.where((row) => row.followerId.eq(userId)),
+      );
+      await deleteAll(() =>
+        db.orm.engagement.Follow.where((row) => row.followingId.eq(userId)),
       );
     }
 

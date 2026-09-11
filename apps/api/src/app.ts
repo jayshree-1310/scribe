@@ -24,6 +24,7 @@ import libraryRouter from "./routes/library.js";
 import readingRouter from "./routes/reading.js";
 import storiesRouter from "./routes/stories.js";
 import uploadsRouter from "./routes/uploads.js";
+import usersRouter from "./routes/users.js";
 import { UPLOAD_ROOT, UPLOAD_URL_PREFIX } from "./lib/storage.js";
 
 const app = express();
@@ -109,6 +110,11 @@ app.use("/api/library", libraryRouter);
 app.use("/api/reading", readingRouter);
 app.use("/api/stories", storiesRouter);
 app.use("/api/uploads", uploadsRouter);
+/**
+ * Public profiles and the follow graph. Distinct from `/api/account`, which
+ * serves the caller their own account and carries fields no stranger may see.
+ */
+app.use("/api/users", usersRouter);
 /**
  * Comments and ratings, mounted at the root because their paths span both
  * `/api/stories/:id/...` and `/api/comments/:id`. After the stories router,

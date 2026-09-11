@@ -43,21 +43,20 @@ Paste this block at the top of any task prompt below.
 
 **Landed:** auth + account, books + library, stories/chapters + the reader,
 authoring, uploads + chapter multimedia, reading progress + streak, book clubs
-+ broadcast channels, comments + ratings.
++ broadcast channels, comments + ratings, public profiles + follows.
 
 Tasks are numbered by when they were written down, not by when to do them. This
 is the order to do them in, and the reason for each position.
 
 | # | Task | Why here |
 |---|---|---|
-| 1 | **13** — public profiles & follows | With 3 landed this closes all four of 14's dependencies. Also the payoff for the author summaries clubs, channels and comments all render: `/profile/:username` is a live route in `App.tsx` with no endpoint behind it. |
-| 2 | **11** — challenges & leaderboard | Owns the admin/moderator role decision. 15 reuses it, so this comes first. |
-| 3 | **8** — author analytics | Introduces the view / chapter-read event log. Independent of everything above, but it must precede 12. |
-| 4 | **12** — badges & levels | A pure consumer once 8 lands: streak and words written exist, comments and ratings now come from 3, and "chapters read" is only countable from 8's event log — `ReadingHistory` keeps current position per story, not a count. Doing 12 before 8 means either inventing that metric or building it twice. |
-| 5 | **14** — notifications | Needs 3, 9, 10, 13 — only 13 is outstanding. `engagement.Comment.parentId` is what makes "a reply to your comment" expressible for stories, the way `ClubDiscussion.parentId` does for clubs. |
-| 6 | **15** — moderation & reporting | Needs 11's role for a moderator to be. The content to moderate is all there now: 3's comments join 9's discussions and 10's posts. |
-| 7 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed) and ratings (landed with 3). Late because a recommender is worth building once there is signal to rank on. |
-| 8 | **17** — retire the mock layer | Last by definition. |
+| 1 | **11** — challenges & leaderboard | Owns the admin/moderator role decision. 15 reuses it, so this comes first. |
+| 2 | **8** — author analytics | Introduces the view / chapter-read event log. Independent of everything above, but it must precede 12. |
+| 3 | **12** — badges & levels | A pure consumer once 8 lands: streak and words written exist, comments and ratings come from 3, follows from 13, and "chapters read" is only countable from 8's event log — `ReadingHistory` keeps current position per story, not a count. Doing 12 before 8 means either inventing that metric or building it twice. |
+| 4 | **14** — notifications | All four dependencies — 3, 9, 10, 13 — have landed, so every event it fans out from is real. Below 12 only because a newly earned badge is one of the five notification types. |
+| 5 | **15** — moderation & reporting | Needs 11's role for a moderator to be. The content to moderate is all there now: 3's comments join 9's discussions and 10's posts. |
+| 6 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed), ratings (landed with 3) and follows (landed with 13). Late because a recommender is worth building once there is signal to rank on. |
+| 7 | **17** — retire the mock layer | Last by definition. |
 
 **One shared decision, taken once — now settled.** Clubs' discussions,
 channels' posts and stories' comments are three spellings of the same thing:
@@ -232,41 +231,74 @@ that would make a series real, not to replace a fake one.
 
 ---
 
-## Task 13 — Public profiles & follows
+## Task 13 — Public profiles & follows — **landed**
 
-**Prompt:**
+`services/users.ts` + `routes/users.ts` at `/api/users`. Endpoints: `GET
+/api/users/:username`, `/stories`, `/followers`, `/following`, and
+`POST`/`DELETE /api/users/:username/follow`.
 
-> `/profile/:username` is a public route in `App.tsx` but there is no
-> get-user-by-username endpoint, and there is no follow relationship anywhere in
-> `contract.prisma`.
->
-> API:
-> - `GET /api/users/:username` — public profile: display name, avatar, bio,
->   isAuthor, levels, streak, join date, published story count, follower and
->   following counts. Never leak email or `passwordHash`; write the selection
->   explicitly rather than spreading the row.
-> - `GET /api/users/:username/stories` — their published stories, paginated.
-> - Add a `Follow` model (follower, following, createdAt, unique pair, self-follow
->   rejected) plus a migration, and `POST/DELETE /api/users/:username/follow`,
->   `GET /api/users/:username/followers` and `/following`.
->
-> `auth.User` has no `bio` field — add one if the profile page renders it.
->
-> FE: `data/users-api.ts`; rewire `pages/ProfilePage.tsx` to serve both the
-> public `/profile/:username` view and the signed-in `/profile` view from the
-> same component, with a follow button that reflects state optimistically.
->
-> Tests: no sensitive fields in the response body, self-follow rejected,
-> follow/unfollow idempotency, counts correct after churn.
+**The decisions this task owned.**
 
----
+- **`engagement.Follow`, not `auth.Follow`.** `auth` describes who somebody
+  *is*; the rest of `engagement` describes what readers *did*, and a follow is
+  the same kind of row as a rating with another reader as its object. The pair
+  is unique; **self-follow is refused in the service**, because the contract
+  cannot express a check constraint — so the rule lives in exactly one place
+  and a test pins it.
+- **Counts are computed, never denormalised.** `Story.ratingAverage` is a
+  column because `sort=rating` orders in SQL over the story table; nothing
+  sorts or filters on a follower count, so a column would buy nothing and
+  could only drift.
+- **Both writes are idempotent and return the fresh state.** Following twice
+  leaves one row; unfollowing a stranger is a no-op, not a 404. Both answer
+  `{ following, followerCount }` so the button redraws without a second
+  request — the same reasoning as `DELETE .../rating` returning the summary.
+- **`storyCount` and the Stories tab share one rule.** `countVisibleStoriesBy`
+  in `services/stories.ts` applies the same `visibleTo` *and* `source =
+  SCRIBE` filters `listStories` does. The first draft of this got it wrong —
+  the header said 4 over a tab listing 1, because seeded catalogue editions
+  carry a real author — which is why the count is exported from the stories
+  service rather than written a second time. A test pins it.
+- **The profile shape is written out field by field**, sharing nothing with
+  `services/account.ts` but the table. `email`, `emailVerified`, `hasPassword`,
+  `googleId` and `streakLastReadAt` are never selected. A test asserts the
+  exact key set, so a column added to `auth.User` cannot start leaking.
+- **`auth.User.bio` already existed** (added with the settings task), so the
+  profile renders it with no migration of its own.
+
+**What this removed rather than faked.** The stat row was four mock aggregates;
+it is now four real ones — stories, followers, following, reading streak.
+`chaptersRead`, `minutesReadThisWeek` and `totalViews` are gone, because
+nothing records a view or a chapter read yet: that is Task 8, and Task 12 owns
+the levels the header now shows. The author's average-rating chip went with
+them — per-story averages are real, an author-wide one is not an endpoint.
+
+**A bug this fixed on the way.** `ProfilePage` rendered the *viewer's* library,
+badges and clubs under whichever name was in the URL, so somebody else's
+profile showed your own currently-reading shelf. Those four sections are now
+gated on the profile being your own, and `/profile/<your own handle>` counts as
+your own too — the page folds `!routeUsername` and the API's `isMe` into one
+flag, so the two routes to it cannot behave differently.
+
+**Still mock-fed:** the Badges tab, which is the caller's own and Task 12's to
+replace (`GET /api/users/:username/badges` is in that task). `db.authors`
+survives for `OnboardingPage`'s author picker — Task 16 owns that flow, and
+retiring the fixture with it.
+
+**Unseen in a browser:** the follower/following grid at phone width; the
+optimistic Follow button under a failing request, where the roll-back and the
+error toast have only been reasoned about; and the header actions on
+`/profile/<your own handle>`, which read the API's `isMe` and so answer for
+whoever the *dev header* names in local development — the same gap clubs,
+channels and comments have.
 
 ## Task 14 — Notifications
 
-Depends on Tasks 3, 9, 10, 13. **3, 9 and 10 have landed**, so a new club
-discussion, a new channel post and a new story comment are all real events to
-fan out from now; `clubs.ClubDiscussion.parentId` and
-`engagement.Comment.parentId` are what make "a reply to your comment"
+Depends on Tasks 3, 9, 10, 13 — **all four have landed**, so every event it
+fans out from is real: a new club discussion, a new channel post, a new story
+comment, and now "a new story by an author you follow", which
+`engagement.Follow` is what makes addressable. `clubs.ClubDiscussion.parentId`
+and `engagement.Comment.parentId` are what make "a reply to your comment"
 expressible for club threads and for story comments respectively.
 
 **Prompt:**
@@ -369,6 +401,14 @@ uses for the presentational half of a session (avatar hue, follower counts,
 reading stats) that `auth.User` has no columns for. Each goes with its own
 task; this one is the final sweep.
 
+Two of those now have a real replacement to point at rather than a missing
+endpoint. `db.authors` survives only for `OnboardingPage`'s author picker:
+`GET /api/users/:username` serves a profile and follows are real, so what that
+step still lacks is somewhere to *persist* its answers — Task 16. And the
+session's `followerCount` / `followingCount` are now computable, so
+`AuthProvider.toUser` no longer needs the mock for them; `ProfilePage` already
+bypasses it and asks the API for its own numbers.
+
 The club and channel types also left `types/domain.ts` for `types/clubs.ts` and
 `types/channels.ts`, which mirror the API the way `types/stories.ts` does. That
 is the pattern this task's reconciliation should finish, not undo.
@@ -434,6 +474,31 @@ folding into whichever task next touches that surface.
   no session exists, so `VITE_DEV_USER_ID` has to name a user that really
   exists. If it does not, every save 401s and the block above silences it for
   the whole page load with nothing shown to the reader.
+
+### Public profiles and follows (Task 13)
+
+- **The optimistic Follow button has never failed.** The flip, the count
+  adjustment and the roll-back on an `ApiError` are straightforward, but only
+  the happy path has been exercised — a rejected follow's toast and the
+  restored count want a throttled or offline browser to see.
+- **`isMe` has two sources that can disagree in development.** The page treats
+  a profile as its own when the route carries no handle *or* when the API says
+  `isMe`, and the API answers for whoever `readerHeaders()` names when there is
+  no session. So a dev without a real session sees "Edit profile" on the dev
+  user's profile and a Follow button on their *own* account's. Goes away with
+  the dev header, like the same gap in clubs, channels and comments.
+- **Followers pages are offset-based**, so a follow arriving mid-scroll can
+  shift a row across a page boundary. `createdAt` + `id` makes the *order*
+  stable, not the offsets; a keyset cursor is the fix if these lists ever get
+  long enough to matter.
+- **Nobody can see another reader's badges, clubs or shelves.** Those four
+  tabs are gated on the profile being the caller's own, which is honest today —
+  there is no endpoint that answers them for somebody else. Task 12 adds the
+  badge one; a public "clubs this person is in" would be a new endpoint on the
+  clubs service, not a UI change.
+- **Unseen in a browser:** the follower/following grid at phone width, where
+  `.people-list` drops to one column and a long display name has to clamp
+  rather than push the "Following" badge off the row.
 
 ### Clubs and channels (Tasks 9 and 10)
 

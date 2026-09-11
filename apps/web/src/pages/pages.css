@@ -946,6 +946,55 @@
   font-size: var(--text-xs);
 }
 
+/* The follower / following tabs. A row is one link to that person's profile:
+   the follow button lives there, beside the count it changes, rather than
+   being duplicated here with its own optimistic state to keep in step. */
+.people-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-3);
+}
+
+.people-list__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface);
+  color: inherit;
+  transition:
+    border-color var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+.people-list__row:hover {
+  border-color: var(--border-strong);
+  background-color: var(--surface-hover);
+}
+
+.people-list__text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Both lines clamp: a display name is free text, and a long one would push
+   the "Following" badge off the end of the row. */
+.people-list__text > strong,
+.people-list__text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-list__text > span {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
 /* Settings ---------------------------------------------------------------- */
 
 .settings {

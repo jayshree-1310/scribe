@@ -1,0 +1,323 @@
+[
+  {
+    "id": "table.follow",
+    "label": "Create table \"follow\"",
+    "summary": "Creates table \"follow\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "table",
+        "name": "follow"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"follow\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"follow\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"follow\"",
+        "sql": "CREATE TABLE \"engagement\".\"follow\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"followerId\" text NOT NULL,\n  \"followingId\" text NOT NULL,\n  \"id\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"follow\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"follow\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.follow.follow_followerId_followingId_key",
+    "label": "Add unique constraint on \"follow\" (followerId, followingId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "unique",
+        "name": "follow_followerId_followingId_key",
+        "table": "follow"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"follow_followerId_followingId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "follow_followerId_followingId_key",
+          "engagement",
+          "\"engagement\".\"follow\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"follow_followerId_followingId_key\"",
+        "sql": "ALTER TABLE \"engagement\".\"follow\" ADD CONSTRAINT \"follow_followerId_followingId_key\" UNIQUE (\"followerId\", \"followingId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"follow_followerId_followingId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "follow_followerId_followingId_key",
+          "engagement",
+          "\"engagement\".\"follow\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.follow.follow_followerId_createdAt_idx_04c22e1e",
+    "label": "Create index \"follow_followerId_createdAt_idx_04c22e1e\" on \"follow\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "follow_followerId_createdAt_idx_04c22e1e",
+        "table": "follow"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"follow_followerId_createdAt_idx_04c22e1e\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"follow_followerId_createdAt_idx_04c22e1e\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"follow_followerId_createdAt_idx_04c22e1e\"",
+        "sql": "CREATE INDEX \"follow_followerId_createdAt_idx_04c22e1e\" ON \"engagement\".\"follow\" (\"followerId\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"follow_followerId_createdAt_idx_04c22e1e\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"follow_followerId_createdAt_idx_04c22e1e\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.follow.follow_followerId_idx_2aa6c62d",
+    "label": "Create index \"follow_followerId_idx_2aa6c62d\" on \"follow\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "follow_followerId_idx_2aa6c62d",
+        "table": "follow"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"follow_followerId_idx_2aa6c62d\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"follow_followerId_idx_2aa6c62d\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"follow_followerId_idx_2aa6c62d\"",
+        "sql": "CREATE INDEX \"follow_followerId_idx_2aa6c62d\" ON \"engagement\".\"follow\" (\"followerId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"follow_followerId_idx_2aa6c62d\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"follow_followerId_idx_2aa6c62d\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.follow.follow_followingId_createdAt_idx_789d8a0b",
+    "label": "Create index \"follow_followingId_createdAt_idx_789d8a0b\" on \"follow\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "follow_followingId_createdAt_idx_789d8a0b",
+        "table": "follow"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"follow_followingId_createdAt_idx_789d8a0b\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"follow_followingId_createdAt_idx_789d8a0b\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"follow_followingId_createdAt_idx_789d8a0b\"",
+        "sql": "CREATE INDEX \"follow_followingId_createdAt_idx_789d8a0b\" ON \"engagement\".\"follow\" (\"followingId\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"follow_followingId_createdAt_idx_789d8a0b\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"follow_followingId_createdAt_idx_789d8a0b\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.follow.follow_followingId_idx_1cf16645",
+    "label": "Create index \"follow_followingId_idx_1cf16645\" on \"follow\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "follow_followingId_idx_1cf16645",
+        "table": "follow"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"follow_followingId_idx_1cf16645\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"follow_followingId_idx_1cf16645\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"follow_followingId_idx_1cf16645\"",
+        "sql": "CREATE INDEX \"follow_followingId_idx_1cf16645\" ON \"engagement\".\"follow\" (\"followingId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"follow_followingId_idx_1cf16645\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"follow_followingId_idx_1cf16645\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.follow.follow_followerId_fkey",
+    "label": "Add foreign key \"follow_followerId_fkey\" on \"follow\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "follow_followerId_fkey",
+        "table": "follow"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"follow_followerId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "follow_followerId_fkey",
+          "engagement",
+          "\"engagement\".\"follow\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"follow_followerId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"follow\"\nADD CONSTRAINT \"follow_followerId_fkey\"\nFOREIGN KEY (\"followerId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"follow_followerId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "follow_followerId_fkey",
+          "engagement",
+          "\"engagement\".\"follow\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.follow.follow_followingId_fkey",
+    "label": "Add foreign key \"follow_followingId_fkey\" on \"follow\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "follow_followingId_fkey",
+        "table": "follow"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"follow_followingId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "follow_followingId_fkey",
+          "engagement",
+          "\"engagement\".\"follow\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"follow_followingId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"follow\"\nADD CONSTRAINT \"follow_followingId_fkey\"\nFOREIGN KEY (\"followingId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"follow_followingId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "follow_followingId_fkey",
+          "engagement",
+          "\"engagement\".\"follow\""
+        ]
+      }
+    ]
+  }
+]

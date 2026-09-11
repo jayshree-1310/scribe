@@ -88,6 +88,10 @@ namespace auth {
     comments         engagement.Comment[]
     ratings          engagement.Rating[]
     readingHistory   engagement.ReadingHistory[]
+    /// Rows where this account is the one being followed.
+    followers        engagement.Follow[] @relation("Followers")
+    /// Rows where this account is the one doing the following.
+    following        engagement.Follow[] @relation("Following")
     badges           gamification.UserBadge[]
     challengeEntries challenges.ChallengeEntry[]
     createdClubs     clubs.BookClub[]
@@ -292,6 +296,33 @@ namespace engagement {
       @relation(fields: [chapterId], references: [id])
 
     @@unique([userId, storyId])
+  }
+
+  /// One reader following another.
+  ///
+  /// In `engagement` rather than `auth` for the same reason the rest of this
+  /// namespace is: `auth` describes who somebody is, and this describes
+  /// something they did. It is the same kind of row as a rating, with another
+  /// reader as its object instead of a story.
+  ///
+  /// The pair is unique, so following twice is a no-op rather than a second
+  /// row. Following *yourself* is refused by `services/users.ts`: the contract
+  /// has no way to express a check constraint, so that rule lives in exactly
+  /// one place and a test pins it.
+  model Follow {
+    id          String   @id @default(uuid())
+    followerId  String
+    followingId String
+    createdAt   DateTime @default(now())
+
+    follower  auth.User @relation("Following", fields: [followerId], references: [id])
+    following auth.User @relation("Followers", fields: [followingId], references: [id])
+
+    @@unique([followerId, followingId])
+    // Somebody's follower list, newest first -- and the follower count.
+    @@index([followingId, createdAt])
+    // Who somebody follows, newest first -- and the following count.
+    @@index([followerId, createdAt])
   }
 }
 

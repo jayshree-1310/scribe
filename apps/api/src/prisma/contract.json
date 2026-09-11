@@ -44,6 +44,10 @@
       "model": "Comment",
       "namespace": "engagement"
     },
+    "follow": {
+      "model": "Follow",
+      "namespace": "engagement"
+    },
     "genre": {
       "model": "Genre",
       "namespace": "content"
@@ -308,6 +312,36 @@
                 "to": {
                   "model": "BookClub",
                   "namespace": "clubs"
+                }
+              },
+              "followers": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "followingId"
+                  ]
+                },
+                "to": {
+                  "model": "Follow",
+                  "namespace": "engagement"
+                }
+              },
+              "following": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "followerId"
+                  ]
+                },
+                "to": {
+                  "model": "Follow",
+                  "namespace": "engagement"
                 }
               },
               "ratings": {
@@ -2200,6 +2234,88 @@
               },
               "namespaceId": "engagement",
               "table": "comment"
+            }
+          },
+          "Follow": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "followerId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "followingId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "follower": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "followerId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              },
+              "following": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "followingId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "followerId": {
+                  "column": "followerId"
+                },
+                "followingId": {
+                  "column": "followingId"
+                },
+                "id": {
+                  "column": "id"
+                }
+              },
+              "namespaceId": "engagement",
+              "table": "follow"
             }
           },
           "Rating": {
@@ -4450,6 +4566,117 @@
               },
               "uniques": []
             },
+            "follow": {
+              "columns": {
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "followerId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "followingId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "followerId"
+                    ],
+                    "namespaceId": "engagement",
+                    "tableName": "follow"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "source": {
+                    "columns": [
+                      "followingId"
+                    ],
+                    "namespaceId": "engagement",
+                    "tableName": "follow"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "followerId",
+                    "createdAt"
+                  ],
+                  "name": "follow_followerId_createdAt_idx_04c22e1e",
+                  "prefix": "follow_followerId_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "followerId"
+                  ],
+                  "name": "follow_followerId_idx_2aa6c62d",
+                  "prefix": "follow_followerId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "followingId",
+                    "createdAt"
+                  ],
+                  "name": "follow_followingId_createdAt_idx_789d8a0b",
+                  "prefix": "follow_followingId_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "followingId"
+                  ],
+                  "name": "follow_followingId_idx_1cf16645",
+                  "prefix": "follow_followingId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "followerId",
+                    "followingId"
+                  ]
+                }
+              ]
+            },
             "rating": {
               "columns": {
                 "createdAt": {
@@ -5054,10 +5281,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "bec91705027d519b853ac1db47e1bc3e0cbce132a72233a50519629b230f299a"
+    "storageHash": "dd92396eafcc15822b31c2fd407f9a61c78ef5bf988cc7681ae670d473e8bc6a"
   },
   "execution": {
-    "executionHash": "483770b6c0065f49d672438a713821d2685c115dc0ce6ef27b121fbf47c04b2f",
+    "executionHash": "8ed44bbf5870335b930ce6cf5ac9f5a79e4ee6cc67d4ecfd9747a33d7b0be08b",
     "mutations": {
       "defaults": [
         {
@@ -5168,6 +5395,17 @@
             "column": "id",
             "namespace": "engagement",
             "table": "comment"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "engagement",
+            "table": "follow"
           }
         },
         {
