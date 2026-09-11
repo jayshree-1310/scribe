@@ -95,6 +95,33 @@ export interface Chapter extends ChapterSummary {
   nextNumber: number | null
 }
 
+/* Reading progress ----------------------------------------------------- */
+
+/** Mirrors `ReadingProgress` in `apps/api/src/services/reading.ts`. */
+export interface ReadingProgress {
+  storyId: string
+  chapterId: string | null
+  /** The chapter's reader-facing number, for building a resume link. */
+  chapterNumber: number | null
+  /**
+   * Character offset into that chapter's `content`, not a scroll position:
+   * font size and reading width are preferences, so a pixel offset restores
+   * to the wrong paragraph the moment either changes.
+   */
+  offset: number
+  /** Whole-story completion, 0–100, weighted by chapter word counts. */
+  percentComplete: number
+  lastReadAt: string
+}
+
+/** A resume point with enough of its story attached to render a card. */
+export interface ContinueEntry {
+  progress: ReadingProgress
+  story: Story
+  /** Null when the chapter was deleted since the position was saved. */
+  chapter: { id: string; number: number; title: string } | null
+}
+
 export const STORY_SORTS = ['trending', 'newest', 'rating', 'views'] as const
 
 export type StorySort = (typeof STORY_SORTS)[number]

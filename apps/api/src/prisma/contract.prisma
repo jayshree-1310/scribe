@@ -66,6 +66,19 @@ namespace auth {
 
     isAuthor      Boolean @default(false)
     readingStreak Int     @default(0)
+
+    /// The reading event `readingStreak` was last advanced for.
+    ///
+    /// The streak cannot be recomputed from `ReadingHistory`, which keeps only
+    /// the latest position per story and so forgets every day but the last --
+    /// so the rule needs the previous day stored beside the count it advances.
+    /// Null means the reader has no recorded reading yet.
+    ///
+    /// Deliberately not `ReadingHistory.lastReadAt`'s maximum: that moves when
+    /// a reader revisits an old story, which is the same day-boundary question
+    /// and a different row.
+    streakLastReadAt DateTime?
+
     authorLevel   Int     @default(1)
     readerLevel   Int     @default(1)
 
@@ -225,12 +238,25 @@ namespace engagement {
     @@unique([userId, storyId])
   }
 
+  /// One row per reader per story: where they are now, not where they have
+  /// been. The unique pair below is what makes "continue reading" one row per
+  /// story without a dedupe pass, and what the progress upsert conflicts on.
   model ReadingHistory {
     id         String   @id @default(uuid())
     userId     String
     storyId    String
     chapterId  String?
+
+    /// Character offset into `chapter.content`, not a pixel scroll position:
+    /// the reader's font size and width are user preferences, so a pixel
+    /// offset restores to the wrong paragraph as soon as either changes.
+    offset     Int      @default(0)
+
+    /// Whole-story completion, 0-100. Derived server-side from `offset` and
+    /// the word counts of the chapters the reader can see -- a client cannot
+    /// know the story's total length from the one chapter it has loaded.
     progress   Int      @default(0)
+
     lastReadAt DateTime @default(now())
     createdAt  DateTime @default(now())
     updatedAt  DateTime @default(now())

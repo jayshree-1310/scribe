@@ -266,6 +266,49 @@ export class TestApi {
     });
   }
 
+  /**
+   * Puts a reader's streak into a chosen state.
+   *
+   * Backdating the anchor is the only way to exercise the day-boundary
+   * branches through the API: a test cannot wait a day, and moving the clock
+   * would move it for the database's `now()` too, which the streak is compared
+   * against.
+   */
+  async setStreak(
+    userId: string,
+    input: { streak: number; lastReadAt: Date | null },
+  ): Promise<void> {
+    await db.orm.auth.User.where((user) => user.id.eq(userId)).update({
+      readingStreak: input.streak,
+      streakLastReadAt:
+        input.lastReadAt === null
+          ? null
+          : Temporal.Instant.from(input.lastReadAt.toISOString()),
+    });
+  }
+
+  /** A reader's streak as stored, for asserting what a write did. */
+  async readStreak(
+    userId: string,
+  ): Promise<{ streak: number; lastReadAt: Date | null }> {
+    const user = await db.orm.auth.User.select(
+      "readingStreak",
+      "streakLastReadAt",
+    )
+      .where((row) => row.id.eq(userId))
+      .first();
+
+    if (!user) throw new Error(`no such fixture user: ${userId}`);
+
+    return {
+      streak: user.readingStreak,
+      lastReadAt:
+        user.streakLastReadAt === null || user.streakLastReadAt === undefined
+          ? null
+          : new Date(String(user.streakLastReadAt)),
+    };
+  }
+
   /* Teardown -------------------------------------------------------------- */
 
   private async cleanup(): Promise<void> {
@@ -289,10 +332,15 @@ export class TestApi {
       }
     }
 
-    // Shelf rows first: they reference both users and stories.
+    // Shelf and reading-position rows first: they reference both users and
+    // stories, and a suite can have written either against a *seeded* story,
+    // which the per-story sweep below never visits.
     for (const userId of this.created.users) {
       await deleteAll(() =>
         db.orm.library.LibraryEntry.where((entry) => entry.userId.eq(userId)),
+      );
+      await deleteAll(() =>
+        db.orm.engagement.ReadingHistory.where((row) => row.userId.eq(userId)),
       );
     }
 

@@ -18,6 +18,7 @@ import authSecurityRouter from "./routes/auth-security.js";
 import authoringRouter from "./routes/authoring.js";
 import booksRouter from "./routes/books.js";
 import libraryRouter from "./routes/library.js";
+import readingRouter from "./routes/reading.js";
 import storiesRouter from "./routes/stories.js";
 import uploadsRouter from "./routes/uploads.js";
 import { UPLOAD_ROOT, UPLOAD_URL_PREFIX } from "./lib/storage.js";
@@ -100,6 +101,7 @@ app.use("/api/auth", authSecurityRouter);
 app.use("/api/author", authoringRouter);
 app.use("/api/books", booksRouter);
 app.use("/api/library", libraryRouter);
+app.use("/api/reading", readingRouter);
 app.use("/api/stories", storiesRouter);
 app.use("/api/uploads", uploadsRouter);
 

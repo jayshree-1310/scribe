@@ -629,7 +629,8 @@ The flagship. Everything so far exists to make this possible.
 >   containing an injection attempt.**
 > - **Spoilers.** A reader on chapter 3 asking a question should not be answered
 >   from chapter 30. Accept an optional `upToChapter` and filter retrieval by it;
->   default to the reader's progress once `BACKLOG.md` Task 2 exists.
+>   default to the reader's progress from `GET /api/reading/progress/:storyId`,
+>   which carries the chapter they last read.
 >
 > FE: an "Ask this book" panel on `StoryDetailPage` and in the reader, with the
 > question box, the streamed answer, and citation chips that navigate to the

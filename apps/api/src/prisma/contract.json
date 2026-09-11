@@ -178,6 +178,13 @@
                   "kind": "scalar"
                 }
               },
+              "streakLastReadAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
               "updatedAt": {
                 "nullable": false,
                 "type": {
@@ -370,6 +377,9 @@
                 },
                 "readingStreak": {
                   "column": "readingStreak"
+                },
+                "streakLastReadAt": {
+                  "column": "streakLastReadAt"
                 },
                 "updatedAt": {
                   "column": "updatedAt"
@@ -2028,6 +2038,13 @@
                   "kind": "scalar"
                 }
               },
+              "offset": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "progress": {
                 "nullable": false,
                 "type": {
@@ -2117,6 +2134,9 @@
                 },
                 "lastReadAt": {
                   "column": "lastReadAt"
+                },
+                "offset": {
+                  "column": "offset"
                 },
                 "progress": {
                   "column": "progress"
@@ -2582,6 +2602,11 @@
                   },
                   "nativeType": "int4",
                   "nullable": false
+                },
+                "streakLastReadAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
                 },
                 "updatedAt": {
                   "codecId": "pg/timestamptz-temporal@1",
@@ -4024,6 +4049,15 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "offset": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
                 "progress": {
                   "codecId": "pg/int4@1",
                   "default": {
@@ -4482,7 +4516,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "f3ad3aa752ccc8276d2e5a845eab61c409f5440c1d95b60b03935f5367e3a34a"
+    "storageHash": "3e097fcdd1e171f1128ccb37aef53aeb02b160f047e0143ebf78524a8096a844"
   },
   "execution": {
     "executionHash": "2a8f10d344652873c2c64255cf26b8b7ef763928007ad7cae38f4ead2fc152a3",

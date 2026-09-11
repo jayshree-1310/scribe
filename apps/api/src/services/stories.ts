@@ -770,6 +770,29 @@ export async function getRelatedStories(
   return hydrate(rows as StoryRow[], viewerId);
 }
 
+/**
+ * Several stories by id, hydrated the same way a listing is, keyed by id.
+ *
+ * For callers holding ids from another table -- reading history, a shelf --
+ * that need story cards without a query per row. Ids the caller may not see
+ * are simply absent from the map rather than an error: the caller's own rows
+ * can outlive a story being unlisted, and that should thin the list, not fail
+ * the request.
+ */
+export async function getStoriesByIds(
+  storyIds: string[],
+  viewerId: string | null,
+): Promise<Map<string, Story>> {
+  if (storyIds.length === 0) return new Map();
+
+  const rows = await visibleTo(storiesBase(), viewerId)
+    .where((story) => story.id.in(storyIds))
+    .all();
+
+  const stories = await hydrate(rows as StoryRow[], viewerId);
+  return new Map(stories.map((story) => [story.id, story]));
+}
+
 /* Reference data --------------------------------------------------------- */
 
 export interface GenreSummary extends StoryGenre {

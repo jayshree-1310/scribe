@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import { formatCount, formatMinutes } from '../lib/format'
 import * as api from '../data/api'
 import * as books from '../data/books-api'
+import * as reading from '../data/reading-api'
 import type { Book, Discover } from '../types/books'
 import { AppShell } from '../components/layout/AppShell'
 import { ButtonLink } from '../components/ui/Button'
@@ -11,8 +12,10 @@ import { SectionHead } from '../components/ui/Card'
 import { Icon } from '../components/ui/Icon'
 import { EmptyState, ErrorState } from '../components/ui/States'
 import { ProgressBar } from '../components/ui/Progress'
+import { Skeleton } from '../components/ui/Skeleton'
 import { BookCard, BookCardSkeleton } from '../components/books/BookCard'
 import { StoryShelf } from '../components/story/StoryShelf'
+import { ContinueCard } from '../components/story/ContinueCard'
 import { ChallengeCard, ClubCard } from '../components/story/Cards'
 import './pages.css'
 import '../components/books/books.css'
@@ -25,7 +28,13 @@ export function HomePage() {
   // Books come from the catalogue API; clubs and challenges are still the
   // mock data layer, which is a separate feature from the book shelves.
   const discover = useAsync(() => books.getDiscover(), [])
-  const reading = useAsync(() => books.getLibrary({ status: 'READING' }), [])
+  const shelved = useAsync(() => books.getLibrary({ status: 'READING' }), [])
+  /**
+   * Where the reader actually left off, which is not the same question as the
+   * Reading shelf below: this comes from reading activity and carries a resume
+   * target, that one is the set of books they chose to shelve.
+   */
+  const inProgressStories = useAsync(() => reading.getContinueReading(4), [])
   const clubs = useAsync(() => api.getClubs(), [])
   const challenges = useAsync(() => api.getChallenges(), [])
 
@@ -64,7 +73,7 @@ export function HomePage() {
     )
 
     // The "currently reading" shelf is defined by status, so it has to reload.
-    reading.reload()
+    shelved.reload()
   }
 
   const user = session?.user
@@ -72,7 +81,14 @@ export function HomePage() {
   const streak = user?.stats.readingStreakDays ?? 0
   const minutes = user?.stats.minutesReadThisWeek ?? 0
 
-  const inProgress = reading.data?.items ?? []
+  const inProgress = shelved.data?.items ?? []
+  /**
+   * A failed continue list is not surfaced: the rail simply does not appear.
+   * It is a shortcut back into something the reader can still reach from their
+   * library, and an error panel above the fold for it would cost more than it
+   * tells them.
+   */
+  const resumable = inProgressStories.data ?? []
   const myClubs = clubs.data?.filter((club) => club.membership !== null) ?? []
   const suggestedClubs = clubs.data?.filter((club) => club.membership === null) ?? []
   const activeChallenges = challenges.data?.filter((item) => item.state === 'active') ?? []
@@ -147,13 +163,42 @@ export function HomePage() {
         </div>
       </section>
 
+      {/* Pick up where you left off -------------------------------------- */}
+      {/*
+        Rendered only when there is something to resume. A reader who has not
+        started anything already has the Reading shelf's empty state below,
+        and two empty states stacked would say the same thing twice.
+      */}
+      {resumable.length > 0 || inProgressStories.status === 'loading' ? (
+        <section className="page-section">
+          <SectionHead
+            title="Pick up where you left off"
+            subtitle="The last thing you were reading, at the page you stopped on."
+          />
+
+          {inProgressStories.status === 'loading' ? (
+            <div className="card-grid card-grid--wide">
+              {Array.from({ length: 2 }, (_, index) => (
+                <Skeleton key={index} height="7.5rem" radius="var(--radius-lg)" />
+              ))}
+            </div>
+          ) : (
+            <div className="card-grid card-grid--wide">
+              {resumable.map((entry) => (
+                <ContinueCard key={entry.story.id} entry={entry} />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
+
       {/* Currently reading ---------------------------------------------- */}
       <section className="page-section">
         <SectionHead title="Currently reading" to="/library" linkLabel="My library" />
 
-        {reading.status === 'error' ? (
-          <ErrorState message={reading.error} onRetry={reading.reload} />
-        ) : reading.status === 'loading' ? (
+        {shelved.status === 'error' ? (
+          <ErrorState message={shelved.error} onRetry={shelved.reload} />
+        ) : shelved.status === 'loading' ? (
           <div className="card-grid card-grid--wide">
             {Array.from({ length: 2 }, (_, index) => (
               <BookCardSkeleton key={index} variant="row" />
@@ -178,7 +223,7 @@ export function HomePage() {
                 key={entry.id}
                 book={entry.book}
                 variant="row"
-                onShelfChange={() => reading.reload()}
+                onShelfChange={() => shelved.reload()}
               />
             ))}
           </div>

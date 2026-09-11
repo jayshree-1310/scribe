@@ -66,7 +66,7 @@ const BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '')
 const REQUEST_TIMEOUT_MS = 15_000
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   /**
    * Serialised as JSON, unless it is binary — a `File`, `Blob` or buffer —
    * in which case it is sent verbatim. The avatar endpoint takes the image

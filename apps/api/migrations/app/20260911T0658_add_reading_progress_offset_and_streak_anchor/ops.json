@@ -1,0 +1,86 @@
+[
+  {
+    "id": "column.auth.user.streakLastReadAt",
+    "label": "Add column \"streakLastReadAt\" to \"user\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "column",
+        "name": "streakLastReadAt",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"streakLastReadAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "user",
+          "streakLastReadAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"streakLastReadAt\"",
+        "sql": "ALTER TABLE \"auth\".\"user\" ADD COLUMN \"streakLastReadAt\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"streakLastReadAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "user",
+          "streakLastReadAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.engagement.readingHistory.offset",
+    "label": "Add column \"offset\" to \"readingHistory\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "column",
+        "name": "offset",
+        "table": "readingHistory"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"offset\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "engagement",
+          "readingHistory",
+          "offset"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"offset\"",
+        "sql": "ALTER TABLE \"engagement\".\"readingHistory\" ADD COLUMN \"offset\" int4 DEFAULT 0 NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"offset\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "engagement",
+          "readingHistory",
+          "offset"
+        ]
+      }
+    ]
+  }
+]

@@ -39,44 +39,6 @@ Paste this block at the top of any task prompt below.
 
 ---
 
-## Task 2 — Reading progress & history
-
-The Home page's core loop. `engagement.ReadingHistory` exists, no routes.
-
-**Prompt:**
-
-> Implement reading progress. `engagement.ReadingHistory` already exists in
-> `contract.prisma` — read it first and extend it if it cannot express a resume
-> point (needs at minimum: story, chapter, scroll/character offset, percent
-> complete, `lastReadAt`). Migration required if you change it.
->
-> API — `apps/api/src/services/reading.ts` + `routes/reading.ts` at
-> `/api/reading` (all behind `requireUser`):
-> - `PUT /progress` — upsert progress for `{ storyId, chapterId, offset }`.
->   Idempotent; called frequently from the reader, so it must be a single
->   upsert, not read-then-write.
-> - `GET /continue?limit=` — most recently read stories with resume target,
->   newest first, one row per story.
-> - `GET /progress/:storyId` — resume point for one story, or null.
-> - `DELETE /progress/:storyId` — clear it.
->
-> Also update `auth.User.readingStreak` when progress is recorded: a day-boundary
-> streak in the user's stored timezone, or UTC if none is stored. Put the streak
-> rule in one function in the service with a comment explaining the boundary
-> choice, and unit-test it directly.
->
-> FE — extend `data/stories-api.ts` (or a new `reading-api.ts`). Wire
-> `pages/ReaderPage.tsx` to save progress on a debounced scroll (reuse
-> `hooks/useDebouncedValue.ts`) and to restore position on mount;
-> `components/story/ContinueCard.tsx` and `pages/HomePage.tsx` read from
-> `/continue`. Remove `getContinueReading` and `getReadingEntryForStory` from
-> `data/api.ts`.
->
-> Tests: upsert idempotency, continue-list ordering and per-story dedupe,
-> streak increment / same-day no-op / gap reset.
-
----
-
 ## Task 3 — Comments & ratings
 
 `engagement.Comment` and `engagement.Rating` exist, no routes.

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
+import { useReadingProgress } from '../hooks/useReadingProgress'
 import { cn } from '../lib/cn'
 import { useToast } from '../lib/toast'
 import {
@@ -49,6 +50,17 @@ export function ReaderPage() {
 
 
   const [progress, setProgress] = useState(0)
+
+  /**
+   * Restores the reader's place when a chapter opens and saves it as they
+   * scroll, off the same `progress` fraction the bar above is drawn from.
+   */
+  useReadingProgress({
+    storyId,
+    chapter: chapter.data ?? null,
+    scrollFraction: progress,
+  })
+
   const [focusMode, setFocusMode] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [bookmarked, setBookmarked] = useState(false)

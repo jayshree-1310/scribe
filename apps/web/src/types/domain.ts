@@ -88,24 +88,6 @@ export interface Story {
   tagline: string
 }
 
-/**
- * Only `ReadingEntry` still refers to this. The reader's chapter types live in
- * `types/stories.ts` and an author's in `data/authoring-api.ts`; the mock
- * `Multimedia` that used to sit here went with the real attachment types.
- */
-export interface Chapter {
-  id: string
-  storyId: string
-  number: number
-  title: string
-  /** Paragraphs of prose; the reader renders these directly. */
-  paragraphs: string[]
-  publishedAt: string | null
-  wordCount: number
-  readingMinutes: number
-  viewCount: number
-}
-
 /* engagement ---------------------------------------------------------- */
 
 export interface Comment {
@@ -128,21 +110,6 @@ export interface Rating {
   createdAt: string
 }
 
-export interface ReadingHistory {
-  id: string
-  userId: string
-  storyId: string
-  chapterId: string
-  /** 0–1 through the current chapter. */
-  chapterProgress: number
-  /** 0–1 through the whole story. */
-  storyProgress: number
-  lastReadAt: string
-  shelf: LibraryShelf
-  bookmarked: boolean
-}
-
-export type LibraryShelf = 'reading' | 'completed' | 'saved'
 
 /* gamification -------------------------------------------------------- */
 
@@ -273,13 +240,6 @@ export interface ChannelPost {
 export interface StoryWithMeta extends Story {
   author: User
   genres: Genre[]
-}
-
-/** A library/continue-reading entry joined with its story and chapter. */
-export interface ReadingEntry {
-  history: ReadingHistory
-  story: StoryWithMeta
-  chapter: Pick<Chapter, 'id' | 'number' | 'title'>
 }
 
 export interface DiscoverFilters {
