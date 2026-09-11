@@ -26,6 +26,11 @@ import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { SelectableChip, StatusBadge } from '../../components/ui/Chip'
 import { ConfirmDialog, Dialog } from '../../components/ui/Dialog'
+import {
+  DropdownMenu,
+  MenuItem,
+  MenuSeparator,
+} from '../../components/ui/DropdownMenu'
 import { Icon, type IconName } from '../../components/ui/Icon'
 import { Switch } from '../../components/ui/Checkbox'
 import { SegmentedControl } from '../../components/ui/Tabs'
@@ -34,7 +39,7 @@ import { InlineNotice } from '../../components/ui/States'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { ErrorState } from '../../components/ui/States'
 import { CoverField } from '../../components/story/CoverField'
-import { countWords, renderMarkdown } from './markdown'
+import { countWords, renderChapter } from '../../lib/chapter-markdown'
 import '../pages.css'
 import './author.css'
 
@@ -175,6 +180,12 @@ export function StoryEditorPage() {
   const [chapters, setChapters] = useState<DraftChapter[]>([blankChapter(1)])
   const [activeKey, setActiveKey] = useState<string>(() => chapters[0]!.key)
   const [orderDirty, setOrderDirty] = useState(false)
+  /**
+   * The drag in progress: which row was picked up, and which one the pointer
+   * is over. One piece of state rather than two, so a row can never be shown
+   * as a drop target while nothing is being dragged.
+   */
+  const [drag, setDrag] = useState<{ from: number; over: number } | null>(null)
   const [mode, setMode] = useState<'write' | 'preview'>('write')
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -198,7 +209,19 @@ export function StoryEditorPage() {
 
   const bodyRef = useRef<HTMLTextAreaElement>(null)
   const mediaInputRef = useRef<HTMLInputElement>(null)
+  const chapterListRef = useRef<HTMLOListElement>(null)
   const active = chapters.find((chapter) => chapter.key === activeKey) ?? chapters[0]!
+
+  /**
+   * The chapter list scrolls once a story runs long, so a chapter picked from
+   * anywhere but the list itself — a freshly added one, or one moved past the
+   * edge — has to be brought back into view.
+   */
+  useEffect(() => {
+    chapterListRef.current
+      ?.querySelector('.is-active')
+      ?.scrollIntoView({ block: 'nearest' })
+  }, [activeKey, chapters])
 
   /**
    * Seed the form from the loaded story.
@@ -597,18 +620,26 @@ export function StoryEditorPage() {
     setDirty(true)
   }
 
-  function moveChapter(index: number, direction: -1 | 1) {
-    const target = index + direction
-    if (target < 0 || target >= chapters.length) return
+  /**
+   * Lifts the chapter at `from` and drops it back in at `to`, which is what
+   * both ways of reordering come down to — the menu's one-step moves and a
+   * drag across the list.
+   */
+  function reorderChapter(from: number, to: number) {
+    if (from === to || to < 0 || to >= chapters.length) return
 
     setChapters((current) => {
       const next = [...current]
-      const [moved] = next.splice(index, 1)
-      next.splice(target, 0, moved!)
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved!)
       return next
     })
     setOrderDirty(true)
     setDirty(true)
+  }
+
+  function moveChapter(index: number, direction: -1 | 1) {
+    reorderChapter(index, index + direction)
   }
 
   const [chapterBusy, setChapterBusy] = useState<string | null>(null)
@@ -966,7 +997,7 @@ export function StoryEditorPage() {
                 {active.body.trim().length === 0 ? (
                   <p className="preview__empty">Nothing to preview yet.</p>
                 ) : (
-                  renderMarkdown(active.body, active.media)
+                  renderChapter(active.body, active.media)
                 )}
               </div>
             )}
@@ -1040,166 +1071,242 @@ export function StoryEditorPage() {
               </Button>
             </div>
 
-            <ol className="chapter-manager">
+            <ol className="chapter-manager" ref={chapterListRef}>
               {chapters.map((chapter, index) => (
-                <li key={chapter.key} className={cn(chapter.key === activeKey && 'is-active')}>
+                <li
+                  key={chapter.key}
+                  draggable
+                  onDragStart={(event) => {
+                    // Firefox starts no drag at all unless the event carries
+                    // data, and the key is the one stable thing to put in it.
+                    event.dataTransfer.setData('text/plain', chapter.key)
+                    event.dataTransfer.effectAllowed = 'move'
+                    setDrag({ from: index, over: index })
+                  }}
+                  onDragOver={(event) => {
+                    // A row is not a drop target until this is prevented.
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'move'
+                    setDrag((current) =>
+                      current === null || current.over === index
+                        ? current
+                        : { ...current, over: index },
+                    )
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault()
+                    if (drag) reorderChapter(drag.from, index)
+                    setDrag(null)
+                  }}
+                  // Fires on a cancelled drag too, which is the only thing
+                  // that clears the state when the drop lands outside a row.
+                  onDragEnd={() => setDrag(null)}
+                  className={cn(
+                    chapter.key === activeKey && 'is-active',
+                    drag?.from === index && 'is-dragging',
+                    drag !== null &&
+                      drag.over === index &&
+                      drag.from !== index &&
+                      // The row is spliced in at the index it was dropped on,
+                      // so dragging down lands it after that row and dragging
+                      // up lands it before. The marker has to say which.
+                      (drag.from < index ? 'is-drop-after' : 'is-drop-before'),
+                  )}
+                >
                   <button
                     type="button"
                     className="chapter-manager__pick"
                     onClick={() => setActiveKey(chapter.key)}
                   >
-                    <span className="chapter-manager__num">{index + 1}</span>
+                    {/*
+                      The number doubles as the drag affordance, turning into a
+                      grip under the pointer. A separate handle would be a
+                      fifth thing in a row that just got down to four.
+                    */}
+                    <span className="chapter-manager__num">
+                      <span className="chapter-manager__num-value">{index + 1}</span>
+                      <Icon
+                        className="chapter-manager__grip"
+                        name="grip"
+                        size="0.85rem"
+                      />
+                    </span>
                     <span className="chapter-manager__title">
                       {chapter.title || 'Untitled'}
                     </span>
-                    {chapter.published ? (
-                      <StatusBadge tone="success">Live</StatusBadge>
-                    ) : (
-                      <StatusBadge tone="neutral">Draft</StatusBadge>
-                    )}
+                    <StatusBadge tone={chapter.published ? 'success' : 'neutral'}>
+                      {chapter.published ? 'Live' : 'Draft'}
+                    </StatusBadge>
                   </button>
-                  <span className="chapter-manager__order">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly
-                      aria-label={
-                        chapter.published
-                          ? `Unpublish ${chapter.title}`
-                          : `Publish ${chapter.title}`
-                      }
-                      title={chapter.published ? 'Unpublish' : 'Publish'}
-                      loading={chapterBusy === chapter.key}
-                      onClick={() => void toggleChapter(chapter)}
-                      startIcon={
+
+                  {/*
+                    One menu rather than four icon buttons per row. Spelled out
+                    as a column of glyphs they made every row three lines tall
+                    and ran together between rows, and a twenty-chapter story
+                    turned the panel into a wall of them.
+
+                    Moves and deletes that cannot apply are left out of the
+                    menu instead of shown disabled: nothing has to explain why
+                    the first chapter cannot move up.
+                  */}
+                  <DropdownMenu
+                    escapesOverflow
+                    label={`Actions for ${chapter.title || 'this chapter'}`}
+                    trigger={(props) => (
+                      <Button
+                        {...props}
+                        className="chapter-manager__more"
+                        variant="ghost"
+                        size="sm"
+                        iconOnly
+                        aria-label={`Actions for ${chapter.title || 'this chapter'}`}
+                        loading={chapterBusy === chapter.key}
+                        startIcon={<Icon name="more" size="1rem" />}
+                      />
+                    )}
+                  >
+                    <MenuItem
+                      icon={
                         <Icon
                           name={chapter.published ? 'eye' : 'upload'}
-                          size="0.9rem"
+                          size="1rem"
                         />
                       }
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly
-                      aria-label={`Move ${chapter.title} earlier`}
-                      disabled={index === 0}
-                      onClick={() => moveChapter(index, -1)}
-                      startIcon={<Icon name="chevron-up" size="0.9rem" />}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly
-                      aria-label={`Move ${chapter.title} later`}
-                      disabled={index === chapters.length - 1}
-                      onClick={() => moveChapter(index, 1)}
-                      startIcon={<Icon name="chevron-down" size="0.9rem" />}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      iconOnly
-                      aria-label={`Delete ${chapter.title}`}
-                      title="Delete chapter"
-                      disabled={chapters.length === 1}
-                      onClick={() => void removeChapter(chapter)}
-                      startIcon={<Icon name="trash" size="0.9rem" />}
-                    />
-                  </span>
+                      onSelect={() => void toggleChapter(chapter)}
+                    >
+                      {chapter.published ? 'Unpublish' : 'Publish'}
+                    </MenuItem>
+
+                    {index > 0 ? (
+                      <MenuItem
+                        icon={<Icon name="chevron-up" size="1rem" />}
+                        onSelect={() => moveChapter(index, -1)}
+                      >
+                        Move up
+                      </MenuItem>
+                    ) : null}
+
+                    {index < chapters.length - 1 ? (
+                      <MenuItem
+                        icon={<Icon name="chevron-down" size="1rem" />}
+                        onSelect={() => moveChapter(index, 1)}
+                      >
+                        Move down
+                      </MenuItem>
+                    ) : null}
+
+                    {chapters.length > 1 ? (
+                      <>
+                        <MenuSeparator />
+                        <MenuItem
+                          tone="danger"
+                          icon={<Icon name="trash" size="1rem" />}
+                          onSelect={() => void removeChapter(chapter)}
+                        >
+                          Delete chapter
+                        </MenuItem>
+                      </>
+                    ) : null}
+                  </DropdownMenu>
                 </li>
               ))}
             </ol>
           </Card>
-
-          {/* Story details */}
-          <Card>
-            <h2 className="editor__side-title">Story details</h2>
-
-            <div className="stack" style={{ gap: 'var(--space-5)' }}>
-              <CoverField
-                story={{
-                  id: storyId ?? 'new',
-                  title: title || 'Untitled story',
-                  coverUrl,
-                  genres:
-                    genres.data?.filter((genre) => genreIds.includes(genre.id)) ?? [],
-                  author: { displayName: 'You' },
-                }}
-                onChange={onCoverChange}
-                disabled={publishing}
-              />
-
-              <TextField
-                multiline
-                label="Description"
-                placeholder="What is this story about? This is what readers see first."
-                rows={4}
-                value={synopsis}
-                error={errors.synopsis}
-                maxLength={1200}
-                counterMax={1200}
-                onChange={(event) => {
-                  setSynopsis(event.target.value)
-                  setErrors((current) => ({ ...current, synopsis: '' }))
-                  setDirty(true)
-                }}
-              />
-
-              <div>
-                <p className="editor__label">Genres</p>
-                {errors.genres ? <p className="editor__error">{errors.genres}</p> : null}
-                <div className="chip-row">
-                  {genres.data?.map((genre) => (
-                    <SelectableChip
-                      key={genre.id}
-                      hue={genre.hue}
-                      selected={genreIds.includes(genre.id)}
-                      onToggle={() => {
-                        setGenreIds((current) =>
-                          current.includes(genre.id)
-                            ? current.filter((id) => id !== genre.id)
-                            : [...current, genre.id],
-                        )
-                        setErrors((current) => ({ ...current, genres: '' }))
-                        setDirty(true)
-                      }}
-                    >
-                      {genre.name}
-                    </SelectableChip>
-                  ))}
-                </div>
-              </div>
-
-              <Switch
-                checked={kidsAppropriate}
-                onChange={(value) => {
-                  setKidsAppropriate(value)
-                  setDirty(true)
-                }}
-                label="Kid-appropriate"
-                description="Shown to readers filtering for younger audiences."
-              />
-
-              {/*
-                Publication state is not a field: a story is a draft until it is
-                listed, and "completed" is the one part of it the author
-                decides directly. The old status select offered a hiatus the
-                contract cannot store.
-              */}
-              <Switch
-                checked={isCompleted}
-                onChange={(value) => {
-                  setIsCompleted(value)
-                  setDirty(true)
-                }}
-                label="The story is complete"
-                description="Tells readers no more chapters are coming."
-              />
-            </div>
-          </Card>
         </aside>
       </div>
+
+      {/*
+        Story details sit on their own full-width row rather than in the side
+        panel: the cover, a 1,200-character description and a dozen genre chips
+        all read badly stacked in a 21rem column, and none of them are things
+        an author touches while writing a chapter.
+      */}
+      <Card className="editor__details">
+        <h2 className="editor__details-title">Story details</h2>
+
+        <div className="editor__details-grid">
+          <CoverField
+            story={{
+              id: storyId ?? 'new',
+              title: title || 'Untitled story',
+              coverUrl,
+              genres: genres.data?.filter((genre) => genreIds.includes(genre.id)) ?? [],
+              author: { displayName: 'You' },
+            }}
+            onChange={onCoverChange}
+            disabled={publishing}
+          />
+
+          <TextField
+            multiline
+            label="Description"
+            placeholder="What is this story about? This is what readers see first."
+            rows={6}
+            value={synopsis}
+            error={errors.synopsis}
+            maxLength={1200}
+            counterMax={1200}
+            onChange={(event) => {
+              setSynopsis(event.target.value)
+              setErrors((current) => ({ ...current, synopsis: '' }))
+              setDirty(true)
+            }}
+          />
+
+          <div className="editor__details-genres">
+            <p className="editor__label">Genres</p>
+            {errors.genres ? <p className="editor__error">{errors.genres}</p> : null}
+            <div className="chip-row">
+              {genres.data?.map((genre) => (
+                <SelectableChip
+                  key={genre.id}
+                  hue={genre.hue}
+                  selected={genreIds.includes(genre.id)}
+                  onToggle={() => {
+                    setGenreIds((current) =>
+                      current.includes(genre.id)
+                        ? current.filter((id) => id !== genre.id)
+                        : [...current, genre.id],
+                    )
+                    setErrors((current) => ({ ...current, genres: '' }))
+                    setDirty(true)
+                  }}
+                >
+                  {genre.name}
+                </SelectableChip>
+              ))}
+            </div>
+          </div>
+
+          <div className="editor__details-flags">
+            <Switch
+              checked={kidsAppropriate}
+              onChange={(value) => {
+                setKidsAppropriate(value)
+                setDirty(true)
+              }}
+              label="Kid-appropriate"
+              description="Shown to readers filtering for younger audiences."
+            />
+
+            {/*
+              Publication state is not a field: a story is a draft until it is
+              listed, and "completed" is the one part of it the author decides
+              directly. The old status select offered a hiatus the contract
+              cannot store.
+            */}
+            <Switch
+              checked={isCompleted}
+              onChange={(value) => {
+                setIsCompleted(value)
+                setDirty(true)
+              }}
+              label="The story is complete"
+              description="Tells readers no more chapters are coming."
+            />
+          </div>
+        </div>
+      </Card>
 
       {/* Attach media -------------------------------------------------- */}
       <Dialog

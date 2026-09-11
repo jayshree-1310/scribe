@@ -213,16 +213,16 @@
     text-transform: uppercase;
   }
 
-  .data-table td[data-label='Story'] {
+  .data-table td[data-label="Story"] {
     justify-content: flex-start;
     margin-bottom: var(--space-3);
   }
 
-  .data-table td[data-label='Story']::before {
+  .data-table td[data-label="Story"]::before {
     display: none;
   }
 
-  .data-table td[data-label='Actions'] {
+  .data-table td[data-label="Actions"] {
     margin-top: var(--space-3);
   }
 }
@@ -424,12 +424,44 @@
 }
 
 .editor__side-head h2,
-.editor__side-title {
+.editor__details-title {
   font-size: var(--text-lg);
 }
 
-.editor__side-title {
-  margin-bottom: var(--space-4);
+.editor__details-title {
+  margin-bottom: var(--space-5);
+}
+
+/* Story details ---------------------------------------------------------- */
+
+.editor__details {
+  margin-top: var(--space-6);
+}
+
+/* Cover, description and genres side by side. The cover column is sized to
+   the 12rem artwork plus the note beside it; the other two split what is
+   left. */
+.editor__details-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 23rem) minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-6) var(--space-7);
+  align-items: start;
+}
+
+/* The two toggles read as a pair, and neither needs a full column, so they
+   share a row under the rest. */
+.editor__details-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-7);
+  grid-column: 1 / -1;
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.editor__details-flags > * {
+  flex: 1 1 18rem;
+  max-width: 26rem;
 }
 
 .editor__label {
@@ -438,12 +470,64 @@
   font-weight: 600;
 }
 
+/* The list grows with the story, so cap it and let it scroll rather than
+   stretching the sticky side panel well past the bottom of the viewport. */
+.chapter-manager {
+  max-height: min(26rem, 60vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  /* Keeps the row hover/active background clear of the scrollbar. */
+  padding-right: var(--space-1);
+}
+
 .chapter-manager > li {
   display: flex;
   align-items: center;
   gap: var(--space-1);
+  /* Rows are one line each; the title is what gives way when space runs out. */
+  min-height: 2.5rem;
   border-radius: var(--radius-md);
+  /* Anchors the drop marker below. */
+  position: relative;
   transition: background-color var(--dur-fast) var(--ease);
+}
+
+/* Dragging ---------------------------------------------------------------- */
+
+/* Left in place at low contrast rather than removed, so the list does not
+   reflow under the pointer while the author is aiming at a gap. */
+.chapter-manager > li.is-dragging {
+  opacity: 0.4;
+}
+
+/* Where the row will land: a rule on the edge it is being inserted against. */
+.chapter-manager > li.is-drop-before::after,
+.chapter-manager > li.is-drop-after::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: var(--radius-full);
+  background-color: var(--brand);
+}
+
+/* Flush with the row's own edge rather than straddling it: rows sit directly
+   against each other, so this still reads as the gap between them, and the
+   first and last markers cannot be clipped by the scroll container. */
+.chapter-manager > li.is-drop-before::after {
+  top: 0;
+}
+
+.chapter-manager > li.is-drop-after::after {
+  bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chapter-manager > li {
+    transition: none;
+  }
 }
 
 .chapter-manager > li:hover {
@@ -478,6 +562,43 @@
   color: var(--text-secondary);
   font-size: var(--text-xs);
   font-weight: 700;
+  cursor: grab;
+}
+
+.chapter-manager > li.is-dragging .chapter-manager__num {
+  cursor: grabbing;
+}
+
+/* The number and the grip share one cell, so swapping them moves nothing. */
+.chapter-manager__num-value,
+.chapter-manager__grip {
+  grid-area: 1 / 1;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+/* The swap is gated on there being a pointer to swap under — which is also
+   the only place HTML5 dragging works, so a grip is never offered where it
+   would do nothing. Touch keeps the number and reorders from the row menu. */
+@media (hover: hover) {
+  .chapter-manager__grip {
+    opacity: 0;
+  }
+
+  .chapter-manager > li:hover .chapter-manager__num-value {
+    opacity: 0;
+  }
+
+  .chapter-manager > li:hover .chapter-manager__grip {
+    opacity: 1;
+  }
+}
+
+/* `:hover` still sticks after a tap on touch, so the grip is taken out
+   entirely rather than left to cover a number that never fades. */
+@media (hover: none) {
+  .chapter-manager__grip {
+    display: none;
+  }
 }
 
 .chapter-manager > li.is-active .chapter-manager__num {
@@ -495,15 +616,23 @@
   font-weight: 550;
 }
 
-.chapter-manager__order {
-  display: flex;
-  flex-direction: column;
+/* Dimmed rather than hidden until hovered. It is the only way to publish,
+   reorder or delete a chapter, and a control that appears only under the
+   pointer is a control most authors never find — the same reason
+   `AuthorStoriesPage` keeps its row menu on show. Muted is enough to stop a
+   column of them reading as the loudest thing in the panel. */
+.chapter-manager__more {
   flex: none;
+  margin-right: var(--space-1);
+  opacity: 0.5;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
-.chapter-manager__order .btn {
-  --btn-height: 1.25rem;
-  width: 1.5rem;
+.chapter-manager > li:hover .chapter-manager__more,
+.chapter-manager > li.is-active .chapter-manager__more,
+.chapter-manager__more:focus-visible,
+.chapter-manager__more[aria-expanded='true'] {
+  opacity: 1;
 }
 
 .editor__cover {
@@ -674,6 +803,16 @@
   .editor__side {
     position: static;
   }
+
+  /* Genres drop below the cover and description, where the chips have the
+     full width to wrap across instead of a column two chips wide. */
+  .editor__details-grid {
+    grid-template-columns: minmax(0, 23rem) minmax(0, 1fr);
+  }
+
+  .editor__details-genres {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 47.99rem) {
@@ -701,5 +840,9 @@
 
   .editor__cover {
     flex-direction: column;
+  }
+
+  .editor__details-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

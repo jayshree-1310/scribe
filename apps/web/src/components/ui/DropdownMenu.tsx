@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react'
-import type { MouseEvent, ReactNode } from 'react'
+import type { CSSProperties, MouseEvent, ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 
 interface DropdownMenuProps {
@@ -20,6 +20,13 @@ interface DropdownMenuProps {
   side?: 'bottom' | 'top'
   /** Accessible name for the menu itself. */
   label: string
+  /**
+   * Positions the menu against the viewport rather than the trigger, for
+   * triggers that sit inside a scrolling panel — an absolutely positioned
+   * menu is clipped by the scroller that contains it. The menu closes on
+   * scroll, since it no longer travels with the trigger.
+   */
+  escapesOverflow?: boolean
 }
 
 /**
@@ -28,6 +35,9 @@ interface DropdownMenuProps {
  * than rendering it offscreen first.
  */
 const ESTIMATED_MENU_HEIGHT = 260
+
+/** Gap between trigger and menu, matching `--space-2` in the stylesheet. */
+const MENU_GAP = 8
 
 /**
  * Small menu popover. Closes on outside click, on Esc, and when a menu item is
@@ -39,9 +49,12 @@ export function DropdownMenu({
   align = 'end',
   side = 'bottom',
   label,
+  escapesOverflow = false,
 }: DropdownMenuProps) {
   const [open, setOpen] = useState(false)
   const [placement, setPlacement] = useState<'bottom' | 'top'>(side)
+  /** Viewport offsets for `escapesOverflow`; null for the default placement. */
+  const [anchor, setAnchor] = useState<CSSProperties | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const triggerId = useId()
 
@@ -67,10 +80,26 @@ export function DropdownMenu({
 
     // Keep the caller's preference unless it cannot fit and the other side
     // genuinely has more room.
-    setPlacement(
+    const chosen =
       room[side] < ESTIMATED_MENU_HEIGHT && room[opposite] > room[side]
         ? opposite
-        : side,
+        : side
+
+    setPlacement(chosen)
+
+    // The same rect, read as viewport offsets, is what a fixed menu needs to
+    // sit where an absolutely positioned one would have.
+    setAnchor(
+      escapesOverflow
+        ? {
+            ...(chosen === 'bottom'
+              ? { top: rect.bottom + MENU_GAP }
+              : { bottom: window.innerHeight - rect.top + MENU_GAP }),
+            ...(align === 'end'
+              ? { right: window.innerWidth - rect.right }
+              : { left: rect.left }),
+          }
+        : null,
     )
     setOpen(true)
   }
@@ -87,13 +116,26 @@ export function DropdownMenu({
       containerRef.current?.querySelector<HTMLElement>(`#${CSS.escape(triggerId)}`)?.focus()
     }
 
+    // A fixed menu is placed from the trigger's position at the moment it
+    // opened, so once anything scrolls it is pointing at nothing. Captured,
+    // because the scroller is an ancestor and scroll does not bubble.
+    function onScroll() {
+      setOpen(false)
+    }
+
     document.addEventListener('pointerdown', onPointerDown)
     document.addEventListener('keydown', onKeyDown)
+    if (anchor) {
+      document.addEventListener('scroll', onScroll, true)
+      window.addEventListener('resize', onScroll)
+    }
     return () => {
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onScroll)
     }
-  }, [open, triggerId])
+  }, [open, triggerId, anchor])
 
   return (
     <div className="dropdown" ref={containerRef}>
@@ -110,7 +152,9 @@ export function DropdownMenu({
             'dropdown__menu',
             `dropdown__menu--${align}`,
             `dropdown__menu--${placement}`,
+            anchor && 'dropdown__menu--fixed',
           )}
+          style={anchor ?? undefined}
           role="menu"
           aria-label={label}
           onClick={() => setOpen(false)}

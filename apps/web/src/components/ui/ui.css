@@ -1061,6 +1061,11 @@ textarea.field__control {
 .dropdown__menu--end { right: 0; }
 .dropdown__menu--start { left: 0; }
 
+/* Viewport-positioned, for a trigger inside a scrolling panel that would
+   otherwise clip the menu. The offsets come from the component as inline
+   styles, which beat the placement rules above. */
+.dropdown__menu--fixed { position: fixed; }
+
 /* Vertical side, chosen by the component from the room around the trigger.
    Each direction grows out of the trigger rather than toward it. */
 .dropdown__menu--bottom { top: calc(100% + var(--space-2)); }

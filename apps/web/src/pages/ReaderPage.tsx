@@ -14,7 +14,7 @@ import {
   useReaderPrefs,
 } from '../lib/reader-prefs'
 import { formatCount, formatRelative } from '../lib/format'
-import { chapterBlocks } from '../lib/chapter-media'
+import { renderChapter } from '../lib/chapter-markdown'
 import * as stories from '../data/stories-api'
 import { readingMinutes, storyAuthorName } from '../types/stories'
 import { Button, ButtonLink } from '../components/ui/Button'
@@ -25,7 +25,6 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Switch } from '../components/ui/Checkbox'
 import { ErrorState } from '../components/ui/States'
 import { Dialog } from '../components/ui/Dialog'
-import { ChapterAttachment } from '../components/story/ChapterAttachment'
 import './reader.css'
 
 export function ReaderPage() {
@@ -231,15 +230,13 @@ export function ReaderPage() {
               own text puts them: an attachment sits where the author placed
               it, and one they never placed follows the text. See
               `lib/chapter-media.ts`.
+
+              Through the same renderer as the editor's preview, so the
+              headings and emphasis an author formats with are the ones their
+              readers get. See `lib/chapter-markdown.tsx`.
             */}
             <div className="reader__prose">
-              {chapterBlocks(current.content, current.multimedia).map((block) =>
-                block.kind === 'media' ? (
-                  <ChapterAttachment key={block.key} item={block.item} hue={hue} />
-                ) : (
-                  <p key={block.key}>{block.text}</p>
-                ),
-              )}
+              {renderChapter(current.content, current.multimedia, hue)}
             </div>
 
             {/* Chapter footer ------------------------------------------- */}

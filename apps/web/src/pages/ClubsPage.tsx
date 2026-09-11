@@ -1,18 +1,21 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { useToast } from '../lib/toast'
 import { formatCount, formatRelative } from '../lib/format'
-import * as api from '../data/api'
+import * as clubsApi from '../data/clubs-api'
+import { clubUserName, type Club } from '../types/clubs'
 import { AppShell } from '../components/layout/AppShell'
 import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
 import { Card, SectionHead } from '../components/ui/Card'
+import { Dialog } from '../components/ui/Dialog'
 import { Icon } from '../components/ui/Icon'
 import { Skeleton } from '../components/ui/Skeleton'
+import { TextField } from '../components/ui/TextField'
 import { Tabs, TabPanel } from '../components/ui/Tabs'
 import { EmptyState, ErrorState } from '../components/ui/States'
 import { ClubCard } from '../components/story/Cards'
-import { Link } from 'react-router-dom'
 import './pages.css'
 
 type ClubTab = 'discover' | 'mine' | 'popular'
@@ -23,45 +26,149 @@ const TABS = [
   { id: 'popular' as const, label: 'Popular' },
 ]
 
+/**
+ * Which API query each tab is. "Discover" and "Popular" differ only in sort --
+ * the server has no notion of a club being new to *you* -- and "My clubs" is
+ * the membership filter.
+ */
+const TAB_QUERY: Record<ClubTab, clubsApi.ClubFilters> = {
+  discover: { sort: 'newest' },
+  mine: { mine: true, sort: 'members' },
+  popular: { sort: 'members' },
+}
+
 export function ClubsPage() {
-  const clubs = useAsync(() => api.getClubs(), [])
-  const discussions = useAsync(() => api.getClubDiscussions('bc-northernlights'), [])
   const { showToast } = useToast()
 
   const [tab, setTab] = useState<ClubTab>('discover')
-  const [pendingId, setPendingId] = useState<string | null>(null)
-  const [joined, setJoined] = useState<Set<string>>(new Set())
+  const clubs = useAsync(
+    () => clubsApi.listClubs({ ...TAB_QUERY[tab], limit: 24 }),
+    [tab],
+  )
 
-  async function onToggleMembership(club: api.ClubWithMeta) {
+  /**
+   * The membership counter on the "My clubs" tab. Loaded separately from the
+   * list so the number is there whichever tab is open -- the tab label should
+   * not be blank until you click it.
+   */
+  const mine = useAsync(
+    () => clubsApi.listClubs({ mine: true, limit: 1 }),
+    [],
+  )
+
+  const [pendingId, setPendingId] = useState<string | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [name, setName] = useState('')
+  const [description, setDescription] = useState('')
+  const [errors, setErrors] = useState<{ name?: string }>({})
+  const [creating, setCreating] = useState(false)
+
+  /**
+   * The five most recent threads across the clubs on screen, so the rail is
+   * about clubs the reader can actually open. One request per club, capped --
+   * there is no cross-club discussion feed in the API, and inventing one for a
+   * sidebar would be the wrong place to start.
+   */
+  const shown = clubs.data?.items ?? []
+  const railKey = shown
+    .slice(0, 4)
+    .map((club) => club.id)
+    .join(',')
+
+  const discussions = useAsync(async () => {
+    const clubIds = railKey.length > 0 ? railKey.split(',') : []
+    if (clubIds.length === 0) return []
+
+    const pages = await Promise.all(
+      clubIds.map(async (clubId) => {
+        const page = await clubsApi.getClubDiscussions(clubId, { limit: 3 })
+        const club = shown.find((item) => item.id === clubId)
+        return page.items.map((thread) => ({ thread, club }))
+      }),
+    )
+
+    return pages
+      .flat()
+      .sort(
+        (a, b) =>
+          new Date(b.thread.createdAt).getTime() -
+          new Date(a.thread.createdAt).getTime(),
+      )
+      .slice(0, 4)
+  }, [railKey])
+
+  async function onToggleMembership(club: Club) {
     if (pendingId) return
     setPendingId(club.id)
+
+    const joining = club.membership === null
     try {
-      await new Promise((resolve) => setTimeout(resolve, 450))
-      setJoined((current) => {
-        const next = new Set(current)
-        if (next.has(club.id)) next.delete(club.id)
-        else next.add(club.id)
-        return next
+      if (joining) await clubsApi.joinClub(club.id)
+      else await clubsApi.leaveClub(club.id)
+
+      showToast({
+        message: joining ? `You joined ${club.name}.` : `You left ${club.name}.`,
       })
-      showToast({ message: `You joined ${club.name}.` })
-    } catch {
-      showToast({ tone: 'error', message: `We couldn't join ${club.name}. Please try again.` })
+      clubs.reload()
+      mine.reload()
+    } catch (cause) {
+      showToast({
+        tone: 'error',
+        message:
+          cause instanceof Error
+            ? cause.message
+            : `We couldn't update ${club.name}. Please try again.`,
+      })
     } finally {
       setPendingId(null)
     }
   }
 
-  const withLocalState = (list: api.ClubWithMeta[]) =>
-    list.map((club) =>
-      joined.has(club.id) && club.membership === null
-        ? { ...club, membership: { role: 'member' } }
-        : club,
-    )
+  async function onCreate() {
+    const trimmed = name.trim()
+    if (trimmed.length < 2) {
+      setErrors({ name: 'Give the club a name.' })
+      return
+    }
 
-  const all = withLocalState(clubs.data ?? [])
-  const mine = all.filter((club) => club.membership !== null)
-  const popular = [...all].sort((a, b) => b.memberCount - a.memberCount)
-  const shown = tab === 'mine' ? mine : tab === 'popular' ? popular : all
+    setCreating(true)
+    try {
+      const club = await clubsApi.createClub({
+        name: trimmed,
+        description: description.trim() || null,
+      })
+
+      setCreateOpen(false)
+      setName('')
+      setDescription('')
+      setErrors({})
+      showToast({ message: `${club.name} is open. You are its owner.` })
+      clubs.reload()
+      mine.reload()
+    } catch (cause) {
+      const message =
+        cause instanceof Error ? cause.message : 'We could not start that club.'
+      setErrors({ name: message })
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  const emptyCopy: Record<ClubTab, { title: string; description: string }> = {
+    discover: {
+      title: 'No clubs yet',
+      description: 'Start the first one — whoever creates a club owns it.',
+    },
+    mine: {
+      title: "You haven't joined a club yet",
+      description:
+        'Clubs read one story at a time — join one and its current book shows up here.',
+    },
+    popular: {
+      title: 'No clubs yet',
+      description: 'Once clubs have members, the busiest ones show up here.',
+    },
+  }
 
   return (
     <AppShell>
@@ -73,7 +180,11 @@ export function ClubsPage() {
             and argue about it in the threads.
           </p>
         </div>
-        <Button variant="primary" startIcon={<Icon name="plus" size="1em" />}>
+        <Button
+          variant="primary"
+          onClick={() => setCreateOpen(true)}
+          startIcon={<Icon name="plus" size="1em" />}
+        >
           Start a club
         </Button>
       </header>
@@ -81,7 +192,7 @@ export function ClubsPage() {
       <div className="page-tabs">
         <Tabs
           items={TABS.map((item) =>
-            item.id === 'mine' ? { ...item, count: mine.length } : item,
+            item.id === 'mine' ? { ...item, count: mine.data?.total ?? 0 } : item,
           )}
           active={tab}
           onChange={setTab}
@@ -101,9 +212,19 @@ export function ClubsPage() {
         ) : shown.length === 0 ? (
           <EmptyState
             icon="users"
-            title="You haven't joined a club yet"
-            description="Clubs read one story at a time — join one and the current book shows up in your library."
-            action={<Button variant="primary" onClick={() => setTab('discover')}>Browse clubs</Button>}
+            title={emptyCopy[tab].title}
+            description={emptyCopy[tab].description}
+            action={
+              tab === 'mine' ? (
+                <Button variant="primary" onClick={() => setTab('discover')}>
+                  Browse clubs
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={() => setCreateOpen(true)}>
+                  Start a club
+                </Button>
+              )
+            }
           />
         ) : (
           <div className="card-grid card-grid--wide">
@@ -120,38 +241,100 @@ export function ClubsPage() {
       </TabPanel>
 
       {/* Active discussions --------------------------------------------- */}
-      <section className="page-section">
-        <SectionHead
-          title="Active discussions"
-          subtitle="The threads people are replying to right now."
-        />
-        {discussions.status === 'loading' ? (
-          <Skeleton height="10rem" radius="var(--radius-lg)" />
-        ) : (
-          <Card padded={false}>
-            <ul className="thread-list">
-              {discussions.data?.slice(0, 4).map((thread) => (
-                <li key={thread.id}>
-                  <Link className="thread" to="/clubs/northern-lights-readers">
-                    <Avatar user={thread.user} size="sm" />
-                    <span className="thread__body">
-                      <span className="thread__title">{thread.title}</span>
-                      <span className="thread__meta">
-                        {thread.user.displayName} · {formatRelative(thread.createdAt)}
-                        {thread.chapterNumber ? ` · chapter ${thread.chapterNumber}` : ''}
+      {shown.length > 0 ? (
+        <section className="page-section">
+          <SectionHead
+            title="Active discussions"
+            subtitle="The threads people are replying to right now."
+          />
+          {discussions.status === 'loading' ? (
+            <Skeleton height="10rem" radius="var(--radius-lg)" />
+          ) : discussions.status === 'error' ? (
+            <ErrorState message={discussions.error} onRetry={discussions.reload} />
+          ) : (discussions.data?.length ?? 0) === 0 ? (
+            <EmptyState
+              size="sm"
+              icon="comment"
+              title="No discussions yet"
+              description="Open a club and start the first thread."
+            />
+          ) : (
+            <Card padded={false}>
+              <ul className="thread-list">
+                {discussions.data?.map(({ thread, club }) => (
+                  <li key={thread.id}>
+                    <Link className="thread" to={`/clubs/${club?.slug ?? ''}`}>
+                      <Avatar user={thread.user} size="sm" />
+                      <span className="thread__body">
+                        {/*
+                          `ClubDiscussion` has no title column — the mock's was
+                          invented — so the body is the headline, clamped by
+                          `.thread__title`'s own line clamp.
+                        */}
+                        <span className="thread__title">{thread.body}</span>
+                        <span className="thread__meta">
+                          {clubUserName(thread.user)} ·{' '}
+                          {formatRelative(thread.createdAt)}
+                          {club ? ` · ${club.name}` : ''}
+                        </span>
                       </span>
-                    </span>
-                    <span className="thread__replies">
-                      <Icon name="comment" size="0.9em" />
-                      {formatCount(thread.replyCount)}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Card>
-        )}
-      </section>
+                      <span className="thread__replies">
+                        <Icon name="comment" size="0.9em" />
+                        {formatCount(thread.replyCount)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+        </section>
+      ) : null}
+
+      <Dialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title="Start a book club"
+        description="You will be its owner. Anyone can join an open club."
+        dismissible={!creating}
+        footer={
+          <>
+            <Button onClick={() => setCreateOpen(false)} disabled={creating}>
+              Cancel
+            </Button>
+            <Button variant="primary" loading={creating} onClick={onCreate}>
+              Start club
+            </Button>
+          </>
+        }
+      >
+        <div className="stack" style={{ gap: 'var(--space-5)' }}>
+          <TextField
+            label="Name"
+            placeholder="Northern Lights Readers"
+            value={name}
+            error={errors.name}
+            maxLength={120}
+            counterMax={120}
+            disabled={creating}
+            onChange={(event) => {
+              setName(event.target.value)
+              setErrors({})
+            }}
+          />
+          <TextField
+            multiline
+            label="Description"
+            placeholder="What does this club read, and how fast?"
+            rows={4}
+            value={description}
+            maxLength={2000}
+            counterMax={2000}
+            disabled={creating}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </div>
+      </Dialog>
     </AppShell>
   )
 }

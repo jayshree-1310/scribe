@@ -8,7 +8,7 @@ import type { ReactElement } from 'react'
 export type IconName =
   | 'home' | 'compass' | 'library' | 'users' | 'trophy' | 'medal' | 'megaphone'
   | 'book' | 'book-open' | 'bookmark' | 'bookmark-filled' | 'pencil' | 'pen'
-  | 'search' | 'filter' | 'sliders' | 'grid' | 'list' | 'more'
+  | 'search' | 'filter' | 'sliders' | 'grid' | 'list' | 'more' | 'grip'
   | 'star' | 'star-filled' | 'star-half' | 'heart' | 'heart-filled' | 'comment'
   | 'eye' | 'flame' | 'clock' | 'calendar' | 'trend' | 'crown' | 'sparkle'
   | 'target' | 'quote' | 'lock' | 'globe' | 'shield'
@@ -83,6 +83,12 @@ const PATHS: Record<IconName, ReactElement> = {
   grid: <path d="M4.5 4.5h6v6h-6zM13.5 4.5h6v6h-6zM4.5 13.5h6v6h-6zM13.5 13.5h6v6h-6z" />,
   list: <path d="M4 7h1M4 12h1M4 17h1M8 7h12M8 12h12M8 17h12" />,
   more: <path d="M6 12h.01M12 12h.01M18 12h.01" strokeWidth={2.4} />,
+  grip: (
+    <path
+      d="M9 6h.01M9 12h.01M9 18h.01M15 6h.01M15 12h.01M15 18h.01"
+      strokeWidth={2.4}
+    />
+  ),
   star: <path d="m12 4.5 2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4-3.9-3.8 5.4-.8z" />,
   'star-filled': <path d="m12 4.5 2.4 4.9 5.4.8-3.9 3.8.9 5.4-4.8-2.6-4.8 2.6.9-5.4-3.9-3.8 5.4-.8z" fill="currentColor" />,
   'star-half': (

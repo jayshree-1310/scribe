@@ -2,9 +2,13 @@
  * Scribe domain types.
  *
  * These mirror the backend entities (auth / content / engagement /
- * gamification / challenges / clubs / channels) so that swapping the mock data
- * layer in `src/data/api.ts` for real endpoints is a change of transport only.
+ * gamification / challenges) so that swapping the mock data layer in
+ * `src/data/api.ts` for real endpoints is a change of transport only.
  * Timestamps are ISO-8601 strings.
+ *
+ * The club and channel shapes that used to live here are gone: those features
+ * have real endpoints now, and their types are the API's to define -- see
+ * `types/clubs.ts` and `types/channels.ts`.
  */
 
 /* auth ---------------------------------------------------------------- */
@@ -163,75 +167,6 @@ export interface ChallengeEntry {
   submittedAt: string
   voteCount: number
   rank: number
-}
-
-/* clubs --------------------------------------------------------------- */
-
-export interface BookClub {
-  id: string
-  name: string
-  slug: string
-  description: string
-  hue: number
-  ownerId: string
-  memberCount: number
-  currentStoryId: string | null
-  discussionCount: number
-  isPrivate: boolean
-  createdAt: string
-  genreIds: string[]
-}
-
-export type ClubRole = 'owner' | 'moderator' | 'member'
-
-export interface ClubMembership {
-  clubId: string
-  userId: string
-  role: ClubRole
-  joinedAt: string
-}
-
-export interface ClubDiscussion {
-  id: string
-  clubId: string
-  userId: string
-  title: string
-  body: string
-  createdAt: string
-  replyCount: number
-  /** Chapter the thread is anchored to, when relevant. */
-  chapterNumber: number | null
-}
-
-/* channels ------------------------------------------------------------ */
-
-export interface BroadcastChannel {
-  id: string
-  name: string
-  slug: string
-  description: string
-  authorId: string
-  subscriberCount: number
-  postCount: number
-  createdAt: string
-}
-
-export interface ChannelSubscriber {
-  channelId: string
-  userId: string
-  subscribedAt: string
-}
-
-export interface ChannelPost {
-  id: string
-  channelId: string
-  title: string
-  body: string
-  publishedAt: string
-  likeCount: number
-  commentCount: number
-  /** Set when the post announces a chapter. */
-  linkedStoryId: string | null
 }
 
 /* view models --------------------------------------------------------- */

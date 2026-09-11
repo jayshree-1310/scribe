@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '../../lib/cn'
+import { hueFor } from '../../lib/cover'
 import { daysUntil, formatCount, formatDate, formatRelative } from '../../lib/format'
 import { Avatar } from '../ui/Avatar'
 import { Button, ButtonLink } from '../ui/Button'
@@ -8,7 +9,9 @@ import { GenreChip, StatusBadge } from '../ui/Chip'
 import { Icon } from '../ui/Icon'
 import { ProgressBar } from '../ui/Progress'
 import { StoryCover } from './StoryCover'
-import type { BadgeWithProgress, ChannelWithMeta, ClubWithMeta } from '../../data/api'
+import type { BadgeWithProgress } from '../../data/api'
+import { channelAuthorName, type Channel } from '../../types/channels'
+import { CLUB_ROLE_LABELS, type Club } from '../../types/clubs'
 import type { User, WritingChallenge } from '../../types/domain'
 
 /* Author -------------------------------------------------------------- */
@@ -126,8 +129,8 @@ export function ChallengeCard({ challenge }: { challenge: WritingChallenge }) {
 /* Club ---------------------------------------------------------------- */
 
 interface ClubCardProps {
-  club: ClubWithMeta
-  onToggleMembership?: (club: ClubWithMeta) => void
+  club: Club
+  onToggleMembership?: (club: Club) => void
   pending?: boolean
 }
 
@@ -135,7 +138,15 @@ export function ClubCard({ club, onToggleMembership, pending = false }: ClubCard
   const joined = club.membership !== null
 
   return (
-    <article className="club-card" style={{ '--club-hue': club.hue } as CSSProperties}>
+    <article
+      className="club-card"
+      /**
+       * `clubs.BookClub` has no hue column — the mock's was invented — so the
+       * banner colour is derived from the slug instead. Deterministic, so a
+       * club keeps its colour across reloads and between light and dark.
+       */
+      style={{ '--club-hue': hueFor(club.slug) } as CSSProperties}
+    >
       <div className="club-card__banner" aria-hidden="true">
         {club.currentStory ? <StoryCover story={club.currentStory} size="xs" /> : null}
       </div>
@@ -145,10 +156,8 @@ export function ClubCard({ club, onToggleMembership, pending = false }: ClubCard
           <h3 className="club-card__title">
             <Link to={`/clubs/${club.slug}`}>{club.name}</Link>
           </h3>
-          {club.isPrivate ? (
-            <StatusBadge tone="plum" icon={<Icon name="lock" size="0.8em" />}>
-              Private
-            </StatusBadge>
+          {club.membership ? (
+            <StatusBadge tone="brand">{CLUB_ROLE_LABELS[club.membership.role]}</StatusBadge>
           ) : null}
         </div>
 
@@ -195,7 +204,7 @@ export function ClubCard({ club, onToggleMembership, pending = false }: ClubCard
 
 /* Channel -------------------------------------------------------------- */
 
-export function ChannelCard({ channel }: { channel: ChannelWithMeta }) {
+export function ChannelCard({ channel }: { channel: Channel }) {
   return (
     <article className="channel-card">
       <div className="channel-card__head">
@@ -204,7 +213,7 @@ export function ChannelCard({ channel }: { channel: ChannelWithMeta }) {
           <h3 className="channel-card__title">
             <Link to={`/channels/${channel.slug}`}>{channel.name}</Link>
           </h3>
-          <p className="channel-card__author">{channel.author.displayName}</p>
+          <p className="channel-card__author">{channelAuthorName(channel.author)}</p>
         </div>
         {channel.subscribed ? <StatusBadge tone="brand">Subscribed</StatusBadge> : null}
       </div>
@@ -218,7 +227,7 @@ export function ChannelCard({ channel }: { channel: ChannelWithMeta }) {
         </span>
         <span>
           <Icon name="megaphone" size="0.9em" />
-          {channel.postCount} posts
+          {formatCount(channel.postCount)} posts
         </span>
       </div>
     </article>

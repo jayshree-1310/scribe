@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth'
 import { formatCount, formatMinutes } from '../lib/format'
 import * as api from '../data/api'
 import * as books from '../data/books-api'
+import * as clubsApi from '../data/clubs-api'
 import * as reading from '../data/reading-api'
 import type { Book, Discover } from '../types/books'
 import { AppShell } from '../components/layout/AppShell'
@@ -35,7 +36,7 @@ export function HomePage() {
    * target, that one is the set of books they chose to shelve.
    */
   const inProgressStories = useAsync(() => reading.getContinueReading(4), [])
-  const clubs = useAsync(() => api.getClubs(), [])
+  const clubs = useAsync(() => clubsApi.listClubs({ limit: 6 }), [])
   const challenges = useAsync(() => api.getChallenges(), [])
 
   /**
@@ -89,8 +90,9 @@ export function HomePage() {
    * tells them.
    */
   const resumable = inProgressStories.data ?? []
-  const myClubs = clubs.data?.filter((club) => club.membership !== null) ?? []
-  const suggestedClubs = clubs.data?.filter((club) => club.membership === null) ?? []
+  const myClubs = clubs.data?.items.filter((club) => club.membership !== null) ?? []
+  const suggestedClubs =
+    clubs.data?.items.filter((club) => club.membership === null) ?? []
   const activeChallenges = challenges.data?.filter((item) => item.state === 'active') ?? []
 
   /** Rail body: skeletons while loading, cards once there are any. */

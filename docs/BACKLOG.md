@@ -39,6 +39,52 @@ Paste this block at the top of any task prompt below.
 
 ---
 
+## Order
+
+**Landed:** auth + account, books + library, stories/chapters + the reader,
+authoring, uploads + chapter multimedia, reading progress + streak, book clubs
++ broadcast channels.
+
+Tasks are numbered by when they were written down, not by when to do them. This
+is the order to do them in, and the reason for each position.
+
+| # | Task | Why here |
+|---|---|---|
+| 1 | **3** — comments & ratings | The only remaining task that unblocks others (14, 15). Purely additive on the FE. Reuse the thread shape 9 established for `ClubDiscussion` rather than inventing a second one — see the note below. |
+| 2 | **13** — public profiles & follows | With 3 done this closes all four of 14's dependencies. Also the payoff for the author summaries clubs, channels and comments all render: `/profile/:username` is a live route in `App.tsx` with no endpoint behind it. |
+| 3 | **11** — challenges & leaderboard | Owns the admin/moderator role decision. 15 reuses it, so this comes first. |
+| 4 | **8** — author analytics | Introduces the view / chapter-read event log. Independent of everything above, but it must precede 12. |
+| 5 | **12** — badges & levels | A pure consumer once 8 lands: streak and words written exist, comments and ratings come from 3, and "chapters read" is only countable from 8's event log — `ReadingHistory` keeps current position per story, not a count. Doing 12 before 8 means either inventing that metric or building it twice. |
+| 6 | **14** — notifications | Needs 3, 9, 10, 13 — 9 and 10 have landed. |
+| 7 | **15** — moderation & reporting | Needs 3 for content to moderate (9's discussions are already there), and 11's role for a moderator to be. |
+| 8 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed) and ratings (3). Late because a recommender is worth building once there is signal to rank on. |
+| 9 | **17** — retire the mock layer | Last by definition. |
+
+**One shared decision, taken once — now settled.** Clubs' discussions,
+channels' posts and stories' comments are three spellings of the same thing:
+user-written text, paginated newest-first, with an author summary, a
+rate-limited create and a delete only the author or an admin may perform. 9 got
+there first and 10 followed it, so **Task 3 follows the same shape** rather than
+inventing a third. Concretely, as `services/clubs.ts` and `services/channels.ts`
+now spell it:
+
+- A `Page<T>` of `{ items, page, limit, total, totalPages, hasMore }`, newest
+  first with `id` as the tie-breaker so pagination cannot repeat a row.
+- An author summary of exactly `{ id, username, displayName, avatarUrl }` —
+  never the whole user row.
+- One table for threads and replies, a nullable `parentId` telling them apart,
+  replies capped at one level deep (`createDiscussion` re-points a reply to a
+  reply at its thread), and `replyCount` gathered for a whole page in one query.
+- Create is rate-limited per *user*, not per IP, and charged only after the
+  write succeeds; delete is author-or-moderator, resolved from the membership
+  row rather than a creator column.
+
+Three independent implementations is still the outcome worth avoiding — 15 would
+then have three different read paths to audit for hidden content, and that is
+exactly where a moderation bug hides.
+
+---
+
 ## Task 3 — Comments & ratings
 
 `engagement.Comment` and `engagement.Rating` exist, no routes.
@@ -50,8 +96,13 @@ is currently unused and waits for a real breakdown. `Story.ratingCount` still
 does not exist as a column; the stories service computes count and average from
 `Rating` rows and falls back to the denormalised `Story.ratingAverage` only when
 there are none. Deciding whether to add `ratingCount` and make the columns
-authoritative is part of this task. `getComments` / `getRatings` are still called
-from `StoryDetailPage` and `ReaderPage`, returning nothing for a real story id.
+authoritative is part of this task.
+
+The mock comment and rating functions are **already gone** from `data/api.ts` —
+there is nothing to unwire. `StoryDetailPage` simply renders no comments, the
+reader's comment panel says "Comments are not available yet" in so many words,
+and `components/charts/RatingBars.tsx` is imported nowhere. So this task is
+purely additive on the frontend.
 
 **Prompt:**
 
@@ -73,11 +124,11 @@ from `StoryDetailPage` and `ReaderPage`, returning nothing for a real story id.
 > `Story.ratingAverage` / `ratingCount` are denormalised — recompute them inside
 > the same transaction as any rating write so they cannot drift.
 >
-> FE — replace `getComments`, `addComment`, `getRatings` and especially
-> `getRatingBreakdown` in `data/api.ts` (that last one invents a histogram from
-> hardcoded weights at `api.ts:256` — delete it, don't port it). Wire
-> `pages/StoryDetailPage.tsx` and `components/charts/RatingBars.tsx` to the real
-> breakdown, and `components/ui/Rating.tsx` to submit.
+> FE — a new `data/engagement-api.ts`; there are no mock functions left to
+> replace. Wire `pages/StoryDetailPage.tsx` and the currently-unused
+> `components/charts/RatingBars.tsx` to the real breakdown,
+> `components/ui/Rating.tsx` to submit, and replace the reader's
+> "Comments are not available yet" panel with the real thread.
 >
 > Tests: comment validation and ownership on delete, rating upsert replaces
 > rather than duplicates, denormalised average matches a recomputed one after a
@@ -87,15 +138,19 @@ from `StoryDetailPage` and `ReaderPage`, returning nothing for a real story id.
 
 ## Task 8 — Author analytics
 
-Depends on the authoring task, which has landed. Currently synthesised from
-mock view counts.
+Depends on the authoring task, which has landed.
+
+`getAuthorOverview` is **already gone** from `data/api.ts`, along with the view
+series and read counts it invented, so both pages currently show what the real
+`content.Story` columns carry and nothing more. The task is to record the events
+that would make a series real, not to replace a fake one.
 
 **Prompt:**
 
 > `apps/web/src/pages/author/AuthorAnalyticsPage.tsx` and
-> `AuthorDashboardPage.tsx` render views, reads, average rating, engagement and
-> a time series — all invented client-side in `data/api.ts` (`getAuthorOverview`,
-> which multiplies view counts by 0.46 to fake a read count).
+> `AuthorDashboardPage.tsx` want views, reads, average rating, engagement and a
+> time series. Nothing records any of it: there is no view event and no
+> chapter-read event anywhere in the contract.
 >
 > Make it real. Decide what to actually record: at minimum a story view event
 > and a chapter-read event, timestamped, deduped per user per day so a refresh
@@ -108,66 +163,10 @@ mock view counts.
 > breakdown. Aggregate in SQL, not in JS over every row.
 >
 > FE: rewire both pages onto it; `components/charts/LineChart.tsx` already takes
-> a series, so match its shape. Delete `getAuthorOverview` from `data/api.ts`.
+> a series, so match its shape.
 >
 > Tests: dedupe within a day, range boundary correctness, and that a story with
 > no events returns zeroes rather than erroring or omitting days.
-
----
-
-## Task 9 — Book clubs
-
-**Prompt:**
-
-> Implement book clubs. `clubs.BookClub` and `clubs.ClubMembership` exist in
-> `contract.prisma`; there is **no** discussion model, though the FE has one —
-> add `clubs.ClubDiscussion` (club, author, body, parent for replies,
-> timestamps) plus a migration.
->
-> API — `services/clubs.ts` + `routes/clubs.ts` at `/api/clubs`:
-> - `GET /` (public, with search and a member count), `GET /:slug` (public,
->   including the caller's membership if any).
-> - `POST /` — create; creator becomes `OWNER`.
-> - `PATCH /:id`, `DELETE /:id` — `OWNER`/`ADMIN` only.
-> - `POST /:id/join`, `DELETE /:id/leave` — the last `OWNER` cannot leave
->   without transferring ownership; return a clear error.
-> - `PATCH /:id/members/:userId` — role change, `OWNER` only.
-> - `PUT /:id/current-read` — set the club's current story.
-> - `GET /:id/discussions`, `POST /:id/discussions` (members only),
->   `DELETE /discussions/:id` (author or club admin).
->
-> FE: `data/clubs-api.ts`; rewire `pages/ClubsPage.tsx` and
-> `pages/ClubDetailPage.tsx`, remove the club functions from `data/api.ts`.
->
-> Tests: role enforcement on every privileged action, last-owner-leave guard,
-> non-member posting blocked, join idempotency.
-
----
-
-## Task 10 — Broadcast channels
-
-**Prompt:**
-
-> Implement broadcast channels. `channels.BroadcastChannel`,
-> `ChannelSubscriber` and `ChannelPost` all exist in `contract.prisma`; there
-> are no routes.
->
-> API — `services/channels.ts` + `routes/channels.ts` at `/api/channels`:
-> - `GET /` and `GET /:slug` — public, with subscriber counts and the caller's
->   subscription state when signed in.
-> - `POST /` — create (owner is the caller), `PATCH /:id`, `DELETE /:id` — owner
->   only.
-> - `POST /:id/subscribe`, `DELETE /:id/subscribe` — idempotent both ways.
-> - `GET /:id/posts` — paginated, newest first, public.
-> - `POST /:id/posts`, `PATCH /posts/:id`, `DELETE /posts/:id` — owner only.
->
-> FE: `data/channels-api.ts`; rewire `pages/ChannelsPage.tsx`,
-> `pages/ChannelDetailPage.tsx` and `pages/author/AuthorChannelsPage.tsx`
-> (which manages the caller's own channels and composes posts). Remove the
-> channel functions from `data/api.ts`.
->
-> Tests: owner-only enforcement, subscribe/unsubscribe idempotency, post
-> pagination ordering.
 
 ---
 
@@ -267,7 +266,10 @@ mock view counts.
 
 ## Task 14 — Notifications
 
-Depends on Tasks 3, 9, 10, 13.
+Depends on Tasks 3, 9, 10, 13. **9 and 10 have landed**, so a new club
+discussion and a new channel post are both real events to fan out from now;
+`clubs.ClubDiscussion.parentId` is what makes "a reply to your comment"
+expressible for club threads.
 
 **Prompt:**
 
@@ -295,7 +297,11 @@ Depends on Tasks 3, 9, 10, 13.
 
 ## Task 15 — Moderation & reporting
 
-Depends on Tasks 3 and 9.
+Depends on Tasks 3 and 9. **9 and 10 have landed**, so club discussions and
+channel posts already exist as user-generated content with no reporting path —
+their public read paths are `listDiscussions` in `services/clubs.ts` and
+`listPosts` in `services/channels.ts`, and both need auditing for hidden
+content when this lands.
 
 **Prompt:**
 
@@ -353,14 +359,19 @@ Depends on Tasks 3 and 9.
 
 Final cleanup. Do last.
 
-**Half done already.** The story, chapter, book, shelf, comment, rating and
-reading-history fixtures are gone from `mock-db.ts` (832 lines down to ~400),
-along with the author aggregates that invented view series and read counts.
-What remains is the data whose features have no endpoints: clubs, channels,
-challenges, badges, and the author directory (`db.authors`) — plus `db.currentUser`,
-which `AuthProvider` still uses for the presentational half of a session
-(avatar hue, follower counts, reading stats) that `auth.User` has no columns
-for. Each goes with its own task; this one is the final sweep.
+**Mostly done already.** The story, chapter, book, shelf, comment, rating,
+reading-history, club and channel fixtures are gone from `mock-db.ts` (832
+lines down to ~263), along with the author aggregates that invented view series
+and read counts. `data/api.ts` is down to four functions. What remains is the
+data whose features have no endpoints: challenges, badges, and the author
+directory (`db.authors`) — plus `db.currentUser`, which `AuthProvider` still
+uses for the presentational half of a session (avatar hue, follower counts,
+reading stats) that `auth.User` has no columns for. Each goes with its own
+task; this one is the final sweep.
+
+The club and channel types also left `types/domain.ts` for `types/clubs.ts` and
+`types/channels.ts`, which mirror the API the way `types/stories.ts` does. That
+is the pattern this task's reconciliation should finish, not undo.
 
 **Prompt:**
 
@@ -379,3 +390,89 @@ for. Each goes with its own task; this one is the final sweep.
 > and `Skeleton.tsx`.
 >
 > Confirm the full test suite passes and the app builds.
+
+---
+
+## Open questions from landed work
+
+Things the test suite cannot reach — browser behaviour, real clocks, layout.
+Each is a known gap, not a suspicion: worth confirming by hand, and worth
+folding into whichever task next touches that surface.
+
+### Reading progress (Task 2)
+
+- **A late-growing chapter restores short.** The restore measures
+  `document.body.scrollHeight` in one `requestAnimationFrame` after the chapter
+  paints (`hooks/useReadingProgress.ts`). A chapter carrying an image or video
+  whose intrinsic size arrives after that frame grows the page *after* it was
+  measured, so the reader lands earlier than where they stopped. Text-only
+  chapters are unaffected. The fix is to re-apply the restore when the article
+  resizes (a `ResizeObserver`, or a second pass on media `load`) — deliberately
+  not done, because it wants a browser to tune against.
+- **The offset↔scroll mapping assumes even text density.** A character offset is
+  converted to a scroll position by simple proportion, which is exact for prose
+  and drifts in proportion to how much vertical space a chapter's attachments
+  take, since no characters correspond to them. Restoring *within* a chapter is
+  approximate for media-heavy chapters; the chapter itself is always right.
+- **The streak has never crossed a real midnight.** `advanceStreak` is unit
+  tested against a controlled clock for every branch, but the wiring has only
+  been exercised against a backdated anchor (`TestApi.setStreak`), never against
+  the database's own `now()` rolling over a UTC day.
+- **Catalogue books record no position.** `PUT /api/reading/progress` requires a
+  `chapterId`, and catalogue editions are `Story` rows with no chapters, so the
+  Reading shelf and the "Pick up where you left off" rail can legitimately
+  disagree about what is in progress. Intended for now; revisit if the reader
+  ever opens a catalogue edition.
+- **`useReadingProgress` stops saving for the rest of the page load** once the
+  API answers 401/403, so a reader who signs in while the reader page is open
+  saves nothing until they navigate. Cheap to fix by keying the block on the
+  session rather than the mount.
+- **Unseen in a browser:** the "Pick up where you left off" rail — `ContinueCard`
+  inside `card-grid--wide` — at phone width, and the restore/save cycle while
+  flicking quickly between chapters.
+- **Dev identity:** saves go out with `stories-api.ts`'s `readerHeaders()` when
+  no session exists, so `VITE_DEV_USER_ID` has to name a user that really
+  exists. If it does not, every save 401s and the block above silences it for
+  the whole page load with nothing shown to the reader.
+
+### Clubs and channels (Tasks 9 and 10)
+
+- **What the mock invented, and what replaced it.** Five fields had nothing
+  behind them and were dropped rather than faked: a club's `isPrivate` (there is
+  no invite or approval flow — every club is open, and the detail page now says
+  "Open club" unconditionally), its `genreIds` (clubs have no genre relation),
+  and a channel post's `likeCount`, `commentCount` and `linkedStoryId` (a
+  channel is one-way; `.post__foot` and `.post__link` left `pages.css` with the
+  markup). A club's and a channel's `hue` is now derived from the slug through
+  `hueFor` rather than stored, which is what it always was. Two columns were
+  *added* because the UI genuinely collects them: `BookClub.slug` /
+  `currentStoryId` and `BroadcastChannel.slug` / `ChannelPost.title`.
+- **`ClubDiscussion` has no title.** The mock carried a separate title and body;
+  the contract carries one `body`, so the thread list clamps the body to two
+  lines as its headline (`.thread__title`). If threads ever want real titles
+  that is a column and a migration, not a UI change.
+- **A club's discussion rail on `ClubsPage` is one request per club**, capped at
+  the first four on screen. There is no cross-club discussion feed endpoint, and
+  inventing one for a sidebar was the wrong place to start — but it is the first
+  thing to replace if that rail stays.
+- **`members` and `subscribers` sorts page in JS.** Both counts live in a child
+  table and the ORM's grouped collection cannot order by an aggregate, so those
+  two sorts hydrate the whole filtered set and slice it. Fine at today's row
+  counts, wrong at ten thousand clubs; the fix is `db.sql` with a join, and the
+  comment in `listClubs` says so.
+- **Ownership transfer is two steps, deliberately.** `PATCH
+  /:id/members/:userId` to make somebody else `OWNER`, then leave. The last
+  owner cannot leave or be demoted (409), and `assertNotLastOwner` runs inside
+  the same transaction as the write it guards. There is no one-shot "transfer
+  ownership" endpoint; if the UI wants one, it is a wrapper, not a new rule.
+- **Delete actions are hidden rather than disabled** when the caller is neither
+  the author nor a moderator, and that check reads `session.user.id` — which is
+  null in local development, where `readerHeaders()` identifies the caller by
+  header instead. So a dev without a real session sees no Delete button on their
+  own posts even though the API would allow it. Cheap to fix once the dev header
+  goes.
+- **Unseen in a browser:** the club hero and its derived banner hue at phone
+  width; a thread with its replies expanded inside `.discussion-replies`; the
+  channel feed's "Load older posts" accumulation across more than two pages; and
+  `AuthorChannelsPage` with more than one channel, where the channel picker row
+  appears.

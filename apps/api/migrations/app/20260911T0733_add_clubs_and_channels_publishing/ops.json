@@ -1,0 +1,902 @@
+[
+  {
+    "id": "table.clubDiscussion",
+    "label": "Create table \"clubDiscussion\"",
+    "summary": "Creates table \"clubDiscussion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "table",
+        "name": "clubDiscussion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"clubDiscussion\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubDiscussion\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"clubDiscussion\"",
+        "sql": "CREATE TABLE \"clubs\".\"clubDiscussion\" (\n  \"body\" text NOT NULL,\n  \"clubId\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"parentId\" text,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"clubDiscussion\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubDiscussion\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.clubs.bookClub.currentStoryId",
+    "label": "Add column \"currentStoryId\" to \"bookClub\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "column",
+        "name": "currentStoryId",
+        "table": "bookClub"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"currentStoryId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "clubs",
+          "bookClub",
+          "currentStoryId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"currentStoryId\"",
+        "sql": "ALTER TABLE \"clubs\".\"bookClub\" ADD COLUMN \"currentStoryId\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"currentStoryId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "clubs",
+          "bookClub",
+          "currentStoryId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.channels.broadcastChannel.slug",
+    "label": "Add column \"slug\" to \"broadcastChannel\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "column",
+        "name": "slug",
+        "table": "broadcastChannel"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"slug\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "channels",
+          "broadcastChannel",
+          "slug"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"slug\"",
+        "sql": "ALTER TABLE \"channels\".\"broadcastChannel\" ADD COLUMN \"slug\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"slug\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "channels",
+          "broadcastChannel",
+          "slug"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data.channels.broadcastChannel.backfill-slug",
+    "label": "Backfill channels.broadcastChannel.slug from names",
+    "operationClass": "data",
+    "target": {
+      "id": "channels.broadcastChannel",
+      "details": {
+        "schema": "channels",
+        "name": "broadcastChannel",
+        "objectType": "table"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Derive a unique slug per channel from its name",
+        "sql": "UPDATE channels.\"broadcastChannel\" AS c\n                     SET \"slug\" = candidate.slug\n                    FROM (\n                          SELECT id,\n                                 base || CASE WHEN rn = 1 THEN '' ELSE '-' || rn::text END AS slug\n                            FROM (\n                                  SELECT id,\n                                         base,\n                                         row_number() OVER (PARTITION BY base ORDER BY \"createdAt\", id) AS rn\n                                    FROM (\n                                          SELECT id,\n                                                 \"createdAt\",\n                                                 COALESCE(\n                                                   NULLIF(\n                                                     trim(BOTH '-' FROM regexp_replace(lower(name), '[^a-z0-9]+', '-', 'g')),\n                                                     ''\n                                                   ),\n                                                   'channel'\n                                                 ) AS base\n                                            FROM channels.\"broadcastChannel\"\n                                           WHERE \"slug\" IS NULL\n                                         ) AS slugged\n                                 ) AS numbered\n                         ) AS candidate\n                   WHERE c.id = candidate.id\n                     AND c.\"slug\" IS NULL"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "alterNullability.setNotNull.broadcastChannel.slug",
+    "label": "Set NOT NULL on \"broadcastChannel\".\"slug\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "column",
+        "name": "slug",
+        "table": "broadcastChannel"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"slug\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "channels",
+          "broadcastChannel",
+          "slug"
+        ]
+      },
+      {
+        "description": "ensure no NULL values in \"slug\"",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"channels\".\"broadcastChannel\" WHERE \"slug\" IS NULL) AS \"result\"",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"slug\"",
+        "sql": "ALTER TABLE \"channels\".\"broadcastChannel\" ALTER COLUMN \"slug\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"slug\" is NOT NULL",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "channels",
+          "broadcastChannel",
+          "slug",
+          "NO"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.channels.channelPost.title",
+    "label": "Add column \"title\" to \"channelPost\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "column",
+        "name": "title",
+        "table": "channelPost"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"title\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "channels",
+          "channelPost",
+          "title"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"title\"",
+        "sql": "ALTER TABLE \"channels\".\"channelPost\" ADD COLUMN \"title\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"title\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "channels",
+          "channelPost",
+          "title"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data.channels.channelPost.backfill-title",
+    "label": "Backfill channels.channelPost.title from the body",
+    "operationClass": "data",
+    "target": {
+      "id": "channels.channelPost",
+      "details": {
+        "schema": "channels",
+        "name": "channelPost",
+        "objectType": "table"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Take the first line of the body as the title",
+        "sql": "UPDATE channels.\"channelPost\"\n                     SET \"title\" = COALESCE(\n                           NULLIF(left(trim(split_part(\"content\", E'\\n', 1)), 120), ''),\n                           'Untitled post'\n                         )\n                   WHERE \"title\" IS NULL"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "alterNullability.setNotNull.channelPost.title",
+    "label": "Set NOT NULL on \"channelPost\".\"title\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "column",
+        "name": "title",
+        "table": "channelPost"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"title\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "channels",
+          "channelPost",
+          "title"
+        ]
+      },
+      {
+        "description": "ensure no NULL values in \"title\"",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"channels\".\"channelPost\" WHERE \"title\" IS NULL) AS \"result\"",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"title\"",
+        "sql": "ALTER TABLE \"channels\".\"channelPost\" ALTER COLUMN \"title\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"title\" is NOT NULL",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "channels",
+          "channelPost",
+          "title",
+          "NO"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.clubs.bookClub.slug",
+    "label": "Add column \"slug\" to \"bookClub\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "column",
+        "name": "slug",
+        "table": "bookClub"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"slug\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "clubs",
+          "bookClub",
+          "slug"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"slug\"",
+        "sql": "ALTER TABLE \"clubs\".\"bookClub\" ADD COLUMN \"slug\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"slug\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "clubs",
+          "bookClub",
+          "slug"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data.clubs.bookClub.backfill-slug",
+    "label": "Backfill clubs.bookClub.slug from names",
+    "operationClass": "data",
+    "target": {
+      "id": "clubs.bookClub",
+      "details": {
+        "schema": "clubs",
+        "name": "bookClub",
+        "objectType": "table"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Derive a unique slug per club from its name",
+        "sql": "UPDATE clubs.\"bookClub\" AS b\n                     SET \"slug\" = candidate.slug\n                    FROM (\n                          SELECT id,\n                                 base || CASE WHEN rn = 1 THEN '' ELSE '-' || rn::text END AS slug\n                            FROM (\n                                  SELECT id,\n                                         base,\n                                         row_number() OVER (PARTITION BY base ORDER BY \"createdAt\", id) AS rn\n                                    FROM (\n                                          SELECT id,\n                                                 \"createdAt\",\n                                                 COALESCE(\n                                                   NULLIF(\n                                                     trim(BOTH '-' FROM regexp_replace(lower(name), '[^a-z0-9]+', '-', 'g')),\n                                                     ''\n                                                   ),\n                                                   'club'\n                                                 ) AS base\n                                            FROM clubs.\"bookClub\"\n                                           WHERE \"slug\" IS NULL\n                                         ) AS slugged\n                                 ) AS numbered\n                         ) AS candidate\n                   WHERE b.id = candidate.id\n                     AND b.\"slug\" IS NULL"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "alterNullability.setNotNull.bookClub.slug",
+    "label": "Set NOT NULL on \"bookClub\".\"slug\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "column",
+        "name": "slug",
+        "table": "bookClub"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"slug\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "clubs",
+          "bookClub",
+          "slug"
+        ]
+      },
+      {
+        "description": "ensure no NULL values in \"slug\"",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"clubs\".\"bookClub\" WHERE \"slug\" IS NULL) AS \"result\"",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"slug\"",
+        "sql": "ALTER TABLE \"clubs\".\"bookClub\" ALTER COLUMN \"slug\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"slug\" is NOT NULL",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "clubs",
+          "bookClub",
+          "slug",
+          "NO"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.broadcastChannel.broadcastChannel_slug_key",
+    "label": "Add unique constraint on \"broadcastChannel\" (slug)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "unique",
+        "name": "broadcastChannel_slug_key",
+        "table": "broadcastChannel"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"broadcastChannel_slug_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "broadcastChannel_slug_key",
+          "channels",
+          "\"channels\".\"broadcastChannel\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"broadcastChannel_slug_key\"",
+        "sql": "ALTER TABLE \"channels\".\"broadcastChannel\" ADD CONSTRAINT \"broadcastChannel_slug_key\" UNIQUE (\"slug\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"broadcastChannel_slug_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "broadcastChannel_slug_key",
+          "channels",
+          "\"channels\".\"broadcastChannel\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.bookClub.bookClub_slug_key",
+    "label": "Add unique constraint on \"bookClub\" (slug)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "unique",
+        "name": "bookClub_slug_key",
+        "table": "bookClub"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"bookClub_slug_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "bookClub_slug_key",
+          "clubs",
+          "\"clubs\".\"bookClub\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"bookClub_slug_key\"",
+        "sql": "ALTER TABLE \"clubs\".\"bookClub\" ADD CONSTRAINT \"bookClub_slug_key\" UNIQUE (\"slug\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"bookClub_slug_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "bookClub_slug_key",
+          "clubs",
+          "\"clubs\".\"bookClub\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.channelPost.channelPost_channelId_postedAt_idx_39fe8d82",
+    "label": "Create index \"channelPost_channelId_postedAt_idx_39fe8d82\" on \"channelPost\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "index",
+        "name": "channelPost_channelId_postedAt_idx_39fe8d82",
+        "table": "channelPost"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"channelPost_channelId_postedAt_idx_39fe8d82\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"channelPost_channelId_postedAt_idx_39fe8d82\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"channelPost_channelId_postedAt_idx_39fe8d82\"",
+        "sql": "CREATE INDEX \"channelPost_channelId_postedAt_idx_39fe8d82\" ON \"channels\".\"channelPost\" (\"channelId\", \"postedAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"channelPost_channelId_postedAt_idx_39fe8d82\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"channels\".\"channelPost_channelId_postedAt_idx_39fe8d82\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.bookClub.bookClub_currentStoryId_idx_76f32fbb",
+    "label": "Create index \"bookClub_currentStoryId_idx_76f32fbb\" on \"bookClub\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "index",
+        "name": "bookClub_currentStoryId_idx_76f32fbb",
+        "table": "bookClub"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"bookClub_currentStoryId_idx_76f32fbb\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"bookClub_currentStoryId_idx_76f32fbb\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"bookClub_currentStoryId_idx_76f32fbb\"",
+        "sql": "CREATE INDEX \"bookClub_currentStoryId_idx_76f32fbb\" ON \"clubs\".\"bookClub\" (\"currentStoryId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"bookClub_currentStoryId_idx_76f32fbb\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"bookClub_currentStoryId_idx_76f32fbb\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.clubDiscussion.clubDiscussion_clubId_idx_7aff947d",
+    "label": "Create index \"clubDiscussion_clubId_idx_7aff947d\" on \"clubDiscussion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "index",
+        "name": "clubDiscussion_clubId_idx_7aff947d",
+        "table": "clubDiscussion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"clubDiscussion_clubId_idx_7aff947d\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubDiscussion_clubId_idx_7aff947d\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"clubDiscussion_clubId_idx_7aff947d\"",
+        "sql": "CREATE INDEX \"clubDiscussion_clubId_idx_7aff947d\" ON \"clubs\".\"clubDiscussion\" (\"clubId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"clubDiscussion_clubId_idx_7aff947d\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubDiscussion_clubId_idx_7aff947d\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.clubDiscussion.clubDiscussion_clubId_parentId_createdAt_idx_844f84c4",
+    "label": "Create index \"clubDiscussion_clubId_parentId_createdAt_idx_844f84c4\" on \"clubDiscussion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "index",
+        "name": "clubDiscussion_clubId_parentId_createdAt_idx_844f84c4",
+        "table": "clubDiscussion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"clubDiscussion_clubId_parentId_createdAt_idx_844f84c4\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubDiscussion_clubId_parentId_createdAt_idx_844f84c4\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"clubDiscussion_clubId_parentId_createdAt_idx_844f84c4\"",
+        "sql": "CREATE INDEX \"clubDiscussion_clubId_parentId_createdAt_idx_844f84c4\" ON \"clubs\".\"clubDiscussion\" (\"clubId\", \"parentId\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"clubDiscussion_clubId_parentId_createdAt_idx_844f84c4\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubDiscussion_clubId_parentId_createdAt_idx_844f84c4\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.clubDiscussion.clubDiscussion_parentId_idx_6a68f597",
+    "label": "Create index \"clubDiscussion_parentId_idx_6a68f597\" on \"clubDiscussion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "index",
+        "name": "clubDiscussion_parentId_idx_6a68f597",
+        "table": "clubDiscussion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"clubDiscussion_parentId_idx_6a68f597\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubDiscussion_parentId_idx_6a68f597\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"clubDiscussion_parentId_idx_6a68f597\"",
+        "sql": "CREATE INDEX \"clubDiscussion_parentId_idx_6a68f597\" ON \"clubs\".\"clubDiscussion\" (\"parentId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"clubDiscussion_parentId_idx_6a68f597\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubDiscussion_parentId_idx_6a68f597\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.clubDiscussion.clubDiscussion_userId_idx_a489d58a",
+    "label": "Create index \"clubDiscussion_userId_idx_a489d58a\" on \"clubDiscussion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "index",
+        "name": "clubDiscussion_userId_idx_a489d58a",
+        "table": "clubDiscussion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"clubDiscussion_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubDiscussion_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"clubDiscussion_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"clubDiscussion_userId_idx_a489d58a\" ON \"clubs\".\"clubDiscussion\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"clubDiscussion_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"clubs\".\"clubDiscussion_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.bookClub.bookClub_currentStoryId_fkey",
+    "label": "Add foreign key \"bookClub_currentStoryId_fkey\" on \"bookClub\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "foreignKey",
+        "name": "bookClub_currentStoryId_fkey",
+        "table": "bookClub"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"bookClub_currentStoryId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "bookClub_currentStoryId_fkey",
+          "clubs",
+          "\"clubs\".\"bookClub\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"bookClub_currentStoryId_fkey\"",
+        "sql": "ALTER TABLE \"clubs\".\"bookClub\"\nADD CONSTRAINT \"bookClub_currentStoryId_fkey\"\nFOREIGN KEY (\"currentStoryId\")\nREFERENCES \"content\".\"story\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"bookClub_currentStoryId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "bookClub_currentStoryId_fkey",
+          "clubs",
+          "\"clubs\".\"bookClub\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.clubDiscussion.clubDiscussion_clubId_fkey",
+    "label": "Add foreign key \"clubDiscussion_clubId_fkey\" on \"clubDiscussion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "foreignKey",
+        "name": "clubDiscussion_clubId_fkey",
+        "table": "clubDiscussion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"clubDiscussion_clubId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "clubDiscussion_clubId_fkey",
+          "clubs",
+          "\"clubs\".\"clubDiscussion\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"clubDiscussion_clubId_fkey\"",
+        "sql": "ALTER TABLE \"clubs\".\"clubDiscussion\"\nADD CONSTRAINT \"clubDiscussion_clubId_fkey\"\nFOREIGN KEY (\"clubId\")\nREFERENCES \"clubs\".\"bookClub\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"clubDiscussion_clubId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "clubDiscussion_clubId_fkey",
+          "clubs",
+          "\"clubs\".\"clubDiscussion\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.clubDiscussion.clubDiscussion_userId_fkey",
+    "label": "Add foreign key \"clubDiscussion_userId_fkey\" on \"clubDiscussion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "foreignKey",
+        "name": "clubDiscussion_userId_fkey",
+        "table": "clubDiscussion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"clubDiscussion_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "clubDiscussion_userId_fkey",
+          "clubs",
+          "\"clubs\".\"clubDiscussion\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"clubDiscussion_userId_fkey\"",
+        "sql": "ALTER TABLE \"clubs\".\"clubDiscussion\"\nADD CONSTRAINT \"clubDiscussion_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"clubDiscussion_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "clubDiscussion_userId_fkey",
+          "clubs",
+          "\"clubs\".\"clubDiscussion\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.clubDiscussion.clubDiscussion_parentId_fkey",
+    "label": "Add foreign key \"clubDiscussion_parentId_fkey\" on \"clubDiscussion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "foreignKey",
+        "name": "clubDiscussion_parentId_fkey",
+        "table": "clubDiscussion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"clubDiscussion_parentId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "clubDiscussion_parentId_fkey",
+          "clubs",
+          "\"clubs\".\"clubDiscussion\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"clubDiscussion_parentId_fkey\"",
+        "sql": "ALTER TABLE \"clubs\".\"clubDiscussion\"\nADD CONSTRAINT \"clubDiscussion_parentId_fkey\"\nFOREIGN KEY (\"parentId\")\nREFERENCES \"clubs\".\"clubDiscussion\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"clubDiscussion_parentId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "clubDiscussion_parentId_fkey",
+          "clubs",
+          "\"clubs\".\"clubDiscussion\""
+        ]
+      }
+    ]
+  }
+]

@@ -32,6 +32,10 @@
       "model": "Chapter",
       "namespace": "content"
     },
+    "clubDiscussion": {
+      "model": "ClubDiscussion",
+      "namespace": "clubs"
+    },
     "clubMembership": {
       "model": "ClubMembership",
       "namespace": "clubs"
@@ -244,6 +248,21 @@
                 "to": {
                   "model": "BroadcastChannel",
                   "namespace": "channels"
+                }
+              },
+              "clubDiscussions": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "ClubDiscussion",
+                  "namespace": "clubs"
                 }
               },
               "clubMemberships": {
@@ -631,6 +650,13 @@
                   "kind": "scalar"
                 }
               },
+              "slug": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "updatedAt": {
                 "nullable": false,
                 "type": {
@@ -703,6 +729,9 @@
                 "name": {
                   "column": "name"
                 },
+                "slug": {
+                  "column": "slug"
+                },
                 "updatedAt": {
                   "column": "updatedAt"
                 }
@@ -738,6 +767,13 @@
                 "nullable": false,
                 "type": {
                   "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
               },
@@ -779,6 +815,9 @@
                 },
                 "postedAt": {
                   "column": "postedAt"
+                },
+                "title": {
+                  "column": "title"
                 },
                 "updatedAt": {
                   "column": "updatedAt"
@@ -890,6 +929,13 @@
                   "kind": "scalar"
                 }
               },
+              "currentStoryId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "description": {
                 "nullable": true,
                 "type": {
@@ -905,6 +951,13 @@
                 }
               },
               "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "slug": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
@@ -935,6 +988,36 @@
                   "namespace": "auth"
                 }
               },
+              "currentStory": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "currentStoryId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Story",
+                  "namespace": "content"
+                }
+              },
+              "discussions": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "clubId"
+                  ]
+                },
+                "to": {
+                  "model": "ClubDiscussion",
+                  "namespace": "clubs"
+                }
+              },
               "memberships": {
                 "cardinality": "1:N",
                 "on": {
@@ -959,6 +1042,9 @@
                 "creatorId": {
                   "column": "creatorId"
                 },
+                "currentStoryId": {
+                  "column": "currentStoryId"
+                },
                 "description": {
                   "column": "description"
                 },
@@ -968,12 +1054,157 @@
                 "name": {
                   "column": "name"
                 },
+                "slug": {
+                  "column": "slug"
+                },
                 "updatedAt": {
                   "column": "updatedAt"
                 }
               },
               "namespaceId": "clubs",
               "table": "bookClub"
+            }
+          },
+          "ClubDiscussion": {
+            "fields": {
+              "body": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "clubId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "parentId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "club": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "clubId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "BookClub",
+                  "namespace": "clubs"
+                }
+              },
+              "parent": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "parentId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "ClubDiscussion",
+                  "namespace": "clubs"
+                }
+              },
+              "replies": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "parentId"
+                  ]
+                },
+                "to": {
+                  "model": "ClubDiscussion",
+                  "namespace": "clubs"
+                }
+              },
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "body": {
+                  "column": "body"
+                },
+                "clubId": {
+                  "column": "clubId"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "parentId": {
+                  "column": "parentId"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "clubs",
+              "table": "clubDiscussion"
             }
           },
           "ClubMembership": {
@@ -1586,6 +1817,21 @@
                 "to": {
                   "model": "Chapter",
                   "namespace": "content"
+                }
+              },
+              "clubReads": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "currentStoryId"
+                  ]
+                },
+                "to": {
+                  "model": "BookClub",
+                  "namespace": "clubs"
                 }
               },
               "comments": {
@@ -2864,6 +3110,11 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "slug": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
                 "updatedAt": {
                   "codecId": "pg/timestamptz-temporal@1",
                   "default": {
@@ -2907,7 +3158,13 @@
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "slug"
+                  ]
+                }
+              ]
             },
             "channelPost": {
               "columns": {
@@ -2933,6 +3190,11 @@
                     "kind": "function"
                   },
                   "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
                   "nullable": false
                 },
                 "updatedAt": {
@@ -2970,6 +3232,15 @@
                   ],
                   "name": "channelPost_channelId_idx_166d3598",
                   "prefix": "channelPost_channelId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "channelId",
+                    "postedAt"
+                  ],
+                  "name": "channelPost_channelId_postedAt_idx_39fe8d82",
+                  "prefix": "channelPost_channelId_postedAt_idx",
                   "unique": false
                 }
               ],
@@ -3097,6 +3368,11 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "currentStoryId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "description": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -3108,6 +3384,11 @@
                   "nullable": false
                 },
                 "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "slug": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
@@ -3138,6 +3419,22 @@
                     "namespaceId": "auth",
                     "tableName": "user"
                   }
+                },
+                {
+                  "source": {
+                    "columns": [
+                      "currentStoryId"
+                    ],
+                    "namespaceId": "clubs",
+                    "tableName": "bookClub"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "story"
+                  }
                 }
               ],
               "indexes": [
@@ -3147,6 +3444,159 @@
                   ],
                   "name": "bookClub_creatorId_idx_3a77d800",
                   "prefix": "bookClub_creatorId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "currentStoryId"
+                  ],
+                  "name": "bookClub_currentStoryId_idx_76f32fbb",
+                  "prefix": "bookClub_currentStoryId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "slug"
+                  ]
+                }
+              ]
+            },
+            "clubDiscussion": {
+              "columns": {
+                "body": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "clubId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "parentId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "userId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "clubId"
+                    ],
+                    "namespaceId": "clubs",
+                    "tableName": "clubDiscussion"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "clubs",
+                    "tableName": "bookClub"
+                  }
+                },
+                {
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "clubs",
+                    "tableName": "clubDiscussion"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "source": {
+                    "columns": [
+                      "parentId"
+                    ],
+                    "namespaceId": "clubs",
+                    "tableName": "clubDiscussion"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "clubs",
+                    "tableName": "clubDiscussion"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "clubId"
+                  ],
+                  "name": "clubDiscussion_clubId_idx_7aff947d",
+                  "prefix": "clubDiscussion_clubId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "clubId",
+                    "parentId",
+                    "createdAt"
+                  ],
+                  "name": "clubDiscussion_clubId_parentId_createdAt_idx_844f84c4",
+                  "prefix": "clubDiscussion_clubId_parentId_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "parentId"
+                  ],
+                  "name": "clubDiscussion_parentId_idx_6a68f597",
+                  "prefix": "clubDiscussion_parentId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "clubDiscussion_userId_idx_a489d58a",
+                  "prefix": "clubDiscussion_userId_idx",
                   "unique": false
                 }
               ],
@@ -4516,10 +4966,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "3e097fcdd1e171f1128ccb37aef53aeb02b160f047e0143ebf78524a8096a844"
+    "storageHash": "d7f3d5ce2f31e0ce355c371c9b81727e91d49585529c768d0616b3b594470d70"
   },
   "execution": {
-    "executionHash": "2a8f10d344652873c2c64255cf26b8b7ef763928007ad7cae38f4ead2fc152a3",
+    "executionHash": "483770b6c0065f49d672438a713821d2685c115dc0ce6ef27b121fbf47c04b2f",
     "mutations": {
       "defaults": [
         {
@@ -4597,6 +5047,17 @@
             "column": "id",
             "namespace": "content",
             "table": "chapter"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "clubs",
+            "table": "clubDiscussion"
           }
         },
         {

@@ -1,7 +1,7 @@
 import { useAsync } from '../../hooks/useAsync'
 import { useAuth } from '../../lib/auth'
 import { formatCount, formatRating, formatRelative } from '../../lib/format'
-import * as api from '../../data/api'
+import * as channelsApi from '../../data/channels-api'
 import * as storiesApi from '../../data/stories-api'
 import { STORY_STATUS_LABELS, type Story } from '../../types/stories'
 import { AppShell } from '../../components/layout/AppShell'
@@ -52,9 +52,16 @@ export function AuthorDashboardPage() {
         : Promise.resolve([]),
     [authorId],
   )
-  const channels = useAsync(() => api.getChannels(), [])
+  /**
+   * Filtered server-side rather than by comparing author ids here: ownership is
+   * the API's to decide, and `mine=true` is the endpoint that answers it.
+   */
+  const channels = useAsync(
+    () => channelsApi.listChannels({ mine: true, limit: 12 }),
+    [],
+  )
 
-  const myChannels = channels.data?.filter((channel) => channel.authorId === authorId) ?? []
+  const myChannels = channels.data?.items ?? []
 
   return (
     <AppShell variant="author">

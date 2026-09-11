@@ -194,6 +194,51 @@
   font-weight: 600;
 }
 
+/* Blocks the prose can now contain, since the reader renders the same
+   markdown the editor previews. Sized against the reading measure rather than
+   the UI scale, so they hold their proportions as the reader resizes the
+   text. Mirrors `.preview` in `author/author.css`. */
+
+.reader__prose h2,
+.reader__prose h3 {
+  /* Font and weight come from the global heading rule, as `.reader__title`'s
+     do; sized in `em` so they track the reader's own text-size control. */
+  margin: 1.8em 0 0.6em;
+}
+
+.reader__prose h2 {
+  font-size: 1.45em;
+}
+
+.reader__prose h3 {
+  font-size: 1.2em;
+}
+
+/* A heading already sets its paragraph apart, so the one under it opens flush
+   — the indent above marks a new paragraph, not a new section. */
+.reader__prose > :is(h2, h3, blockquote, ul) + p {
+  text-indent: 0;
+  margin-top: 1.35em;
+}
+
+.reader__prose blockquote {
+  margin: 1.6em 0;
+  padding-left: 1em;
+  border-left: 3px solid var(--brand-border);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.reader__prose ul {
+  margin: 1.4em 0;
+  padding-left: 1.6em;
+  list-style: disc;
+}
+
+.reader__prose li + li {
+  margin-top: 0.4em;
+}
+
 /* Footer and pager ------------------------------------------------------- */
 
 .reader__footer {

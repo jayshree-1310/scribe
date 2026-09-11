@@ -41,6 +41,8 @@ export class TestApi {
     chapters: [] as string[],
     stories: [] as string[],
     genres: [] as string[],
+    clubs: [] as string[],
+    channels: [] as string[],
     users: [] as string[],
   };
 
@@ -253,6 +255,138 @@ export class TestApi {
     this.created.entries.push(entryId);
   }
 
+  /**
+   * Records a club or channel a suite created *through the API*, so teardown
+   * reaches it. Rows created by the fixtures below are tracked already; these
+   * are for the ids a `POST` handed back.
+   */
+  trackClub(clubId: string): void {
+    if (!this.created.clubs.includes(clubId)) this.created.clubs.push(clubId);
+  }
+
+  trackChannel(channelId: string): void {
+    if (!this.created.channels.includes(channelId)) {
+      this.created.channels.push(channelId);
+    }
+  }
+
+  /* Clubs ---------------------------------------------------------------- */
+
+  /**
+   * A club with its creator already holding `OWNER` -- the state
+   * `createClub` in the service leaves behind, which every authorisation path
+   * assumes.
+   */
+  async createClub(input: {
+    name: string;
+    creatorId: string;
+    slug?: string;
+    currentStoryId?: string | null;
+  }): Promise<{ id: string; slug: string }> {
+    const slug = `${this.runId}-${input.slug ?? slugify(input.name)}`.slice(0, 80);
+
+    const club = await db.orm.clubs.BookClub.select("id").create({
+      name: input.name,
+      slug,
+      description: `${input.name} — fixture`,
+      creatorId: input.creatorId,
+      currentStoryId: input.currentStoryId ?? null,
+    });
+
+    this.created.clubs.push(club.id);
+
+    await db.orm.clubs.ClubMembership.create({
+      clubId: club.id,
+      userId: input.creatorId,
+      role: "OWNER",
+    });
+
+    return { id: club.id, slug };
+  }
+
+  /** Puts somebody in a club at a chosen role. */
+  async addClubMember(input: {
+    clubId: string;
+    userId: string;
+    role?: "OWNER" | "ADMIN" | "MEMBER";
+  }): Promise<void> {
+    await db.orm.clubs.ClubMembership.create({
+      clubId: input.clubId,
+      userId: input.userId,
+      role: input.role ?? "MEMBER",
+    });
+  }
+
+  /** A thread, or a reply when `parentId` is given. */
+  async createDiscussion(input: {
+    clubId: string;
+    userId: string;
+    body?: string;
+    parentId?: string | null;
+  }): Promise<string> {
+    const row = await db.orm.clubs.ClubDiscussion.select("id").create({
+      clubId: input.clubId,
+      userId: input.userId,
+      body: input.body ?? "Fixture discussion.",
+      parentId: input.parentId ?? null,
+    });
+
+    return row.id;
+  }
+
+  /* Channels ------------------------------------------------------------- */
+
+  async createChannel(input: {
+    name: string;
+    authorId: string;
+    slug?: string;
+  }): Promise<{ id: string; slug: string }> {
+    const slug = `${this.runId}-${input.slug ?? slugify(input.name)}`.slice(0, 80);
+
+    const channel = await db.orm.channels.BroadcastChannel.select("id").create({
+      authorId: input.authorId,
+      name: input.name,
+      slug,
+      description: `${input.name} — fixture`,
+    });
+
+    this.created.channels.push(channel.id);
+    return { id: channel.id, slug };
+  }
+
+  /**
+   * A post on a channel. `postedAt` is settable because the feed's ordering
+   * and pagination cannot be exercised against rows written in the same
+   * millisecond.
+   */
+  async createChannelPost(input: {
+    channelId: string;
+    title?: string;
+    content?: string;
+    postedAt?: Date;
+  }): Promise<string> {
+    const post = await db.orm.channels.ChannelPost.select("id").create({
+      channelId: input.channelId,
+      title: input.title ?? "Fixture post",
+      content: input.content ?? "Body of a fixture post.",
+      ...(input.postedAt
+        ? { postedAt: Temporal.Instant.from(input.postedAt.toISOString()) }
+        : {}),
+    });
+
+    return post.id;
+  }
+
+  async subscribeToChannel(input: {
+    channelId: string;
+    userId: string;
+  }): Promise<void> {
+    await db.orm.channels.ChannelSubscriber.create({
+      channelId: input.channelId,
+      userId: input.userId,
+    });
+  }
+
   /** A reader's rating of a story, for the aggregate paths. */
   async createRating(input: {
     userId: string;
@@ -330,6 +464,83 @@ export class TestApi {
           this.created.stories.push(story.id);
         }
       }
+    }
+
+    /**
+     * Clubs and channels a fixture user created through the API, swept up the
+     * same way as their stories: a `POST /api/clubs` hands back an id the
+     * suite may not have tracked, and the user delete at the end would then
+     * fail on the foreign key.
+     */
+    for (const userId of this.created.users) {
+      const clubs = await db.orm.clubs.BookClub.select("id")
+        .where((club) => club.creatorId.eq(userId))
+        .all();
+      for (const club of clubs) this.trackClub(club.id);
+
+      const channels = await db.orm.channels.BroadcastChannel.select("id")
+        .where((channel) => channel.authorId.eq(userId))
+        .all();
+      for (const channel of channels) this.trackChannel(channel.id);
+    }
+
+    /**
+     * Clubs go before the stories below, not after: `BookClub.currentStoryId`
+     * references `content.Story`, so a club still pointing at a fixture story
+     * would block that story's delete.
+     */
+    for (const clubId of this.created.clubs) {
+      // Replies before threads: `parentId` points into this same table.
+      await deleteAll(() =>
+        db.orm.clubs.ClubDiscussion.where((row) => row.clubId.eq(clubId)).where(
+          (row) => row.parentId.isNotNull(),
+        ),
+      );
+      await deleteAll(() =>
+        db.orm.clubs.ClubDiscussion.where((row) => row.clubId.eq(clubId)),
+      );
+      await deleteAll(() =>
+        db.orm.clubs.ClubMembership.where((row) => row.clubId.eq(clubId)),
+      );
+
+      await db.orm.clubs.BookClub.where((club) => club.id.eq(clubId)).delete();
+    }
+
+    for (const channelId of this.created.channels) {
+      await deleteAll(() =>
+        db.orm.channels.ChannelPost.where((row) => row.channelId.eq(channelId)),
+      );
+      await deleteAll(() =>
+        db.orm.channels.ChannelSubscriber.where((row) =>
+          row.channelId.eq(channelId),
+        ),
+      );
+
+      await db.orm.channels.BroadcastChannel.where((channel) =>
+        channel.id.eq(channelId),
+      ).delete();
+    }
+
+    /**
+     * Memberships, discussions and subscriptions a fixture user holds in rows
+     * this run did *not* create -- a seeded club, say -- which the per-club
+     * sweep above never visits.
+     */
+    for (const userId of this.created.users) {
+      await deleteAll(() =>
+        db.orm.clubs.ClubDiscussion.where((row) => row.userId.eq(userId)).where(
+          (row) => row.parentId.isNotNull(),
+        ),
+      );
+      await deleteAll(() =>
+        db.orm.clubs.ClubDiscussion.where((row) => row.userId.eq(userId)),
+      );
+      await deleteAll(() =>
+        db.orm.clubs.ClubMembership.where((row) => row.userId.eq(userId)),
+      );
+      await deleteAll(() =>
+        db.orm.channels.ChannelSubscriber.where((row) => row.userId.eq(userId)),
+      );
     }
 
     // Shelf and reading-position rows first: they reference both users and

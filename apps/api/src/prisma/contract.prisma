@@ -92,6 +92,7 @@ namespace auth {
     challengeEntries challenges.ChallengeEntry[]
     createdClubs     clubs.BookClub[]
     clubMemberships  clubs.ClubMembership[]
+    clubDiscussions  clubs.ClubDiscussion[]
     channels         channels.BroadcastChannel[]
     subscriptions    channels.ChannelSubscriber[]
   }
@@ -144,6 +145,8 @@ namespace content {
     ratings          engagement.Rating[]
     readingHistory   engagement.ReadingHistory[]
     challengeEntries challenges.ChallengeEntry[]
+    /// Clubs currently reading this story together.
+    clubReads        clubs.BookClub[]
   }
 
   model Chapter {
@@ -332,14 +335,32 @@ namespace clubs {
   model BookClub {
     id          String   @id @default(uuid())
     name        String
+
+    /// Stable, URL-safe identity, derived once from the name. Every
+    /// reader-facing club URL addresses a club by this rather than by id, so
+    /// it survives a rename -- the same rule `content.Story.slug` follows.
+    slug        String   @unique
+
     description String?
+
+    /// Who created the club. Kept alongside the `OWNER` membership rather than
+    /// replaced by it: ownership transfers (`PATCH /:id/members/:userId`) and
+    /// the creator is then no longer the owner, but the historical fact does
+    /// not change. Authorisation reads the membership, never this column.
     creatorId   String
+
+    /// The story the club is reading together, or null between reads.
+    currentStoryId String?
+
     createdAt   DateTime @default(now())
     updatedAt   DateTime @default(now())
 
     creator     auth.User
       @relation(fields: [creatorId], references: [id])
+    currentStory content.Story?
+      @relation(fields: [currentStoryId], references: [id])
     memberships ClubMembership[]
+    discussions ClubDiscussion[]
   }
 
   model ClubMembership {
@@ -356,6 +377,38 @@ namespace clubs {
 
     @@unique([clubId, userId])
   }
+
+  /// A thread in a club, or a reply to one.
+  ///
+  /// One table for both: a reply is a discussion whose `parentId` points at
+  /// the thread it answers. Replies are one level deep by convention -- the
+  /// API refuses a parent that is itself a reply -- so a thread is a flat list
+  /// rather than a tree the UI would have to recurse through.
+  model ClubDiscussion {
+    id        String   @id @default(uuid())
+    clubId    String
+    userId    String
+    body      String
+
+    /// Null for a top-level thread; the thread's id for a reply.
+    parentId  String?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+
+    club   BookClub
+      @relation(fields: [clubId], references: [id])
+    user   auth.User
+      @relation(fields: [userId], references: [id])
+    parent ClubDiscussion?
+      @relation(fields: [parentId], references: [id])
+    replies ClubDiscussion[]
+
+    // The thread list: one club's top-level threads, newest first.
+    @@index([clubId, parentId, createdAt])
+    // Counting and listing a thread's replies.
+    @@index([parentId])
+  }
 }
 
 namespace channels {
@@ -363,6 +416,11 @@ namespace channels {
     id          String   @id @default(uuid())
     authorId    String
     name        String
+
+    /// Stable, URL-safe identity, derived once from the name -- the same rule
+    /// `content.Story.slug` and `clubs.BookClub.slug` follow.
+    slug        String   @unique
+
     description String?
     createdAt   DateTime @default(now())
     updatedAt   DateTime @default(now())
@@ -389,13 +447,22 @@ namespace channels {
 
   model ChannelPost {
     id        String   @id @default(uuid())
+
     channelId String
+
+    /// The post's headline. A post has no author of its own: only the
+    /// channel's owner may write one, so the author is the channel's.
+    title     String
+
     content   String
     postedAt  DateTime @default(now())
     updatedAt DateTime @default(now())
 
     channel BroadcastChannel
       @relation(fields: [channelId], references: [id])
+
+    // The channel feed: one channel's posts, newest first.
+    @@index([channelId, postedAt])
   }
 }
 

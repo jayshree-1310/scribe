@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth'
 import { formatCount, formatDate, formatMinutes, formatRating, formatRelative } from '../lib/format'
 import * as api from '../data/api'
 import * as books from '../data/books-api'
+import * as clubsApi from '../data/clubs-api'
 import * as storiesApi from '../data/stories-api'
 import { READING_STATUS_LABELS } from '../types/books'
 import { AppShell } from '../components/layout/AppShell'
@@ -38,7 +39,7 @@ export function ProfilePage() {
 
   const authors = useAsync(() => api.getAuthors(), [])
   const badges = useAsync(() => api.getBadges(), [])
-  const clubs = useAsync(() => api.getClubs(), [])
+  const clubs = useAsync(() => clubsApi.listClubs({ mine: true, limit: 24 }), [])
   // The shelves are real: `library.LibraryEntry` records intent, so these are
   // this reader's own books. Where they are *inside* a book is reading
   // progress, which has no endpoint yet — hence no progress bars below.
@@ -91,7 +92,8 @@ export function ProfilePage() {
   }
 
   const earnedBadges = badges.data?.filter((entry) => entry.earned) ?? []
-  const myClubs = clubs.data?.filter((club) => club.membership !== null) ?? []
+  // Already narrowed to the caller's own clubs by the `mine` filter above.
+  const myClubs = clubs.data?.items ?? []
 
   return (
     <AppShell>
