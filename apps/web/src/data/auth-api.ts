@@ -127,3 +127,74 @@ export async function signOutRequest(): Promise<void> {
     setAccessToken(null)
   }
 }
+
+/* Passwords and email verification -------------------------------------- */
+
+/**
+ * Asks for a reset link.
+ *
+ * Resolves the same way whether or not that address has an account — the API
+ * refuses to say, so the page must not imply otherwise in what it renders
+ * afterwards.
+ */
+export function requestPasswordReset(email: string): Promise<{ message: string }> {
+  return request('/auth/forgot-password', { method: 'POST', body: { email } })
+}
+
+/**
+ * Spends a reset link. No session comes back on purpose: the API revokes
+ * every session on a reset, including any an intruder was holding, so the
+ * caller signs in with the new password afterwards.
+ */
+export function resetPassword(input: {
+  token: string
+  password: string
+}): Promise<{ message: string }> {
+  return request('/auth/reset-password', { method: 'POST', body: input })
+}
+
+/**
+ * Changing or setting a password signs out every other device, which means
+ * the caller's own session is replaced too — the response carries its
+ * successor, and adopting it here is what keeps the page usable afterwards
+ * rather than 401-ing on its next request.
+ */
+export async function changePassword(input: {
+  currentPassword: string
+  newPassword: string
+}): Promise<void> {
+  const response = await request<{ accessToken: string }>('/auth/change-password', {
+    method: 'POST',
+    body: input,
+  })
+
+  setAccessToken(response.accessToken)
+}
+
+/** For accounts created through Google, which have no password to change. */
+export async function setPassword(password: string): Promise<void> {
+  const response = await request<{ accessToken: string }>('/auth/set-password', {
+    method: 'POST',
+    body: { password },
+  })
+
+  setAccessToken(response.accessToken)
+}
+
+export function sendVerificationEmail(): Promise<{ message: string }> {
+  return request('/auth/send-verification', { method: 'POST' })
+}
+
+/** Confirms an address from the link in the email. Needs no session. */
+export function verifyEmail(token: string): Promise<{ email: string }> {
+  return request('/auth/verify-email', { method: 'POST', body: { token } })
+}
+
+/** Ends every session this account has, on every device. */
+export async function signOutEverywhere(): Promise<void> {
+  try {
+    await request('/auth/logout-all', { method: 'POST' })
+  } finally {
+    setAccessToken(null)
+  }
+}

@@ -1,17 +1,16 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
-  PASSWORD_RULES,
   isValidEmail,
   isValidUsername,
   passwordStrength,
   useAuth,
 } from '../lib/auth'
-import { cn } from '../lib/cn'
 import { Button } from '../components/ui/Button'
 import { Checkbox } from '../components/ui/Checkbox'
 import { Icon } from '../components/ui/Icon'
 import { PasswordField, TextField } from '../components/ui/TextField'
+import { PasswordStrength } from '../components/ui/PasswordStrength'
 import { InlineNotice } from '../components/ui/States'
 import { AuthLayout } from './AuthLayout'
 
@@ -152,35 +151,7 @@ export function RegisterPage() {
             setPassword(event.target.value)
             setErrors((current) => ({ ...current, password: undefined }))
           }}
-          footer={
-            <div className="strength">
-              <div className="strength__meter" aria-hidden="true">
-                {[1, 2, 3, 4].map((step) => (
-                  <span
-                    key={step}
-                    className={cn(
-                      'strength__step',
-                      strength.score >= step && `is-on is-level-${strength.score}`,
-                    )}
-                  />
-                ))}
-              </div>
-              <p className="strength__label" aria-live="polite">
-                {strength.label}
-              </p>
-              <ul className="strength__rules">
-                {PASSWORD_RULES.map((rule) => {
-                  const met = strength.passed.includes(rule.id)
-                  return (
-                    <li key={rule.id} className={cn(met && 'is-met')}>
-                      <Icon name={met ? 'check-circle' : 'minus'} size="0.85em" />
-                      {rule.label}
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          }
+          footer={<PasswordStrength value={password} />}
         />
 
         <PasswordField

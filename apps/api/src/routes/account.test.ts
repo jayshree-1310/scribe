@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import argon2 from "argon2";
 import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { TestApi, databaseAvailable } from "../test/harness.js";
+import { db } from "../prisma/db.js";
 import { UPLOAD_ROOT } from "../lib/storage.js";
 
 const api = new TestApi();
@@ -231,5 +233,135 @@ describe.skipIf(!available)("avatar upload", () => {
     });
 
     expect(response.status).toBe(401);
+  });
+});
+
+describe.skipIf(!available)("DELETE /api/account/me", () => {
+  /**
+   * A fixture user carries a placeholder hash that argon2 cannot read, and
+   * the delete route asks for a password whenever the account has one — so
+   * these tests give it a real hash rather than testing against a value no
+   * real account would hold.
+   */
+  // Labels stay short: the harness truncates a fixture username to 30
+  // characters, and four long ones collide into a single name.
+  async function createDeletable(
+    label: string,
+    password: string | null,
+  ): Promise<{ id: string; username: string }> {
+    const id = await api.createUser(label);
+
+    await db.orm.auth.User.where((u) => u.id.eq(id)).update({
+      passwordHash: password === null ? null : await argon2.hash(password),
+    });
+
+    const row = await db.orm.auth.User.select("username")
+      .where((u) => u.id.eq(id))
+      .first();
+
+    return { id, username: row!.username };
+  }
+
+  function stillExists(id: string) {
+    return db.orm.auth.User.select("id")
+      .where((u) => u.id.eq(id))
+      .first();
+  }
+
+  it("refuses without the typed confirmation", async () => {
+    const user = await createDeletable("d1", "open sesame please");
+
+    const response = await api.request("/api/account/me", {
+      method: "DELETE",
+      as: user.id,
+      body: { confirmUsername: "not-my-username", password: "open sesame please" },
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.details.confirmUsername).toBeTruthy();
+    expect(await stillExists(user.id)).toBeTruthy();
+  });
+
+  it("refuses the wrong password", async () => {
+    const user = await createDeletable("d2", "open sesame please");
+
+    const response = await api.request("/api/account/me", {
+      method: "DELETE",
+      as: user.id,
+      body: { confirmUsername: user.username, password: "wrong one entirely" },
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.details.password).toBeTruthy();
+    expect(await stillExists(user.id)).toBeTruthy();
+  });
+
+  it("deletes the account and everything hanging off it", async () => {
+    const user = await createDeletable("d3", "open sesame please");
+
+    const genreId = await api.createGenre("dg");
+    const story = await api.createStory({
+      title: "A story to be unpublished by deletion",
+      authorId: user.id,
+      genreIds: [genreId],
+    });
+    await api.createChapter({ storyId: story.id, number: 1 });
+
+    // Someone else's rating against that story has to go too, or the story
+    // delete would fail on a foreign key.
+    const neighbourId = await api.createUser("d5");
+    await api.createRating({ userId: neighbourId, storyId: story.id, rating: 4 });
+
+    const response = await api.request("/api/account/me", {
+      method: "DELETE",
+      as: user.id,
+      body: { confirmUsername: user.username, password: "open sesame please" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await stillExists(user.id)).toBeFalsy();
+
+    const remaining = await db.orm.content.Story.select("id")
+      .where((row) => row.id.eq(story.id))
+      .first();
+
+    expect(remaining).toBeFalsy();
+  });
+
+  it("asks a Google-only account for the username alone", async () => {
+    const user = await createDeletable("d4", null);
+
+    const response = await api.request("/api/account/me", {
+      method: "DELETE",
+      as: user.id,
+      body: { confirmUsername: user.username },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await stillExists(user.id)).toBeFalsy();
+  });
+
+  it("requires a signed-in caller", async () => {
+    const response = await api.request("/api/account/me", {
+      method: "DELETE",
+      body: { confirmUsername: "anyone" },
+    });
+
+    expect(response.status).toBe(401);
+  });
+});
+
+describe.skipIf(!available)("password state on the profile", () => {
+  it("reports whether the account can be signed into with a password", async () => {
+    const withPassword = await api.request("/api/account/me", { as: reader });
+    expect(withPassword.body.hasPassword).toBe(true);
+
+    await db.orm.auth.User.where((u) => u.id.eq(neighbour)).update({
+      passwordHash: null,
+    });
+
+    const googleOnly = await api.request("/api/account/me", { as: neighbour });
+    expect(googleOnly.body.hasPassword).toBe(false);
+    expect(googleOnly.body).not.toHaveProperty("passwordHash");
   });
 });

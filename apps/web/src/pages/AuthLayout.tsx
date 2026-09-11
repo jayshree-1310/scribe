@@ -6,10 +6,17 @@ import { AuthAside } from './AuthAside'
 import './auth.css'
 
 interface AuthLayoutProps {
+  /** Chooses the editorial copy on the ink panel. */
   variant: 'login' | 'register'
   title: string
   subtitle: string
   children: ReactNode
+  /**
+   * The sign-in / create-account switch. Off for the pages that are neither —
+   * forgot password, reset, verify — where offering "Create account" next to
+   * "we have emailed you a link" is a wrong turn rather than a choice.
+   */
+  showSwitch?: boolean
 }
 
 /**
@@ -19,7 +26,13 @@ interface AuthLayoutProps {
  * two screens stay in step and switching between them barely moves anything
  * on screen.
  */
-export function AuthLayout({ variant, title, subtitle, children }: AuthLayoutProps) {
+export function AuthLayout({
+  variant,
+  title,
+  subtitle,
+  children,
+  showSwitch = true,
+}: AuthLayoutProps) {
   return (
     <div className="auth">
       <AuthAside variant={variant} />
@@ -35,14 +48,16 @@ export function AuthLayout({ variant, title, subtitle, children }: AuthLayoutPro
             Back to Scribe
           </Link>
 
-          <nav className="auth__switch" aria-label="Sign in or create an account">
-            <Link to="/login" aria-current={variant === 'login' ? 'page' : undefined}>
-              Sign in
-            </Link>
-            <Link to="/register" aria-current={variant === 'register' ? 'page' : undefined}>
-              Create account
-            </Link>
-          </nav>
+          {showSwitch ? (
+            <nav className="auth__switch" aria-label="Sign in or create an account">
+              <Link to="/login" aria-current={variant === 'login' ? 'page' : undefined}>
+                Sign in
+              </Link>
+              <Link to="/register" aria-current={variant === 'register' ? 'page' : undefined}>
+                Create account
+              </Link>
+            </nav>
+          ) : null}
 
           <header className="auth__head">
             <h1>{title}</h1>

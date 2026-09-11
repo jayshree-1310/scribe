@@ -54,20 +54,22 @@
 .cover--v4 .cover__rule { bottom: 28%; inset-inline: 14% 20%; }
 
 /* Uploaded artwork -------------------------------------------------------
-   Takes a fixed three quarters of the frame rather than whatever the title
-   leaves over, so every cover on a shelf crops its art to the same shape and
-   sets its type on the same baseline -- a proportion that flexed with the
-   length of the title would give each cover a different one. */
+   Fills the frame edge to edge. Real cover art carries its own title, so the
+   component prints none beside it -- and with no type to leave room for there
+   is no padding to keep, which is why the frame's own padding and radius are
+   dropped here rather than the art being inset within them. Every cover on a
+   shelf therefore crops to the same 2:3 shape. */
 .cover--photo {
   justify-content: flex-start;
+  padding: 0;
+  gap: 0;
 }
 
 .cover__art {
-  flex: 0 0 74%;
+  flex: 1 1 100%;
   min-height: 0;
   width: 100%;
   object-fit: cover;
-  border-radius: calc(var(--radius-sm) - 1px);
   /* Shows through while the image loads, and behind a transparent PNG. */
   background: rgba(0, 0, 0, 0.16);
 }
@@ -106,48 +108,6 @@
 .cover--xs .cover__author { display: none; }
 .cover--lg .cover__author,
 .cover--xl .cover__author { font-size: 0.6875rem; }
-
-/* Type is smaller under artwork than on a generated cover, where the title
-   *is* the art. Two lines, because that is what the remaining quarter holds.
-   Declared after the per-size rules above, which match with the same
-   specificity and would otherwise win on source order. */
-.cover--photo .cover__title {
-  font-size: clamp(0.5625rem, 0.3rem + 0.8vw, 0.8125rem);
-  -webkit-line-clamp: 2;
-}
-
-.cover--sm.cover--photo .cover__title { font-size: 0.5rem; }
-.cover--lg.cover--photo .cover__title { font-size: 0.8125rem; }
-.cover--xl.cover--photo .cover__title { font-size: 1rem; }
-
-.cover--photo .cover__author { font-size: 0.5rem; }
-.cover--lg.cover--photo .cover__author,
-.cover--xl.cover--photo .cover__author { font-size: 0.5625rem; }
-
-/* At `sm` the quarter left over holds two lines of title *or* one line plus a
-   byline, and a title truncated to "The Tidewate..." is the worse trade -- the
-   cards at this size print the author underneath the cover anyway. */
-.cover--sm.cover--photo .cover__author { display: none; }
-
-/* At 52px wide there is no room for readable type under the art -- a title
-   there sets at 7px and truncates to a syllable -- and the places that use
-   this size (table rows, dashboard lists, club cards) print the title beside
-   the cover anyway. So the artwork takes the whole frame instead: hiding the
-   type without also releasing the art's fixed 74% would leave a quarter of
-   dead background under the picture. */
-.cover--xs.cover--photo {
-  padding: 0;
-  gap: 0;
-}
-
-.cover--xs.cover--photo .cover__art {
-  flex: 1 1 100%;
-}
-
-.cover--xs.cover--photo .cover__title,
-.cover--xs.cover--photo .cover__author {
-  display: none;
-}
 
 /* Story card ------------------------------------------------------------- */
 

@@ -20,6 +20,13 @@ export interface User {
   avatarHue: number
   joinedAt: string
   isAuthor: boolean
+  /**
+   * Present only for the signed-in account. Another reader's verification
+   * state and whether they hold a password are not ours to know, so no
+   * public profile carries these.
+   */
+  emailVerified?: boolean
+  hasPassword?: boolean
   followerCount: number
   followingCount: number
   /** Aggregates the backend exposes on the profile endpoint. */

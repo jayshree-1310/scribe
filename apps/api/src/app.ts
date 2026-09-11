@@ -14,6 +14,7 @@ import { authenticate } from "./middleware/authenticate.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import accountRouter from "./routes/account.js";
 import authRouter from "./routes/auth.js";
+import authSecurityRouter from "./routes/auth-security.js";
 import authoringRouter from "./routes/authoring.js";
 import booksRouter from "./routes/books.js";
 import libraryRouter from "./routes/library.js";
@@ -93,6 +94,9 @@ app.use(
 
 app.use("/api/account", accountRouter);
 app.use("/api/auth", authRouter);
+// Passwords and email verification, split out of `auth.ts` to keep it
+// readable. Two routers, one prefix: see the header of `auth-security.ts`.
+app.use("/api/auth", authSecurityRouter);
 app.use("/api/author", authoringRouter);
 app.use("/api/books", booksRouter);
 app.use("/api/library", libraryRouter);

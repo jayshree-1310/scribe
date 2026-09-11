@@ -14,6 +14,9 @@ import { RequireAuth } from './components/RequireAuth'
 import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { RegisterPage } from './pages/RegisterPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
+import { VerifyEmailPage } from './pages/VerifyEmailPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { ForWritersPage } from './pages/ForWritersPage'
 import { PrivacyPage, TermsPage } from './pages/LegalPage'
@@ -51,6 +54,10 @@ const router = createBrowserRouter(
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      {/* Reached from a link in an email, so all three must work signed out. */}
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+      <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
       <Route path="/onboarding" element={<OnboardingPage />} />
       <Route path="/for-writers" element={<ForWritersPage />} />
       <Route path="/terms" element={<TermsPage />} />

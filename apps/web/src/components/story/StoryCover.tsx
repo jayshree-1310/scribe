@@ -25,12 +25,13 @@ interface StoryCoverProps {
 /**
  * A story's cover.
  *
- * Both variants — uploaded artwork and generated art — are the same frame in
- * the same palette, drawn from the story's primary genre hue: art sits above
- * the title and author rather than replacing them, so a shelf mixing the two
- * still reads as a shelf. Uploaded artwork is never stretched; it fills the
- * panel and crops, because an author's 4:3 photograph distorted to 2:3 looks
- * worse than a crop of it.
+ * Uploaded artwork takes the whole frame: real cover art already carries its
+ * own title, so setting ours under it prints the name twice. The title and
+ * author are the fallback — they *are* the art on a generated cover, drawn in
+ * the story's primary genre hue so a shelf mixing the two still reads as a
+ * shelf. Uploaded artwork is never stretched; it fills the panel and crops,
+ * because an author's 4:3 photograph distorted to 2:3 looks worse than a crop
+ * of it.
  */
 export function StoryCover({ story, size = 'md', className }: StoryCoverProps) {
   const hue = story.genres[0]?.hue ?? 268
@@ -57,12 +58,14 @@ export function StoryCover({ story, size = 'md', className }: StoryCoverProps) {
       {story.coverUrl ? (
         <img className="cover__art" src={story.coverUrl} alt="" loading="lazy" />
       ) : (
-        <span className="cover__rule" />
+        <>
+          <span className="cover__rule" />
+          <span className="cover__title">{story.title}</span>
+          <span className="cover__author">
+            {story.author.displayName || story.author.username}
+          </span>
+        </>
       )}
-      <span className="cover__title">{story.title}</span>
-      <span className="cover__author">
-        {story.author.displayName || story.author.username}
-      </span>
     </div>
   )
 }

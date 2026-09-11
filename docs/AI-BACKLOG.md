@@ -990,7 +990,8 @@ Not a task you do at the end — a checklist you audit at the end.
 >   content behind an explicit debug flag that is off in production.
 > - Retention: decide and document how long conversations, usage rows and
 >   generated artefacts live, and add the deletion path — including what
->   `DELETE /api/account/me` (Task 4) has to remove.
+>   `DELETE /api/account/me` has to remove -- see the deletion policy
+>   documented in `services/account.ts`.
 > - Abuse: detect and throttle a caller burning budget in a loop, and make the
 >   429 informative.
 >

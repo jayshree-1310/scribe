@@ -12,9 +12,12 @@ import { z } from "zod";
 import { HttpError } from "../lib/http-error.js";
 import { parseOrThrow } from "../lib/validate.js";
 import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
+import { emailSchema, usernameSchema } from "../lib/auth-schemas.js";
+import { clearRefreshCookie } from "../lib/sessions.js";
 import { requireUser, requireUserId } from "../middleware/current-user.js";
 import {
   MAX_AVATAR_BYTES,
+  deleteAccount,
   getProfile,
   removeAvatar,
   setAvatar,
@@ -24,28 +27,6 @@ import {
 const router = Router();
 
 router.use(requireUser);
-
-/**
- * Kept in step with `routes/auth.ts` and the web form
- * (`apps/web/src/lib/auth.ts`) on purpose: three rules that disagree means the
- * form accepts names signup rejects, or the reverse.
- *
- * Lower-cased because the column is `@unique`, which is case-sensitive —
- * without normalising, `Alice` and `alice` are two accounts that look like one.
- */
-const usernameSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .min(3, "Use at least 3 characters.")
-  .max(24, "Use at most 24 characters.")
-  .regex(/^[a-z0-9_]+$/, "Use only letters, numbers and underscores.");
-
-const emailSchema = z
-  .string()
-  .trim()
-  .toLowerCase()
-  .email("That email address does not look right.");
 
 /** Matches the counter the settings form shows. */
 const BIO_MAX = 280;
@@ -62,6 +43,15 @@ const updateSchema = z
   .refine((value) => Object.keys(value).length > 0, {
     message: "Nothing to update.",
   });
+
+/**
+ * Deleting an account asks for the username back, and for the password when
+ * the account has one — see `services/account.ts` for why each is there.
+ */
+const deleteSchema = z.object({
+  confirmUsername: z.string().trim().min(1, "Type your username to confirm."),
+  password: z.string().min(1).max(128).optional(),
+});
 
 /** Avatar uploads per user per window, and how long the window lasts. */
 const AVATAR_UPLOAD_LIMIT = 10;
@@ -124,6 +114,28 @@ router.post("/avatar", avatarBody, async (req, res, next) => {
     }
 
     res.json(await setAvatar(userId, req.body));
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Closing the account. A body on a DELETE is unusual, but the confirmation it
+ * carries has to be on the request that performs the deletion — putting it in
+ * the query string would write it into every access log on the way.
+ *
+ * The refresh cookie is scoped to `/api/auth` so it cannot be *read* here,
+ * but `Set-Cookie` names the path it clears, so it can still be removed.
+ */
+router.delete("/me", async (req, res, next) => {
+  try {
+    const body = parseOrThrow(deleteSchema, req.body ?? {});
+
+    await deleteAccount(requireUserId(res), body);
+
+    clearRefreshCookie(res);
+
+    res.json({ message: "Your account has been deleted." });
   } catch (error) {
     next(error);
   }

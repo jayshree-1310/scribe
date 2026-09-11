@@ -23,6 +23,12 @@ export interface AccountProfile {
   readerLevel: number
   authorLevel: number
   joinedAt: string
+  /**
+   * Whether this account can be signed into with a password at all. Google
+   * accounts start without one, so the settings form offers "set a password"
+   * rather than "change your password".
+   */
+  hasPassword: boolean
 }
 
 /** Only the fields the caller is changing; anything omitted is left alone. */
@@ -69,4 +75,16 @@ export function uploadAvatar(file: File): Promise<AccountProfile> {
 
 export function removeAvatar(): Promise<AccountProfile> {
   return request<AccountProfile>('/account/avatar', { method: 'DELETE' })
+}
+
+/**
+ * Closes the account for good. The username is typed back as confirmation,
+ * and the password is required whenever the account has one — see
+ * `apps/api/src/services/account.ts` for what is removed and what that costs.
+ */
+export function deleteMyAccount(input: {
+  confirmUsername: string
+  password?: string
+}): Promise<{ message: string }> {
+  return request('/account/me', { method: 'DELETE', body: input })
 }

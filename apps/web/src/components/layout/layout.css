@@ -618,3 +618,58 @@ a.logo:hover .logo__mark {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Unverified-email banner -------------------------------------------------- */
+
+.verify-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--border);
+  background-color: var(--warning-soft);
+  color: var(--text);
+}
+
+.verify-banner__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--warning);
+}
+
+.verify-banner__text {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.verify-banner__text strong {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.verify-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: none;
+}
+
+@media (max-width: 47.99rem) {
+  .verify-banner {
+    flex-wrap: wrap;
+    padding-inline: var(--space-4);
+  }
+
+  .verify-banner__text {
+    flex-basis: 100%;
+    order: 1;
+  }
+
+  .verify-banner__actions {
+    order: 2;
+    margin-left: auto;
+  }
+}

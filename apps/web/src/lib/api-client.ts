@@ -120,12 +120,30 @@ function isBinary(body: unknown): body is Blob | ArrayBuffer | ArrayBufferView {
 }
 
 /**
- * Auth endpoints mint and clear the session themselves, so they must not be
+ * Endpoints that mint, clear or deliberately skip a session. They must not be
  * routed through the token bootstrap or the refresh-and-replay below — doing
- * so would have `/auth/refresh` recurse into itself.
+ * so would have `/auth/refresh` recurse into itself, and would make the
+ * signed-out flows (a reset link opened in a fresh browser) wait on a refresh
+ * that is always going to fail.
+ *
+ * Listed rather than matched on the `/auth/` prefix: the password-change and
+ * resend-verification routes live under the same prefix and *do* need the
+ * bearer token, and a prefix match silently sent them anonymously.
  */
-function isAuthEndpoint(path: string): boolean {
-  return path.startsWith('/auth/')
+const SESSION_ENDPOINTS = new Set([
+  '/auth/signup',
+  '/auth/login',
+  '/auth/google',
+  '/auth/refresh',
+  '/auth/logout',
+  '/auth/logout-all',
+  '/auth/forgot-password',
+  '/auth/reset-password',
+  '/auth/verify-email',
+])
+
+function isSessionEndpoint(path: string): boolean {
+  return SESSION_ENDPOINTS.has(path)
 }
 
 export async function request<T>(
@@ -139,7 +157,7 @@ export async function request<T>(
    * is null until `/auth/refresh` answers, and a request that went out in that
    * window came back 401 with the API's "Sign in to use your library."
    */
-  const bootstrapped = isAuthEndpoint(path) ? null : await ensureAccessToken()
+  const bootstrapped = isSessionEndpoint(path) ? null : await ensureAccessToken()
 
   return send<T>(path, { method, body, query, headers, signal }, bootstrapped)
 }
@@ -204,7 +222,7 @@ async function send<T>(
    * this to a single attempt, and the refresh itself is de-duplicated, so a
    * page whose requests all 401 at once shares one refresh between them.
    */
-  if (response.status === 401 && !retried && !isAuthEndpoint(path)) {
+  if (response.status === 401 && !retried && !isSessionEndpoint(path)) {
     const renewed = await refreshAccessToken()
     if (renewed) {
       return send<T>(path, { method, body, query, headers, signal }, renewed, true)

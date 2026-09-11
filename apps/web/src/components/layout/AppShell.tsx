@@ -7,6 +7,7 @@ import { Icon } from '../ui/Icon'
 import { MobileNav } from './MobileNav'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
+import { VerifyEmailBanner } from './VerifyEmailBanner'
 import { AUTHOR_NAV, READER_NAV } from './nav-config'
 import './layout.css'
 
@@ -85,6 +86,9 @@ export function AppShell({ children, variant = 'reader', width = 'default' }: Ap
 
       <div className="shell__main">
         <TopBar onOpenNav={() => setDrawerOpen(true)} />
+        {/* Above <main>, which is keyed on the path and remounts on every
+            navigation — the banner should not flicker as pages change. */}
+        <VerifyEmailBanner />
         <main className={cn('shell__content', `shell__content--${width}`)} id="main" key={location.pathname}>
           {children}
         </main>

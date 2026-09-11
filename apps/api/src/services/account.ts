@@ -6,10 +6,13 @@
  * decide whose profile is read or written.
  */
 
+import argon2 from "argon2";
 import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.js";
+import { deleteAll } from "../prisma/delete-all.js";
 import { HttpError } from "../lib/http-error.js";
 import { sniffImage } from "../lib/image.js";
+import { revokeAllSessions } from "../lib/sessions.js";
 import { storage } from "../lib/storage.js";
 
 /** The profile shape the account endpoints return. Written out field by field
@@ -28,6 +31,13 @@ export interface AccountProfile {
   readerLevel: number;
   authorLevel: number;
   joinedAt: string;
+  /**
+   * Whether this account can be signed into with a password at all. A
+   * Google-only account has none (`contract.prisma`), so the settings form
+   * has to offer "set a password" rather than "change your password" — and
+   * the *hash itself* obviously never leaves the server, only this boolean.
+   */
+  hasPassword: boolean;
 }
 
 export interface ProfileUpdate {
@@ -63,6 +73,9 @@ const PROFILE_COLUMNS = [
   "readerLevel",
   "authorLevel",
   "createdAt",
+  // Read only to answer `hasPassword` below. `toProfile` is the reason that
+  // is safe: it names every field it returns, so the hash has no path out.
+  "passwordHash",
 ] as const;
 
 function toProfile(row: {
@@ -78,6 +91,7 @@ function toProfile(row: {
   readerLevel: number;
   authorLevel: number;
   createdAt: unknown;
+  passwordHash: string | null;
 }): AccountProfile {
   return {
     id: row.id,
@@ -92,6 +106,7 @@ function toProfile(row: {
     readerLevel: row.readerLevel,
     authorLevel: row.authorLevel,
     joinedAt: toIso(row.createdAt),
+    hasPassword: row.passwordHash !== null,
   };
 }
 
@@ -274,4 +289,184 @@ export async function removeAvatar(userId: string): Promise<AccountProfile> {
   }
 
   return loadProfile(userId);
+}
+
+/* Deletion --------------------------------------------------------------- */
+
+/**
+ * What a caller must send to close their account.
+ *
+ * `confirmUsername` is not security — anyone holding the session already
+ * knows it — it is the friction that separates "I meant this" from a
+ * mis-click on an irreversible button. The password is the security part,
+ * and only accounts that have one can be asked for it.
+ */
+export interface AccountDeletion {
+  confirmUsername: string;
+  password?: string | undefined;
+}
+
+/**
+ * Closes an account and removes what it left behind.
+ *
+ * **The policy is hard deletion, and it includes the person's stories.** That
+ * is the promise the settings page has always made ("This removes your
+ * profile, stories, comments and reading history"), and quietly keeping
+ * published work under an "[deleted]" byline would make that a lie. It is the
+ * harsher of the two reasonable choices: the alternative — anonymising
+ * authorship so readers keep the story — is defensible, but it takes the
+ * author's decision away from them and cannot be undone either.
+ *
+ * Two consequences worth stating plainly:
+ *
+ * - Other readers' shelves, ratings, comments and reading progress against
+ *   those stories go with them. There is no story left for those rows to
+ *   point at, so this is deletion, not a cascade we chose.
+ * - Clubs and channels this person created are deleted along with their
+ *   memberships and posts. Transfer of ownership is a feature those tasks
+ *   can add; inventing one here would be guessing at it.
+ *
+ * The row removal runs in one transaction, so a failure part-way through
+ * cannot leave an account half gone. The avatar file and the sessions are
+ * cleaned up *after* it commits, because neither can be rolled back.
+ */
+export async function deleteAccount(
+  userId: string,
+  input: AccountDeletion,
+): Promise<void> {
+  const user = await db.orm.auth.User.select("id", "username", "passwordHash")
+    .where((u) => u.id.eq(userId))
+    .first();
+
+  if (!user) throw HttpError.unauthorized("Your account no longer exists.");
+
+  if (input.confirmUsername.trim().toLowerCase() !== user.username) {
+    throw HttpError.badRequest("Some of the details need fixing.", {
+      confirmUsername: `Type ${user.username} to confirm.`,
+    });
+  }
+
+  if (user.passwordHash !== null) {
+    // An unreadable stored hash counts as a mismatch rather than a 500 — the
+    // same rule `services/passwords.ts` applies, for the same reason.
+    const valid =
+      input.password !== undefined &&
+      (await argon2
+        .verify(user.passwordHash, input.password)
+        .catch(() => false));
+
+    if (!valid) {
+      throw HttpError.badRequest("Some of the details need fixing.", {
+        password: "That is not your password.",
+      });
+    }
+  }
+
+  const avatarUrl = (await loadProfile(userId)).avatarUrl;
+
+  await db.transaction(async (tx) => {
+    const stories = await tx.orm.content.Story.select("id")
+      .where((story) => story.authorId.eq(userId))
+      .all();
+
+    for (const { id: storyId } of stories) {
+      const chapters = await tx.orm.content.Chapter.select("id")
+        .where((chapter) => chapter.storyId.eq(storyId))
+        .all();
+
+      for (const { id: chapterId } of chapters) {
+        await deleteAll(() =>
+          tx.orm.content.Multimedia.where((item) => item.chapterId.eq(chapterId)),
+        );
+      }
+
+      // Everyone's rows against this story, not just the author's: the story
+      // is going, and a rating pointing at nothing is a foreign-key error.
+      await deleteAll(() =>
+        tx.orm.engagement.Comment.where((row) => row.storyId.eq(storyId)),
+      );
+      await deleteAll(() =>
+        tx.orm.engagement.Rating.where((row) => row.storyId.eq(storyId)),
+      );
+      await deleteAll(() =>
+        tx.orm.engagement.ReadingHistory.where((row) => row.storyId.eq(storyId)),
+      );
+      await deleteAll(() =>
+        tx.orm.library.LibraryEntry.where((row) => row.storyId.eq(storyId)),
+      );
+      await deleteAll(() =>
+        tx.orm.challenges.ChallengeEntry.where((row) => row.storyId.eq(storyId)),
+      );
+      await deleteAll(() =>
+        tx.orm.content.StoryGenre.where((row) => row.storyId.eq(storyId)),
+      );
+      await deleteAll(() =>
+        tx.orm.content.Chapter.where((row) => row.storyId.eq(storyId)),
+      );
+
+      await tx.orm.content.Story.where((row) => row.id.eq(storyId)).delete();
+    }
+
+    // What this person left on other people's work.
+    await deleteAll(() =>
+      tx.orm.engagement.Comment.where((row) => row.userId.eq(userId)),
+    );
+    await deleteAll(() =>
+      tx.orm.engagement.Rating.where((row) => row.userId.eq(userId)),
+    );
+    await deleteAll(() =>
+      tx.orm.engagement.ReadingHistory.where((row) => row.userId.eq(userId)),
+    );
+    await deleteAll(() =>
+      tx.orm.library.LibraryEntry.where((row) => row.userId.eq(userId)),
+    );
+    await deleteAll(() =>
+      tx.orm.challenges.ChallengeEntry.where((row) => row.userId.eq(userId)),
+    );
+    await deleteAll(() =>
+      tx.orm.gamification.UserBadge.where((row) => row.userId.eq(userId)),
+    );
+    await deleteAll(() =>
+      tx.orm.clubs.ClubMembership.where((row) => row.userId.eq(userId)),
+    );
+    await deleteAll(() =>
+      tx.orm.channels.ChannelSubscriber.where((row) => row.userId.eq(userId)),
+    );
+
+    const clubs = await tx.orm.clubs.BookClub.select("id")
+      .where((club) => club.creatorId.eq(userId))
+      .all();
+
+    for (const { id: clubId } of clubs) {
+      await deleteAll(() =>
+        tx.orm.clubs.ClubMembership.where((row) => row.clubId.eq(clubId)),
+      );
+      await tx.orm.clubs.BookClub.where((row) => row.id.eq(clubId)).delete();
+    }
+
+    const channels = await tx.orm.channels.BroadcastChannel.select("id")
+      .where((channel) => channel.authorId.eq(userId))
+      .all();
+
+    for (const { id: channelId } of channels) {
+      await deleteAll(() =>
+        tx.orm.channels.ChannelPost.where((row) => row.channelId.eq(channelId)),
+      );
+      await deleteAll(() =>
+        tx.orm.channels.ChannelSubscriber.where((row) =>
+          row.channelId.eq(channelId),
+        ),
+      );
+      await tx.orm.channels.BroadcastChannel.where((row) =>
+        row.id.eq(channelId),
+      ).delete();
+    }
+
+    await tx.orm.auth.User.where((row) => row.id.eq(userId)).delete();
+  });
+
+  // Past the point of no return: neither of these can fail the deletion, and
+  // both would be wrong to retry against an account that no longer exists.
+  await revokeAllSessions(userId);
+  if (avatarUrl) await storage.remove(avatarUrl);
 }

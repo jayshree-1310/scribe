@@ -36,6 +36,8 @@ function toUser(profile: AccountProfile): User {
     bio: profile.bio ?? '',
     avatarUrl: profile.avatarUrl,
     isAuthor: profile.isAuthor,
+    emailVerified: profile.emailVerified,
+    hasPassword: profile.hasPassword,
     joinedAt: profile.joinedAt,
     stats: {
       ...db.currentUser.stats,

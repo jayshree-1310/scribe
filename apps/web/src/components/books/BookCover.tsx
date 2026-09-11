@@ -11,9 +11,10 @@ interface BookCoverProps {
 
 /**
  * A book's cover — the same frame `StoryCover` draws, over the same
- * `content.Story` table. Artwork where the edition has some, generated art
- * from the title, author and primary genre where it does not, so a catalogue
- * with patchy imagery still reads as a shelf rather than a list of grey boxes.
+ * `content.Story` table. Artwork where the edition has some, filling the
+ * frame; generated art from the title, author and primary genre where it does
+ * not, so a catalogue with patchy imagery still reads as a shelf rather than a
+ * list of grey boxes.
  */
 export function BookCover({ book, size = 'md', className }: BookCoverProps) {
   const hue = book.genres[0]?.hue ?? 268
@@ -40,10 +41,12 @@ export function BookCover({ book, size = 'md', className }: BookCoverProps) {
       {book.coverUrl ? (
         <img className="cover__art" src={book.coverUrl} alt="" loading="lazy" />
       ) : (
-        <span className="cover__rule" />
+        <>
+          <span className="cover__rule" />
+          <span className="cover__title">{book.title}</span>
+          <span className="cover__author">{authorName(book.author)}</span>
+        </>
       )}
-      <span className="cover__title">{book.title}</span>
-      <span className="cover__author">{authorName(book.author)}</span>
     </div>
   )
 }
