@@ -34,6 +34,12 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Neon's hostname carries both A and AAAA records. Node races the two
+      # families (Happy Eyeballs) on a 250ms budget per address, so on a host
+      # with no working IPv6 route every connection dies as a bogus
+      # AggregateError [ETIMEDOUT] long before `connectionTimeoutMillis`.
+      - key: NODE_OPTIONS
+        value: --dns-result-order=ipv4first --network-family-autoselection-attempt-timeout=2000
       # PORT is injected by Render; server.ts already reads it.
 
       # Render's own free Postgres is deleted after 30 days, so the database
