@@ -1,0 +1,100 @@
+# Render blueprint — the deployed equivalent of docker-compose.prod.yml.
+#
+# Render has no Docker daemon inside a service, so Compose cannot run there:
+# each Compose service becomes its own Render resource instead. `postgres` and
+# `redis` become managed add-ons, `api` keeps its Dockerfile, and `web` becomes
+# a static site rather than an nginx container (Render serves and CDN-caches
+# the bundle itself, so the nginx hop buys nothing).
+#
+# Apply with: Render dashboard -> New -> Blueprint, pointed at this repo.
+
+databases:
+  - name: scribe-db
+    databaseName: scribe
+    user: scribe
+    plan: free # free Postgres is deleted after 30 days; use `basic-256mb` to keep it
+
+services:
+  # --- redis ---------------------------------------------------------------
+  - type: keyvalue
+    name: scribe-redis
+    plan: free
+    # Reachable only from other services in this blueprint, never the internet.
+    ipAllowList: []
+
+  # --- api -----------------------------------------------------------------
+  - type: web
+    name: scribe-api
+    runtime: docker
+    # Context is the repo root because the Dockerfile copies the workspace
+    # manifests (pnpm-workspace.yaml, both app package.json files).
+    dockerContext: .
+    dockerfilePath: ./apps/api/Dockerfile
+    plan: starter # a disk cannot be attached to a free instance
+    healthCheckPath: /health
+    # Uploads are written to the local filesystem, which is wiped on every
+    # deploy and restart without this.
+    disk:
+      name: scribe-uploads
+      mountPath: /var/lib/scribe/uploads
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # PORT is injected by Render; server.ts already reads it.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: scribe-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: keyvalue
+          name: scribe-redis
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 30d
+      - key: LOG_LEVEL
+        value: info
+      # Render's load balancer is the single hop in front of the API, so one
+      # forwarded address can be trusted for rate-limit bucketing.
+      - key: TRUST_PROXY
+        value: "1"
+      - key: UPLOAD_DIR
+        value: /var/lib/scribe/uploads
+      # The web app is on a different origin now, so avatar URLs the API hands
+      # out must be absolute. Set to this service's own URL.
+      - key: PUBLIC_UPLOAD_BASE_URL
+        sync: false
+      # The static site's URL, e.g. https://scribe-web.onrender.com — a
+      # blueprint cannot build it from `property: host`, so it is set by hand.
+      - key: CORS_ORIGIN
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+
+  # --- web -----------------------------------------------------------------
+  - type: web
+    name: scribe-web
+    runtime: static
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter web build
+    staticPublishPath: ./apps/web/dist
+    envVars:
+      # Vite inlines VITE_* at build time, so these are build inputs: changing
+      # one needs a redeploy, not a restart.
+      #
+      # The API's URL, e.g. https://scribe-api.onrender.com.
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_GOOGLE_CLIENT_ID
+        sync: false
+    routes:
+      # Client-side routing: unknown paths are React Router's, not 404s.
+      - type: rewrite
+        source: /*
+        destination: /index.html
