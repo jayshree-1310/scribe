@@ -43,6 +43,7 @@ export class TestApi {
     genres: [] as string[],
     clubs: [] as string[],
     channels: [] as string[],
+    challenges: [] as string[],
     users: [] as string[],
   };
 
@@ -303,6 +304,12 @@ export class TestApi {
     }
   }
 
+  trackChallenge(challengeId: string): void {
+    if (!this.created.challenges.includes(challengeId)) {
+      this.created.challenges.push(challengeId);
+    }
+  }
+
   /* Clubs ---------------------------------------------------------------- */
 
   /**
@@ -365,6 +372,76 @@ export class TestApi {
     });
 
     return row.id;
+  }
+
+  /* Challenges ----------------------------------------------------------- */
+
+  /**
+   * A writing challenge whose window is given in days from now.
+   *
+   * Relative rather than absolute, because every rule worth testing is about
+   * where `now()` falls: `{ opensIn: 2 }` is upcoming, `{ opensIn: -1,
+   * closesIn: 1 }` is active, and `{ closesIn: -1 }` is past. A suite cannot
+   * wait a day and must not move the clock, which the database's own `now()`
+   * would not follow.
+   */
+  async createChallenge(input: {
+    title: string;
+    hostId: string;
+    /** Days from now the window opens. Negative is in the past. */
+    opensIn?: number;
+    /** Days from now the window closes. */
+    closesIn?: number;
+    slug?: string;
+    prompt?: string;
+    wordTarget?: number | null;
+  }): Promise<{ id: string; slug: string }> {
+    const slug = `${this.runId}-${input.slug ?? slugify(input.title)}`.slice(0, 80);
+    const day = 24 * 60 * 60 * 1000;
+
+    const challenge = await db.orm.challenges.WritingChallenge.select("id").create({
+      title: input.title,
+      slug,
+      prompt: input.prompt ?? "Write something about a door.",
+      description: `${input.title} — fixture`,
+      wordTarget: input.wordTarget === undefined ? 1000 : input.wordTarget,
+      hostId: input.hostId,
+      startAt: Temporal.Instant.from(
+        new Date(Date.now() + (input.opensIn ?? -1) * day).toISOString(),
+      ),
+      endAt: Temporal.Instant.from(
+        new Date(Date.now() + (input.closesIn ?? 7) * day).toISOString(),
+      ),
+    });
+
+    this.created.challenges.push(challenge.id);
+    return { id: challenge.id, slug };
+  }
+
+  /** A place in a challenge, with a story on it when one is given. */
+  async createChallengeEntry(input: {
+    challengeId: string;
+    userId: string;
+    storyId?: string | null;
+    note?: string | null;
+    submittedAt?: Date;
+  }): Promise<string> {
+    const entry = await db.orm.challenges.ChallengeEntry.select("id").create({
+      challengeId: input.challengeId,
+      userId: input.userId,
+      storyId: input.storyId ?? null,
+      note: input.note ?? null,
+      ...(input.submittedAt
+        ? { submittedAt: Temporal.Instant.from(input.submittedAt.toISOString()) }
+        : {}),
+    });
+
+    return entry.id;
+  }
+
+  /** Makes a fixture account an administrator, which no endpoint can do. */
+  async setAdmin(userId: string, isAdmin = true): Promise<void> {
+    await db.orm.auth.User.where((user) => user.id.eq(userId)).update({ isAdmin });
   }
 
   /* Channels ------------------------------------------------------------- */
@@ -586,6 +663,11 @@ export class TestApi {
         .where((channel) => channel.authorId.eq(userId))
         .all();
       for (const channel of channels) this.trackChannel(channel.id);
+
+      const challenges = await db.orm.challenges.WritingChallenge.select("id")
+        .where((challenge) => challenge.hostId.eq(userId))
+        .all();
+      for (const challenge of challenges) this.trackChallenge(challenge.id);
     }
 
     /**
@@ -622,6 +704,31 @@ export class TestApi {
 
       await db.orm.channels.BroadcastChannel.where((channel) =>
         channel.id.eq(channelId),
+      ).delete();
+    }
+
+    /**
+     * Challenges go before the stories below for the reason clubs do:
+     * `ChallengeEntry.storyId` references `content.Story`, so an entry still
+     * pointing at a fixture story would block that story's delete. The
+     * per-user sweep catches a fixture reader's place in a *seeded* challenge,
+     * which the per-challenge loop never visits.
+     */
+    for (const userId of this.created.users) {
+      await deleteAll(() =>
+        db.orm.challenges.ChallengeEntry.where((row) => row.userId.eq(userId)),
+      );
+    }
+
+    for (const challengeId of this.created.challenges) {
+      await deleteAll(() =>
+        db.orm.challenges.ChallengeEntry.where((row) =>
+          row.challengeId.eq(challengeId),
+        ),
+      );
+
+      await db.orm.challenges.WritingChallenge.where((challenge) =>
+        challenge.id.eq(challengeId),
       ).delete();
     }
 

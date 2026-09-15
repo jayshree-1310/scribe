@@ -65,6 +65,18 @@ namespace auth {
     bio         String?
 
     isAuthor      Boolean @default(false)
+
+    /// Platform administrator: may create and edit writing challenges, and is
+    /// the flag every later privileged surface reads rather than inventing a
+    /// second one.
+    ///
+    /// A boolean rather than a role enum because there is exactly one
+    /// privileged set of actions today -- two enum values that did the same
+    /// thing would be a distinction nothing enforces. Granted by
+    /// `scripts/grant-admin.ts`; there is no endpoint that sets it, so no
+    /// request can escalate itself.
+    isAdmin       Boolean @default(false)
+
     readingStreak Int     @default(0)
 
     /// The reading event `readingStreak` was last advanced for.
@@ -94,6 +106,7 @@ namespace auth {
     following        engagement.Follow[] @relation("Following")
     badges           gamification.UserBadge[]
     challengeEntries challenges.ChallengeEntry[]
+    hostedChallenges challenges.WritingChallenge[]
     createdClubs     clubs.BookClub[]
     clubMemberships  clubs.ClubMembership[]
     clubDiscussions  clubs.ClubDiscussion[]
@@ -353,32 +366,85 @@ namespace gamification {
 }
 
 namespace challenges {
+  /// A timed writing brief: a prompt, a window, and the entries written to it.
+  ///
+  /// There is deliberately no stored status column. "Active", "upcoming" and
+  /// "past" are the three positions `now()` can hold against `startAt` and
+  /// `endAt`, so a column would be a second answer to the same question -- one
+  /// that a missed job leaves wrong while the dates stay right.
   model WritingChallenge {
     id          String   @id @default(uuid())
     title       String
-    description String?
-    startAt     DateTime
-    endAt       DateTime
-    createdAt   DateTime @default(now())
 
+    /// Stable, URL-safe identity, derived once from the title. Every
+    /// reader-facing challenge URL addresses one by this rather than by id --
+    /// the same rule `content.Story.slug` and `clubs.BookClub.slug` follow.
+    slug        String   @unique
+
+    /// The brief itself, rendered as the challenge's pull quote. Separate from
+    /// `description`, which is the long form underneath it.
+    prompt      String
+    description String?
+
+    /// Words the host is asking for, or null for "no limit". Advisory: nothing
+    /// rejects an entry for missing it, because enforcing a target would mean
+    /// deciding what counts as a word.
+    wordTarget  Int?
+
+    /// The admin who set the brief. Recorded for the reason
+    /// `clubs.BookClub.creatorId` is -- who started it does not change -- and
+    /// it authorises nothing on its own: `auth.User.isAdmin` is what an edit
+    /// is checked against.
+    hostId      String
+
+    startAt   DateTime
+    endAt     DateTime
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+
+    host    auth.User
+      @relation(fields: [hostId], references: [id])
     entries ChallengeEntry[]
+
+    /// The list endpoint sorts the whole table against `now()` on this pair.
+    @@index([startAt, endAt])
   }
 
+  /// One writer's place in one challenge.
+  ///
+  /// Entering and submitting are two steps, which is why `storyId` is
+  /// nullable: `POST /:id/enter` takes the place, `PUT /entries/:id` attaches
+  /// the story once there is one to attach. That split is also what makes the
+  /// challenge page's two stats mean different things -- participants are
+  /// rows, entries are rows with a story on them.
   model ChallengeEntry {
     id          String   @id @default(uuid())
     challengeId String
     userId      String
-    storyId     String
+
+    /// Null until the entrant attaches a story, and swappable until the
+    /// window closes.
+    storyId     String?
+
+    /// The entrant's own note about their submission, returned only on their
+    /// own entry. Stored rather than discarded because the dialog that
+    /// collects it also re-opens on it.
+    note        String?
+
     submittedAt DateTime @default(now())
+    updatedAt   DateTime @default(now())
 
     challenge WritingChallenge
       @relation(fields: [challengeId], references: [id])
     user auth.User
       @relation(fields: [userId], references: [id])
-    story content.Story
+    story content.Story?
       @relation(fields: [storyId], references: [id])
 
-    @@unique([challengeId, userId, storyId])
+    /// One place per writer per challenge. Was `[challengeId, userId,
+    /// storyId]`, which let one writer hold several rows on the leaderboard
+    /// and made "already entered?" a question with no single answer.
+    @@unique([challengeId, userId])
   }
 }
 

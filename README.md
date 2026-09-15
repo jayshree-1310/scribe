@@ -21,8 +21,11 @@ which parts are real today.
 | Stories & chapters — public reading                                            | **Real API**                                                                |
 | Author studio — stories, chapters, reorder, publish/unpublish, multimedia rows | **Real API**                                                                |
 | Image uploads (`kind=cover`)                                                   | **Real API**                                                                |
-| Home feed, profiles, onboarding, badges, clubs, channels, challenges           | **Mock** (`apps/web/src/data/api.ts` + `mock-db.ts`)                        |
-| Comments, ratings, reading progress, notifications, moderation                 | Not built — see `docs/BACKLOG.md`                                           |
+| Home feed, public profiles & follows, clubs, channels                          | **Real API**                                                                |
+| Comments, ratings, reading progress & streak                                   | **Real API**                                                                |
+| Writing challenges & leaderboard                                               | **Real API**                                                                |
+| Onboarding answers, badges                                                     | **Mock** (`apps/web/src/data/api.ts` + `mock-db.ts`)                        |
+| Notifications, moderation, author analytics, recommendations                   | Not built — see `docs/BACKLOG.md`                                           |
 | GenAI features                                                                 | Provider seam only — see `docs/AI-BACKLOG.md` and `docs/ai-architecture.md` |
 
 Two planning documents drive the work, and both are grounded in the current
@@ -247,8 +250,17 @@ docker compose run --rm api-migrate
 ### 5. Optional: seed sample content
 
 ```bash
-docker compose exec api pnpm --filter api seed:books    # catalogue books + a demo reader
-docker compose exec api pnpm --filter api seed:stories  # Scribe stories with chapters
+docker compose exec api pnpm --filter api seed:books       # catalogue books + a demo reader
+docker compose exec api pnpm --filter api seed:stories     # Scribe stories with chapters
+docker compose exec api pnpm --filter api seed:challenges  # writing challenges, past and upcoming
+```
+
+Writing challenges can only be created by an administrator, and no endpoint
+grants that flag — so it is set against the database:
+
+```bash
+docker compose exec api pnpm --filter api admin:grant <username>
+docker compose exec api pnpm --filter api admin:grant <username> --revoke
 ```
 
 | Service    | URL                                               |
@@ -477,6 +489,35 @@ same shape as a club's discussions. `content.Story.ratingAverage` and
 `ratingCount` are denormalised and recomputed inside the same transaction as
 every rating write, because `sort=rating` orders in SQL over that table.
 
+### Writing challenges — `routes/challenges.ts`
+
+Browsing is public; entering needs a signed-in user, and hosting needs an
+administrator (`auth.User.isAdmin`, granted by `admin:grant` above and read in
+one place, `services/roles.ts`).
+
+```text
+GET    /api/challenges                  # active, upcoming and past, in one response
+GET    /api/challenges/:slug            # detail + the caller's own entry
+GET    /api/challenges/:slug/leaderboard
+
+POST   /api/challenges/:id/enter        # take a place; 409 outside the window or twice
+PUT    /api/challenges/entries/:id      # attach, swap or clear the story; edit the note
+DELETE /api/challenges/entries/:id      # withdraw, while the window is open
+
+POST   /api/challenges                  # administrators only
+PATCH  /api/challenges/:id              # administrators only
+```
+
+A challenge's state — `upcoming`, `active`, `past` — is derived from its date
+window rather than stored, so nothing can be left stale by a job that did not
+run. Entering and submitting are separate steps, which is why a place can exist
+with no story on it and why "participants" and "entries" are different numbers.
+The leaderboard ranks in SQL by the **sum of the star ratings each entry's
+story has earned** — there is no ballot in the contract, and `RANKING` in
+`services/challenges.ts` is the one place that rule lives. Only published
+stories are ranked, and the board is built anonymously so every viewer sees the
+same order.
+
 ### Health
 
 ```text
@@ -517,9 +558,9 @@ docker compose exec api pnpm --filter api test routes/authoring
 ```
 
 Covered today: auth (incl. Google), account, books, library, stories, authoring,
-uploads, reading progress, clubs, channels, comments + ratings, and public
-profiles + follows, plus the AI provider seam. The web app has no test suite
-yet.
+uploads, reading progress, clubs, channels, comments + ratings, public profiles
++ follows, and writing challenges, plus the AI provider seam. The web app has
+no test suite yet.
 
 ## 📌 Development Roadmap
 
@@ -542,7 +583,7 @@ yet.
 - [x] Logout / logout-all
 - [x] Google sign-in
 - [ ] Password reset & email verification
-- [ ] Role-based authorization (ownership checks only, so far)
+- [x] Role-based authorization (`auth.User.isAdmin`, read only in `services/roles.ts`)
 
 ### Phase 3 — Core Platform
 
@@ -555,14 +596,14 @@ yet.
 - [x] Reader experience (story detail, chapter reader)
 - [x] Image uploads (covers, avatars)
 - [ ] Audio/video uploads for chapter multimedia
-- [ ] Public author profiles
+- [x] Public author profiles
 
 ### Phase 4 — Social Features
 
 - [x] Comments
 - [x] Ratings
 - [x] Reading history & progress
-- [ ] Follows
+- [x] Follows
 - [ ] Notifications
 
 ### Phase 5 — Platform Features
@@ -572,9 +613,9 @@ yet.
 - [ ] Author analytics on real data
 - [ ] Content moderation & reporting
 - [ ] Badges and levels
-- [ ] Writing challenges
-- [ ] Book clubs
-- [ ] Broadcast channels
+- [x] Writing challenges
+- [x] Book clubs
+- [x] Broadcast channels
 - [ ] Retire the mock data layer
 
 ### Phase 6 — GenAI (`docs/AI-BACKLOG.md`)

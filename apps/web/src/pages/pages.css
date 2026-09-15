@@ -607,6 +607,14 @@
   margin-top: var(--space-6);
 }
 
+/* What the caller's own entry says, under the actions that change it. */
+.challenge-hero__entry {
+  max-width: 68ch;
+  margin-top: var(--space-4);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
 .leaderboard > li {
   display: flex;
   align-items: center;

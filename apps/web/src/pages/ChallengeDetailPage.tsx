@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import type { CSSProperties } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
+import { hueFor } from '../lib/cover'
 import { daysUntil, formatCount, formatDate } from '../lib/format'
-import * as api from '../data/api'
+import { ApiError } from '../lib/api-client'
+import * as challengesApi from '../data/challenges-api'
 import * as storiesApi from '../data/stories-api'
+import type { ChallengeDetail } from '../types/challenges'
 import { AppShell } from '../components/layout/AppShell'
 import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
@@ -20,7 +23,39 @@ import { TextField } from '../components/ui/TextField'
 import { EmptyState, ErrorState } from '../components/ui/States'
 import './pages.css'
 
-const TONE = { active: 'success', upcoming: 'brand', completed: 'neutral' } as const
+const TONE = { active: 'success', upcoming: 'brand', past: 'neutral' } as const
+
+const STATE_LABEL = { active: 'active', upcoming: 'upcoming', past: 'ended' } as const
+
+function messageFor(cause: unknown): string {
+  return cause instanceof ApiError || cause instanceof Error
+    ? cause.message
+    : 'Something went wrong. Please try again.'
+}
+
+/**
+ * What the page says about the caller's own entry.
+ *
+ * A draft gets its own line rather than being treated as submitted: the
+ * leaderboard only ranks published stories, so a writer who attached a draft
+ * would otherwise watch the board and never find themselves on it.
+ */
+function entryStatus(data: ChallengeDetail): string | null {
+  const entry = data.entry
+  if (!entry) return null
+
+  if (!entry.story) {
+    return data.state === 'active'
+      ? `You have a place in this challenge. Attach a story before ${formatDate(data.endsAt)}.`
+      : 'You entered this challenge but never attached a story.'
+  }
+
+  if (entry.story.status === 'draft') {
+    return `Your entry is “${entry.story.title}”, which is still a draft — publish it to appear on the leaderboard.`
+  }
+
+  return `Your entry is “${entry.story.title}”.`
+}
 
 export function ChallengeDetailPage() {
   const { slug = '' } = useParams()
@@ -28,12 +63,8 @@ export function ChallengeDetailPage() {
   const { session, initialising } = useAuth()
   const authorId = initialising ? undefined : session?.user.id
 
-  const challenge = useAsync(() => api.getChallenge(slug), [slug])
-  const challengeId = challenge.data?.id
-  const leaderboard = useAsync(
-    () => (challengeId ? api.getChallengeLeaderboard(challengeId) : Promise.resolve([])),
-    [challengeId],
-  )
+  const challenge = useAsync(() => challengesApi.getChallenge(slug), [slug])
+  const leaderboard = useAsync(() => challengesApi.getLeaderboard(slug), [slug])
   // The entry picker needs the caller's own stories, drafts included.
   const myStories = useAsync(
     () =>
@@ -50,7 +81,6 @@ export function ChallengeDetailPage() {
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [submitted, setSubmitted] = useState(false)
 
   if (challenge.status === 'loading') {
     return (
@@ -73,9 +103,44 @@ export function ChallengeDetailPage() {
   }
 
   const data = challenge.data
+  const entry = data.entry
   const remaining = daysUntil(data.endsAt)
+  const opensIn = daysUntil(data.startsAt)
 
-  async function onSubmitEntry() {
+  /** Opens the dialog on whatever the entry already says, so it is an edit. */
+  function openSubmit(): void {
+    setStoryId(entry?.story?.id ?? '')
+    setNote(entry?.note ?? '')
+    setError(null)
+    setSubmitOpen(true)
+  }
+
+  /**
+   * Takes a place. Entering and submitting are two requests because the API
+   * separates them: the deadline closes the place, and a writer can hold one
+   * before they have anything to attach.
+   *
+   * Deliberately does *not* open the submit dialog straight afterwards.
+   * `reload` puts the page back through its loading branch — the pattern every
+   * detail page here follows after a write — which would unmount the dialog a
+   * moment after opening it. The hero comes back reading "Submit story".
+   */
+  async function onEnter(): Promise<void> {
+    setSubmitting(true)
+    try {
+      await challengesApi.enterChallenge(data.id)
+      showToast({ message: "You're in. Attach a story when you have one." })
+      challenge.reload()
+    } catch (cause) {
+      showToast({ message: messageFor(cause), tone: 'error' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function onSubmitEntry(): Promise<void> {
+    if (!entry) return
+
     if (!storyId) {
       setError('Choose which story you are entering.')
       return
@@ -84,25 +149,44 @@ export function ChallengeDetailPage() {
     setSubmitting(true)
     setError(null)
     try {
-      await new Promise((resolve) => setTimeout(resolve, 600))
-      setSubmitted(true)
+      await challengesApi.updateEntry(entry.id, { storyId, note: note || null })
       setSubmitOpen(false)
       showToast({ message: 'Your entry is in. Good luck.' })
-    } catch {
-      setError('We could not submit that entry. Please try again.')
+      challenge.reload()
+      leaderboard.reload()
+    } catch (cause) {
+      setError(messageFor(cause))
     } finally {
       setSubmitting(false)
     }
   }
 
+  async function onWithdraw(): Promise<void> {
+    if (!entry) return
+
+    setSubmitting(true)
+    try {
+      await challengesApi.withdrawEntry(entry.id)
+      showToast({ message: 'Your entry has been withdrawn.' })
+      challenge.reload()
+      leaderboard.reload()
+    } catch (cause) {
+      showToast({ message: messageFor(cause), tone: 'error' })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const rows = leaderboard.data?.items ?? []
+
   return (
     <AppShell>
       <header
         className="challenge-hero"
-        style={{ '--challenge-hue': data.hue } as CSSProperties}
+        style={{ '--challenge-hue': hueFor(data.slug) } as CSSProperties}
       >
         <div className="challenge-hero__top">
-          <StatusBadge tone={TONE[data.state]}>{data.state}</StatusBadge>
+          <StatusBadge tone={TONE[data.state]}>{STATE_LABEL[data.state]}</StatusBadge>
           <span>
             <Icon name="calendar" size="0.9em" />
             {formatDate(data.startsAt)} — {formatDate(data.endsAt)}
@@ -111,34 +195,66 @@ export function ChallengeDetailPage() {
 
         <h1 className="challenge-hero__title">{data.title}</h1>
         <blockquote className="challenge-hero__prompt">“{data.prompt}”</blockquote>
-        <p className="challenge-hero__desc">{data.description}</p>
+        {data.description ? (
+          <p className="challenge-hero__desc">{data.description}</p>
+        ) : null}
 
         <div className="challenge-hero__actions">
           {data.state === 'active' ? (
-            <Button
-              variant="primary"
-              size="lg"
-              disabled={submitted}
-              onClick={() => setSubmitOpen(true)}
-              startIcon={<Icon name={submitted ? 'check' : 'send'} />}
-            >
-              {submitted ? 'Entry submitted' : 'Submit Story'}
-            </Button>
+            entry ? (
+              <>
+                <Button
+                  variant="primary"
+                  size="lg"
+                  loading={submitting}
+                  onClick={openSubmit}
+                  startIcon={<Icon name={entry.story ? 'pencil' : 'send'} />}
+                >
+                  {entry.story ? 'Change entry' : 'Submit story'}
+                </Button>
+                <Button size="lg" disabled={submitting} onClick={() => void onWithdraw()}>
+                  Withdraw
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="primary"
+                size="lg"
+                loading={submitting}
+                onClick={() => void onEnter()}
+                startIcon={<Icon name="plus" />}
+              >
+                Enter challenge
+              </Button>
+            )
           ) : data.state === 'upcoming' ? (
-            <Button variant="primary" size="lg" startIcon={<Icon name="bell" />}>
-              Remind me when it opens
+            /*
+              No "Remind me": there is no notification system to remind anybody
+              with yet. The date is the honest thing to show instead.
+            */
+            <Button size="lg" disabled startIcon={<Icon name="clock" />}>
+              {opensIn <= 0 ? 'Opens today' : `Opens in ${opensIn} days`}
             </Button>
           ) : (
             <Button size="lg" disabled startIcon={<Icon name="lock" />}>
               Entries closed
             </Button>
           )}
-          <Button size="lg" iconOnly aria-label="Share challenge" startIcon={<Icon name="share" />} />
         </div>
+
+        {entryStatus(data) ? (
+          <p className="challenge-hero__entry" role="status">
+            {entryStatus(data)}
+          </p>
+        ) : null}
       </header>
 
       <div className="stat-row">
-        <StatTile label="Participants" value={formatCount(data.participantCount)} icon="users" />
+        <StatTile
+          label="Participants"
+          value={formatCount(data.participantCount)}
+          icon="users"
+        />
         <StatTile label="Entries" value={formatCount(data.entryCount)} icon="pen" />
         <StatTile
           label="Word target"
@@ -146,9 +262,9 @@ export function ChallengeDetailPage() {
           icon="target"
         />
         <StatTile
-          label={data.state === 'completed' ? 'Ended' : 'Time left'}
+          label={data.state === 'past' ? 'Ended' : 'Time left'}
           value={
-            data.state === 'completed'
+            data.state === 'past'
               ? formatDate(data.endsAt)
               : remaining <= 0
                 ? 'Today'
@@ -159,34 +275,51 @@ export function ChallengeDetailPage() {
       </div>
 
       <section className="page-section">
-        <SectionHead title="Leaderboard" subtitle="Ranked by community votes." />
+        <SectionHead
+          title="Leaderboard"
+          subtitle="Ranked by the star ratings each entry has earned, added up."
+        />
 
         {leaderboard.status === 'error' ? (
           <ErrorState message={leaderboard.error} onRetry={leaderboard.reload} />
-        ) : leaderboard.data?.length === 0 ? (
+        ) : leaderboard.status === 'loading' ? (
+          <Skeleton height="12rem" radius="var(--radius-lg)" />
+        ) : rows.length === 0 ? (
           <EmptyState
             icon="trophy"
             title="No entries yet"
-            description="Entries appear here as soon as writers start submitting."
+            description="Entries appear here once writers submit a published story."
           />
         ) : (
           <Card padded={false}>
             <ol className="leaderboard">
-              {leaderboard.data?.map((row) => (
-                <li key={row.id}>
+              {rows.map((row) => (
+                <li key={row.entryId}>
                   <span className={`leaderboard__rank is-rank-${Math.min(row.rank, 4)}`}>
                     {row.rank}
                   </span>
                   <Avatar user={row.user} size="sm" />
-                  {/* The entry's story is not resolved: entries point at a
-                      story id, and there is no challenges API to join it. */}
                   <span className="leaderboard__body">
-                    <span className="leaderboard__story">{row.user.displayName}</span>
-                    <span className="leaderboard__author">@{row.user.username}</span>
+                    <Link className="leaderboard__story" to={`/story/${row.story.slug}`}>
+                      {row.story.title}
+                    </Link>
+                    <span className="leaderboard__author">
+                      @{row.user.username}
+                      {row.ratingCount > 0
+                        ? ` · ${formatCount(row.ratingCount)} rating${row.ratingCount === 1 ? '' : 's'}`
+                        : ' · not yet rated'}
+                    </span>
                   </span>
-                  <span className="leaderboard__votes">
-                    <Icon name="heart" size="0.9em" />
-                    {formatCount(row.voteCount)}
+                  <span
+                    className="leaderboard__votes"
+                    title={
+                      row.ratingAverage === null
+                        ? 'No ratings yet'
+                        : `${row.ratingAverage.toFixed(1)} average over ${row.ratingCount} ratings`
+                    }
+                  >
+                    <Icon name="star" size="0.9em" />
+                    {row.score}
                   </span>
                 </li>
               ))}
@@ -206,7 +339,7 @@ export function ChallengeDetailPage() {
             <Button onClick={() => setSubmitOpen(false)} disabled={submitting}>
               Cancel
             </Button>
-            <Button variant="primary" loading={submitting} onClick={onSubmitEntry}>
+            <Button variant="primary" loading={submitting} onClick={() => void onSubmitEntry()}>
               Submit entry
             </Button>
           </>
@@ -232,7 +365,8 @@ export function ChallengeDetailPage() {
                 { value: '', label: 'Choose a story…' },
                 ...(myStories.data ?? []).map((story) => ({
                   value: story.id,
-                  label: story.title,
+                  label:
+                    story.status === 'draft' ? `${story.title} (draft)` : story.title,
                 })),
               ]}
             />
@@ -246,7 +380,7 @@ export function ChallengeDetailPage() {
 
           <TextField
             multiline
-            label="Note to the judges (optional)"
+            label="Note to the host (optional)"
             placeholder="Anything they should know before reading."
             rows={3}
             value={note}

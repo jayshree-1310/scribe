@@ -43,20 +43,20 @@ Paste this block at the top of any task prompt below.
 
 **Landed:** auth + account, books + library, stories/chapters + the reader,
 authoring, uploads + chapter multimedia, reading progress + streak, book clubs
-+ broadcast channels, comments + ratings, public profiles + follows.
++ broadcast channels, comments + ratings, public profiles + follows, writing
+challenges + leaderboard.
 
 Tasks are numbered by when they were written down, not by when to do them. This
 is the order to do them in, and the reason for each position.
 
 | # | Task | Why here |
 |---|---|---|
-| 1 | **11** — challenges & leaderboard | Owns the admin/moderator role decision. 15 reuses it, so this comes first. |
-| 2 | **8** — author analytics | Introduces the view / chapter-read event log. Independent of everything above, but it must precede 12. |
-| 3 | **12** — badges & levels | A pure consumer once 8 lands: streak and words written exist, comments and ratings come from 3, follows from 13, and "chapters read" is only countable from 8's event log — `ReadingHistory` keeps current position per story, not a count. Doing 12 before 8 means either inventing that metric or building it twice. |
-| 4 | **14** — notifications | All four dependencies — 3, 9, 10, 13 — have landed, so every event it fans out from is real. Below 12 only because a newly earned badge is one of the five notification types. |
-| 5 | **15** — moderation & reporting | Needs 11's role for a moderator to be. The content to moderate is all there now: 3's comments join 9's discussions and 10's posts. |
-| 6 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed), ratings (landed with 3) and follows (landed with 13). Late because a recommender is worth building once there is signal to rank on. |
-| 7 | **17** — retire the mock layer | Last by definition. |
+| 1 | **8** — author analytics | Introduces the view / chapter-read event log. Independent of everything above, but it must precede 12. |
+| 2 | **12** — badges & levels | A pure consumer once 8 lands: streak and words written exist, comments and ratings come from 3, follows from 13, and "chapters read" is only countable from 8's event log — `ReadingHistory` keeps current position per story, not a count. Doing 12 before 8 means either inventing that metric or building it twice. |
+| 3 | **14** — notifications | All four dependencies — 3, 9, 10, 13 — have landed, so every event it fans out from is real. Below 12 only because a newly earned badge is one of the five notification types. |
+| 4 | **15** — moderation & reporting | The role it needs a moderator to be is now `auth.User.isAdmin`, landed with 11 and read only in `services/roles.ts`. The content to moderate is all there: 3's comments join 9's discussions and 10's posts. |
+| 5 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed), ratings (landed with 3) and follows (landed with 13). Late because a recommender is worth building once there is signal to rank on. |
+| 6 | **17** — retire the mock layer | Last by definition. |
 
 **One shared decision, taken once — now settled.** Clubs' discussions,
 channels' posts and stories' comments are three spellings of the same thing:
@@ -166,37 +166,88 @@ that would make a series real, not to replace a fake one.
 
 ---
 
-## Task 11 — Writing challenges & leaderboard
+## Task 11 — Writing challenges & leaderboard — **landed**
 
-**Prompt:**
+`services/challenges.ts` + `routes/challenges.ts` at `/api/challenges`, plus
+`services/roles.ts`, which owns the admin flag this task was put first for.
 
-> Implement writing challenges. `challenges.WritingChallenge` and
-> `ChallengeEntry` exist; no routes.
->
-> API — `services/challenges.ts` + `routes/challenges.ts` at `/api/challenges`:
-> - `GET /` — active, upcoming and past, derived from the challenge's date
->   window rather than a stored status field. `GET /:slug` — detail plus the
->   caller's entry if any.
-> - `POST /:id/enter` — join; rejected outside the submission window, and
->   rejected as a duplicate if already entered.
-> - `PUT /entries/:id` — attach or update the submitted story; entrant only.
-> - `DELETE /entries/:id` — withdraw.
-> - `GET /:id/leaderboard` — ranked rows matching what
->   `pages/ChallengeDetailPage.tsx` renders today (see `LeaderboardRow` in
->   `types/domain.ts`). Define the ranking rule explicitly in one commented
->   function; rank in SQL.
-> - Admin create/update of challenges — there is no admin role in the system
->   yet; either add a minimal `isAdmin` flag with a migration or gate it behind
->   a seed script, and say which you chose and why.
->
-> FE: `data/challenges-api.ts`; rewire `pages/ChallengesPage.tsx` and
-> `pages/ChallengeDetailPage.tsx`, remove the challenge functions from
-> `data/api.ts`.
->
-> Tests: window boundaries (entering before, during, after), duplicate entry
-> rejection, leaderboard tie-breaking is deterministic.
+Endpoints: `GET /api/challenges`, `GET /api/challenges/:slug`, `GET
+/api/challenges/:slug/leaderboard`, `POST /api/challenges/:id/enter`,
+`PUT`/`DELETE /api/challenges/entries/:id`, and `POST /api/challenges` /
+`PATCH /api/challenges/:id` for administrators.
 
----
+**The decisions this task owned.**
+
+- **The role is one boolean, `auth.User.isAdmin`, read in exactly one place.**
+  Not a `UserRole` enum: there is a single privileged set of actions today, so
+  `MODERATOR` and `ADMIN` would be two names for the same permission with
+  nothing enforcing the difference — and widening a boolean into an enum is a
+  migration whenever they genuinely diverge. What Task 15 must not do is invent
+  a *second* notion of staff; `assertAdmin` in `services/roles.ts` is the one
+  to call. **Nothing grants the flag over HTTP** — `scripts/grant-admin.ts`
+  sets it against the database, so no request can escalate itself and there is
+  no endpoint to forget to protect.
+- **State is derived, never stored.** `upcoming` / `active` / `past` are the
+  three positions `now()` can hold against `startAt` and `endAt`. `stateOf` is
+  the only place that is decided, and `assertOpen` asks it the same question
+  the page displays, so "the badge says active" and "the API let me in" cannot
+  come apart.
+- **Entering and submitting are two steps**, so `ChallengeEntry.storyId` became
+  nullable and the unique key went from `[challengeId, userId, storyId]` to
+  `[challengeId, userId]` — the old one let one writer hold several rows on the
+  leaderboard and made "already entered?" a question with no single answer.
+  That split is also what makes the page's two stats mean different things:
+  participants are entries, entries are entries with a story on them.
+- **The ranking rule is `score = the sum of the star ratings the entry's story
+  has earned`,** ranked in SQL, in one commented function (`RANKING` in
+  `services/challenges.ts`). Summing rather than averaging is deliberate: a
+  mean lets one five-star rating beat fifty fours, and the sum is monotone in
+  both reach and quality without an invented Bayesian prior. Ties break by
+  rating count, then earliest submission, then entry id — a total order, so
+  paging a board cannot repeat or skip a row.
+- **Only published entries are ranked, and the board is built anonymously.**
+  `getStoriesByIds(…, null)` rather than as the caller: resolving as the viewer
+  would put an author's own draft on the board for them alone and shift
+  everybody below it by one. A writer who attached a draft is told so on the
+  detail page instead.
+- **Edits close with the challenge.** Swapping a story, editing a note and
+  withdrawing all go through `assertOpen`, because a board that can still
+  change after it closed is not a result. Entering out of window and entering
+  twice are both 409 — nothing about the request is malformed, the challenge is
+  just not in a state that accepts it.
+- **A story must be the caller's own and `source = SCRIBE`.** Without the first
+  check anybody could enter somebody else's story and take their ranking; the
+  second is the filter `countVisibleStoriesBy` already applies, because a
+  catalogue edition carries a real author column and nobody wrote it here.
+
+**What this removed rather than faked.** The entry's `voteCount` and `rank` are
+gone as stored fields: there is no ballot in the contract, and inventing a
+voting feature to fill a mock column was the wrong place to start — the board
+ranks on `engagement.Rating`, which is real, and the leaderboard row shows the
+score with the rating count beside it rather than a heart. A challenge's `hue`
+is derived from the slug through `hueFor`, the way a club's and a channel's
+are. The **"Host a challenge" button is gone**: creating one is an admin action
+and there is no admin surface in the reader-facing app to put it behind, so the
+button promised something it could not do — the same call Task 15 makes about a
+moderator UI. "Remind me when it opens" went with it, because there is nothing
+to remind anybody with until Task 14.
+
+**What was added because the UI genuinely collects it.** `WritingChallenge`
+gained `slug`, `prompt`, `wordTarget` and `hostId`; `ChallengeEntry` gained
+`note`, which the submit dialog was discarding on save — it round-trips now, so
+the dialog re-opens on what was written rather than blank.
+
+**Seeded rather than left empty.** The mock's challenge fixtures are deleted,
+and nothing but an administrator can create a replacement, so
+`scripts/seed-challenges.ts` (`pnpm --filter api seed:challenges`) loads six
+challenges across the three states and moves their windows forward on every
+run. It seeds no *entries*: a place belongs to a writer who took it, and the
+board ranks on ratings readers left.
+
+**Unseen in a browser:** the challenge hero and its derived banner hue at phone
+width; the leaderboard rows with a long story title beside a long handle, where
+`.leaderboard__story` has to clamp rather than push the score off the row; and
+the enter → submit sequence, where two requests happen behind one button.
 
 ## Task 12 — Badges & levels (award engine)
 
@@ -333,7 +384,8 @@ public read paths are `listComments` in `services/engagement.ts`,
 `listDiscussions` in `services/clubs.ts` and `listPosts` in
 `services/channels.ts` — all three need auditing for hidden content when this
 lands. `services/engagement.ts` is also where the story-author-as-moderator
-question was deferred to; answering it is part of this task's role decision.
+question was deferred to; answering it is what is left of this task's role
+decision, because the role itself landed with 11 as `auth.User.isAdmin`.
 
 **Prompt:**
 
@@ -344,9 +396,12 @@ question was deferred to; answering it is part of this task's role decision.
 > resolvedBy, timestamps) plus a migration, and `POST /api/reports` (rate-limited,
 > one open report per user per target). Add a moderator view: `GET
 > /api/moderation/reports` with filters and `POST /api/moderation/reports/:id/resolve`
-> taking an action (dismiss, hide content, suspend user). This needs the
-> admin/moderator role decision from the challenges task — reuse it, do not
-> invent a second one.
+> taking an action (dismiss, hide content, suspend user). The role already
+> exists — `auth.User.isAdmin`, landed with Task 11 and read only through
+> `assertAdmin` in `services/roles.ts`. Call that; do not invent a second
+> notion of staff. Splitting it into a `MODERATOR` / `ADMIN` distinction is
+> fair game *if* the two get genuinely different powers here — say which, and
+> migrate.
 >
 > Soft-hide rather than hard-delete content so a wrong call is reversible; hidden
 > content must disappear from every public read path — audit them all.
@@ -392,14 +447,14 @@ question was deferred to; answering it is part of this task's role decision.
 Final cleanup. Do last.
 
 **Mostly done already.** The story, chapter, book, shelf, comment, rating,
-reading-history, club and channel fixtures are gone from `mock-db.ts` (832
-lines down to ~263), along with the author aggregates that invented view series
-and read counts. `data/api.ts` is down to four functions. What remains is the
-data whose features have no endpoints: challenges, badges, and the author
-directory (`db.authors`) — plus `db.currentUser`, which `AuthProvider` still
-uses for the presentational half of a session (avatar hue, follower counts,
-reading stats) that `auth.User` has no columns for. Each goes with its own
-task; this one is the final sweep.
+reading-history, club, channel and challenge fixtures are gone from
+`mock-db.ts` (832 lines down to ~177), along with the author aggregates that
+invented view series and read counts. `data/api.ts` is down to two functions.
+What remains is the data whose features have no endpoints: badges, and the
+author directory (`db.authors`) — plus `db.currentUser`, which `AuthProvider`
+still uses for the presentational half of a session (avatar hue, follower
+counts, reading stats) that `auth.User` has no columns for. Each goes with its
+own task; this one is the final sweep.
 
 Two of those now have a real replacement to point at rather than a missing
 endpoint. `db.authors` survives only for `OnboardingPage`'s author picker:
@@ -409,9 +464,10 @@ session's `followerCount` / `followingCount` are now computable, so
 `AuthProvider.toUser` no longer needs the mock for them; `ProfilePage` already
 bypasses it and asks the API for its own numbers.
 
-The club and channel types also left `types/domain.ts` for `types/clubs.ts` and
-`types/channels.ts`, which mirror the API the way `types/stories.ts` does. That
-is the pattern this task's reconciliation should finish, not undo.
+The club, channel and challenge types also left `types/domain.ts` for
+`types/clubs.ts`, `types/channels.ts` and `types/challenges.ts`, which mirror
+the API the way `types/stories.ts` does. That is the pattern this task's
+reconciliation should finish, not undo.
 
 **Prompt:**
 
@@ -499,6 +555,45 @@ folding into whichever task next touches that surface.
 - **Unseen in a browser:** the follower/following grid at phone width, where
   `.people-list` drops to one column and a long display name has to clamp
   rather than push the "Following" badge off the row.
+
+### Writing challenges (Task 11)
+
+- **The window is judged by the app's clock, not the database's.** `stateOf`
+  and `assertOpen` compare `new Date()` against the stored window, while every
+  other timestamp on the row is written by Postgres. The two agree to within
+  clock skew, and a challenge closing in the second that separates them is the
+  same class of gap the streak's untested midnight is. Comparing in SQL would
+  close it, at the cost of a round trip on every read.
+- **"Entries" and the board's total can legitimately disagree.** The stat tile
+  counts places with a story attached; the leaderboard ranks only *published*
+  ones. A writer who attached a draft is counted above and absent below, which
+  the detail page tells them in as many words — but somebody reading the two
+  numbers side by side has no way to know that is why.
+- **The leaderboard is offset-paged**, so a rating arriving mid-scroll can move
+  a row across a page boundary. `ROW_NUMBER()` over a total order makes the
+  *ranking* stable, not the offsets; a keyset cursor is the fix if a board ever
+  gets long enough to matter. The same caveat the followers lists carry.
+- **There is no host UI at all.** `POST` / `PATCH /api/challenges` are covered
+  by tests and reachable with a token, but the only supported way to make an
+  administrator is `pnpm --filter api admin:grant`, and the only way to create
+  a challenge outside the seed script is the API directly. Deliberate — an
+  admin console is its own surface — but it means the create and edit paths
+  have never been exercised by a person.
+- **Withdrawing is impossible once a challenge closes.** Deliberate: a closed
+  board is a result, and a row leaving it would renumber everybody below.
+  Nothing yet offers the other thing a writer might want — removing an entry
+  from a finished board — which is Task 15's territory rather than a fourth
+  state here.
+- **Dev identity:** the entry the detail page shows is the caller's, and with
+  no session the API answers for whoever `readerHeaders()` names. So a dev
+  without a real session sees the dev user's entry and can withdraw it — the
+  same gap clubs, channels, comments and profiles have, and it goes with the
+  dev header.
+- **Unseen in a browser:** the challenge hero and its derived banner hue at
+  phone width; a leaderboard row with a long story title next to a long handle,
+  where `.leaderboard__story` has to clamp rather than push the score off the
+  row; and the enter → submit sequence, where one button fires two requests and
+  the dialog opens on the second.
 
 ### Clubs and channels (Tasks 9 and 10)
 

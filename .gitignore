@@ -34,3 +34,5 @@ Thumbs.db
 # Editor temporary files
 *.swp
 *.swo
+# Database dumps: real user data, never committed
+backups/

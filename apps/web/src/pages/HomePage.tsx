@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../lib/auth'
 import { formatCount, formatMinutes } from '../lib/format'
-import * as api from '../data/api'
 import * as books from '../data/books-api'
+import * as challengesApi from '../data/challenges-api'
 import * as clubsApi from '../data/clubs-api'
 import * as reading from '../data/reading-api'
 import type { Book, Discover } from '../types/books'
@@ -26,8 +26,6 @@ const WEEKLY_GOAL_MINUTES = 400
 export function HomePage() {
   const { session } = useAuth()
 
-  // Books come from the catalogue API; clubs and challenges are still the
-  // mock data layer, which is a separate feature from the book shelves.
   const discover = useAsync(() => books.getDiscover(), [])
   const shelved = useAsync(() => books.getLibrary({ status: 'READING' }), [])
   /**
@@ -37,7 +35,7 @@ export function HomePage() {
    */
   const inProgressStories = useAsync(() => reading.getContinueReading(4), [])
   const clubs = useAsync(() => clubsApi.listClubs({ limit: 6 }), [])
-  const challenges = useAsync(() => api.getChallenges(), [])
+  const challenges = useAsync(() => challengesApi.getChallenges(), [])
 
   /**
    * A local copy of the rails, so shelving a book updates its card straight
@@ -93,7 +91,7 @@ export function HomePage() {
   const myClubs = clubs.data?.items.filter((club) => club.membership !== null) ?? []
   const suggestedClubs =
     clubs.data?.items.filter((club) => club.membership === null) ?? []
-  const activeChallenges = challenges.data?.filter((item) => item.state === 'active') ?? []
+  const activeChallenges = challenges.data?.active ?? []
 
   /** Rail body: skeletons while loading, cards once there are any. */
   function rail(label: string, items: Book[] | undefined) {
@@ -277,11 +275,15 @@ export function HomePage() {
 
         <section className="page-section">
           <SectionHead title="Writing challenges" to="/challenges" linkLabel="All challenges" />
-          <div className="row-list">
-            {activeChallenges.slice(0, 2).map((challenge) => (
-              <ChallengeCard key={challenge.id} challenge={challenge} />
-            ))}
-          </div>
+          {activeChallenges.length === 0 ? (
+            <EmptyState icon="trophy" size="sm" title="Nothing running right now" />
+          ) : (
+            <div className="row-list">
+              {activeChallenges.slice(0, 2).map((challenge) => (
+                <ChallengeCard key={challenge.id} challenge={challenge} />
+              ))}
+            </div>
+          )}
         </section>
       </div>
     </AppShell>

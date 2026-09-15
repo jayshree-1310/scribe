@@ -7,14 +7,7 @@
  * reads this — swap that file for real fetches and the UI is unchanged.
  */
 
-import type {
-  Badge,
-  ChallengeEntry,
-  Genre,
-  User,
-  UserBadge,
-  WritingChallenge,
-} from '../types/domain'
+import type { Badge, Genre, User, UserBadge } from '../types/domain'
 
 /* Deterministic helpers ------------------------------------------------ */
 
@@ -37,14 +30,6 @@ const NOW = new Date('2026-09-08T09:00:00.000Z')
 
 function daysAgo(days: number): string {
   return new Date(NOW.getTime() - days * 86400000).toISOString()
-}
-
-function daysAhead(days: number): string {
-  return new Date(NOW.getTime() + days * 86400000).toISOString()
-}
-
-function pick<T>(items: readonly T[], random: () => number): T {
-  return items[Math.floor(random() * items.length)] as T
 }
 
 function between(random: () => number, min: number, max: number): number {
@@ -153,8 +138,8 @@ export const userById = new Map(users.map((user) => [user.id, user]))
  *   pnpm --filter api seed:books      # imported catalogue editions
  *   pnpm --filter api seed:stories    # authored stories with chapters
  *
- * What remains below is the data whose features have no endpoints yet -- clubs,
- * channels, challenges, badges and the author directory.
+ * What remains below is the data whose features have no endpoints yet --
+ * badges and the author directory.
  */
 
 /* Gamification --------------------------------------------------------- */
@@ -189,75 +174,4 @@ export const userBadges: UserBadge[] = [
   { badgeId: 'b-critic', userId: currentUser.id, earnedAt: null, progress: 0.72 },
 ]
 
-/* Challenges ----------------------------------------------------------- */
-
-export const challenges: WritingChallenge[] = [
-  {
-    id: 'wc-septflash', title: 'September Flash Fiction', slug: 'september-flash-fiction',
-    prompt: 'A door that only opens for one person.',
-    description: 'One thousand words or fewer. Any genre. The door can be literal, and it is more interesting when it is not. Entries are read blind by three guest authors and the community vote decides the shortlist.',
-    hue: 268, state: 'active', startsAt: daysAgo(8), endsAt: daysAhead(6),
-    participantCount: 2841, entryCount: 1902, wordTarget: 1000, hostId: 'u-ilse',
-  },
-  {
-    id: 'wc-firstline', title: 'Steal This First Line', slug: 'steal-this-first-line',
-    prompt: '"I have been dead for a week and nobody has noticed."',
-    description: 'Start with the line exactly as written, then go anywhere. Up to 5,000 words. Last year\'s winner turned it into a novel that has since been read 400,000 times.',
-    hue: 6, state: 'active', startsAt: daysAgo(3), endsAt: daysAhead(18),
-    participantCount: 1264, entryCount: 613, wordTarget: 5000, hostId: 'u-castellanos',
-  },
-  {
-    id: 'wc-slowromance', title: 'The Slowest Burn', slug: 'the-slowest-burn',
-    prompt: 'Two people, one shared task, no confession.',
-    description: 'A romance challenge with a rule: nobody may say how they feel. Show it in the work they do together.',
-    hue: 342, state: 'active', startsAt: daysAgo(14), endsAt: daysAhead(2),
-    participantCount: 3902, entryCount: 2611, wordTarget: 3000, hostId: 'u-adeyemi',
-  },
-  {
-    id: 'wc-octhorror', title: 'Daylight Horror', slug: 'daylight-horror',
-    prompt: 'Something is wrong and it is two in the afternoon.',
-    description: 'No night scenes. No basements. Make noon frightening.',
-    hue: 150, state: 'upcoming', startsAt: daysAhead(9), endsAt: daysAhead(39),
-    participantCount: 412, entryCount: 0, wordTarget: 4000, hostId: 'u-lindqvist',
-  },
-  {
-    id: 'wc-worldbuild', title: 'One Map, Many Stories', slug: 'one-map-many-stories',
-    prompt: 'Everyone writes in the same invented country.',
-    description: 'A shared-setting challenge. The map is published on day one; you claim a region and write it.',
-    hue: 96, state: 'upcoming', startsAt: daysAhead(21), endsAt: daysAhead(72),
-    participantCount: 188, entryCount: 0, wordTarget: null, hostId: 'u-fairweather',
-  },
-  {
-    id: 'wc-augpoetry', title: 'Thirty Poems, Thirty Days', slug: 'thirty-poems-thirty-days',
-    prompt: 'One poem a day for the month.',
-    description: 'Completed in August. 1,204 writers finished all thirty days.',
-    hue: 224, state: 'completed', startsAt: daysAgo(68), endsAt: daysAgo(38),
-    participantCount: 4120, entryCount: 3811, wordTarget: null, hostId: 'u-abadi',
-  },
-  {
-    id: 'wc-junemystery', title: 'The Closed Room', slug: 'the-closed-room',
-    prompt: 'A crime with only one possible suspect, who did not do it.',
-    description: 'Completed in June. Judged by three crime novelists.',
-    hue: 202, state: 'completed', startsAt: daysAgo(120), endsAt: daysAgo(90),
-    participantCount: 2210, entryCount: 1640, wordTarget: 6000, hostId: 'u-solano',
-  },
-]
-
-export const challengeEntries: ChallengeEntry[] = challenges
-  .filter((challenge) => challenge.state !== 'upcoming')
-  .flatMap((challenge) => {
-    const random = seeded(`${challenge.id}-entries`)
-    return Array.from({ length: 8 }, (_, index) => ({
-      id: `${challenge.id}-e${index}`,
-      challengeId: challenge.id,
-      userId: (pick(users, random) as User).id,
-      // No story to point at: stories live in the database now, and the
-      // challenges API that would join them does not exist yet.
-      storyId: '',
-      submittedAt: daysAgo(between(random, 1, 20)),
-      voteCount: 4200 - index * between(random, 180, 420),
-      rank: index + 1,
-    }))
-  })
-
-export { NOW, daysAgo, daysAhead }
+export { NOW, daysAgo }

@@ -1,0 +1,834 @@
+[
+  {
+    "id": "dropConstraint.challengeEntry.challengeEntry_challengeId_userId_storyId_key",
+    "label": "Drop constraint \"challengeEntry_challengeId_userId_storyId_key\" on \"challengeEntry\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "unique",
+        "name": "challengeEntry_challengeId_userId_storyId_key",
+        "table": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"challengeEntry_challengeId_userId_storyId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "challengeEntry_challengeId_userId_storyId_key",
+          "challenges",
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop constraint \"challengeEntry_challengeId_userId_storyId_key\"",
+        "sql": "ALTER TABLE \"challenges\".\"challengeEntry\" DROP CONSTRAINT \"challengeEntry_challengeId_userId_storyId_key\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"challengeEntry_challengeId_userId_storyId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "challengeEntry_challengeId_userId_storyId_key",
+          "challenges",
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.auth.user.isAdmin",
+    "label": "Add column \"isAdmin\" to \"user\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "column",
+        "name": "isAdmin",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"isAdmin\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "user",
+          "isAdmin"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"isAdmin\"",
+        "sql": "ALTER TABLE \"auth\".\"user\" ADD COLUMN \"isAdmin\" bool DEFAULT false NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"isAdmin\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "user",
+          "isAdmin"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.challenges.challengeEntry.note",
+    "label": "Add column \"note\" to \"challengeEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "column",
+        "name": "note",
+        "table": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"note\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "challengeEntry",
+          "note"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"note\"",
+        "sql": "ALTER TABLE \"challenges\".\"challengeEntry\" ADD COLUMN \"note\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"note\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "challengeEntry",
+          "note"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.challenges.challengeEntry.updatedAt",
+    "label": "Add column \"updatedAt\" to \"challengeEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "column",
+        "name": "updatedAt",
+        "table": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"updatedAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "challengeEntry",
+          "updatedAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"updatedAt\"",
+        "sql": "ALTER TABLE \"challenges\".\"challengeEntry\" ADD COLUMN \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"updatedAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "challengeEntry",
+          "updatedAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.challenges.writingChallenge.updatedAt",
+    "label": "Add column \"updatedAt\" to \"writingChallenge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "column",
+        "name": "updatedAt",
+        "table": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"updatedAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "updatedAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"updatedAt\"",
+        "sql": "ALTER TABLE \"challenges\".\"writingChallenge\" ADD COLUMN \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"updatedAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "updatedAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.challenges.writingChallenge.wordTarget",
+    "label": "Add column \"wordTarget\" to \"writingChallenge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "column",
+        "name": "wordTarget",
+        "table": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"wordTarget\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "wordTarget"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"wordTarget\"",
+        "sql": "ALTER TABLE \"challenges\".\"writingChallenge\" ADD COLUMN \"wordTarget\" int4"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"wordTarget\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "wordTarget"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.challenges.writingChallenge.hostId",
+    "label": "Add column \"hostId\" to \"writingChallenge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "column",
+        "name": "hostId",
+        "table": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"hostId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "hostId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"hostId\"",
+        "sql": "ALTER TABLE \"challenges\".\"writingChallenge\" ADD COLUMN \"hostId\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"hostId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "hostId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data.challenges.writingChallenge.backfill-host-id",
+    "label": "Attribute host-less challenges to the oldest account",
+    "operationClass": "data",
+    "target": {
+      "id": "challenges.writingChallenge",
+      "details": {
+        "schema": "challenges",
+        "name": "writingChallenge",
+        "objectType": "table"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Set hostId on rows that predate the column",
+        "sql": "UPDATE challenges.\"writingChallenge\" AS c\n                     SET \"hostId\" = (\n                           SELECT u.\"id\"\n                             FROM auth.\"user\" AS u\n                            ORDER BY u.\"createdAt\", u.\"id\"\n                            LIMIT 1\n                         )\n                   WHERE c.\"hostId\" IS NULL"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "alterNullability.setNotNull.writingChallenge.hostId",
+    "label": "Set NOT NULL on \"writingChallenge\".\"hostId\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "column",
+        "name": "hostId",
+        "table": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"hostId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "hostId"
+        ]
+      },
+      {
+        "description": "ensure no NULL values in \"hostId\"",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"challenges\".\"writingChallenge\" WHERE \"hostId\" IS NULL) AS \"result\"",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"hostId\"",
+        "sql": "ALTER TABLE \"challenges\".\"writingChallenge\" ALTER COLUMN \"hostId\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"hostId\" is NOT NULL",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "hostId",
+          "NO"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.challenges.writingChallenge.prompt",
+    "label": "Add column \"prompt\" to \"writingChallenge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "column",
+        "name": "prompt",
+        "table": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"prompt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "prompt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"prompt\"",
+        "sql": "ALTER TABLE \"challenges\".\"writingChallenge\" ADD COLUMN \"prompt\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"prompt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "prompt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data.challenges.writingChallenge.backfill-prompt",
+    "label": "Derive a prompt for challenges that predate the column",
+    "operationClass": "data",
+    "target": {
+      "id": "challenges.writingChallenge",
+      "details": {
+        "schema": "challenges",
+        "name": "writingChallenge",
+        "objectType": "table"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Set prompt from the description, or the title when there is none",
+        "sql": "UPDATE challenges.\"writingChallenge\"\n                     SET \"prompt\" = COALESCE(NULLIF(btrim(\"description\"), ''), \"title\")\n                   WHERE \"prompt\" IS NULL"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "alterNullability.setNotNull.writingChallenge.prompt",
+    "label": "Set NOT NULL on \"writingChallenge\".\"prompt\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "column",
+        "name": "prompt",
+        "table": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"prompt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "prompt"
+        ]
+      },
+      {
+        "description": "ensure no NULL values in \"prompt\"",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"challenges\".\"writingChallenge\" WHERE \"prompt\" IS NULL) AS \"result\"",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"prompt\"",
+        "sql": "ALTER TABLE \"challenges\".\"writingChallenge\" ALTER COLUMN \"prompt\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"prompt\" is NOT NULL",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "prompt",
+          "NO"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.challenges.writingChallenge.slug",
+    "label": "Add column \"slug\" to \"writingChallenge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "column",
+        "name": "slug",
+        "table": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"slug\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "slug"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"slug\"",
+        "sql": "ALTER TABLE \"challenges\".\"writingChallenge\" ADD COLUMN \"slug\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"slug\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "slug"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data.challenges.writingChallenge.backfill-slug",
+    "label": "Backfill challenges.writingChallenge.slug from titles",
+    "operationClass": "data",
+    "target": {
+      "id": "challenges.writingChallenge",
+      "details": {
+        "schema": "challenges",
+        "name": "writingChallenge",
+        "objectType": "table"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Derive a unique slug per challenge from its title",
+        "sql": "UPDATE challenges.\"writingChallenge\" AS c\n                     SET \"slug\" = candidate.slug\n                    FROM (\n                          SELECT id,\n                                 base || CASE WHEN rn = 1 THEN '' ELSE '-' || rn::text END AS slug\n                            FROM (\n                                  SELECT id,\n                                         base,\n                                         row_number() OVER (PARTITION BY base ORDER BY \"createdAt\", id) AS rn\n                                    FROM (\n                                          SELECT id,\n                                                 \"createdAt\",\n                                                 COALESCE(\n                                                   NULLIF(\n                                                     trim(BOTH '-' FROM regexp_replace(lower(title), '[^a-z0-9]+', '-', 'g')),\n                                                     ''\n                                                   ),\n                                                   'challenge'\n                                                 ) AS base\n                                            FROM challenges.\"writingChallenge\"\n                                           WHERE \"slug\" IS NULL\n                                         ) AS slugged\n                                 ) AS numbered\n                         ) AS candidate\n                   WHERE c.id = candidate.id\n                     AND c.\"slug\" IS NULL"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "alterNullability.setNotNull.writingChallenge.slug",
+    "label": "Set NOT NULL on \"writingChallenge\".\"slug\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "column",
+        "name": "slug",
+        "table": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"slug\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "slug"
+        ]
+      },
+      {
+        "description": "ensure no NULL values in \"slug\"",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"challenges\".\"writingChallenge\" WHERE \"slug\" IS NULL) AS \"result\"",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"slug\"",
+        "sql": "ALTER TABLE \"challenges\".\"writingChallenge\" ALTER COLUMN \"slug\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"slug\" is NOT NULL",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "challenges",
+          "writingChallenge",
+          "slug",
+          "NO"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "alterNullability.dropNotNull.challengeEntry.storyId",
+    "label": "Drop NOT NULL on \"challengeEntry\".\"storyId\"",
+    "operationClass": "widening",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "column",
+        "name": "storyId",
+        "table": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"storyId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "challenges",
+          "challengeEntry",
+          "storyId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop NOT NULL on \"storyId\"",
+        "sql": "ALTER TABLE \"challenges\".\"challengeEntry\" ALTER COLUMN \"storyId\" DROP NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"storyId\" is nullable",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "challenges",
+          "challengeEntry",
+          "storyId",
+          "YES"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.challengeEntry.challengeEntry_challengeId_userId_key",
+    "label": "Add unique constraint on \"challengeEntry\" (challengeId, userId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "unique",
+        "name": "challengeEntry_challengeId_userId_key",
+        "table": "challengeEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"challengeEntry_challengeId_userId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "challengeEntry_challengeId_userId_key",
+          "challenges",
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"challengeEntry_challengeId_userId_key\"",
+        "sql": "ALTER TABLE \"challenges\".\"challengeEntry\" ADD CONSTRAINT \"challengeEntry_challengeId_userId_key\" UNIQUE (\"challengeId\", \"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"challengeEntry_challengeId_userId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "challengeEntry_challengeId_userId_key",
+          "challenges",
+          "\"challenges\".\"challengeEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.writingChallenge.writingChallenge_slug_key",
+    "label": "Add unique constraint on \"writingChallenge\" (slug)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "unique",
+        "name": "writingChallenge_slug_key",
+        "table": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"writingChallenge_slug_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "writingChallenge_slug_key",
+          "challenges",
+          "\"challenges\".\"writingChallenge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"writingChallenge_slug_key\"",
+        "sql": "ALTER TABLE \"challenges\".\"writingChallenge\" ADD CONSTRAINT \"writingChallenge_slug_key\" UNIQUE (\"slug\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"writingChallenge_slug_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "writingChallenge_slug_key",
+          "challenges",
+          "\"challenges\".\"writingChallenge\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.writingChallenge.writingChallenge_hostId_idx_05205577",
+    "label": "Create index \"writingChallenge_hostId_idx_05205577\" on \"writingChallenge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "index",
+        "name": "writingChallenge_hostId_idx_05205577",
+        "table": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"writingChallenge_hostId_idx_05205577\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"writingChallenge_hostId_idx_05205577\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"writingChallenge_hostId_idx_05205577\"",
+        "sql": "CREATE INDEX \"writingChallenge_hostId_idx_05205577\" ON \"challenges\".\"writingChallenge\" (\"hostId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"writingChallenge_hostId_idx_05205577\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"writingChallenge_hostId_idx_05205577\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.writingChallenge.writingChallenge_startAt_endAt_idx_9d707d87",
+    "label": "Create index \"writingChallenge_startAt_endAt_idx_9d707d87\" on \"writingChallenge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "index",
+        "name": "writingChallenge_startAt_endAt_idx_9d707d87",
+        "table": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"writingChallenge_startAt_endAt_idx_9d707d87\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"writingChallenge_startAt_endAt_idx_9d707d87\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"writingChallenge_startAt_endAt_idx_9d707d87\"",
+        "sql": "CREATE INDEX \"writingChallenge_startAt_endAt_idx_9d707d87\" ON \"challenges\".\"writingChallenge\" (\"startAt\", \"endAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"writingChallenge_startAt_endAt_idx_9d707d87\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"challenges\".\"writingChallenge_startAt_endAt_idx_9d707d87\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.writingChallenge.writingChallenge_hostId_fkey",
+    "label": "Add foreign key \"writingChallenge_hostId_fkey\" on \"writingChallenge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "challenges",
+        "objectType": "foreignKey",
+        "name": "writingChallenge_hostId_fkey",
+        "table": "writingChallenge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"writingChallenge_hostId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "writingChallenge_hostId_fkey",
+          "challenges",
+          "\"challenges\".\"writingChallenge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"writingChallenge_hostId_fkey\"",
+        "sql": "ALTER TABLE \"challenges\".\"writingChallenge\"\nADD CONSTRAINT \"writingChallenge_hostId_fkey\"\nFOREIGN KEY (\"hostId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"writingChallenge_hostId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "writingChallenge_hostId_fkey",
+          "challenges",
+          "\"challenges\".\"writingChallenge\""
+        ]
+      }
+    ]
+  }
+]

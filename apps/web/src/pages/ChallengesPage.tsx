@@ -1,30 +1,37 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
-import * as api from '../data/api'
-import type { ChallengeState } from '../types/domain'
+import * as challengesApi from '../data/challenges-api'
+import type { ChallengeState } from '../types/challenges'
 import { AppShell } from '../components/layout/AppShell'
-import { Button } from '../components/ui/Button'
-import { Icon } from '../components/ui/Icon'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Tabs, TabPanel } from '../components/ui/Tabs'
 import { EmptyState, ErrorState } from '../components/ui/States'
 import { ChallengeCard } from '../components/story/Cards'
-import { Link } from 'react-router-dom'
 import './pages.css'
 
 const TABS = [
   { id: 'active' as const, label: 'Active' },
   { id: 'upcoming' as const, label: 'Upcoming' },
-  { id: 'completed' as const, label: 'Completed' },
+  { id: 'past' as const, label: 'Past' },
 ]
 
+const EMPTY_COPY: Record<ChallengeState, string> = {
+  active: 'Nothing is running right now — the next one is under Upcoming.',
+  upcoming: 'Nothing announced yet — check back soon.',
+  past: 'Nothing has finished yet.',
+}
+
 export function ChallengesPage() {
-  const challenges = useAsync(() => api.getChallenges(), [])
+  /**
+   * One request for all three groups. The API splits them by the window
+   * rather than by a stored status, and answers all three at once because the
+   * tabs below show a count for each.
+   */
+  const challenges = useAsync(() => challengesApi.getChallenges(), [])
   const [tab, setTab] = useState<ChallengeState>('active')
 
-  const shown = challenges.data?.filter((challenge) => challenge.state === tab) ?? []
-  const counts = (state: ChallengeState) =>
-    challenges.data?.filter((challenge) => challenge.state === state).length
+  const shown = challenges.data?.[tab] ?? []
 
   return (
     <AppShell>
@@ -36,14 +43,21 @@ export function ChallengesPage() {
             brief. The fastest way to finish something.
           </p>
         </div>
-        <Button variant="primary" startIcon={<Icon name="plus" size="1em" />}>
-          Host a challenge
-        </Button>
+        {/*
+          No "Host a challenge" button. Creating one is an administrator
+          action — `POST /api/challenges`, gated on `auth.User.isAdmin` — and
+          there is no admin surface in the reader-facing app to put it behind,
+          so the button did nothing but promise something. Hosting is done
+          through the API today; see the README.
+        */}
       </header>
 
       <div className="page-tabs">
         <Tabs
-          items={TABS.map((item) => ({ ...item, count: counts(item.id) }))}
+          items={TABS.map((item) => ({
+            ...item,
+            count: challenges.data?.[item.id].length,
+          }))}
           active={tab}
           onChange={setTab}
           label="Challenge status"
@@ -62,17 +76,17 @@ export function ChallengesPage() {
         ) : shown.length === 0 ? (
           <EmptyState
             icon="trophy"
-            title={`No ${tab} challenges`}
-            description={
-              tab === 'upcoming'
-                ? 'Nothing announced yet — check back soon.'
-                : 'Nothing here right now.'
-            }
+            title={`No ${tab === 'past' ? 'past' : tab} challenges`}
+            description={EMPTY_COPY[tab]}
           />
         ) : (
           <div className="card-grid">
             {shown.map((challenge) => (
-              <Link key={challenge.id} to={`/challenges/${challenge.slug}`} className="card-link">
+              <Link
+                key={challenge.id}
+                to={`/challenges/${challenge.slug}`}
+                className="card-link"
+              >
                 <ChallengeCard challenge={challenge} />
               </Link>
             ))}

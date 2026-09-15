@@ -2,13 +2,14 @@
  * Scribe domain types.
  *
  * These mirror the backend entities (auth / content / engagement /
- * gamification / challenges) so that swapping the mock data layer in
- * `src/data/api.ts` for real endpoints is a change of transport only.
- * Timestamps are ISO-8601 strings.
+ * gamification) so that swapping the mock data layer in `src/data/api.ts` for
+ * real endpoints is a change of transport only. Timestamps are ISO-8601
+ * strings.
  *
- * The club and channel shapes that used to live here are gone: those features
- * have real endpoints now, and their types are the API's to define -- see
- * `types/clubs.ts` and `types/channels.ts`.
+ * The club, channel and challenge shapes that used to live here are gone:
+ * those features have real endpoints now, and their types are the API's to
+ * define -- see `types/clubs.ts`, `types/channels.ts` and
+ * `types/challenges.ts`.
  */
 
 /* auth ---------------------------------------------------------------- */
@@ -137,36 +138,6 @@ export interface UserBadge {
   earnedAt: string | null
   /** 0–1 toward earning it; 1 once earned. */
   progress: number
-}
-
-/* challenges ---------------------------------------------------------- */
-
-export type ChallengeState = 'active' | 'upcoming' | 'completed'
-
-export interface WritingChallenge {
-  id: string
-  title: string
-  slug: string
-  prompt: string
-  description: string
-  hue: number
-  state: ChallengeState
-  startsAt: string
-  endsAt: string
-  participantCount: number
-  entryCount: number
-  wordTarget: number | null
-  hostId: string
-}
-
-export interface ChallengeEntry {
-  id: string
-  challengeId: string
-  userId: string
-  storyId: string
-  submittedAt: string
-  voteCount: number
-  rank: number
 }
 
 /* view models --------------------------------------------------------- */

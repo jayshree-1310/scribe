@@ -158,6 +158,13 @@
                   "kind": "scalar"
                 }
               },
+              "isAdmin": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
               "isAuthor": {
                 "nullable": false,
                 "type": {
@@ -344,6 +351,21 @@
                   "namespace": "engagement"
                 }
               },
+              "hostedChallenges": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "hostId"
+                  ]
+                },
+                "to": {
+                  "model": "WritingChallenge",
+                  "namespace": "challenges"
+                }
+              },
               "ratings": {
                 "cardinality": "1:N",
                 "on": {
@@ -419,6 +441,9 @@
                 "id": {
                   "column": "id"
                 },
+                "isAdmin": {
+                  "column": "isAdmin"
+                },
                 "isAuthor": {
                   "column": "isAuthor"
                 },
@@ -465,14 +490,28 @@
                   "kind": "scalar"
                 }
               },
+              "note": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "storyId": {
-                "nullable": false,
+                "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
               },
               "submittedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/timestamptz-temporal@1",
@@ -542,11 +581,17 @@
                 "id": {
                   "column": "id"
                 },
+                "note": {
+                  "column": "note"
+                },
                 "storyId": {
                   "column": "storyId"
                 },
                 "submittedAt": {
                   "column": "submittedAt"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
                 },
                 "userId": {
                   "column": "userId"
@@ -579,7 +624,28 @@
                   "kind": "scalar"
                 }
               },
+              "hostId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "prompt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "slug": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
@@ -599,6 +665,20 @@
                   "codecId": "pg/text@1",
                   "kind": "scalar"
                 }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "wordTarget": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
               }
             },
             "relations": {
@@ -616,6 +696,21 @@
                   "model": "ChallengeEntry",
                   "namespace": "challenges"
                 }
+              },
+              "host": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "hostId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
               }
             },
             "storage": {
@@ -629,14 +724,29 @@
                 "endAt": {
                   "column": "endAt"
                 },
+                "hostId": {
+                  "column": "hostId"
+                },
                 "id": {
                   "column": "id"
+                },
+                "prompt": {
+                  "column": "prompt"
+                },
+                "slug": {
+                  "column": "slug"
                 },
                 "startAt": {
                   "column": "startAt"
                 },
                 "title": {
                   "column": "title"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                },
+                "wordTarget": {
+                  "column": "wordTarget"
                 }
               },
               "namespaceId": "challenges",
@@ -2983,6 +3093,15 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "isAdmin": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": false
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
                 "isAuthor": {
                   "codecId": "pg/bool@1",
                   "default": {
@@ -3080,12 +3199,26 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "note": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "storyId": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
-                  "nullable": false
+                  "nullable": true
                 },
                 "submittedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "updatedAt": {
                   "codecId": "pg/timestamptz-temporal@1",
                   "default": {
                     "expression": "now()",
@@ -3185,8 +3318,7 @@
                 {
                   "columns": [
                     "challengeId",
-                    "userId",
-                    "storyId"
+                    "userId"
                   ]
                 }
               ]
@@ -3212,7 +3344,22 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "hostId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
                 "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "prompt": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "slug": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
@@ -3226,16 +3373,71 @@
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "wordTarget": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
                 }
               },
-              "foreignKeys": [],
-              "indexes": [],
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "hostId"
+                    ],
+                    "namespaceId": "challenges",
+                    "tableName": "writingChallenge"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "hostId"
+                  ],
+                  "name": "writingChallenge_hostId_idx_05205577",
+                  "prefix": "writingChallenge_hostId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "startAt",
+                    "endAt"
+                  ],
+                  "name": "writingChallenge_startAt_endAt_idx_9d707d87",
+                  "prefix": "writingChallenge_startAt_endAt_idx",
+                  "unique": false
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
                 ]
               },
-              "uniques": []
+              "uniques": [
+                {
+                  "columns": [
+                    "slug"
+                  ]
+                }
+              ]
             }
           }
         },
@@ -5281,7 +5483,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "dd92396eafcc15822b31c2fd407f9a61c78ef5bf988cc7681ae670d473e8bc6a"
+    "storageHash": "efd4d8e5f424a80aab08e125ffc91d1c0f204592b83ceb11c95cf4736a5f58f2"
   },
   "execution": {
     "executionHash": "8ed44bbf5870335b930ce6cf5ac9f5a79e4ee6cc67d4ecfd9747a33d7b0be08b",

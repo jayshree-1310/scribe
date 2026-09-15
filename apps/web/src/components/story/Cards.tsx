@@ -12,7 +12,8 @@ import { StoryCover } from './StoryCover'
 import type { BadgeWithProgress } from '../../data/api'
 import { channelAuthorName, type Channel } from '../../types/channels'
 import { CLUB_ROLE_LABELS, type Club } from '../../types/clubs'
-import type { User, WritingChallenge } from '../../types/domain'
+import type { Challenge } from '../../types/challenges'
+import type { User } from '../../types/domain'
 
 /* Author -------------------------------------------------------------- */
 
@@ -69,10 +70,17 @@ export function GenreCard({ genre }: { genre: CardGenre }) {
 const CHALLENGE_TONE = {
   active: 'success',
   upcoming: 'brand',
-  completed: 'neutral',
+  past: 'neutral',
 } as const
 
-export function ChallengeCard({ challenge }: { challenge: WritingChallenge }) {
+/** What each state is called on screen; `past` reads badly as a badge. */
+const CHALLENGE_LABEL = {
+  active: 'active',
+  upcoming: 'upcoming',
+  past: 'ended',
+} as const
+
+export function ChallengeCard({ challenge }: { challenge: Challenge }) {
   const remaining = daysUntil(challenge.endsAt)
   const starts = daysUntil(challenge.startsAt)
 
@@ -88,11 +96,11 @@ export function ChallengeCard({ challenge }: { challenge: WritingChallenge }) {
   return (
     <article
       className="challenge-card"
-      style={{ '--challenge-hue': challenge.hue } as CSSProperties}
+      style={{ '--challenge-hue': hueFor(challenge.slug) } as CSSProperties}
     >
       <div className="challenge-card__head">
         <StatusBadge tone={CHALLENGE_TONE[challenge.state]}>
-          {challenge.state}
+          {CHALLENGE_LABEL[challenge.state]}
         </StatusBadge>
         <span className="challenge-card__timing">
           <Icon name="clock" size="0.9em" />
