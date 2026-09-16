@@ -265,3 +265,140 @@ describe.skipIf(!available)("GET /api/books/discover", () => {
     ).toBe(false);
   });
 });
+
+/**
+ * Its own fixtures and its own genre on purpose: the shared catalogue genres
+ * carry exact-set assertions above, and the suites run against the dev
+ * database where `seed-books.ts` has already written real kids-appropriate
+ * rows. Pinning `genreId` is what keeps those out of these assertions.
+ */
+/**
+ * Catalogue authors are seeded with usernames like `amara_okonkwo` and no
+ * display name, so the name a reader would actually type never reached them:
+ * `_` is a LIKE wildcard, `escapeLike` makes it literal, and a space cannot
+ * match a literal underscore.
+ */
+describe.skipIf(!available)("GET /api/books?search= by author name", () => {
+  let penName: string;
+  let byThem: string;
+
+  beforeAll(async () => {
+    if (!available) return;
+    // Never rebuild the handle by hand: `createUser` truncates it to 30
+    // characters, which is exactly what `usernameOf` exists to hide.
+    const author = await api.createUser("hallberg");
+    penName = api.usernameOf(author);
+    byThem = await api.createBook({
+      title: "The Cartographer's Apology",
+      authorId: author,
+    });
+  });
+
+  it("finds a book by the author's username", async () => {
+    const { status, body } = await api.request(
+      `/api/books?search=${encodeURIComponent(penName)}`,
+    );
+
+    expect(status).toBe(200);
+    expect(body.items.map((book: { id: string }) => book.id)).toContain(byThem);
+  });
+
+  it("finds the same book when the name is typed with spaces", async () => {
+    const spaced = penName.replace(/-/g, " ");
+
+    const { body } = await api.request(
+      `/api/books?search=${encodeURIComponent(spaced)}`,
+    );
+
+    expect(body.items.map((book: { id: string }) => book.id)).toContain(byThem);
+  });
+
+  it("finds the same book when the name arrives reordered and punctuated", async () => {
+    // What a model actually produces from "by tomas hallberg".
+    const words = penName.split("-").filter((word) => word.length >= 2);
+    const reordered = [...words].reverse().join(", ");
+
+    const { body } = await api.request(
+      `/api/books?search=${encodeURIComponent(reordered)}`,
+    );
+
+    expect(body.items.map((book: { id: string }) => book.id)).toContain(byThem);
+  });
+
+  it("still does not match an unrelated author", async () => {
+    const { body } = await api.request(
+      "/api/books?search=nobody%20of%20that%20name",
+    );
+
+    expect(body.items.map((book: { id: string }) => book.id)).not.toContain(
+      byThem,
+    );
+  });
+});
+
+describe.skipIf(!available)("GET /api/books?kidsAppropriate", () => {
+  let shelfId: string;
+  let picture: string;
+  let grownUp: string;
+
+  beforeAll(async () => {
+    if (!available) return;
+    shelfId = await api.createGenre("Nursery", 96);
+    picture = await api.createBook({
+      title: "The Very Patient Badger",
+      authorId,
+      genreIds: [shelfId],
+      kidsAppropriate: true,
+    });
+    grownUp = await api.createBook({
+      title: "Ledgers of the Drowned Fleet",
+      authorId,
+      genreIds: [shelfId],
+      kidsAppropriate: false,
+    });
+  });
+
+  it("narrows to vouched-for titles", async () => {
+    const { status, body } = await api.request(
+      `/api/books?genreId=${shelfId}&kidsAppropriate=true`,
+    );
+
+    expect(status).toBe(200);
+    expect(body.items.map((book: { id: string }) => book.id)).toEqual([picture]);
+  });
+
+  it("keeps everything when the filter is absent", async () => {
+    const { body } = await api.request(`/api/books?genreId=${shelfId}`);
+
+    const returned = body.items.map((book: { id: string }) => book.id).sort();
+    expect(returned).toEqual([picture, grownUp].sort());
+  });
+
+  /**
+   * The column records that someone vouched for a book, never that they ruled
+   * against one, so there is no "adults only" to select. `false` is therefore
+   * a no-op rather than an inversion -- and a client that serialises `false`
+   * naively must not get a surprise.
+   */
+  it("treats false as absent rather than as an inversion", async () => {
+    const { body } = await api.request(
+      `/api/books?genreId=${shelfId}&kidsAppropriate=false`,
+    );
+
+    const returned = body.items.map((book: { id: string }) => book.id).sort();
+    expect(returned).toEqual([picture, grownUp].sort());
+  });
+
+  /**
+   * `z.coerce.boolean()` would accept this and silently mean `true`, because
+   * every non-empty query string is truthy. The enum is what makes it a 400.
+   */
+  it("rejects a value that is not a boolean", async () => {
+    const { status, body } = await api.request(
+      `/api/books?genreId=${shelfId}&kidsAppropriate=banana`,
+    );
+
+    expect(status).toBe(400);
+    expect(body.error.details.kidsAppropriate).toBeDefined();
+  });
+});

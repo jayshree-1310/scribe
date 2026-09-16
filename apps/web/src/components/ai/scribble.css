@@ -1,0 +1,635 @@
+/* ==========================================================================
+   Scribble — the docked reading assistant
+
+   A launcher pinned bottom-right and a panel that rises from it. Sized like a
+   support widget rather than a page: narrow, scrollable, and never covering
+   the content it is talking about. Full-width sheet on a phone, where a 380px
+   card would be the whole screen anyway.
+   ========================================================================== */
+
+.scribble-fab {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--brand);
+  color: var(--brand-fg);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 26%);
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.scribble-fab:hover {
+  background: var(--brand-hover);
+  transform: translateY(-2px);
+}
+
+/* The panel carries its own close control; a second one floating beneath it
+   just reads as clutter. */
+.scribble-fab.is-hidden {
+  display: none;
+}
+
+.scribble-fab:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+
+/* Panel ------------------------------------------------------------------- */
+
+.scribble {
+  position: fixed;
+  right: var(--space-5);
+  bottom: calc(var(--space-5) + 4rem);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  width: min(31rem, calc(100vw - var(--space-8)));
+  /**
+   * A fixed height, not a max.
+   *
+   * Sized to content the panel collapsed the moment the welcome screen was
+   * replaced by a single question -- so asking something made the window
+   * visibly shrink under the cursor. Every docked assistant holds its frame
+   * and scrolls inside it; only the log should move.
+   */
+  height: min(36rem, calc(100vh - 7rem));
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 18px 48px rgb(0 0 0 / 22%);
+  overflow: hidden;
+
+  /* Closed: out of the way and untabbable. `inert` handles focus; this is
+     only the visual half. */
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  pointer-events: none;
+  transition:
+    opacity var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-out);
+}
+
+.scribble.is-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scribble,
+  .scribble-fab {
+    transition: none;
+  }
+}
+
+/* Header ------------------------------------------------------------------ */
+
+.scribble__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.scribble__avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--radius-full);
+  background: var(--brand-soft);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.scribble__heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.scribble__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+}
+
+.scribble__sub {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+/* States plainly where the answers come from: the catalogue, not the model. */
+.scribble__status-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  /* The real tokens, so the pill follows the theme like everything else. */
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.scribble__dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+/* Welcome ----------------------------------------------------------------- */
+
+.scribble__greeting {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--brand-soft);
+}
+
+.scribble__greeting-title {
+  margin: 0 0 var(--space-1);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: var(--tracking-tight);
+}
+
+.scribble__greeting-body {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.scribble__greeting-art {
+  flex: none;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.scribble__section {
+  margin: var(--space-4) 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.scribble__examples {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scribble__example {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--tone-bg);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.scribble__example:hover {
+  border-color: var(--tone-ink);
+  transform: translateY(-2px);
+}
+
+.scribble__example:focus-visible {
+  outline: 2px solid var(--tone-ink);
+  outline-offset: 2px;
+}
+
+/* Tints carry the only colour in the panel, so each prompt reads as its own
+   thing without needing an illustration per card. */
+.scribble__example--violet {
+  --tone-bg: color-mix(in oklab, #7c5cff 12%, var(--surface));
+  --tone-ink: #6d4df0;
+}
+
+.scribble__example--peach {
+  --tone-bg: color-mix(in oklab, #ff8a5c 13%, var(--surface));
+  --tone-ink: #d4622f;
+}
+
+.scribble__example--mint {
+  --tone-bg: color-mix(in oklab, #35a06a 13%, var(--surface));
+  --tone-ink: #1f7d4d;
+}
+
+.scribble__example-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.scribble__example-icon {
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--tone-ink);
+  padding: var(--space-1);
+  box-sizing: content-box;
+}
+
+.scribble__example-go {
+  color: var(--text-muted);
+}
+
+.scribble__example-title {
+  font-weight: 600;
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
+}
+
+.scribble__example-blurb {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.scribble__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scribble__chip {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  white-space: nowrap;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.scribble__chip:hover {
+  border-color: var(--brand-border);
+  color: var(--brand);
+}
+
+.scribble__reset,
+.scribble__close {
+  flex: none;
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.scribble__reset:hover,
+.scribble__close:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+/* Conversation ------------------------------------------------------------ */
+
+/**
+ * A tinted canvas the bubbles sit on.
+ *
+ * White bubbles on a white panel have only their hairline border to separate
+ * them, which is what made the conversation read as a list of boxes rather
+ * than as messages. One step of contrast under them does the whole job.
+ */
+.scribble__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-4);
+  background: var(--surface-3);
+}
+
+.scribble__log {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Only once there is a conversation: the welcome screen supplies its own
+   spacing and would otherwise sit too low. */
+.scribble__log:not(:empty) {
+  padding-top: var(--space-4);
+}
+
+/**
+ * Scribble's side of the conversation.
+ *
+ * No per-message avatar. One was tried and read as a stray icon floating
+ * beside the text -- and with a brand mark already in the header, a second one
+ * on every reply was the third book icon on screen. Alignment and colour
+ * separate the two voices on their own, which is all a bubble has to do.
+ */
+.scribble__from-bot {
+  align-self: flex-start;
+  max-width: 94%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs) var(--radius-md) var(--radius-md)
+    var(--radius-md);
+  background: var(--surface);
+}
+
+/* The reader's own words, right-aligned the way a chat bubble reads. */
+.scribble__question {
+  align-self: flex-end;
+  max-width: 85%;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md) var(--radius-md) var(--radius-xs)
+    var(--radius-md);
+  background: var(--brand-soft);
+  color: var(--text);
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
+}
+
+.scribble__thinking,
+.scribble__error {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-base);
+}
+
+/* A setback, not a stack trace: reads as part of the conversation. */
+.scribble__error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  line-height: var(--leading-normal);
+}
+
+.scribble__error svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-muted);
+}
+
+.scribble__dots::after {
+  content: '…';
+  animation: scribble-dots 1.4s steps(4, end) infinite;
+}
+
+@keyframes scribble-dots {
+  0% {
+    content: '';
+  }
+  25% {
+    content: '.';
+  }
+  50% {
+    content: '..';
+  }
+  75% {
+    content: '...';
+  }
+}
+
+.scribble__intro {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.scribble__substitute,
+.scribble__considering {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.scribble__substitute {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--border-strong);
+  background: var(--surface-3);
+}
+
+.scribble__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scribble__item {
+  display: flex;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.scribble__item:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+
+.scribble__cover-link {
+  flex: none;
+}
+
+.scribble__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.scribble__book-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  line-height: var(--leading-tight);
+}
+
+.scribble__book-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.scribble__book-title a:hover {
+  color: var(--brand);
+}
+
+.scribble__byline {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+}
+
+/* The generated sentence. Set apart on purpose: a machine's opinion must not
+   be mistaken for the author's own description. */
+.scribble__reason {
+  margin: var(--space-1) 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+/* The author's own blurb, shown when the model contributed no note. Set in
+   the reading face so it reads as the book's voice rather than Scribble's. */
+.scribble__reason--blurb {
+  font-family: var(--font-reading);
+  color: var(--text-muted);
+}
+
+.scribble__disclaimer {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+}
+
+/* Composer ---------------------------------------------------------------- */
+
+.scribble__footer {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+/* One rounded field holding the icon, the input and the send button, so the
+   whole row reads as a single control. */
+.scribble__form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+}
+
+.scribble__form:focus-within {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-ring);
+}
+
+.scribble__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.scribble__input:focus {
+  outline: none;
+}
+
+.scribble__send {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.1rem;
+  height: 2.1rem;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--brand);
+  color: var(--brand-fg);
+  cursor: pointer;
+}
+
+.scribble__send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Phone ------------------------------------------------------------------- */
+
+@media (max-width: 40rem) {
+  /* Clear of the mobile tab bar, which owns the bottom edge. */
+  .scribble-fab {
+    right: var(--space-4);
+    bottom: calc(var(--mobile-nav-height) + var(--space-3));
+  }
+
+  .scribble {
+    right: var(--space-3);
+    left: var(--space-3);
+    bottom: calc(var(--mobile-nav-height) + var(--space-3) + 4rem);
+    width: auto;
+    height: min(32rem, calc(100vh - var(--mobile-nav-height) - 9rem));
+  }
+
+  .scribble__head,
+  .scribble__footer {
+    padding-inline: var(--space-4);
+  }
+
+  .scribble__scroll {
+    padding-inline: var(--space-4);
+  }
+
+  /* The status pill is the first thing to go: the title says enough. */
+  .scribble__status-pill {
+    display: none;
+  }
+
+  .scribble__examples {
+    grid-template-columns: 1fr;
+  }
+
+  .scribble__greeting-art {
+    display: none;
+  }
+}

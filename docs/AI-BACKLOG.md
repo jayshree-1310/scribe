@@ -4,9 +4,11 @@ Companion to `BACKLOG.md`, derived from `scribe-genai-roadmap.md`. Same format:
 each task is a self-contained prompt you can hand to an implementer, grounded in
 what this repo actually has rather than in the abstract.
 
-The roadmap's 20 phases collapse into 21 tasks here (AI 0 – AI 20), in the order
-the roadmap recommends. Every task states what already exists, because most of them build on
-code that is already in the tree.
+The roadmap's 20 phases collapse into 22 tasks here (AI 0 – AI 20, plus AI 1.5),
+in the order the roadmap recommends. Every task states what already exists, because most of them build on
+code that is already in the tree. AI 1.5 is not from the roadmap: it is the first
+user-visible feature, and it sits early precisely because it needs none of the
+retrieval infrastructure the roadmap front-loads.
 
 **Learning is the point.** Each task carries a `Learn:` line naming the concepts
 it exists to teach — that is why the tasks are sequenced the way they are rather
@@ -206,6 +208,7 @@ Task AI 0 interface; nothing else changes.
 | --- | --- |
 | AI 0 Provider seam | **Free** — build the Ollama implementation first; add a hosted one later as a second file |
 | AI 1 First endpoint | **Free** |
+| AI 1.5 Scribble concierge | **Free** — two small calls per turn; the retrieval is SQL |
 | AI 2 Streaming | **Free** — Ollama streams |
 | AI 3 Writing assistant | **Free** — quality is the limit, not access |
 | AI 4 Structured outputs | **Free** — Ollama takes a JSON schema |
@@ -328,6 +331,116 @@ getting right before the first feature.
 >
 > Learn: the full request lifecycle, prompt construction, token accounting,
 > where cost actually accrues.
+
+---
+
+## Task AI 1.5 — Scribble, the discovery concierge
+
+**Status: built, including streaming.** `services/ai/scribble.ts`,
+`services/ai/json-stream.ts`, `routes/ai.ts` (a JSON route and an SSE one),
+`components/ai/ScribbleWidget.tsx`, tests in `routes/ai.test.ts` and
+`services/ai/json-stream.test.ts`. `kidsAppropriate` is a filter on both
+services and both list routes. Verified end to end against `llama3.2:3b`:
+cards at 5.5s, full reply at 97s — which is the whole argument for streaming
+the retrieval result before the model has written anything.
+
+Still open: no conversation memory, so a follow-up ("something shorter?")
+does not resolve against the previous answer — that is Task AI 10. The daily
+token budget is read but unenforced (Task AI 18).
+
+The first task a user can see the point of, and deliberately placed before the
+embedding work: it needs no vectors, no pgvector, no chunking. Everything it
+retrieves with, `services/books.ts` and `services/stories.ts` already do.
+
+**The invariant that defines this task: the model never produces a book.** It
+turns a sentence into filters, and it writes the prose around rows that
+Postgres returned. Title, author, description and URL come off the row
+verbatim and never pass through a completion. A recommender that *writes*
+recommendations invents titles that do not exist and URLs that 404; one that
+routes a query and narrates real rows cannot. Every rule below exists to keep
+that separation intact.
+
+**Prompt:**
+
+> A chat assistant — call it Scribble — that answers "some fantasy books for
+> kids?" with real titles from this database, each with its description, its
+> author and a link that navigates to it.
+>
+> API — `POST /api/ai/scribble`, `requireUser`, rate-limited, taking
+> `{ message }` and returning an intro line plus a list of recommendations.
+> Three stages, and only the first and third call a model:
+>
+> 1. **Intent.** One completion that translates the message into a filter
+>    object: `{ genreId, kidsAppropriate, completed, search, sort, limit }`.
+>    Inject the real genre list from `listGenres()` into the prompt — the model
+>    picks from ten names it has been shown rather than inventing one. Validate
+>    the reply with zod and drop any genre id not in that list; a hallucinated
+>    filter must degrade to a broader search, never to an error page. Use the
+>    structured-output path from Task AI 4 if it has landed, a JSON-only system
+>    prompt plus a parse if it has not.
+> 2. **Retrieve.** No model. Call `listBooks` and `listStories` with those
+>    filters and interleave the two pages. **Search both**: a reader asking for
+>    books means the catalogue, but the stories serialised here are the reason
+>    Scribe exists and a concierge that cannot surface them is a search box for
+>    somebody else's library. `visibleTo` still decides what a caller may see —
+>    a draft must never reach a recommendation, and there is a test for it.
+> 3. **Narrate.** One streamed completion given the candidate rows, numbered,
+>    returning a short intro and a `{ id, reason }` per book — one sentence on
+>    why *this* reader gets *this* title. Discard every id that is not in the
+>    candidate set before assembling. The reason is the only field on the
+>    response that came from the model, and it is labelled as generated.
+>
+> Then assemble, in code: `reason` from the model, everything else from the
+> row. **The URL branches on `source`** — `/book/:id` for `CATALOGUE` and
+> `/story/:slug` for `SCRIBE`, per `App.tsx`. Building one shape for both ships
+> a link that 404s on half the corpus.
+>
+> Two gaps in the existing code this closes on the way:
+> - **`kidsAppropriate` is not filterable.** The column is on `content.Story`
+>   and `services/books.ts` returns it, but `BookQuery` has no field for it and
+>   `applyFilters` never reads it — so the example query above cannot be
+>   executed today. Add it to both services as an ordinary filter, with its own
+>   test, independent of anything AI. It is useful to Discover regardless.
+> - **Empty results are a first-class answer.** When retrieval returns nothing,
+>   skip stage 3 entirely, say the catalogue does not have it, and offer the
+>   nearest broader filter. Never hand an empty candidate list to a model and
+>   let it fill the silence — that is exactly where invented books come from,
+>   and it is the same failure Task AI 9 guards against with its threshold.
+>
+> The message is untrusted and so are the rows. A user's own story description
+> is interpolated into stage 3's prompt; fence it and state in the system
+> prompt that candidate rows are data, never instructions. Write the test with
+> a story whose description asks the model to ignore them.
+>
+> FE: a Scribble panel reachable from Discover — the message box, the streamed
+> intro, and a card per recommendation reusing `components/books/*` rather than
+> a second card component, each linking to its story. The generated reason is
+> visibly a machine's opinion, not the author's blurb.
+>
+> Tests: the fake provider receives the real genre list; an invented genre id
+> is dropped rather than queried; a draft never appears for a non-author; an id
+> outside the candidate set is discarded from the narration; a no-match query
+> declines without a second model call; catalogue rows link by id and Scribe
+> rows by slug; an unauthenticated caller gets 401.
+>
+> Learn: natural language as a *router* rather than a generator, structured
+> extraction, grounding without retrieval infrastructure, and why the boundary
+> between what the model decides and what the database asserts is the whole
+> design.
+
+**Worth knowing before you judge the output.** The corpus is 25 catalogue
+titles across ten genres, 13 of them `kidsAppropriate`, plus the seeded Scribe
+stories. "Fantasy for kids" is a genuine `genre = Fantasy AND kidsAppropriate`
+query against real rows — but the pool is small enough that Scribble will
+repeat itself across sessions. That is a seeding problem, not a prompt one, and
+no amount of prompt work will fix it.
+
+**Where it does not go.** Not into `/api/recommendations` — Task AI 11 extends
+`BACKLOG.md` Task 16's deterministic scorer, which is a different feature with a
+different contract: personalised, unprompted, and explainable from signals
+rather than from a sentence. Scribble answers a question that was asked. Once
+both exist, stage 2 here may call that scorer instead of `listBooks`, and that
+is the natural follow-up.
 
 ---
 
@@ -682,7 +795,9 @@ The flagship. Everything so far exists to make this possible.
 ## Task AI 11 — AI recommendations
 
 Overlaps `BACKLOG.md` Task 16 — **do that one first** and extend it here rather
-than building a second recommender.
+than building a second recommender. Distinct from Task AI 1.5: Scribble answers a
+question a reader asked, this ranks for a reader who asked nothing. Once both
+exist, Scribble's retrieval stage can call this scorer instead of `listBooks`.
 
 **Prompt:**
 

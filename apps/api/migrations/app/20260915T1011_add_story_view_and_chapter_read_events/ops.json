@@ -1,0 +1,686 @@
+[
+  {
+    "id": "table.chapterRead",
+    "label": "Create table \"chapterRead\"",
+    "summary": "Creates table \"chapterRead\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "table",
+        "name": "chapterRead"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"chapterRead\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterRead\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"chapterRead\"",
+        "sql": "CREATE TABLE \"engagement\".\"chapterRead\" (\n  \"chapterId\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"day\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"userId\" text,\n  \"visitorKey\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"chapterRead\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterRead\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.storyView",
+    "label": "Create table \"storyView\"",
+    "summary": "Creates table \"storyView\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "table",
+        "name": "storyView"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"storyView\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"storyView\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"storyView\"",
+        "sql": "CREATE TABLE \"engagement\".\"storyView\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"day\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"userId\" text,\n  \"visitorKey\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"storyView\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"storyView\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.chapterRead.chapterRead_chapterId_visitorKey_day_key",
+    "label": "Add unique constraint on \"chapterRead\" (chapterId, visitorKey, day)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "unique",
+        "name": "chapterRead_chapterId_visitorKey_day_key",
+        "table": "chapterRead"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"chapterRead_chapterId_visitorKey_day_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterRead_chapterId_visitorKey_day_key",
+          "engagement",
+          "\"engagement\".\"chapterRead\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"chapterRead_chapterId_visitorKey_day_key\"",
+        "sql": "ALTER TABLE \"engagement\".\"chapterRead\" ADD CONSTRAINT \"chapterRead_chapterId_visitorKey_day_key\" UNIQUE (\"chapterId\", \"visitorKey\", \"day\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"chapterRead_chapterId_visitorKey_day_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterRead_chapterId_visitorKey_day_key",
+          "engagement",
+          "\"engagement\".\"chapterRead\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.storyView.storyView_storyId_visitorKey_day_key",
+    "label": "Add unique constraint on \"storyView\" (storyId, visitorKey, day)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "unique",
+        "name": "storyView_storyId_visitorKey_day_key",
+        "table": "storyView"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"storyView_storyId_visitorKey_day_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyView_storyId_visitorKey_day_key",
+          "engagement",
+          "\"engagement\".\"storyView\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"storyView_storyId_visitorKey_day_key\"",
+        "sql": "ALTER TABLE \"engagement\".\"storyView\" ADD CONSTRAINT \"storyView_storyId_visitorKey_day_key\" UNIQUE (\"storyId\", \"visitorKey\", \"day\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"storyView_storyId_visitorKey_day_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyView_storyId_visitorKey_day_key",
+          "engagement",
+          "\"engagement\".\"storyView\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapterRead.chapterRead_chapterId_day_idx_d49704f1",
+    "label": "Create index \"chapterRead_chapterId_day_idx_d49704f1\" on \"chapterRead\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "chapterRead_chapterId_day_idx_d49704f1",
+        "table": "chapterRead"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapterRead_chapterId_day_idx_d49704f1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterRead_chapterId_day_idx_d49704f1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapterRead_chapterId_day_idx_d49704f1\"",
+        "sql": "CREATE INDEX \"chapterRead_chapterId_day_idx_d49704f1\" ON \"engagement\".\"chapterRead\" (\"chapterId\", \"day\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapterRead_chapterId_day_idx_d49704f1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterRead_chapterId_day_idx_d49704f1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapterRead.chapterRead_chapterId_idx_411dd3d6",
+    "label": "Create index \"chapterRead_chapterId_idx_411dd3d6\" on \"chapterRead\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "chapterRead_chapterId_idx_411dd3d6",
+        "table": "chapterRead"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapterRead_chapterId_idx_411dd3d6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterRead_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapterRead_chapterId_idx_411dd3d6\"",
+        "sql": "CREATE INDEX \"chapterRead_chapterId_idx_411dd3d6\" ON \"engagement\".\"chapterRead\" (\"chapterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapterRead_chapterId_idx_411dd3d6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterRead_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapterRead.chapterRead_storyId_day_idx_00c4c762",
+    "label": "Create index \"chapterRead_storyId_day_idx_00c4c762\" on \"chapterRead\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "chapterRead_storyId_day_idx_00c4c762",
+        "table": "chapterRead"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapterRead_storyId_day_idx_00c4c762\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterRead_storyId_day_idx_00c4c762\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapterRead_storyId_day_idx_00c4c762\"",
+        "sql": "CREATE INDEX \"chapterRead_storyId_day_idx_00c4c762\" ON \"engagement\".\"chapterRead\" (\"storyId\", \"day\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapterRead_storyId_day_idx_00c4c762\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterRead_storyId_day_idx_00c4c762\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapterRead.chapterRead_storyId_idx_cd452158",
+    "label": "Create index \"chapterRead_storyId_idx_cd452158\" on \"chapterRead\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "chapterRead_storyId_idx_cd452158",
+        "table": "chapterRead"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapterRead_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterRead_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapterRead_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"chapterRead_storyId_idx_cd452158\" ON \"engagement\".\"chapterRead\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapterRead_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterRead_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapterRead.chapterRead_userId_idx_a489d58a",
+    "label": "Create index \"chapterRead_userId_idx_a489d58a\" on \"chapterRead\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "chapterRead_userId_idx_a489d58a",
+        "table": "chapterRead"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapterRead_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterRead_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapterRead_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"chapterRead_userId_idx_a489d58a\" ON \"engagement\".\"chapterRead\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapterRead_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterRead_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.storyView.storyView_storyId_day_idx_00c4c762",
+    "label": "Create index \"storyView_storyId_day_idx_00c4c762\" on \"storyView\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "storyView_storyId_day_idx_00c4c762",
+        "table": "storyView"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"storyView_storyId_day_idx_00c4c762\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"storyView_storyId_day_idx_00c4c762\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"storyView_storyId_day_idx_00c4c762\"",
+        "sql": "CREATE INDEX \"storyView_storyId_day_idx_00c4c762\" ON \"engagement\".\"storyView\" (\"storyId\", \"day\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"storyView_storyId_day_idx_00c4c762\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"storyView_storyId_day_idx_00c4c762\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.storyView.storyView_storyId_idx_cd452158",
+    "label": "Create index \"storyView_storyId_idx_cd452158\" on \"storyView\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "storyView_storyId_idx_cd452158",
+        "table": "storyView"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"storyView_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"storyView_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"storyView_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"storyView_storyId_idx_cd452158\" ON \"engagement\".\"storyView\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"storyView_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"storyView_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.storyView.storyView_userId_idx_a489d58a",
+    "label": "Create index \"storyView_userId_idx_a489d58a\" on \"storyView\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "storyView_userId_idx_a489d58a",
+        "table": "storyView"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"storyView_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"storyView_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"storyView_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"storyView_userId_idx_a489d58a\" ON \"engagement\".\"storyView\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"storyView_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"storyView_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chapterRead.chapterRead_storyId_fkey",
+    "label": "Add foreign key \"chapterRead_storyId_fkey\" on \"chapterRead\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "chapterRead_storyId_fkey",
+        "table": "chapterRead"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chapterRead_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterRead_storyId_fkey",
+          "engagement",
+          "\"engagement\".\"chapterRead\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chapterRead_storyId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"chapterRead\"\nADD CONSTRAINT \"chapterRead_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chapterRead_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterRead_storyId_fkey",
+          "engagement",
+          "\"engagement\".\"chapterRead\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chapterRead.chapterRead_chapterId_fkey",
+    "label": "Add foreign key \"chapterRead_chapterId_fkey\" on \"chapterRead\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "chapterRead_chapterId_fkey",
+        "table": "chapterRead"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chapterRead_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterRead_chapterId_fkey",
+          "engagement",
+          "\"engagement\".\"chapterRead\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chapterRead_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"chapterRead\"\nADD CONSTRAINT \"chapterRead_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chapterRead_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterRead_chapterId_fkey",
+          "engagement",
+          "\"engagement\".\"chapterRead\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chapterRead.chapterRead_userId_fkey",
+    "label": "Add foreign key \"chapterRead_userId_fkey\" on \"chapterRead\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "chapterRead_userId_fkey",
+        "table": "chapterRead"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chapterRead_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterRead_userId_fkey",
+          "engagement",
+          "\"engagement\".\"chapterRead\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chapterRead_userId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"chapterRead\"\nADD CONSTRAINT \"chapterRead_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chapterRead_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterRead_userId_fkey",
+          "engagement",
+          "\"engagement\".\"chapterRead\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.storyView.storyView_storyId_fkey",
+    "label": "Add foreign key \"storyView_storyId_fkey\" on \"storyView\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "storyView_storyId_fkey",
+        "table": "storyView"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"storyView_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyView_storyId_fkey",
+          "engagement",
+          "\"engagement\".\"storyView\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"storyView_storyId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"storyView\"\nADD CONSTRAINT \"storyView_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"storyView_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyView_storyId_fkey",
+          "engagement",
+          "\"engagement\".\"storyView\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.storyView.storyView_userId_fkey",
+    "label": "Add foreign key \"storyView_userId_fkey\" on \"storyView\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "storyView_userId_fkey",
+        "table": "storyView"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"storyView_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyView_userId_fkey",
+          "engagement",
+          "\"engagement\".\"storyView\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"storyView_userId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"storyView\"\nADD CONSTRAINT \"storyView_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"storyView_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyView_userId_fkey",
+          "engagement",
+          "\"engagement\".\"storyView\""
+        ]
+      }
+    ]
+  }
+]

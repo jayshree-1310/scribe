@@ -115,6 +115,8 @@ export interface StoryQuery {
    * for it does not.
    */
   authorId?: string | undefined;
+  /** See `BookQuery.kidsAppropriate`: narrows to `true`, never away from it. */
+  kidsAppropriate?: boolean | undefined;
   sort: StorySort;
   page: number;
   limit: number;
@@ -428,16 +430,45 @@ function escapeLike(term: string): string {
  * Resolves a free-text term to the author ids reachable through it, so the
  * caller can OR that against a title match in one query.
  */
+/**
+ * Authors whose name matches `term`, by word rather than by phrase.
+ *
+ * Every word must appear somewhere in the username or the display name, in any
+ * order. That is what makes all of these find `amara_okonkwo`:
+ *
+ *   "amara okonkwo"   "Okonkwo, Amara"   "Amara  Okonkwo"   "okonkwo"
+ *
+ * A single `ilike` over the whole phrase finds none of them but the last.
+ * Catalogue authors are seeded with usernames like `amara_okonkwo` and no
+ * display name, a space matches neither `_` nor `-`, and a name arrives
+ * reordered and punctuated as often as not -- so phrase matching left every
+ * catalogue author unsearchable by the only name a reader knows them by.
+ *
+ * Takes the **raw** term and escapes each word itself: escaping first would
+ * make the separators it needs to ignore significant again.
+ */
 async function authorIdsMatching(term: string): Promise<string[]> {
-  const matches = await db.orm.auth.User.select("id")
-    .where((user) =>
-      or(
-        user.username.ilike(`%${term}%`),
-        user.displayName.ilike(`%${term}%`),
-      ),
-    )
-    .limit(50)
-    .all();
+  // Two characters minimum, so an initial or a stray "a" does not match every
+  // author in the catalogue. Capped, so a pasted paragraph cannot build a
+  // hundred-clause query.
+  const words = term
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length >= 2)
+    .slice(0, 5);
+
+  if (words.length === 0) return [];
+
+  let query = db.orm.auth.User.select("id");
+
+  // Chained `where`s are ANDed: every word has to land somewhere in the name.
+  for (const word of words) {
+    const pattern = `%${escapeLike(word)}%`;
+    query = query.where((user) =>
+      or(user.username.ilike(pattern), user.displayName.ilike(pattern)),
+    );
+  }
+
+  const matches = await query.limit(50).all();
 
   return matches.map((match) => match.id);
 }
@@ -458,7 +489,10 @@ async function storyIdsInGenre(genreId: string): Promise<string[]> {
  */
 async function applyFilters(
   collection: StoryCollection,
-  query: Pick<StoryQuery, "search" | "genreId" | "authorId" | "sort">,
+  query: Pick<
+    StoryQuery,
+    "search" | "genreId" | "authorId" | "kidsAppropriate" | "sort"
+  >,
 ): Promise<StoryCollection | null> {
   // Authored stories only: catalogue imports are browsed through /api/books.
   let current = collection.where((story) => story.source.eq("SCRIBE"));
@@ -474,6 +508,10 @@ async function applyFilters(
     current = current.where((story) => story.id.in(ids));
   }
 
+  if (query.kidsAppropriate) {
+    current = current.where((story) => story.kidsAppropriate.eq(true));
+  }
+
   // "Highest rated" means rated: an unrated story would otherwise sort to the
   // top, since Postgres orders NULLs first on a descending sort.
   if (query.sort === "rating") {
@@ -484,7 +522,7 @@ async function applyFilters(
   if (term) {
     const escaped = escapeLike(term);
     const pattern = `%${escaped}%`;
-    const authorIds = await authorIdsMatching(escaped);
+    const authorIds = await authorIdsMatching(term);
 
     current = current.where((story) =>
       authorIds.length > 0
@@ -503,9 +541,11 @@ async function applyFilters(
  */
 function applySort(collection: StoryCollection, sort: StorySort) {
   switch (sort) {
-    // No view *events* exist yet -- `viewCount` is a lifetime total with no
-    // time dimension to decay, so "trending" leans on engagement rather than
-    // raw traffic. Revisit once story views are recorded per day.
+    // `viewCount` is a lifetime total with no time dimension to decay, so
+    // "trending" leans on engagement rather than raw traffic. Per-day view
+    // events now exist (`engagement.StoryView`, added with author analytics),
+    // so a real recency window is finally expressible -- but it is a ranking
+    // change with its own trade-offs, not a side effect of recording them.
     case "trending":
       return collection.orderBy([
         (story) => story.likeCount.desc(),

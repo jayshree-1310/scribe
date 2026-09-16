@@ -1,10 +1,12 @@
 import { useAsync } from '../../hooks/useAsync'
 import { useAuth } from '../../lib/auth'
 import { formatCount, formatRating, formatRelative } from '../../lib/format'
+import * as analyticsApi from '../../data/analytics-api'
 import * as channelsApi from '../../data/channels-api'
-import * as storiesApi from '../../data/stories-api'
-import { STORY_STATUS_LABELS, type Story } from '../../types/stories'
+import { STORY_STATUS_LABELS } from '../../types/stories'
+import type { StoryPerformance } from '../../types/analytics'
 import { AppShell } from '../../components/layout/AppShell'
+import { LineChart } from '../../components/charts/LineChart'
 import { ButtonLink } from '../../components/ui/Button'
 import { Card, SectionHead, StatTile } from '../../components/ui/Card'
 import { StatusBadge } from '../../components/ui/Chip'
@@ -17,40 +19,41 @@ import '../pages.css'
 import './author.css'
 
 /**
- * Totals over the author's own stories.
+ * The studio's front page, answered by `GET /api/author/analytics` in one
+ * request.
  *
- * Only what the story rows actually carry. There is no per-day series and no
- * read count here: nothing records a view or a chapter read yet, so both used
- * to be invented client-side (reads were views × 0.46).
+ * The stat row used to be summed in the browser over a page of forty-eight
+ * stories, which was neither every story nor an aggregate; the performance
+ * chart was empty because nothing recorded a view or a chapter read. Both are
+ * real now — see the note at the top of `AuthorAnalyticsPage.tsx` for which
+ * numbers are events and which are lifetime counters.
  */
-function totalsFor(stories: Story[]) {
-  const rated = stories.filter((story) => story.ratingAverage !== null)
 
+/** The cover art wants a genre hue and a byline; neither is worth a join. */
+function coverFor(
+  story: StoryPerformance,
+  author: { displayName: string; username: string } | undefined,
+) {
   return {
-    views: stories.reduce((sum, story) => sum + story.viewCount, 0),
-    likes: stories.reduce((sum, story) => sum + story.likeCount, 0),
-    chapters: stories.reduce((sum, story) => sum + story.chapterCount, 0),
-    published: stories.filter((story) => story.status !== 'draft').length,
-    averageRating:
-      rated.length === 0
-        ? null
-        : rated.reduce((sum, story) => sum + (story.ratingAverage ?? 0), 0) /
-          rated.length,
+    id: story.id,
+    title: story.title,
+    coverUrl: story.coverUrl,
+    genres: [{ hue: story.hue }],
+    author: author ?? { displayName: null, username: '' },
   }
 }
 
 export function AuthorDashboardPage() {
   const { session, initialising } = useAuth()
-  const authorId = initialising ? undefined : session?.user.id
+  const signedIn = initialising ? undefined : session !== null
 
+  /**
+   * Thirty days: the default the analytics page opens on, so moving between
+   * the two does not silently change what "recently" means.
+   */
   const overview = useAsync(
-    () =>
-      authorId
-        ? storiesApi
-            .listStories({ authorId, sort: 'newest', limit: 48 })
-            .then((page) => page.items)
-        : Promise.resolve([]),
-    [authorId],
+    () => (signedIn ? analyticsApi.getOverview('30d') : Promise.resolve(null)),
+    [signedIn],
   )
   /**
    * Filtered server-side rather than by comparing author ids here: ownership is
@@ -62,6 +65,16 @@ export function AuthorDashboardPage() {
   )
 
   const myChannels = channels.data?.items ?? []
+
+  /**
+   * The API ranks stories by views in the window, which is what the analytics
+   * page wants. "My stories" here is a *recent* list — four rows under a
+   * heading that links to the manage page — so it is re-sorted by when it was
+   * last touched rather than by how it performed.
+   */
+  const recent = [...(overview.data?.stories ?? [])]
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 4)
 
   return (
     <AppShell variant="author">
@@ -83,7 +96,7 @@ export function AuthorDashboardPage() {
 
       {overview.status === 'error' ? (
         <ErrorState message={overview.error} onRetry={overview.reload} />
-      ) : overview.status === 'loading' || authorId === undefined ? (
+      ) : overview.status === 'loading' || signedIn === undefined ? (
         <>
           <div className="stat-row">
             {Array.from({ length: 4 }, (_, index) => (
@@ -96,32 +109,32 @@ export function AuthorDashboardPage() {
         <>
           <div className="stat-row">
             <StatTile
-              label="Total views"
-              value={formatCount(totalsFor(overview.data).views)}
-              detail="across every story you have written"
+              label="Views"
+              value={formatCount(overview.data.totals.views)}
+              detail={`last 30 days · ${formatCount(overview.data.lifetime.views)} all time`}
               icon="eye"
             />
             <StatTile
-              label="Published stories"
-              value={formatCount(totalsFor(overview.data).published)}
-              detail={`${formatCount(overview.data.length)} in total, drafts included`}
-              icon="book-open"
+              label="Readers"
+              value={formatCount(overview.data.totals.readers)}
+              detail={`${formatCount(overview.data.totals.reads)} chapters opened`}
+              icon="users"
             />
             <StatTile
               label="Average rating"
               value={
-                totalsFor(overview.data).averageRating === null
+                overview.data.lifetime.ratingAverage === null
                   ? '—'
-                  : formatRating(totalsFor(overview.data).averageRating ?? 0)
+                  : formatRating(overview.data.lifetime.ratingAverage)
               }
-              detail="across your rated stories"
+              detail={`${formatCount(overview.data.lifetime.ratings)} ratings across your stories`}
               icon="star"
             />
             <StatTile
-              label="Likes"
-              value={formatCount(totalsFor(overview.data).likes)}
-              detail={`${formatCount(totalsFor(overview.data).chapters)} chapters written`}
-              icon="heart"
+              label="Published stories"
+              value={formatCount(overview.data.lifetime.published)}
+              detail={`${formatCount(overview.data.lifetime.stories)} in total, drafts included`}
+              icon="book-open"
             />
           </div>
 
@@ -129,16 +142,15 @@ export function AuthorDashboardPage() {
           <section className="page-section">
             <SectionHead
               title="Story performance"
-              subtitle="Views and reads over time."
+              subtitle="Views and chapter reads, last 30 days."
               to="/author/analytics"
               linkLabel="Full analytics"
             />
             <Card>
-              <EmptyState
-                size="sm"
-                icon="trend"
-                title="No day-by-day figures yet"
-                description="Views and reads are lifetime totals today. A daily series needs view and read events to be recorded first."
+              <LineChart
+                data={overview.data.series}
+                seriesLabels={['Views', 'Chapter reads']}
+                title="Views and chapter reads, last 30 days"
               />
             </Card>
           </section>
@@ -147,7 +159,7 @@ export function AuthorDashboardPage() {
           <section className="page-section">
             <SectionHead title="My stories" to="/author/stories" linkLabel="Manage all" />
 
-            {overview.data.length === 0 ? (
+            {overview.data.stories.length === 0 ? (
               <EmptyState
                 icon="pen"
                 title="You haven't published a story yet"
@@ -160,10 +172,10 @@ export function AuthorDashboardPage() {
               />
             ) : (
               <ul className="story-rows">
-                {overview.data.slice(0, 4).map((story) => (
+                {recent.map((story) => (
                   <li key={story.id}>
                     <Link className="story-row" to={`/author/stories/${story.slug}`}>
-                      <StoryCover story={story} size="xs" />
+                      <StoryCover story={coverFor(story, session?.user)} size="xs" />
                       <span className="story-row__main">
                         <span className="story-row__title">{story.title}</span>
                         <span className="story-row__meta">
@@ -173,7 +185,7 @@ export function AuthorDashboardPage() {
                       </span>
                       <span className="story-row__stat">
                         <Icon name="eye" size="0.9em" />
-                        {formatCount(story.viewCount)}
+                        {formatCount(story.views)}
                       </span>
                       <span className="story-row__stat">
                         <Icon name="star-filled" size="0.9em" />

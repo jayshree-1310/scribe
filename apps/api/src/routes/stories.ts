@@ -7,10 +7,16 @@
  * rather than the router being placed behind `requireUser`.
  */
 
+import type { Request } from "express";
 import { Router } from "express";
 import { z } from "zod";
 import { parseOrThrow } from "../lib/validate.js";
 import { getUserId } from "../middleware/current-user.js";
+import {
+  recordChapterRead,
+  recordStoryView,
+  visitorFor,
+} from "../services/analytics.js";
 import {
   MAX_PAGE_SIZE,
   STORY_SORTS,
@@ -25,6 +31,21 @@ import {
 const router = Router();
 
 /**
+ * Who the analytics log should dedupe this request by.
+ *
+ * Built here because only the request carries the address and user agent an
+ * anonymous visitor is identified by; `services/analytics.ts` decides what to
+ * do with them.
+ */
+function visitor(req: Request) {
+  return visitorFor({
+    userId: getUserId(req),
+    ip: req.ip,
+    userAgent: req.get("user-agent"),
+  });
+}
+
+/**
  * `req.query` values arrive as strings. Coercion lives in the schema so a bad
  * `page=abc` is a 400 with a field message rather than a silent `NaN`.
  */
@@ -32,6 +53,11 @@ const listQuerySchema = z.object({
   search: z.string().trim().min(1).max(120).optional(),
   genreId: z.uuid("Not a known genre.").optional(),
   authorId: z.uuid("Not a known author.").optional(),
+  /** One-way narrowing flag; see the same field in `routes/books.ts`. */
+  kidsAppropriate: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .optional(),
   sort: z.enum(STORY_SORTS).default("trending"),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(12),
@@ -75,6 +101,7 @@ router.get("/", async (req, res, next) => {
         search: query.search,
         genreId: query.genreId,
         authorId: query.authorId,
+        kidsAppropriate: query.kidsAppropriate,
         sort: query.sort,
         page: query.page,
         limit: query.limit,
@@ -93,7 +120,17 @@ router.get("/", async (req, res, next) => {
 router.get("/:slug", async (req, res, next) => {
   try {
     const { slug } = parseOrThrow(slugParamSchema, req.params);
-    res.json({ story: await getStory(slug, getUserId(req)) });
+    const story = await getStory(slug, getUserId(req));
+
+    /**
+     * After the story resolved, so a view is only recorded for a story the
+     * caller could actually see -- and never awaited: `recordStoryView`
+     * returns `void` by design, so this line cannot delay the response or
+     * turn a counter's failure into a failed read.
+     */
+    recordStoryView(story.id, visitor(req));
+
+    res.json({ story });
   } catch (error) {
     next(error);
   }
@@ -122,7 +159,13 @@ router.get("/:slug/chapters", async (req, res, next) => {
 router.get("/:slug/chapters/:number", async (req, res, next) => {
   try {
     const { slug, number } = parseOrThrow(chapterParamSchema, req.params);
-    res.json({ chapter: await getChapter(slug, number, getUserId(req)) });
+    const chapter = await getChapter(slug, number, getUserId(req));
+
+    // The reader endpoint: fetching a chapter's body is the closest thing to
+    // "somebody read this" the API can observe. See `engagement.ChapterRead`.
+    recordChapterRead(chapter.id, visitor(req));
+
+    res.json({ chapter });
   } catch (error) {
     next(error);
   }

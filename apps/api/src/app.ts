@@ -13,6 +13,8 @@ import { logger } from "./lib/logger.js";
 import { authenticate } from "./middleware/authenticate.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import accountRouter from "./routes/account.js";
+import aiRouter from "./routes/ai.js";
+import analyticsRouter from "./routes/analytics.js";
 import authRouter from "./routes/auth.js";
 import authSecurityRouter from "./routes/auth-security.js";
 import authoringRouter from "./routes/authoring.js";
@@ -99,11 +101,17 @@ app.use(
 );
 
 app.use("/api/account", accountRouter);
+app.use("/api/ai", aiRouter);
 app.use("/api/auth", authRouter);
 // Passwords and email verification, split out of `auth.ts` to keep it
 // readable. Two routers, one prefix: see the header of `auth-security.ts`.
 app.use("/api/auth", authSecurityRouter);
 app.use("/api/author", authoringRouter);
+/**
+ * Author analytics. A second router on `/api/author`, matching none of the
+ * authoring paths above; see the header of `routes/analytics.ts`.
+ */
+app.use("/api/author", analyticsRouter);
 app.use("/api/books", booksRouter);
 app.use("/api/challenges", challengesRouter);
 app.use("/api/channels", channelsRouter);

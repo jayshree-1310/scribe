@@ -24,8 +24,9 @@ which parts are real today.
 | Home feed, public profiles & follows, clubs, channels                          | **Real API**                                                                |
 | Comments, ratings, reading progress & streak                                   | **Real API**                                                                |
 | Writing challenges & leaderboard                                               | **Real API**                                                                |
+| Author analytics — view / chapter-read events, daily series, per-story         | **Real API**                                                                |
 | Onboarding answers, badges                                                     | **Mock** (`apps/web/src/data/api.ts` + `mock-db.ts`)                        |
-| Notifications, moderation, author analytics, recommendations                   | Not built — see `docs/BACKLOG.md`                                           |
+| Notifications, moderation, recommendations                                     | Not built — see `docs/BACKLOG.md`                                           |
 | GenAI features                                                                 | Provider seam only — see `docs/AI-BACKLOG.md` and `docs/ai-architecture.md` |
 
 Two planning documents drive the work, and both are grounded in the current
@@ -52,7 +53,8 @@ tree rather than in the abstract:
 - Write chapters in a markdown editor with live preview and autosave
 - Reorder chapters; publish or unpublish either a story or a single chapter
 - Attach multimedia rows to a chapter
-- A dashboard and analytics view (analytics still reads mock numbers)
+- A studio dashboard and an analytics view on real traffic: views, chapter
+  reads, distinct readers and a per-day series over 7, 30 or 90 days
 
 ### 🔐 Authentication & authorization
 
@@ -166,7 +168,7 @@ scribe/
 │   │   │   ├── lib/          # storage, jwt, redis, rate-limit, image, slug…
 │   │   │   ├── middleware/
 │   │   │   ├── prisma/       # contract.prisma + generated contract types
-│   │   │   ├── scripts/      # seed-books, seed-stories
+│   │   │   ├── scripts/      # seed-books, seed-stories, seed-challenges, grant-admin
 │   │   │   ├── test/         # TestApi harness
 │   │   │   ├── app.ts
 │   │   │   └── server.ts
@@ -518,6 +520,34 @@ story has earned** — there is no ballot in the contract, and `RANKING` in
 stories are ranked, and the board is built anonymously so every viewer sees the
 same order.
 
+### Author analytics — `routes/analytics.ts`
+
+Mounted on `/api/author` beside the authoring router and behind `requireUser`
+in full. Neither call takes an author id: there is no such thing as somebody
+else's analytics, so the API answers for whoever is asking.
+
+```text
+GET /api/author/analytics?range=7d|30d|90d         # totals, lifetime, series, per story
+GET /api/author/analytics/stories/:id?range=…      # one story + its chapter breakdown
+```
+
+Two event tables record the traffic — `engagement.StoryView` and
+`engagement.ChapterRead` — written from the public story and chapter endpoints,
+**deduped to one row per visitor per target per UTC day** by a unique key and
+an `ON CONFLICT DO NOTHING`, so a refresh cannot inflate anything and there is
+no read-then-write to race. The recording calls return `void` by design: a
+handler cannot await one, and a counter's failure can never slow or fail a
+reader's request. An author's visits to their own story are excluded in the
+same statement. Signed-out readers are counted through a digest of address and
+user agent salted with the day, so they are one visitor for a day and nobody in
+particular tomorrow.
+
+Everything is aggregated in SQL, with `generate_series` supplying the days so a
+range always has exactly as many points as it has days — a story with no
+traffic is a run of zeroes, not a gap. `content.Story.viewCount` stays the
+lifetime counter (`sort=views` orders on it) and is moved by the same statement
+that writes the event.
+
 ### Health
 
 ```text
@@ -559,8 +589,8 @@ docker compose exec api pnpm --filter api test routes/authoring
 
 Covered today: auth (incl. Google), account, books, library, stories, authoring,
 uploads, reading progress, clubs, channels, comments + ratings, public profiles
-+ follows, and writing challenges, plus the AI provider seam. The web app has
-no test suite yet.
++ follows, writing challenges and author analytics, plus the AI provider seam.
+The web app has no test suite yet.
 
 ## 📌 Development Roadmap
 
@@ -610,7 +640,7 @@ no test suite yet.
 
 - [x] Search and filtering
 - [ ] Real recommendations (mock today)
-- [ ] Author analytics on real data
+- [x] Author analytics on real data
 - [ ] Content moderation & reporting
 - [ ] Badges and levels
 - [x] Writing challenges

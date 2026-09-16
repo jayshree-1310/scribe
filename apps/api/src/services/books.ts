@@ -75,6 +75,13 @@ export interface BookQuery {
   genreId?: string | undefined;
   /** `true` keeps only finished works, `false` only ongoing ones. */
   completed?: boolean | undefined;
+  /**
+   * `true` keeps only titles flagged suitable for children. Deliberately has
+   * no `false` case that means "adults only": the column records that someone
+   * vouched for a book, not that they ruled against it, so an unset flag is
+   * "unknown" rather than "unsuitable".
+   */
+  kidsAppropriate?: boolean | undefined;
   sort: BookSort;
   page: number;
   limit: number;
@@ -224,11 +231,45 @@ async function hydrate(rows: StoryRow[]): Promise<Book[]> {
  * so the caller can OR that against a title match in one query. Returns an
  * empty list when no author matches, which the caller treats as "title only".
  */
+/**
+ * Authors whose name matches `term`, by word rather than by phrase.
+ *
+ * Every word must appear somewhere in the username or the display name, in any
+ * order. That is what makes all of these find `amara_okonkwo`:
+ *
+ *   "amara okonkwo"   "Okonkwo, Amara"   "Amara  Okonkwo"   "okonkwo"
+ *
+ * A single `ilike` over the whole phrase finds none of them but the last.
+ * Catalogue authors are seeded with usernames like `amara_okonkwo` and no
+ * display name, a space matches neither `_` nor `-`, and a name arrives
+ * reordered and punctuated as often as not -- so phrase matching left every
+ * catalogue author unsearchable by the only name a reader knows them by.
+ *
+ * Takes the **raw** term and escapes each word itself: escaping first would
+ * make the separators it needs to ignore significant again.
+ */
 async function authorIdsMatching(term: string): Promise<string[]> {
-  const matches = await db.orm.auth.User.select("id")
-    .where((user) => user.username.ilike(`%${term}%`))
-    .limit(50)
-    .all();
+  // Two characters minimum, so an initial or a stray "a" does not match every
+  // author in the catalogue. Capped, so a pasted paragraph cannot build a
+  // hundred-clause query.
+  const words = term
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length >= 2)
+    .slice(0, 5);
+
+  if (words.length === 0) return [];
+
+  let query = db.orm.auth.User.select("id");
+
+  // Chained `where`s are ANDed: every word has to land somewhere in the name.
+  for (const word of words) {
+    const pattern = `%${escapeLike(word)}%`;
+    query = query.where((user) =>
+      or(user.username.ilike(pattern), user.displayName.ilike(pattern)),
+    );
+  }
+
+  const matches = await query.limit(50).all();
 
   return matches.map((match) => match.id);
 }
@@ -287,7 +328,10 @@ function catalogueOnly(collection: StoryCollection): StoryCollection {
  */
 async function applyFilters(
   collection: StoryCollection,
-  query: Pick<BookQuery, "search" | "genreId" | "completed" | "sort">,
+  query: Pick<
+    BookQuery,
+    "search" | "genreId" | "completed" | "kidsAppropriate" | "sort"
+  >,
 ): Promise<StoryCollection | null> {
   let current = catalogueOnly(collection);
 
@@ -302,6 +346,11 @@ async function applyFilters(
     current = current.where((story) => story.isCompleted.eq(completed));
   }
 
+  // Only ever narrows to `true`; see the field's comment on `BookQuery`.
+  if (query.kidsAppropriate) {
+    current = current.where((story) => story.kidsAppropriate.eq(true));
+  }
+
   // "Highest rated" means rated: an unranked book would otherwise sort to the
   // top, since Postgres orders NULLs first on a descending sort.
   if (query.sort === "top-rated") {
@@ -312,7 +361,7 @@ async function applyFilters(
   if (term) {
     const escaped = escapeLike(term);
     const pattern = `%${escaped}%`;
-    const authorIds = await authorIdsMatching(escaped);
+    const authorIds = await authorIdsMatching(term);
 
     current = current.where((story) =>
       authorIds.length > 0

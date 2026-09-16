@@ -446,3 +446,54 @@ describe.skipIf(!available)("GET /api/stories/:slug/related", () => {
     expect(status).toBe(404);
   });
 });
+
+/** Its own genre, for the reasons given on the same block in `books.test.ts`. */
+describe.skipIf(!available)("GET /api/stories?kidsAppropriate", () => {
+  let shelfId: string;
+  let gentle: { id: string; slug: string };
+  let bleak: { id: string; slug: string };
+
+  beforeAll(async () => {
+    if (!available) return;
+    shelfId = await api.createGenre("Bedtime", 288);
+    gentle = await api.createStory({
+      title: "The Lamp That Waited",
+      authorId,
+      genreIds: [shelfId],
+      kidsAppropriate: true,
+    });
+    bleak = await api.createStory({
+      title: "Salt and Sediment",
+      authorId,
+      genreIds: [shelfId],
+      kidsAppropriate: false,
+    });
+  });
+
+  it("narrows to vouched-for stories", async () => {
+    const { status, body } = await api.request(
+      `/api/stories?genreId=${shelfId}&kidsAppropriate=true`,
+    );
+
+    expect(status).toBe(200);
+    const slugs = body.items.map((story: { slug: string }) => story.slug);
+    expect(slugs).toContain(gentle.slug);
+    expect(slugs).not.toContain(bleak.slug);
+  });
+
+  it("keeps everything when the filter is absent", async () => {
+    const { body } = await api.request(`/api/stories?genreId=${shelfId}`);
+
+    const slugs = body.items.map((story: { slug: string }) => story.slug);
+    expect(slugs).toContain(gentle.slug);
+    expect(slugs).toContain(bleak.slug);
+  });
+
+  it("rejects a value that is not a boolean", async () => {
+    const { status } = await api.request(
+      `/api/stories?genreId=${shelfId}&kidsAppropriate=banana`,
+    );
+
+    expect(status).toBe(400);
+  });
+});

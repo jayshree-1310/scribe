@@ -37,6 +37,20 @@ const listQuerySchema = z.object({
   search: z.string().trim().min(1).max(120).optional(),
   genreId: z.uuid("Not a known genre.").optional(),
   status: z.enum(["all", "completed", "ongoing"]).default("all"),
+  /**
+   * Narrows to titles vouched for as suitable for children, and never away
+   * from them -- so `false` means the same as absent. See the field comment on
+   * `BookQuery.kidsAppropriate`.
+   *
+   * Not `z.coerce.boolean()`, which is `Boolean(value)`: every query string is
+   * non-empty, so `?kidsAppropriate=false` would read as `true` and turn on
+   * the very filter the caller asked to turn off. Same shape as `mine` in
+   * `routes/clubs.ts`.
+   */
+  kidsAppropriate: z
+    .enum(["true", "false"])
+    .transform((value) => value === "true")
+    .optional(),
   sort: z.enum(BOOK_SORTS).default("recent"),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(12),
@@ -121,6 +135,7 @@ router.get("/", async (req, res, next) => {
       genreId: query.genreId,
       completed:
         query.status === "all" ? undefined : query.status === "completed",
+      kidsAppropriate: query.kidsAppropriate,
       sort: query.sort,
       page: query.page,
       limit: query.limit,

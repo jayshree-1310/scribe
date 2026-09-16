@@ -164,11 +164,13 @@ export class TestApi {
     viewCount?: number;
     likeCount?: number;
     isCompleted?: boolean;
+    kidsAppropriate?: boolean;
+    description?: string;
   }): Promise<string> {
     const story = await db.orm.content.Story.select("id").create({
       authorId: input.authorId,
       title: input.title,
-      description: `${input.title} — fixture`,
+      description: input.description ?? `${input.title} — fixture`,
       // Unique per run, and never a slugified title: a fixture must not be
       // able to collide with a seeded story's slug.
       slug: `${this.runId}-${slugify(input.title)}`.slice(0, 80),
@@ -186,6 +188,7 @@ export class TestApi {
       viewCount: input.viewCount ?? 0,
       likeCount: input.likeCount ?? 0,
       isCompleted: input.isCompleted ?? true,
+      kidsAppropriate: input.kidsAppropriate ?? false,
     });
 
     this.created.stories.push(story.id);
@@ -214,13 +217,15 @@ export class TestApi {
     ratingAverage?: number | null;
     viewCount?: number;
     likeCount?: number;
+    kidsAppropriate?: boolean;
+    description?: string;
   }): Promise<{ id: string; slug: string }> {
     const slug = `${this.runId}-${input.slug ?? slugify(input.title)}`.slice(0, 80);
 
     const story = await db.orm.content.Story.select("id").create({
       authorId: input.authorId,
       title: input.title,
-      description: `${input.title} — fixture`,
+      description: input.description ?? `${input.title} — fixture`,
       slug,
       source: "SCRIBE",
       listedAt: input.listed === false ? null : Temporal.Now.instant(),
@@ -229,6 +234,7 @@ export class TestApi {
         input.ratingAverage === null ? null : String(input.ratingAverage ?? 4),
       viewCount: input.viewCount ?? 0,
       likeCount: input.likeCount ?? 0,
+      kidsAppropriate: input.kidsAppropriate ?? false,
     });
 
     this.created.stories.push(story.id);
@@ -581,6 +587,92 @@ export class TestApi {
     };
   }
 
+  /* Analytics ------------------------------------------------------------ */
+
+  /**
+   * A view or a chapter-read event on a chosen day.
+   *
+   * `daysAgo` is counted in SQL off the database's own UTC date, exactly as
+   * `services/analytics.ts` computes a window's bounds -- a test cannot wait a
+   * day, and computing the day here in Node would let the fixture and the
+   * service disagree about which day "six days ago" is at the wrong moment.
+   *
+   * `visitorKey` defaults to the reader's own, which is what the service
+   * writes for a signed-in caller; pass one explicitly to model two different
+   * signed-out visitors, or the same one twice to exercise the dedupe.
+   *
+   * Returns whether a row was actually written, so a suite can assert that a
+   * second identical event was swallowed by the unique key.
+   */
+  async recordEvent(input: {
+    storyId: string;
+    /** Set for a chapter read; omitted for a story view. */
+    chapterId?: string;
+    userId?: string | null;
+    visitorKey?: string;
+    daysAgo?: number;
+  }): Promise<boolean> {
+    const userId = input.userId ?? null;
+    const key = input.visitorKey ?? (userId ? `user:${userId}` : "anon:fixture");
+    const daysAgo = input.daysAgo ?? 0;
+
+    const plan = input.chapterId
+      ? db.raw.sql`
+          INSERT INTO "engagement"."chapterRead"
+            ("id", "storyId", "chapterId", "userId", "visitorKey", "day", "createdAt")
+          VALUES (gen_random_uuid()::text, ${input.storyId}, ${input.chapterId},
+                  NULLIF(${userId ?? ""}::text, ''), ${key},
+                  to_char((now() AT TIME ZONE 'UTC')::date - ${daysAgo}::int,
+                          'YYYY-MM-DD'),
+                  now())
+          ON CONFLICT ("chapterId", "visitorKey", "day") DO NOTHING
+        `.affectedCount().build()
+      : db.raw.sql`
+          INSERT INTO "engagement"."storyView"
+            ("id", "storyId", "userId", "visitorKey", "day", "createdAt")
+          VALUES (gen_random_uuid()::text, ${input.storyId},
+                  NULLIF(${userId ?? ""}::text, ''), ${key},
+                  to_char((now() AT TIME ZONE 'UTC')::date - ${daysAgo}::int,
+                          'YYYY-MM-DD'),
+                  now())
+          ON CONFLICT ("storyId", "visitorKey", "day") DO NOTHING
+        `.affectedCount().build();
+
+    // `.affectedCount()` answers with the statement's own row statistics, so
+    // "did the unique key swallow it?" is readable without a second query.
+    const [stats] = await db.runtime().query(plan);
+    return (stats?.affectedRows ?? 0) > 0;
+  }
+
+  /** How many view events a story carries, for asserting what a read did. */
+  async countStoryViews(storyId: string): Promise<number> {
+    const totals = await db.orm.engagement.StoryView.where((row) =>
+      row.storyId.eq(storyId),
+    ).aggregate((aggregate) => ({ total: aggregate.count() }));
+
+    return totals.total;
+  }
+
+  /** The same for chapter reads, scoped to one chapter. */
+  async countChapterReads(chapterId: string): Promise<number> {
+    const totals = await db.orm.engagement.ChapterRead.where((row) =>
+      row.chapterId.eq(chapterId),
+    ).aggregate((aggregate) => ({ total: aggregate.count() }));
+
+    return totals.total;
+  }
+
+  /** A story's lifetime view counter as stored. */
+  async readViewCount(storyId: string): Promise<number> {
+    const story = await db.orm.content.Story.select("viewCount")
+      .where((row) => row.id.eq(storyId))
+      .first();
+
+    if (!story) throw new Error(`no such fixture story: ${storyId}`);
+
+    return story.viewCount;
+  }
+
   /**
    * Puts a reader's streak into a chosen state.
    *
@@ -781,6 +873,12 @@ export class TestApi {
       await deleteAll(() =>
         db.orm.engagement.Rating.where((row) => row.userId.eq(userId)),
       );
+      await deleteAll(() =>
+        db.orm.engagement.StoryView.where((row) => row.userId.eq(userId)),
+      );
+      await deleteAll(() =>
+        db.orm.engagement.ChapterRead.where((row) => row.userId.eq(userId)),
+      );
     }
 
     /**
@@ -827,6 +925,15 @@ export class TestApi {
       );
       await deleteAll(() =>
         db.orm.engagement.ReadingHistory.where((row) => row.storyId.eq(storyId)),
+      );
+      // Chapter reads before the chapters they point at, and both before the
+      // story: an anonymous event carries no user id, so the per-user sweep
+      // above never reaches one.
+      await deleteAll(() =>
+        db.orm.engagement.ChapterRead.where((row) => row.storyId.eq(storyId)),
+      );
+      await deleteAll(() =>
+        db.orm.engagement.StoryView.where((row) => row.storyId.eq(storyId)),
       );
       await deleteAll(() =>
         db.orm.engagement.Rating.where((rating) => rating.storyId.eq(storyId)),

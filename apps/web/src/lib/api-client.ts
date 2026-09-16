@@ -25,7 +25,9 @@ const STATUS_MESSAGES: Record<number, string> = {
   409: 'That change conflicts with a more recent update.',
   429: 'Too many requests. Give it a moment and try again.',
   500: 'The server ran into a problem. Please try again.',
+  502: 'The server got a bad response from a service it depends on.',
   503: 'The service is temporarily unavailable. Please try again shortly.',
+  504: 'That took too long and timed out. Please try again.',
 }
 
 export class ApiError extends Error {
@@ -60,10 +62,28 @@ export class ApiError extends Error {
   }
 }
 
-/** `VITE_API_URL` lets a deployed build point at a separate API origin. */
-const BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '')
+/**
+ * `VITE_API_URL` lets a deployed build point at a separate API origin.
+ *
+ * Exported because the streaming read path in `data/ai-api.ts` cannot go
+ * through `request()` — it must build its own `fetch` — and a second copy of
+ * this rule would drift the day a deployment sets `VITE_API_URL`.
+ */
+export const API_BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(
+  /\/$/,
+  '',
+)
+
+const BASE_URL = API_BASE_URL
 
 const REQUEST_TIMEOUT_MS = 15_000
+
+/**
+ * Local model inference is slow enough that the default would abort every
+ * call. A 3B model on CPU takes tens of seconds to answer, and Scribble makes
+ * two calls per question, so its ceiling is minutes rather than seconds.
+ */
+export const AI_REQUEST_TIMEOUT_MS = 180_000
 
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
@@ -77,6 +97,8 @@ interface RequestOptions {
   /** Extra request headers, merged after the JSON content type. */
   headers?: Record<string, string>
   signal?: AbortSignal
+  /** Overrides `REQUEST_TIMEOUT_MS`; see `AI_REQUEST_TIMEOUT_MS`. */
+  timeoutMs?: number
 }
 
 function buildUrl(path: string, query?: RequestOptions['query']): string {
@@ -91,7 +113,8 @@ function buildUrl(path: string, query?: RequestOptions['query']): string {
   return search ? `${url}?${search}` : url
 }
 
-async function toApiError(response: Response): Promise<ApiError> {
+/** Exported for the streaming path, which parses its own error responses. */
+export async function toApiError(response: Response): Promise<ApiError> {
   let body: ApiErrorBody | undefined
   try {
     body = (await response.json()) as ApiErrorBody
@@ -148,7 +171,7 @@ function isSessionEndpoint(path: string): boolean {
 
 export async function request<T>(
   path: string,
-  { method = 'GET', body, query, headers, signal }: RequestOptions = {},
+  { method = 'GET', body, query, headers, signal, timeoutMs }: RequestOptions = {},
 ): Promise<T> {
   /**
    * Waiting for the token rather than reading whatever is in memory right now
@@ -159,17 +182,21 @@ export async function request<T>(
    */
   const bootstrapped = isSessionEndpoint(path) ? null : await ensureAccessToken()
 
-  return send<T>(path, { method, body, query, headers, signal }, bootstrapped)
+  return send<T>(
+    path,
+    { method, body, query, headers, signal, timeoutMs },
+    bootstrapped,
+  )
 }
 
 async function send<T>(
   path: string,
-  { method = 'GET', body, query, headers, signal }: RequestOptions,
+  { method = 'GET', body, query, headers, signal, timeoutMs }: RequestOptions,
   accessToken: string | null,
   retried = false,
 ): Promise<T> {
   // Abort on timeout, but also stay responsive to a caller-supplied signal.
-  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  const timeout = AbortSignal.timeout(timeoutMs ?? REQUEST_TIMEOUT_MS)
   const composed = signal ? AbortSignal.any([signal, timeout]) : timeout
 
   let response: Response
@@ -225,7 +252,12 @@ async function send<T>(
   if (response.status === 401 && !retried && !isSessionEndpoint(path)) {
     const renewed = await refreshAccessToken()
     if (renewed) {
-      return send<T>(path, { method, body, query, headers, signal }, renewed, true)
+      return send<T>(
+        path,
+        { method, body, query, headers, signal, timeoutMs },
+        renewed,
+        true,
+      )
     }
   }
 

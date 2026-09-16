@@ -100,6 +100,8 @@ namespace auth {
     comments         engagement.Comment[]
     ratings          engagement.Rating[]
     readingHistory   engagement.ReadingHistory[]
+    storyViews       engagement.StoryView[]
+    chapterReads     engagement.ChapterRead[]
     /// Rows where this account is the one being followed.
     followers        engagement.Follow[] @relation("Followers")
     /// Rows where this account is the one doing the following.
@@ -168,6 +170,8 @@ namespace content {
     comments         engagement.Comment[]
     ratings          engagement.Rating[]
     readingHistory   engagement.ReadingHistory[]
+    views            engagement.StoryView[]
+    reads            engagement.ChapterRead[]
     challengeEntries challenges.ChallengeEntry[]
     /// Clubs currently reading this story together.
     clubReads        clubs.BookClub[]
@@ -192,6 +196,7 @@ namespace content {
     multimedia     Multimedia[]
     comments       engagement.Comment[]
     readingHistory engagement.ReadingHistory[]
+    reads          engagement.ChapterRead[]
 
     @@unique([storyId, chapterNumber])
   }
@@ -336,6 +341,96 @@ namespace engagement {
     @@index([followingId, createdAt])
     // Who somebody follows, newest first -- and the following count.
     @@index([followerId, createdAt])
+  }
+
+  /// One reader opening one story, on one UTC day.
+  ///
+  /// The event log behind author analytics. `content.Story.viewCount` is the
+  /// lifetime counter and is what `sort=views` orders on in SQL, exactly as
+  /// `ratingAverage` is for `sort=rating`; a counter cannot answer "how many
+  /// on Tuesday?", which is the only question a chart asks. So the counter
+  /// stays and this records *when*.
+  ///
+  /// **The grain is the dedupe rule.** One row per visitor per story per day,
+  /// enforced by the unique key rather than by a check in application code --
+  /// a refresh, a back button and a second tab all conflict on it and insert
+  /// nothing. That is why `day` is stored: a unique constraint can only be
+  /// declared over columns, so the truncated day has to *be* one.
+  ///
+  /// `day` is text in `YYYY-MM-DD` rather than a timestamp, written by
+  /// `to_char(now() AT TIME ZONE 'UTC', ...)`. A truncated `timestamptz`
+  /// would take its day boundary from whatever `TimeZone` the session happens
+  /// to carry, so the same second could land on two different days for two
+  /// connections and dedupe against neither. Text makes the boundary explicit
+  /// and sorts and ranges correctly because ISO dates do.
+  model StoryView {
+    id         String   @id @default(uuid())
+
+    storyId    String
+
+    /// Null for a signed-out reader, who is still counted -- most readers are
+    /// signed out, and a view count that only saw members would be wrong by
+    /// the same margin every day.
+    userId     String?
+
+    /// Who the dedupe is *per*. The reader's id when there is one, otherwise
+    /// a salted digest of the address and user agent that is re-salted every
+    /// day, so it identifies a visitor within a day and nobody across days.
+    /// See `services/analytics.ts`.
+    visitorKey String
+
+    /// The UTC day this happened on, `YYYY-MM-DD`.
+    day        String
+
+    createdAt  DateTime @default(now())
+
+    story content.Story
+      @relation(fields: [storyId], references: [id])
+    user  auth.User?
+      @relation(fields: [userId], references: [id])
+
+    // The dedupe grain, and the only uniqueness this table has.
+    @@unique([storyId, visitorKey, day])
+    // Every analytics read is "this story, these days".
+    @@index([storyId, day])
+  }
+
+  /// One reader opening one chapter, on one UTC day. The same grain and the
+  /// same rules as `StoryView` above.
+  ///
+  /// What it is *not*: a completed read. Whether somebody reached the end is
+  /// `ReadingHistory.progress`, which is a position per reader per story and
+  /// forgets every visit but the last -- it cannot be counted over a range.
+  /// Opening a chapter is what the reader endpoint can actually observe, and
+  /// naming the column `reads` for it is the same compromise every analytics
+  /// product makes.
+  ///
+  /// `storyId` is carried beside `chapterId` although the chapter names its
+  /// story: the author overview groups reads across a whole story and would
+  /// otherwise join through `chapter` on every query for a column that can
+  /// never change -- a chapter does not move between stories.
+  model ChapterRead {
+    id         String   @id @default(uuid())
+
+    storyId    String
+    chapterId  String
+    userId     String?
+    visitorKey String
+    day        String
+    createdAt  DateTime @default(now())
+
+    story   content.Story
+      @relation(fields: [storyId], references: [id])
+    chapter content.Chapter
+      @relation(fields: [chapterId], references: [id])
+    user    auth.User?
+      @relation(fields: [userId], references: [id])
+
+    @@unique([chapterId, visitorKey, day])
+    // The story overview's series and totals.
+    @@index([storyId, day])
+    // The per-chapter breakdown on one story's page.
+    @@index([chapterId, day])
   }
 }
 

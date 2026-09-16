@@ -1,15 +1,15 @@
 # AI architecture
 
 How an AI request flows through Scribe, what each layer is responsible for, and
-what a new AI feature has to add. Written for the state after Task AI 0 of
-`AI-BACKLOG.md`: the module and the provider seam exist; no feature uses them
-yet.
+what a new AI feature has to add. Written for the state after Task AI 0 and
+Task AI 1.5 of `AI-BACKLOG.md`: the module and the provider seam exist, and
+Scribble is the one feature built on them.
 
 ## The path
 
 ```
 browser
-  → POST /api/ai/…                       routes/ai.ts        (AI 1+)
+  → POST /api/ai/…                       routes/ai.ts
       requireUser, rate limit, zod-validated body
   → a feature function                   services/ai/<feature>.ts
       builds the prompt from services/ai/prompts/
@@ -20,6 +20,16 @@ browser
   → back up, validated                   zod, before anything is stored
   → response / SSE stream
 ```
+
+**SSE headers are flushed late, on purpose.** `POST /api/ai/scribble/stream`
+writes nothing until the intent call and retrieval have both succeeded, because
+every provider-availability failure is raised by that first call. Committing to
+`200 text/event-stream` before it would turn a real 503 into a fake success
+carrying an error frame, and the status table below would stop being true.
+After the first byte, `errorHandler` can no longer answer -- it returns early on
+`headersSent` -- so a mid-stream failure is reported as an `error` frame, and a
+stream that ends without its terminal `done` is a failure the client must treat
+as one.
 
 Every arrow is a place something can be rejected, and the rejections are the
 design. A model call is the least interesting part of an AI feature.
@@ -34,6 +44,10 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/provider.ts` | Constructs the provider (once), wraps it with retry and usage policy, and hands it out via `aiProvider()`. The only place a client is built. |
 | `services/ai/usage.ts` | Where usage records go. Logs today; Task AI 18 swaps the sink for one that also persists. |
 | `services/ai/testing.ts` | `fakeAiProvider()` — records what it was sent, returns scripted replies. Every AI test uses it. |
+| `services/ai/scribble.ts` | Task AI 1.5's feature: interpret a request into filters, retrieve with the existing services, narrate the rows. The model never produces a book; see the file header. |
+| `services/ai/scribble-types.ts` | The shapes Scribble's stages pass between them, split out so `prompts/` can render a candidate without an import cycle. |
+| `services/ai/json-stream.ts` | Reads the narration call's JSON object incrementally, so a `pick` can be sent the moment it closes. A byte-wise scanner, because a delta can split mid-uuid or mid-escape. |
+| `services/ai/prompts/scribble.ts` | Both of Scribble's prompts. Built from server-derived values only — no caller text is ever concatenated into system text. |
 
 ## Rules that the code enforces
 
@@ -106,8 +120,11 @@ machine with nothing installed.
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **Prompts, routes and features.** Tasks AI 1 onward.
-- **Persisted usage and budgets.** The sink exists; the table is Task AI 18.
+- **The remaining features.** Tasks AI 1 onward.
+- **Persisted usage and budgets.** The sink exists; the table is Task AI 18. So
+  is enforcement: `config.ts` reads `AI_DAILY_TOKEN_BUDGET` and nothing honours
+  it yet. `routes/ai.ts` rate-limits *requests* per user, which caps the blast
+  radius but not the spend.
 - **Embeddings.** `AiProvider` has no `embed` yet; Task AI 7 adds it along with
   the model and dimension decision.
 

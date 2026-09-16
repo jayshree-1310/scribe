@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../lib/auth'
 import { Icon } from '../ui/Icon'
+import { ScribbleWidget } from '../ai/ScribbleWidget'
 import { MobileNav } from './MobileNav'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
@@ -95,6 +96,12 @@ export function AppShell({ children, variant = 'reader', width = 'default' }: Ap
       </div>
 
       <MobileNav sections={sections} onOpenMore={() => setDrawerOpen(true)} />
+
+      {/* Signed in only: `/api/ai/scribble` is behind `requireUser`, so the
+          launcher would only ever produce a 401 for a signed-out reader.
+          Mounted here rather than per page so the conversation survives
+          navigation — `<main>` remounts on every route, this does not. */}
+      {session ? <ScribbleWidget /> : null}
     </div>
   )
 }

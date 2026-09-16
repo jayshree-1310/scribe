@@ -1,8 +1,15 @@
 # Scribe — Implementation Backlog
 
-Derived from the gap between the frontend surface (`apps/web/src/pages`, still
-mostly served by the mock `data/api.ts` + `mock-db.ts`) and the API
-(`apps/api/src/routes`, currently auth + books + library only).
+What is left to build, and in what order. Derived from the gap between the
+frontend surface (`apps/web/src/pages`) and the API (`apps/api/src/routes`).
+Most of that gap is closed; `data/api.ts` is down to two mock functions, and
+Task 17 is the sweep that removes them.
+
+**Landed tasks are not kept here.** Each one's decisions live in the header of
+the service that owns them — that is the file somebody changing the behaviour
+has open, and a second copy in this document could only go stale. What *is*
+kept is the list below, so a task can name its dependencies, and the open
+questions at the end, which are outstanding rather than done.
 
 GenAI features are tracked separately in `AI-BACKLOG.md`, which notes which of
 the tasks below it depends on.
@@ -41,30 +48,43 @@ Paste this block at the top of any task prompt below.
 
 ## Order
 
-**Landed:** auth + account, books + library, stories/chapters + the reader,
-authoring, uploads + chapter multimedia, reading progress + streak, book clubs
-+ broadcast channels, comments + ratings, public profiles + follows, writing
-challenges + leaderboard.
+### Landed
+
+| Feature | Where its decisions are written down |
+|---|---|
+| Auth, sessions, Google sign-in | `services/passwords.ts`, `routes/auth.ts`, `lib/jwt.ts` |
+| Account + avatar uploads | `services/account.ts`, `services/uploads.ts` |
+| Catalogue books + My Library | `services/books.ts`, `services/library.ts` |
+| Stories, chapters, the reader | `services/stories.ts` |
+| Authoring + chapter multimedia | `services/authoring.ts` |
+| Reading progress + streak | `services/reading.ts` |
+| Book clubs, broadcast channels | `services/clubs.ts`, `services/channels.ts` |
+| Comments + ratings (Task 3) | `services/engagement.ts` |
+| Public profiles + follows (Task 13) | `services/users.ts` |
+| Writing challenges + leaderboard (Task 11) | `services/challenges.ts`, `services/roles.ts` |
+| Author analytics (Task 8) | `services/analytics.ts`, `engagement.StoryView` in `contract.prisma` |
+
+### What is left
 
 Tasks are numbered by when they were written down, not by when to do them. This
 is the order to do them in, and the reason for each position.
 
 | # | Task | Why here |
 |---|---|---|
-| 1 | **8** — author analytics | Introduces the view / chapter-read event log. Independent of everything above, but it must precede 12. |
-| 2 | **12** — badges & levels | A pure consumer once 8 lands: streak and words written exist, comments and ratings come from 3, follows from 13, and "chapters read" is only countable from 8's event log — `ReadingHistory` keeps current position per story, not a count. Doing 12 before 8 means either inventing that metric or building it twice. |
-| 3 | **14** — notifications | All four dependencies — 3, 9, 10, 13 — have landed, so every event it fans out from is real. Below 12 only because a newly earned badge is one of the five notification types. |
-| 4 | **15** — moderation & reporting | The role it needs a moderator to be is now `auth.User.isAdmin`, landed with 11 and read only in `services/roles.ts`. The content to moderate is all there: 3's comments join 9's discussions and 10's posts. |
-| 5 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed), ratings (landed with 3) and follows (landed with 13). Late because a recommender is worth building once there is signal to rank on. |
-| 6 | **17** — retire the mock layer | Last by definition. |
+| 1 | **12** — badges & levels | A pure consumer now that 8 has landed: streak and words written exist, comments and ratings come from 3, follows from 13, and "chapters read" is countable at last — `engagement.ChapterRead` is the event log 8 added, where `ReadingHistory` only ever kept current position per story. |
+| 2 | **14** — notifications | All four dependencies — 3, 9, 10, 13 — have landed, so every event it fans out from is real. Below 12 only because a newly earned badge is one of the five notification types. |
+| 3 | **15** — moderation & reporting | The role it needs a moderator to be is now `auth.User.isAdmin`, landed with 11 and read only in `services/roles.ts`. The content to moderate is all there: 3's comments join 9's discussions and 10's posts. |
+| 4 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed), ratings (landed with 3) and follows (landed with 13). Late because a recommender is worth building once there is signal to rank on. |
+| 5 | **17** — retire the mock layer | Last by definition. |
 
-**One shared decision, taken once — now settled.** Clubs' discussions,
-channels' posts and stories' comments are three spellings of the same thing:
-user-written text, paginated newest-first, with an author summary, a
-rate-limited create and a delete only the author or an admin may perform. 9 got
-there first, 10 followed it, and **3 followed it too** rather than inventing a
-third. Concretely, as `services/clubs.ts`, `services/channels.ts` and
-`services/engagement.ts` now spell it:
+### One shared shape, settled
+
+Clubs' discussions, channels' posts and stories' comments are three spellings
+of the same thing: user-written text, paginated newest-first, with an author
+summary, a rate-limited create and a delete only the author or an admin may
+perform. 9 got there first, 10 followed it, and **3 followed it too** rather
+than inventing a third. Concretely, as `services/clubs.ts`,
+`services/channels.ts` and `services/engagement.ts` now spell it:
 
 - A `Page<T>` of `{ items, page, limit, total, totalPages, hasMore }`, newest
   first with `id` as the tie-breaker so pagination cannot repeat a row.
@@ -83,173 +103,15 @@ exactly where a moderation bug hides.
 
 ---
 
-## Task 3 — Comments & ratings — **landed**
-
-`services/engagement.ts` + `routes/engagement.ts`, mounted at `/api` rather
-than under the stories router, because the resource set spans both
-`/api/stories/:id/...` and `/api/comments/:id`; splitting that across two
-routers would put one service behind two files. `app.ts` mounts it after the
-stories router, which matches none of those paths.
-
-Endpoints: `GET`/`POST /api/stories/:storyId/comments`, `DELETE
-/api/comments/:id`, `PUT`/`DELETE /api/stories/:storyId/rating`, `GET
-/api/stories/:storyId/ratings`.
-
-**The decisions this task owned.**
-
-- **`ratingCount` was added as a column**, and both it and `ratingAverage` are
-  recomputed inside the same transaction as every rating write. They are *not*
-  the read path — `services/stories.ts` still computes both from `Rating` rows
-  and falls back to the column only when there are none — but `sort=rating`
-  orders in SQL over the story table, so a stale column silently mis-sorts the
-  catalogue. `ratingAverage` is set back to null, not 0, when the last rating
-  goes.
-- **Delete is the comment's author alone.** The shared shape says
-  "author-or-moderator, resolved from the membership row", but a story has no
-  membership table, so there is no moderator to resolve. The story's author is
-  deliberately *not* given the power — that is a moderation rule, and Task 15
-  owns the role decision that would justify it. A test pins this, so changing
-  it is a deliberate act.
-- **Comments carry `parentId`**, one level deep, with `createComment`
-  re-pointing a reply-to-a-reply at its thread — the same table and the same
-  rule as `clubs.ClubDiscussion`. A reply inherits its thread's `chapterId`
-  rather than taking the caller's, so a reply cannot hide from the chapter
-  panel its thread is showing in.
-- **Comments are chapter-scopable.** `engagement.Comment.chapterId` already
-  existed; the reader's panel filters on it, the story page's tab does not.
-
-**What this removed rather than faked.** The rating dialog's "Review
-(optional)" textarea is gone: `engagement.Rating` stores a score and no body,
-so every word typed into it was discarded on save. Written reviews are a column
-and a migration, not a UI change — the Reviews tab now says so. The
-`RatingBars` chart is wired to the real breakdown and is no longer unused.
-
-**Unseen in a browser:** a thread with its replies expanded on
-`StoryDetailPage` at phone width; the reader's comment panel with enough
-comments to scroll; and the Delete action, which reads `session.user.id` and so
-is hidden in local development where `readerHeaders()` identifies the caller by
-header instead — the same gap clubs and channels have.
-
----
-
-## Task 8 — Author analytics
-
-Depends on the authoring task, which has landed.
-
-`getAuthorOverview` is **already gone** from `data/api.ts`, along with the view
-series and read counts it invented, so both pages currently show what the real
-`content.Story` columns carry and nothing more. The task is to record the events
-that would make a series real, not to replace a fake one.
-
-**Prompt:**
-
-> `apps/web/src/pages/author/AuthorAnalyticsPage.tsx` and
-> `AuthorDashboardPage.tsx` want views, reads, average rating, engagement and a
-> time series. Nothing records any of it: there is no view event and no
-> chapter-read event anywhere in the contract.
->
-> Make it real. Decide what to actually record: at minimum a story view event
-> and a chapter-read event, timestamped, deduped per user per day so a refresh
-> does not inflate the numbers. Add the model and migration, and record events
-> from the story detail and reader endpoints (asynchronously — a view write must
-> never fail or slow the read response).
->
-> Then `GET /api/author/analytics?range=7d|30d|90d` returning totals plus a
-> daily series, and `GET /api/author/analytics/stories/:id` for the per-story
-> breakdown. Aggregate in SQL, not in JS over every row.
->
-> FE: rewire both pages onto it; `components/charts/LineChart.tsx` already takes
-> a series, so match its shape.
->
-> Tests: dedupe within a day, range boundary correctness, and that a story with
-> no events returns zeroes rather than erroring or omitting days.
-
----
-
-## Task 11 — Writing challenges & leaderboard — **landed**
-
-`services/challenges.ts` + `routes/challenges.ts` at `/api/challenges`, plus
-`services/roles.ts`, which owns the admin flag this task was put first for.
-
-Endpoints: `GET /api/challenges`, `GET /api/challenges/:slug`, `GET
-/api/challenges/:slug/leaderboard`, `POST /api/challenges/:id/enter`,
-`PUT`/`DELETE /api/challenges/entries/:id`, and `POST /api/challenges` /
-`PATCH /api/challenges/:id` for administrators.
-
-**The decisions this task owned.**
-
-- **The role is one boolean, `auth.User.isAdmin`, read in exactly one place.**
-  Not a `UserRole` enum: there is a single privileged set of actions today, so
-  `MODERATOR` and `ADMIN` would be two names for the same permission with
-  nothing enforcing the difference — and widening a boolean into an enum is a
-  migration whenever they genuinely diverge. What Task 15 must not do is invent
-  a *second* notion of staff; `assertAdmin` in `services/roles.ts` is the one
-  to call. **Nothing grants the flag over HTTP** — `scripts/grant-admin.ts`
-  sets it against the database, so no request can escalate itself and there is
-  no endpoint to forget to protect.
-- **State is derived, never stored.** `upcoming` / `active` / `past` are the
-  three positions `now()` can hold against `startAt` and `endAt`. `stateOf` is
-  the only place that is decided, and `assertOpen` asks it the same question
-  the page displays, so "the badge says active" and "the API let me in" cannot
-  come apart.
-- **Entering and submitting are two steps**, so `ChallengeEntry.storyId` became
-  nullable and the unique key went from `[challengeId, userId, storyId]` to
-  `[challengeId, userId]` — the old one let one writer hold several rows on the
-  leaderboard and made "already entered?" a question with no single answer.
-  That split is also what makes the page's two stats mean different things:
-  participants are entries, entries are entries with a story on them.
-- **The ranking rule is `score = the sum of the star ratings the entry's story
-  has earned`,** ranked in SQL, in one commented function (`RANKING` in
-  `services/challenges.ts`). Summing rather than averaging is deliberate: a
-  mean lets one five-star rating beat fifty fours, and the sum is monotone in
-  both reach and quality without an invented Bayesian prior. Ties break by
-  rating count, then earliest submission, then entry id — a total order, so
-  paging a board cannot repeat or skip a row.
-- **Only published entries are ranked, and the board is built anonymously.**
-  `getStoriesByIds(…, null)` rather than as the caller: resolving as the viewer
-  would put an author's own draft on the board for them alone and shift
-  everybody below it by one. A writer who attached a draft is told so on the
-  detail page instead.
-- **Edits close with the challenge.** Swapping a story, editing a note and
-  withdrawing all go through `assertOpen`, because a board that can still
-  change after it closed is not a result. Entering out of window and entering
-  twice are both 409 — nothing about the request is malformed, the challenge is
-  just not in a state that accepts it.
-- **A story must be the caller's own and `source = SCRIBE`.** Without the first
-  check anybody could enter somebody else's story and take their ranking; the
-  second is the filter `countVisibleStoriesBy` already applies, because a
-  catalogue edition carries a real author column and nobody wrote it here.
-
-**What this removed rather than faked.** The entry's `voteCount` and `rank` are
-gone as stored fields: there is no ballot in the contract, and inventing a
-voting feature to fill a mock column was the wrong place to start — the board
-ranks on `engagement.Rating`, which is real, and the leaderboard row shows the
-score with the rating count beside it rather than a heart. A challenge's `hue`
-is derived from the slug through `hueFor`, the way a club's and a channel's
-are. The **"Host a challenge" button is gone**: creating one is an admin action
-and there is no admin surface in the reader-facing app to put it behind, so the
-button promised something it could not do — the same call Task 15 makes about a
-moderator UI. "Remind me when it opens" went with it, because there is nothing
-to remind anybody with until Task 14.
-
-**What was added because the UI genuinely collects it.** `WritingChallenge`
-gained `slug`, `prompt`, `wordTarget` and `hostId`; `ChallengeEntry` gained
-`note`, which the submit dialog was discarding on save — it round-trips now, so
-the dialog re-opens on what was written rather than blank.
-
-**Seeded rather than left empty.** The mock's challenge fixtures are deleted,
-and nothing but an administrator can create a replacement, so
-`scripts/seed-challenges.ts` (`pnpm --filter api seed:challenges`) loads six
-challenges across the three states and moves their windows forward on every
-run. It seeds no *entries*: a place belongs to a writer who took it, and the
-board ranks on ratings readers left.
-
-**Unseen in a browser:** the challenge hero and its derived banner hue at phone
-width; the leaderboard rows with a long story title beside a long handle, where
-`.leaderboard__story` has to clamp rather than push the score off the row; and
-the enter → submit sequence, where two requests happen behind one button.
-
 ## Task 12 — Badges & levels (award engine)
+
+Depends on Task 8, **which has landed**: "chapters read" is now countable from
+`engagement.ChapterRead` rather than being a metric with nothing behind it. Two
+things there are worth copying rather than reinventing — `evaluateBadges` wants
+the same never-blocks-the-response shape `recordStoryView` has (`void` return,
+failures swallowed into the log, one `flush` seam for the tests), and the
+metrics it computes want to be SQL aggregates for the reason
+`services/analytics.ts` gives.
 
 **Prompt:**
 
@@ -279,69 +141,6 @@ the enter → submit sequence, where two requests happen behind one button.
 > Tests: idempotent re-award, threshold boundary (at, just below, just above),
 > and that seeding a user's metrics then evaluating awards exactly the expected
 > set.
-
----
-
-## Task 13 — Public profiles & follows — **landed**
-
-`services/users.ts` + `routes/users.ts` at `/api/users`. Endpoints: `GET
-/api/users/:username`, `/stories`, `/followers`, `/following`, and
-`POST`/`DELETE /api/users/:username/follow`.
-
-**The decisions this task owned.**
-
-- **`engagement.Follow`, not `auth.Follow`.** `auth` describes who somebody
-  *is*; the rest of `engagement` describes what readers *did*, and a follow is
-  the same kind of row as a rating with another reader as its object. The pair
-  is unique; **self-follow is refused in the service**, because the contract
-  cannot express a check constraint — so the rule lives in exactly one place
-  and a test pins it.
-- **Counts are computed, never denormalised.** `Story.ratingAverage` is a
-  column because `sort=rating` orders in SQL over the story table; nothing
-  sorts or filters on a follower count, so a column would buy nothing and
-  could only drift.
-- **Both writes are idempotent and return the fresh state.** Following twice
-  leaves one row; unfollowing a stranger is a no-op, not a 404. Both answer
-  `{ following, followerCount }` so the button redraws without a second
-  request — the same reasoning as `DELETE .../rating` returning the summary.
-- **`storyCount` and the Stories tab share one rule.** `countVisibleStoriesBy`
-  in `services/stories.ts` applies the same `visibleTo` *and* `source =
-  SCRIBE` filters `listStories` does. The first draft of this got it wrong —
-  the header said 4 over a tab listing 1, because seeded catalogue editions
-  carry a real author — which is why the count is exported from the stories
-  service rather than written a second time. A test pins it.
-- **The profile shape is written out field by field**, sharing nothing with
-  `services/account.ts` but the table. `email`, `emailVerified`, `hasPassword`,
-  `googleId` and `streakLastReadAt` are never selected. A test asserts the
-  exact key set, so a column added to `auth.User` cannot start leaking.
-- **`auth.User.bio` already existed** (added with the settings task), so the
-  profile renders it with no migration of its own.
-
-**What this removed rather than faked.** The stat row was four mock aggregates;
-it is now four real ones — stories, followers, following, reading streak.
-`chaptersRead`, `minutesReadThisWeek` and `totalViews` are gone, because
-nothing records a view or a chapter read yet: that is Task 8, and Task 12 owns
-the levels the header now shows. The author's average-rating chip went with
-them — per-story averages are real, an author-wide one is not an endpoint.
-
-**A bug this fixed on the way.** `ProfilePage` rendered the *viewer's* library,
-badges and clubs under whichever name was in the URL, so somebody else's
-profile showed your own currently-reading shelf. Those four sections are now
-gated on the profile being your own, and `/profile/<your own handle>` counts as
-your own too — the page folds `!routeUsername` and the API's `isMe` into one
-flag, so the two routes to it cannot behave differently.
-
-**Still mock-fed:** the Badges tab, which is the caller's own and Task 12's to
-replace (`GET /api/users/:username/badges` is in that task). `db.authors`
-survives for `OnboardingPage`'s author picker — Task 16 owns that flow, and
-retiring the fixture with it.
-
-**Unseen in a browser:** the follower/following grid at phone width; the
-optimistic Follow button under a failing request, where the roll-back and the
-error toast have only been reasoned about; and the header actions on
-`/profile/<your own handle>`, which read the API's `isMe` and so answer for
-whoever the *dev header* names in local development — the same gap clubs,
-channels and comments have.
 
 ## Task 14 — Notifications
 
@@ -449,7 +248,9 @@ Final cleanup. Do last.
 **Mostly done already.** The story, chapter, book, shelf, comment, rating,
 reading-history, club, channel and challenge fixtures are gone from
 `mock-db.ts` (832 lines down to ~177), along with the author aggregates that
-invented view series and read counts. `data/api.ts` is down to two functions.
+invented view series and read counts — and those now have a real replacement to
+point at rather than a missing endpoint, since Task 8 landed `GET
+/api/author/analytics`. `data/api.ts` is down to two functions.
 What remains is the data whose features have no endpoints: badges, and the
 author directory (`db.authors`) — plus `db.currentUser`, which `AuthProvider`
 still uses for the presentational half of a session (avatar hue, follower
@@ -530,6 +331,41 @@ folding into whichever task next touches that surface.
   no session exists, so `VITE_DEV_USER_ID` has to name a user that really
   exists. If it does not, every save 401s and the block above silences it for
   the whole page load with nothing shown to the reader.
+
+### Author analytics (Task 8)
+
+- **The visitor digest's day and the row's day are decided by different
+  clocks.** `visitorFor` salts with this process's UTC day; the `day` column is
+  written by `to_char(now() AT TIME ZONE 'UTC', …)` in the same statement. In
+  the second the two disagree a signed-out visitor can land twice, once either
+  side of midnight — one extra view per visitor per year. Closing it means
+  computing the digest in SQL, which is not something SQL should be doing.
+- **`Story.viewCount` mixes a seeded base with real events.** Every value in
+  the column today came from `seed-books.ts` / `seed-stories.ts`; every
+  increment from here is a deduped view. So "all time" on the author pages is
+  honest about the platform and not about the story, and a 30-day figure far
+  below it is expected rather than a bug. The seeds are the thing to change if
+  that ever matters.
+- **An anonymous visitor is one visitor per address *and* user agent.** Two
+  people behind one NAT with different browsers are two; the same person on two
+  browsers is also two. The usual trade, but it means `readers` is an estimate
+  for signed-out traffic and exact for signed-in.
+- **Nothing counts a view of a chapter the reader deep-linked into.** Opening
+  `/read/:slug/:n` directly records a chapter read and no story view, because
+  the story endpoint was never called. The reader page happens to fetch the
+  story for its header today, so this is currently theoretical — but it is a
+  property of the page, not of the API.
+- **`req.ip` is only as good as `TRUST_PROXY`.** Unset behind a real proxy,
+  every signed-out reader shares the proxy's address and therefore one visitor
+  key, and a day's anonymous views for a story collapse to one. The same
+  configuration note the auth rate limits carry, with a quieter failure.
+- **The event tables only ever grow.** Nothing prunes them and nothing rolls
+  them up; at 90 days the queries stay indexed, but there is no retention
+  policy and no monthly aggregate table. The first thing to add if a board ever
+  needs a year.
+- **Unseen in a browser:** the `LineChart` under a real 90-day series at phone
+  width; the story picker with enough stories to make the select long; and the
+  chapter breakdown for a story with thirty chapters.
 
 ### Public profiles and follows (Task 13)
 

@@ -11,7 +11,14 @@
 # after 30 days, uploads do not persist because free instances cannot mount a
 # disk, and the API sleeps after 15 minutes idle (~50s cold start).
 #
-# Apply with: Render dashboard -> New -> Blueprint, pointed at this repo.
+# These three services already exist, created by hand (a project's New menu has
+# no Blueprint entry). Names here match the live ones, so applying this adopts
+# them rather than creating duplicates. Deployed 2026-09-15:
+#
+#   web  https://scribe-web-7mpz.onrender.com
+#   api  https://scribe-new.onrender.com
+#
+# Steps, settings and the failures worth knowing about: docs/DEPLOYMENT.md
 
 services:
   # --- redis ---------------------------------------------------------------
@@ -23,7 +30,7 @@ services:
 
   # --- api -----------------------------------------------------------------
   - type: web
-    name: scribe-api
+    name: scribe-new
     runtime: docker
     # Context is the repo root because the Dockerfile copies the workspace
     # manifests (pnpm-workspace.yaml, both app package.json files).
@@ -76,8 +83,10 @@ services:
       # out must be absolute. Set to this service's own URL.
       - key: PUBLIC_UPLOAD_BASE_URL
         sync: false
-      # The static site's URL, e.g. https://scribe-web.onrender.com — a
-      # blueprint cannot build it from `property: host`, so it is set by hand.
+      # The static site's origin, exactly: https://scribe-web-7mpz.onrender.com
+      # No trailing slash — it is compared against the browser's Origin header
+      # as a string. A blueprint cannot build it from `property: host`, so it is
+      # set by hand.
       - key: CORS_ORIGIN
         sync: false
       - key: GOOGLE_CLIENT_ID
@@ -93,7 +102,10 @@ services:
       # Vite inlines VITE_* at build time, so these are build inputs: changing
       # one needs a redeploy, not a restart.
       #
-      # The API's URL, e.g. https://scribe-api.onrender.com.
+      # The API's base path, including /api:
+      #   https://scribe-new.onrender.com/api
+      # api-client.ts appends paths like /stories to this, so dropping the
+      # suffix sends every call to the site's own origin instead.
       - key: VITE_API_URL
         sync: false
       - key: VITE_GOOGLE_CLIENT_ID
