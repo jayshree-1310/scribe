@@ -27,6 +27,7 @@
 import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
+import { evaluateBadges } from "./gamification.js";
 import {
   countVisibleStoriesBy,
   listStories,
@@ -413,6 +414,10 @@ export async function followUser(
       createdAt: now(),
     });
   });
+
+  // The *target's* badges, not the caller's: following somebody moves their
+  // follower count and nothing of the follower's.
+  evaluateBadges(target.id);
 
   return { following: true, followerCount: await countFollowers(target.id) };
 }

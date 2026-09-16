@@ -2,6 +2,8 @@ import app from "./app.js";
 import { logger } from "./lib/logger.js";
 import { db } from "./prisma/db.js";
 import { connectRedis, redis } from "./lib/redis.js";
+import { flushAnalytics } from "./services/analytics.js";
+import { flushBadges } from "./services/gamification.js";
 
 const PORT = Number(process.env.PORT) || 3000;
 
@@ -19,6 +21,18 @@ async function start() {
     server.close(async (error) => {
       if (error) {
         logger.error({ err: error }, "Error while closing server");
+      }
+
+      try {
+        /**
+         * Analytics events and badge awards are issued fire-and-forget, so a
+         * request that has already answered can still have a write in flight
+         * here. Both expose a flush for exactly this; without it the write
+         * meets a closed pool and is lost.
+         */
+        await Promise.all([flushAnalytics(), flushBadges()]);
+      } catch (flushError) {
+        logger.error({ err: flushError }, "Error while draining background writes");
       }
 
       try {

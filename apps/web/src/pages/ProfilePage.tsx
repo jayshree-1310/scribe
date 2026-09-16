@@ -4,8 +4,8 @@ import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
 import { formatCount, formatDate, formatRelative } from '../lib/format'
-import * as api from '../data/api'
 import * as books from '../data/books-api'
+import * as gamification from '../data/gamification-api'
 import * as clubsApi from '../data/clubs-api'
 import * as usersApi from '../data/users-api'
 import { READING_STATUS_LABELS } from '../types/books'
@@ -52,12 +52,15 @@ function messageOf(cause: unknown): string {
  * story list, which returns the caller's own drafts to them and nobody else's
  * to anybody.
  *
- * Four sections are the *caller's own* data and so are hidden on somebody
- * else's profile: currently-reading, reading activity, badges and clubs. They
- * read the signed-in reader's library, the mock badge list and `listClubs({
- * mine: true })` — none of which can be asked about another person. A
- * badges-by-username endpoint arrives with the badge engine; the rest want
- * endpoints that do not exist.
+ * Three sections are the *caller's own* data and so are hidden on somebody
+ * else's profile: currently-reading, reading activity and clubs. They read the
+ * signed-in reader's library and `listClubs({ mine: true })`, neither of which
+ * can be asked about another person; a public "clubs this person is in" would
+ * be a new endpoint on the clubs service rather than a UI change.
+ *
+ * Badges used to be the fourth. They are public now — the badge engine landed
+ * `GET /api/users/:username/badges`, which answers for anybody with the badges
+ * they have earned and no more.
  */
 export function ProfilePage() {
   const { username: routeUsername } = useParams()
@@ -160,11 +163,21 @@ export function ProfilePage() {
     [handle, initialising, tab === 'following'],
   )
 
-  // The caller's own data, so there is nothing to load on somebody else's page.
+  /**
+   * Badges are public: `GET /api/users/:username/badges` answers for anybody,
+   * and returns only what they have *earned* -- a stranger's progress toward a
+   * locked badge is theirs. So this tab is the one of the four below that is
+   * not gated on the profile being the caller's own.
+   */
   const badges = useAsync(
-    () => (isMe ? api.getBadges() : Promise.resolve([])),
-    [isMe],
+    () =>
+      handle && !initialising
+        ? gamification.getUserBadges(handle)
+        : Promise.resolve([]),
+    [handle, initialising],
   )
+
+  // The caller's own data, so there is nothing to load on somebody else's page.
   const clubs = useAsync(
     () =>
       isMe
@@ -234,7 +247,8 @@ export function ProfilePage() {
   }
 
   const displayName = nameOf(data)
-  const earnedBadges = badges.data?.filter((entry) => entry.earned) ?? []
+  // Everything the endpoint returns is earned; there is no locked half here.
+  const earnedBadges = badges.data ?? []
   const myClubs = clubs.data ?? []
 
   const tabs = [
@@ -242,10 +256,10 @@ export function ProfilePage() {
     { id: 'stories' as const, label: 'Stories', count: data.storyCount },
     { id: 'followers' as const, label: 'Followers', count: followerCount },
     { id: 'following' as const, label: 'Following', count: data.followingCount },
+    { id: 'badges' as const, label: 'Badges', count: earnedBadges.length },
     ...(isMe
       ? [
           { id: 'activity' as const, label: 'Reading activity' },
-          { id: 'badges' as const, label: 'Badges', count: earnedBadges.length },
           { id: 'clubs' as const, label: 'Clubs', count: myClubs.length },
         ]
       : []),
@@ -407,7 +421,7 @@ export function ProfilePage() {
                 <SectionHead title="Recent badges" />
                 <div className="card-grid card-grid--tight">
                   {earnedBadges.slice(0, 4).map((entry) => (
-                    <BadgeTile key={entry.badge.id} entry={entry} />
+                    <BadgeTile key={entry.badge.code} entry={entry} />
                   ))}
                 </div>
               </section>
@@ -518,11 +532,41 @@ export function ProfilePage() {
 
       {tab === 'badges' ? (
         <TabPanel id="badges">
-          <div className="card-grid card-grid--tight">
-            {badges.data?.map((entry) => (
-              <BadgeTile key={entry.badge.id} entry={entry} />
-            ))}
-          </div>
+          {badges.status === 'error' ? (
+            <ErrorState message={badges.error} onRetry={badges.reload} />
+          ) : badges.status === 'loading' ? (
+            <div className="card-grid card-grid--tight">
+              {Array.from({ length: 4 }, (_, index) => (
+                <Skeleton key={index} height="12rem" radius="var(--radius-lg)" />
+              ))}
+            </div>
+          ) : earnedBadges.length === 0 ? (
+            <EmptyState
+              icon="medal"
+              title={isMe ? 'No badges yet' : `${displayName} has no badges yet`}
+              description={
+                isMe
+                  ? 'Read, write and join in — these unlock as you go.'
+                  : undefined
+              }
+              action={isMe ? <ButtonLink to="/badges">See what is on offer</ButtonLink> : undefined}
+            />
+          ) : (
+            <>
+              <div className="card-grid card-grid--tight">
+                {earnedBadges.map((entry) => (
+                  <BadgeTile key={entry.badge.code} entry={entry} />
+                ))}
+              </div>
+              {isMe ? (
+                <div className="page-section">
+                  <ButtonLink to="/badges" variant="ghost">
+                    See every badge and how close you are
+                  </ButtonLink>
+                </div>
+              ) : null}
+            </>
+          )}
         </TabPanel>
       ) : null}
 

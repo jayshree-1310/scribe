@@ -4,10 +4,6 @@
   "target": "postgres",
   "profileHash": "3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2",
   "roots": {
-    "badge": {
-      "model": "Badge",
-      "namespace": "gamification"
-    },
     "bookClub": {
       "model": "BookClub",
       "namespace": "clubs"
@@ -2993,86 +2989,9 @@
       },
       "gamification": {
         "models": {
-          "Badge": {
-            "fields": {
-              "createdAt": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/timestamptz-temporal@1",
-                  "kind": "scalar"
-                }
-              },
-              "description": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "id": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "imageUrl": {
-                "nullable": true,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              },
-              "name": {
-                "nullable": false,
-                "type": {
-                  "codecId": "pg/text@1",
-                  "kind": "scalar"
-                }
-              }
-            },
-            "relations": {
-              "users": {
-                "cardinality": "1:N",
-                "on": {
-                  "localFields": [
-                    "id"
-                  ],
-                  "targetFields": [
-                    "badgeId"
-                  ]
-                },
-                "to": {
-                  "model": "UserBadge",
-                  "namespace": "gamification"
-                }
-              }
-            },
-            "storage": {
-              "fields": {
-                "createdAt": {
-                  "column": "createdAt"
-                },
-                "description": {
-                  "column": "description"
-                },
-                "id": {
-                  "column": "id"
-                },
-                "imageUrl": {
-                  "column": "imageUrl"
-                },
-                "name": {
-                  "column": "name"
-                }
-              },
-              "namespaceId": "gamification",
-              "table": "badge"
-            }
-          },
           "UserBadge": {
             "fields": {
-              "badgeId": {
+              "code": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
@@ -3102,21 +3021,6 @@
               }
             },
             "relations": {
-              "badge": {
-                "cardinality": "N:1",
-                "on": {
-                  "localFields": [
-                    "badgeId"
-                  ],
-                  "targetFields": [
-                    "id"
-                  ]
-                },
-                "to": {
-                  "model": "Badge",
-                  "namespace": "gamification"
-                }
-              },
               "user": {
                 "cardinality": "N:1",
                 "on": {
@@ -3135,8 +3039,8 @@
             },
             "storage": {
               "fields": {
-                "badgeId": {
-                  "column": "badgeId"
+                "code": {
+                  "column": "code"
                 },
                 "earnedAt": {
                   "column": "earnedAt"
@@ -5728,56 +5632,9 @@
       "gamification": {
         "entries": {
           "table": {
-            "badge": {
-              "columns": {
-                "createdAt": {
-                  "codecId": "pg/timestamptz-temporal@1",
-                  "default": {
-                    "expression": "now()",
-                    "kind": "function"
-                  },
-                  "nativeType": "timestamptz",
-                  "nullable": false
-                },
-                "description": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "id": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                },
-                "imageUrl": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": true
-                },
-                "name": {
-                  "codecId": "pg/text@1",
-                  "nativeType": "text",
-                  "nullable": false
-                }
-              },
-              "foreignKeys": [],
-              "indexes": [],
-              "primaryKey": {
-                "columns": [
-                  "id"
-                ]
-              },
-              "uniques": [
-                {
-                  "columns": [
-                    "name"
-                  ]
-                }
-              ]
-            },
             "userBadge": {
               "columns": {
-                "badgeId": {
+                "code": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
                   "nullable": false
@@ -5818,33 +5675,9 @@
                     "namespaceId": "auth",
                     "tableName": "user"
                   }
-                },
-                {
-                  "source": {
-                    "columns": [
-                      "badgeId"
-                    ],
-                    "namespaceId": "gamification",
-                    "tableName": "userBadge"
-                  },
-                  "target": {
-                    "columns": [
-                      "id"
-                    ],
-                    "namespaceId": "gamification",
-                    "tableName": "badge"
-                  }
                 }
               ],
               "indexes": [
-                {
-                  "columns": [
-                    "badgeId"
-                  ],
-                  "name": "userBadge_badgeId_idx_e78e6f52",
-                  "prefix": "userBadge_badgeId_idx",
-                  "unique": false
-                },
                 {
                   "columns": [
                     "userId"
@@ -5863,7 +5696,7 @@
                 {
                   "columns": [
                     "userId",
-                    "badgeId"
+                    "code"
                   ]
                 }
               ]
@@ -6059,23 +5892,12 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "6d8f8e7f0f0212ed12a8a583909d0caed0665164e47f82d41cac62030afaf0a8"
+    "storageHash": "f524128153dff34109d41322c22f18344d1294cc5be6da4a0deb68ffca7a2fea"
   },
   "execution": {
-    "executionHash": "44b1a12bcfa4cb0fb82df2b13d4e1f2028a4026f75d36e2b2d28177525326b44",
+    "executionHash": "26001048bff02d2a901fda896d2619ac23edf09be6e9d99cc6fe59c08fa9fc6a",
     "mutations": {
       "defaults": [
-        {
-          "onCreate": {
-            "id": "uuidv4",
-            "kind": "generator"
-          },
-          "ref": {
-            "column": "id",
-            "namespace": "gamification",
-            "table": "badge"
-          }
-        },
         {
           "onCreate": {
             "id": "uuidv4",

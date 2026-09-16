@@ -9,10 +9,10 @@ import { GenreChip, StatusBadge } from '../ui/Chip'
 import { Icon } from '../ui/Icon'
 import { ProgressBar } from '../ui/Progress'
 import { StoryCover } from './StoryCover'
-import type { BadgeWithProgress } from '../../data/api'
 import { channelAuthorName, type Channel } from '../../types/channels'
 import { CLUB_ROLE_LABELS, type Club } from '../../types/clubs'
 import type { Challenge } from '../../types/challenges'
+import type { BadgeProgress } from '../../types/gamification'
 import type { User } from '../../types/domain'
 
 /* Author -------------------------------------------------------------- */
@@ -259,7 +259,7 @@ const BADGE_ICONS: Record<string, Parameters<typeof Icon>[0]['name']> = {
   moon: 'moon',
 }
 
-export function BadgeTile({ entry }: { entry: BadgeWithProgress }) {
+export function BadgeTile({ entry }: { entry: BadgeProgress }) {
   const { badge, earned, earnedAt, progress } = entry
 
   return (

@@ -2,8 +2,8 @@
 
 What is left to build, and in what order. Derived from the gap between the
 frontend surface (`apps/web/src/pages`) and the API (`apps/api/src/routes`).
-Most of that gap is closed; `data/api.ts` is down to two mock functions, and
-Task 17 is the sweep that removes them.
+Most of that gap is closed; `data/api.ts` is down to one mock function, and
+Task 17 is the sweep that removes it.
 
 **Landed tasks are not kept here.** Each one's decisions live in the header of
 the service that owns them — that is the file somebody changing the behaviour
@@ -63,6 +63,7 @@ Paste this block at the top of any task prompt below.
 | Public profiles + follows (Task 13) | `services/users.ts` |
 | Writing challenges + leaderboard (Task 11) | `services/challenges.ts`, `services/roles.ts` |
 | Author analytics (Task 8) | `services/analytics.ts`, `engagement.StoryView` in `contract.prisma` |
+| Badges & levels (Task 12) | `services/gamification.ts`, `gamification.UserBadge` in `contract.prisma` |
 
 ### What is left
 
@@ -71,11 +72,10 @@ is the order to do them in, and the reason for each position.
 
 | # | Task | Why here |
 |---|---|---|
-| 1 | **12** — badges & levels | A pure consumer now that 8 has landed: streak and words written exist, comments and ratings come from 3, follows from 13, and "chapters read" is countable at last — `engagement.ChapterRead` is the event log 8 added, where `ReadingHistory` only ever kept current position per story. |
-| 2 | **14** — notifications | All four dependencies — 3, 9, 10, 13 — have landed, so every event it fans out from is real. Below 12 only because a newly earned badge is one of the five notification types. |
-| 3 | **15** — moderation & reporting | The role it needs a moderator to be is now `auth.User.isAdmin`, landed with 11 and read only in `services/roles.ts`. The content to moderate is all there: 3's comments join 9's discussions and 10's posts. |
-| 4 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed), ratings (landed with 3) and follows (landed with 13). Late because a recommender is worth building once there is signal to rank on. |
-| 5 | **17** — retire the mock layer | Last by definition. |
+| 1 | **14** — notifications | All four dependencies — 3, 9, 10, 13 — have landed, so every event it fans out from is real, and 12 has now landed too: "a badge earned" is one of its five notification types, and the browser-local `newlyEarnedSince` in `data/gamification-api.ts` is the placeholder it replaces. |
+| 2 | **15** — moderation & reporting | The role it needs a moderator to be is now `auth.User.isAdmin`, landed with 11 and read only in `services/roles.ts`. The content to moderate is all there: 3's comments join 9's discussions and 10's posts. |
+| 3 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed), ratings (landed with 3) and follows (landed with 13). Late because a recommender is worth building once there is signal to rank on. |
+| 4 | **17** — retire the mock layer | Last by definition. |
 
 ### One shared shape, settled
 
@@ -102,45 +102,6 @@ then have three different read paths to audit for hidden content, and that is
 exactly where a moderation bug hides.
 
 ---
-
-## Task 12 — Badges & levels (award engine)
-
-Depends on Task 8, **which has landed**: "chapters read" is now countable from
-`engagement.ChapterRead` rather than being a metric with nothing behind it. Two
-things there are worth copying rather than reinventing — `evaluateBadges` wants
-the same never-blocks-the-response shape `recordStoryView` has (`void` return,
-failures swallowed into the log, one `flush` seam for the tests), and the
-metrics it computes want to be SQL aggregates for the reason
-`services/analytics.ts` gives.
-
-**Prompt:**
-
-> `gamification.Badge` and `UserBadge` exist, `apps/web/src/pages/BadgesPage.tsx`
-> renders progress bars, and nothing anywhere ever writes `UserBadge`,
-> `User.readerLevel` or `User.authorLevel`.
->
-> Build the award engine. Define badge criteria declaratively in one place in
-> `services/gamification.ts` (e.g. `{ code, name, description, metric,
-> threshold }` over metrics like stories read, chapters read, comments posted,
-> ratings given, streak length, stories published, words written) so adding a
-> badge is a data change, not a code change. Add an `evaluateBadges(userId)`
-> that computes current metric values, awards anything newly earned, is
-> idempotent, and returns what was newly awarded. Call it after the events that
-> can plausibly move a metric — from the service layer, not the route, and
-> without blocking the response.
->
-> Derive reader/author levels from the same metrics with a documented curve.
->
-> API: `GET /api/badges` — all badges with the caller's progress and earned-at,
-> which is exactly what the mock `getBadges` returns today; `GET
-> /api/users/:username/badges` for public profiles.
->
-> FE: `data/gamification-api.ts`, rewire `pages/BadgesPage.tsx`, remove
-> `getBadges` from `data/api.ts`. Surface newly earned badges as a toast.
->
-> Tests: idempotent re-award, threshold boundary (at, just below, just above),
-> and that seeding a user's metrics then evaluating awards exactly the expected
-> set.
 
 ## Task 14 — Notifications
 
@@ -265,9 +226,9 @@ session's `followerCount` / `followingCount` are now computable, so
 `AuthProvider.toUser` no longer needs the mock for them; `ProfilePage` already
 bypasses it and asks the API for its own numbers.
 
-The club, channel and challenge types also left `types/domain.ts` for
-`types/clubs.ts`, `types/channels.ts` and `types/challenges.ts`, which mirror
-the API the way `types/stories.ts` does. That is the pattern this task's
+The club, channel, challenge and badge types also left `types/domain.ts` for
+`types/clubs.ts`, `types/channels.ts`, `types/challenges.ts` and
+`types/gamification.ts`, which mirror the API the way `types/stories.ts` does. That is the pattern this task's
 reconciliation should finish, not undo.
 
 **Prompt:**
@@ -383,14 +344,64 @@ folding into whichever task next touches that surface.
   shift a row across a page boundary. `createdAt` + `id` makes the *order*
   stable, not the offsets; a keyset cursor is the fix if these lists ever get
   long enough to matter.
-- **Nobody can see another reader's badges, clubs or shelves.** Those four
-  tabs are gated on the profile being the caller's own, which is honest today —
-  there is no endpoint that answers them for somebody else. Task 12 adds the
-  badge one; a public "clubs this person is in" would be a new endpoint on the
-  clubs service, not a UI change.
+- **Nobody can see another reader's clubs or shelves.** Those tabs are gated
+  on the profile being the caller's own, which is honest today — there is no
+  endpoint that answers them for somebody else. A public "clubs this person is
+  in" would be a new endpoint on the clubs service, not a UI change. Badges
+  used to be gated the same way and no longer are: Task 12 landed
+  `GET /api/users/:username/badges`.
 - **Unseen in a browser:** the follower/following grid at phone width, where
   `.people-list` drops to one column and a long display name has to clamp
   rather than push the "Following" badge off the row.
+
+### Badges and levels (Task 12)
+
+- **A newly earned badge is announced by the browser, not by the server.**
+  A badge is awarded by whichever event moved its metric, and the reader is
+  somewhere else when that happens. Until Task 14 there is nowhere to deliver
+  that, so `newlyEarnedSince` in `data/gamification-api.ts` keeps the codes it
+  has already shown in `localStorage` and toasts the difference the next time
+  the badges page loads. Per browser, per account: a second device
+  announces the same badge again, and a cleared store swallows one toast. The
+  award itself is never at risk — only the telling.
+- **`streakDays` is the current streak, not the longest.** Nothing stores a
+  longest, so "read 30 days in a row" is only earnable while the run is still
+  alive: a reader who managed 40 days last year and evaluates today at 3 does
+  not get it retroactively. Once earned it is kept, because `UserBadge` is a
+  record of the award and not of the metric. A `longestStreak` column on
+  `auth.User` is the fix, and it is a migration rather than a rule change.
+- **`storyViews` inherits the seeds' dishonesty.** It sums
+  `content.Story.viewCount`, which the analytics work already documents as a
+  seeded base plus real events — so a seeded author can hold *Popular Writer*
+  for traffic nobody generated. The seeds are the thing to change, and the
+  same note in the analytics section is where it is written down.
+- **Evaluation runs on every debounced scroll save.** `recordProgress` calls
+  `evaluateBadges`, which costs two reads (the metrics aggregate and the held
+  codes) and writes nothing in the steady state. Cheap today and the wrong
+  shape at scale: the fix is to evaluate on a boundary the reader crosses --
+  a chapter finished rather than a scroll -- or to debounce per user in the
+  service.
+- **A fire-and-forget write has to be drained before anything deletes its
+  subject.** An evaluation issued by a comment can still be about to insert a
+  `UserBadge` row when `deleteAccount` sweeps that table, and a row landing
+  between the sweep and the `auth.User` delete fails the whole deletion on
+  `userBadge_userId_fkey`. `deleteAccount` calls `flushBadges()` before it
+  opens the transaction, the server drains on `SIGTERM`, and `TestApi.cleanup`
+  drains before teardown. The same reasoning applies to every future
+  fire-and-forget writer, and the analytics tables have always had the shape
+  without anybody drawing the line.
+- **Nothing tells a reader their level went up.** The two ladders are visible
+  on the badges page and the level number on the profile header, but crossing
+  a step is silent. It is the same gap the badge toast fills and the same
+  place Task 14 closes it.
+- **The toast only fires on `/badges`.** `ProfilePage`'s badges tab reads the
+  same list and does not diff it, so a reader who never opens the badges page
+  is never told. Deliberate — one announcement point is easier to replace than
+  two — but it is the reason the page is the only place a badge "arrives".
+- **Unseen in a browser:** the three-meter row on `BadgesPage` at phone width,
+  where `.badges__meters` drops to one column; the badges tab on somebody
+  else's profile with nothing earned; and the toast itself, which has never
+  fired outside a fresh `localStorage`.
 
 ### Writing challenges (Task 11)
 

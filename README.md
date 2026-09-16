@@ -25,7 +25,8 @@ which parts are real today.
 | Comments, ratings, reading progress & streak                                   | **Real API**                                                                |
 | Writing challenges & leaderboard                                               | **Real API**                                                                |
 | Author analytics — view / chapter-read events, daily series, per-story         | **Real API**                                                                |
-| Onboarding answers, badges                                                     | **Mock** (`apps/web/src/data/api.ts` + `mock-db.ts`)                        |
+| Badges, reader & author levels                                                 | **Real API**                                                                |
+| Onboarding answers                                                             | **Mock** (`apps/web/src/data/api.ts` + `mock-db.ts`)                        |
 | Notifications, moderation, recommendations                                     | Not built — see `docs/BACKLOG.md`                                           |
 | GenAI features                                                                 | Provider seam only — see `docs/AI-BACKLOG.md` and `docs/ai-architecture.md` |
 
@@ -46,6 +47,8 @@ tree rather than in the abstract:
 - Read stories chapter by chapter
 - Shelve stories in a personal library with a status per shelf item
 - Related-title suggestions
+- Earn badges and a reader level from what you actually read, comment on and
+  rate — awarded server-side, visible on your own profile and on other people's
 
 ### ✍️ Authors
 
@@ -589,8 +592,8 @@ docker compose exec api pnpm --filter api test routes/authoring
 
 Covered today: auth (incl. Google), account, books, library, stories, authoring,
 uploads, reading progress, clubs, channels, comments + ratings, public profiles
-+ follows, writing challenges and author analytics, plus the AI provider seam.
-The web app has no test suite yet.
++ follows, writing challenges, author analytics and badges, plus the AI
+provider seam. The web app has no test suite yet.
 
 ## 📌 Development Roadmap
 
@@ -642,7 +645,7 @@ The web app has no test suite yet.
 - [ ] Real recommendations (mock today)
 - [x] Author analytics on real data
 - [ ] Content moderation & reporting
-- [ ] Badges and levels
+- [x] Badges and levels
 - [x] Writing challenges
 - [x] Book clubs
 - [x] Broadcast channels

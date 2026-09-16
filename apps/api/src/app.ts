@@ -23,6 +23,7 @@ import challengesRouter from "./routes/challenges.js";
 import channelsRouter from "./routes/channels.js";
 import clubsRouter from "./routes/clubs.js";
 import engagementRouter from "./routes/engagement.js";
+import gamificationRouter from "./routes/gamification.js";
 import libraryRouter from "./routes/library.js";
 import readingRouter from "./routes/reading.js";
 import storiesRouter from "./routes/stories.js";
@@ -137,6 +138,12 @@ app.use("/api/users", usersRouter);
  * which matches none of them; see the header of `routes/engagement.ts`.
  */
 app.use("/api", engagementRouter);
+/**
+ * Badges. Mounted at the root for the same reason: its two paths sit under
+ * `/api/badges` and `/api/users/:username/badges`. After the users router,
+ * which matches neither; see the header of `routes/gamification.ts`.
+ */
+app.use("/api", gamificationRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -7,7 +7,7 @@
  * reads this — swap that file for real fetches and the UI is unchanged.
  */
 
-import type { Badge, Genre, User, UserBadge } from '../types/domain'
+import type { Genre, User } from '../types/domain'
 
 /* Deterministic helpers ------------------------------------------------ */
 
@@ -129,49 +129,18 @@ export const currentUser: User = {
 export const users: User[] = [currentUser, ...authors]
 export const userById = new Map(users.map((user) => [user.id, user]))
 
-/* Stories, chapters and reading history ---------------------------------
+/* Stories, chapters, reading history and badges -------------------------
  *
- * Deliberately absent. Stories, their chapters, comments, ratings and reading
- * history are served by the API now (`data/stories-api.ts`, `data/books-api.ts`)
- * and the only content in the app is what the seed scripts put in the database:
+ * Deliberately absent. Stories, their chapters, comments, ratings, reading
+ * history and badges are served by the API now (`data/stories-api.ts`,
+ * `data/books-api.ts`, `data/gamification-api.ts`) and the only content in the
+ * app is what the seed scripts put in the database:
  *
  *   pnpm --filter api seed:books      # imported catalogue editions
  *   pnpm --filter api seed:stories    # authored stories with chapters
  *
- * What remains below is the data whose features have no endpoints yet --
- * badges and the author directory.
+ * What remains above is the author directory, the one fixture whose feature
+ * still has no endpoint.
  */
-
-/* Gamification --------------------------------------------------------- */
-
-export const badges: Badge[] = [
-  { id: 'b-first-story', name: 'First Story', description: 'Published your first story on Scribe.', icon: 'book', tier: 'bronze', criteria: 'Publish one story', category: 'writing' },
-  { id: 'b-first-chapter', name: 'First Chapter', description: 'Published your first chapter.', icon: 'pencil', tier: 'bronze', criteria: 'Publish one chapter', category: 'writing' },
-  { id: 'b-first-review', name: 'First Review', description: 'Left your first review on a story.', icon: 'star', tier: 'bronze', criteria: 'Review one story', category: 'community' },
-  { id: 'b-streak-7', name: '7 Day Streak', description: 'Read something every day for a week.', icon: 'flame', tier: 'silver', criteria: 'Read 7 days in a row', category: 'reading' },
-  { id: 'b-chapters-100', name: '100 Chapters', description: 'Read one hundred chapters.', icon: 'library', tier: 'silver', criteria: 'Read 100 chapters', category: 'reading' },
-  { id: 'b-rising-author', name: 'Rising Author', description: 'Reached 1,000 reads across your stories.', icon: 'trend', tier: 'silver', criteria: 'Earn 1,000 reads', category: 'writing' },
-  { id: 'b-popular-writer', name: 'Popular Writer', description: 'Reached 50,000 reads across your stories.', icon: 'crown', tier: 'gold', criteria: 'Earn 50,000 reads', category: 'writing' },
-  { id: 'b-club-regular', name: 'Book Club Regular', description: 'Posted in club discussions ten weeks running.', icon: 'users', tier: 'silver', criteria: 'Post 10 weeks in a row', category: 'community' },
-  { id: 'b-marathon', name: 'Marathon Reader', description: 'Read for 500 minutes in a single week.', icon: 'clock', tier: 'gold', criteria: 'Read 500 minutes in a week', category: 'reading' },
-  { id: 'b-challenge-win', name: 'Challenge Winner', description: 'Placed first in a writing challenge.', icon: 'trophy', tier: 'gold', criteria: 'Win a writing challenge', category: 'writing' },
-  { id: 'b-critic', name: 'Thoughtful Critic', description: 'Wrote 25 reviews other readers found helpful.', icon: 'quote', tier: 'silver', criteria: 'Write 25 helpful reviews', category: 'community' },
-  { id: 'b-nightowl', name: 'Night Owl', description: 'Read after midnight thirty times.', icon: 'moon', tier: 'bronze', criteria: 'Read after midnight 30 times', category: 'reading' },
-]
-
-export const userBadges: UserBadge[] = [
-  { badgeId: 'b-first-story', userId: currentUser.id, earnedAt: daysAgo(180), progress: 1 },
-  { badgeId: 'b-first-chapter', userId: currentUser.id, earnedAt: daysAgo(182), progress: 1 },
-  { badgeId: 'b-first-review', userId: currentUser.id, earnedAt: daysAgo(174), progress: 1 },
-  { badgeId: 'b-streak-7', userId: currentUser.id, earnedAt: daysAgo(1), progress: 1 },
-  { badgeId: 'b-chapters-100', userId: currentUser.id, earnedAt: daysAgo(96), progress: 1 },
-  { badgeId: 'b-rising-author', userId: currentUser.id, earnedAt: daysAgo(42), progress: 1 },
-  { badgeId: 'b-nightowl', userId: currentUser.id, earnedAt: daysAgo(9), progress: 1 },
-  { badgeId: 'b-popular-writer', userId: currentUser.id, earnedAt: null, progress: 0.64 },
-  { badgeId: 'b-club-regular', userId: currentUser.id, earnedAt: null, progress: 0.4 },
-  { badgeId: 'b-marathon', userId: currentUser.id, earnedAt: null, progress: 0.57 },
-  { badgeId: 'b-challenge-win', userId: currentUser.id, earnedAt: null, progress: 0.2 },
-  { badgeId: 'b-critic', userId: currentUser.id, earnedAt: null, progress: 0.72 },
-]
 
 export { NOW, daysAgo }

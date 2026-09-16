@@ -28,6 +28,7 @@
 import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
+import { evaluateBadges } from "./gamification.js";
 import { findVisibleStoryId, toIso } from "./stories.js";
 
 /**
@@ -409,6 +410,11 @@ export async function createComment(
   const [comment] = await hydrateComments([row as CommentRow], true);
   if (!comment) throw HttpError.notFound(COMMENT_NOT_FOUND);
 
+  // Comments posted is a badge metric. Here rather than in the route so the
+  // next caller of this function cannot forget it, and unawaited because a
+  // badge is never worth making somebody wait to see their own comment.
+  evaluateBadges(userId);
+
   return comment;
 }
 
@@ -591,6 +597,10 @@ export async function upsertRating(
 
     await recomputeStoryRating(tx, storyId);
   });
+
+  // Ratings given is a badge metric -- and so is the *author's* view count,
+  // which a rating does not move, so only the rater is re-evaluated.
+  evaluateBadges(userId);
 
   return getRatings(storyId, userId);
 }

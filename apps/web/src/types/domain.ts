@@ -116,29 +116,12 @@ export interface Rating {
 }
 
 
-/* gamification -------------------------------------------------------- */
-
-export type BadgeTier = 'bronze' | 'silver' | 'gold'
-
-export interface Badge {
-  id: string
-  name: string
-  description: string
-  /** Icon key resolved by the `Icon` component. */
-  icon: string
-  tier: BadgeTier
-  /** How the badge is earned, shown on locked badges. */
-  criteria: string
-  category: 'reading' | 'writing' | 'community'
-}
-
-export interface UserBadge {
-  badgeId: string
-  userId: string
-  earnedAt: string | null
-  /** 0–1 toward earning it; 1 once earned. */
-  progress: number
-}
+/* gamification --------------------------------------------------------
+ *
+ * Gone to `types/gamification.ts`, which mirrors the API the way
+ * `types/stories.ts` does. A badge has a `code` rather than an `id` there, and
+ * no stored `progress` -- the server computes it from the metric.
+ */
 
 /* view models --------------------------------------------------------- */
 

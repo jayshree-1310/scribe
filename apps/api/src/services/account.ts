@@ -14,6 +14,7 @@ import { HttpError } from "../lib/http-error.js";
 import { sniffImage } from "../lib/image.js";
 import { revokeAllSessions } from "../lib/sessions.js";
 import { storage } from "../lib/storage.js";
+import { flushBadges } from "./gamification.js";
 
 /** The profile shape the account endpoints return. Written out field by field
  * rather than spread from the row, so adding a column — `passwordHash` being
@@ -363,6 +364,18 @@ export async function deleteAccount(
   }
 
   const avatarUrl = (await loadProfile(userId)).avatarUrl;
+
+  /**
+   * Settle any badge evaluation still in flight before the transaction opens.
+   *
+   * `evaluateBadges` is fire-and-forget, so a comment posted a moment ago can
+   * still be about to insert a `gamification.UserBadge` row. Landing between
+   * the sweep of that table below and the `auth.User` delete at the end, it
+   * breaches `userBadge_userId_fkey` and fails the whole deletion -- a 500 on
+   * the one request that must not need retrying. Draining first is enough:
+   * nothing issues a new evaluation for an account that is being deleted.
+   */
+  await flushBadges();
 
   await db.transaction(async (tx) => {
     const stories = await tx.orm.content.Story.select("id")

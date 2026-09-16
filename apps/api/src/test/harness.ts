@@ -13,6 +13,8 @@ import type { Server } from "node:http";
 import app from "../app.js";
 import { db } from "../prisma/db.js";
 import { deleteAll } from "../prisma/delete-all.js";
+import { flushAnalytics } from "../services/analytics.js";
+import { flushBadges } from "../services/gamification.js";
 import { DEV_USER_HEADER } from "../middleware/current-user.js";
 import { slugify } from "../lib/slug.js";
 
@@ -626,7 +628,8 @@ export class TestApi {
                           'YYYY-MM-DD'),
                   now())
           ON CONFLICT ("chapterId", "visitorKey", "day") DO NOTHING
-        `.affectedCount().build()
+          RETURNING "id"
+        `.returnsRow({ id: "pg/text@1" }).build()
       : db.raw.sql`
           INSERT INTO "engagement"."storyView"
             ("id", "storyId", "userId", "visitorKey", "day", "createdAt")
@@ -636,12 +639,15 @@ export class TestApi {
                           'YYYY-MM-DD'),
                   now())
           ON CONFLICT ("storyId", "visitorKey", "day") DO NOTHING
-        `.affectedCount().build();
+          RETURNING "id"
+        `.returnsRow({ id: "pg/text@1" }).build();
 
-    // `.affectedCount()` answers with the statement's own row statistics, so
-    // "did the unique key swallow it?" is readable without a second query.
-    const [stats] = await db.runtime().query(plan);
-    return (stats?.affectedRows ?? 0) > 0;
+    // `ON CONFLICT DO NOTHING` returns a row for an insert and none for a
+    // conflict, so "did the unique key swallow it?" is readable without a
+    // second query. `.affectedCount()` looks like it would answer the same
+    // thing and does not -- it comes back empty for this statement.
+    const [row] = await db.runtime().query(plan);
+    return row !== undefined;
   }
 
   /** How many view events a story carries, for asserting what a read did. */
@@ -716,9 +722,50 @@ export class TestApi {
     };
   }
 
+  /* Badges ---------------------------------------------------------------- */
+
+  /**
+   * The badge codes a fixture account holds.
+   *
+   * Read straight from the table rather than through `GET /api/badges`,
+   * because that endpoint evaluates before it answers -- a suite asserting
+   * what an *event* awarded has to be able to look without awarding.
+   */
+  async readBadges(userId: string): Promise<string[]> {
+    const rows = await db.orm.gamification.UserBadge.select("code")
+      .where((row) => row.userId.eq(userId))
+      .all();
+
+    return rows.map((row) => row.code).sort();
+  }
+
+  /** The stored reader and author levels, for asserting a derivation. */
+  async readLevels(
+    userId: string,
+  ): Promise<{ reader: number; author: number }> {
+    const user = await db.orm.auth.User.select("readerLevel", "authorLevel")
+      .where((row) => row.id.eq(userId))
+      .first();
+
+    if (!user) throw new Error(`no such fixture user: ${userId}`);
+
+    return { reader: user.readerLevel, author: user.authorLevel };
+  }
+
   /* Teardown -------------------------------------------------------------- */
 
   private async cleanup(): Promise<void> {
+    /**
+     * Fire-and-forget writes first, because they outlive the request that
+     * issued them. A `PUT /api/reading/progress` returns before its badge
+     * evaluation has inserted, and an insert landing *between* the badge sweep
+     * below and the user delete at the end breaches
+     * `userBadge_userId_fkey` -- a teardown failure with nothing in the test
+     * body to explain it. The same is true of an analytics event and
+     * `storyView_userId_fkey`.
+     */
+    await Promise.all([flushBadges(), flushAnalytics()]);
+
     /**
      * Rows a suite created *through the API* -- an authored story, its
      * chapters, an attachment -- carry no fixture id, so tracking alone would
@@ -878,6 +925,9 @@ export class TestApi {
       );
       await deleteAll(() =>
         db.orm.engagement.ChapterRead.where((row) => row.userId.eq(userId)),
+      );
+      await deleteAll(() =>
+        db.orm.gamification.UserBadge.where((row) => row.userId.eq(userId)),
       );
     }
 

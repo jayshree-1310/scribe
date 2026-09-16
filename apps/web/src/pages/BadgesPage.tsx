@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAsync } from '../hooks/useAsync'
-import * as api from '../data/api'
-import type { Badge } from '../types/domain'
+import { useAuth } from '../lib/auth'
+import { useToast } from '../lib/toast'
+import { getBadges, newlyEarnedSince } from '../data/gamification-api'
+import type { BadgeCategory, LevelProgress } from '../types/gamification'
 import { AppShell } from '../components/layout/AppShell'
 import { SectionHead, StatTile } from '../components/ui/Card'
 import { ProgressBar } from '../components/ui/Progress'
@@ -11,7 +13,7 @@ import { EmptyState, ErrorState } from '../components/ui/States'
 import { BadgeTile } from '../components/story/Cards'
 import './pages.css'
 
-type Filter = 'all' | Badge['category']
+type Filter = 'all' | BadgeCategory
 
 const TABS = [
   { id: 'all' as const, label: 'All' },
@@ -20,18 +22,65 @@ const TABS = [
   { id: 'community' as const, label: 'Community' },
 ]
 
+/** One level meter: where the reader is, and what the next step costs. */
+function LevelMeter({
+  title,
+  level,
+  unit,
+}: {
+  title: string
+  level: LevelProgress
+  unit: string
+}) {
+  return (
+    <div className="badges__overall">
+      <div className="badges__overall-head">
+        <span>{title}</span>
+        <strong>Level {level.level}</strong>
+      </div>
+      <ProgressBar value={level.progress} size="md" label={`${title} progress`} />
+      <p className="badges__overall-foot">
+        {level.next === null
+          ? `${level.value.toLocaleString()} ${unit} — top level`
+          : `${level.value.toLocaleString()} of ${level.next.toLocaleString()} ${unit} to level ${level.level + 1}`}
+      </p>
+    </div>
+  )
+}
+
 export function BadgesPage() {
-  const badges = useAsync(() => api.getBadges(), [])
+  const { session } = useAuth()
+  const { showToast } = useToast()
+  const collection = useAsync(() => getBadges(), [])
   const [filter, setFilter] = useState<Filter>('all')
 
-  const all = badges.data ?? []
+  const all = collection.data?.badges ?? []
   const earned = all.filter((entry) => entry.earned)
+
+  /**
+   * Announce anything earned since this browser last showed the reader their
+   * badges — which is where a badge awarded while they were elsewhere finally
+   * surfaces. See `newlyEarnedSince`; a notification system replaces it.
+   */
+  const userId = session?.user.id ?? null
+  useEffect(() => {
+    if (!userId || collection.status !== 'ready') return
+
+    for (const badge of newlyEarnedSince(userId, earned)) {
+      showToast({ message: `Badge earned: ${badge.name}`, tone: 'success' })
+    }
+    // `earned` is derived from the loaded data, so the status change is what
+    // says there is something new to compare.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, collection.status])
+
   const shown =
     filter === 'all' ? all : all.filter((entry) => entry.badge.category === filter)
 
   const earnedShown = shown.filter((entry) => entry.earned)
   const lockedShown = shown.filter((entry) => !entry.earned)
   const completion = all.length === 0 ? 0 : earned.length / all.length
+  const levels = collection.data?.levels
 
   return (
     <AppShell>
@@ -60,14 +109,26 @@ export function BadgesPage() {
         <StatTile label="Completion" value={`${Math.round(completion * 100)}%`} icon="target" />
       </div>
 
-      <div className="badges__overall">
-        <div className="badges__overall-head">
-          <span>Collection progress</span>
-          <strong>
-            {earned.length}/{all.length}
-          </strong>
+      <div className="badges__meters">
+        <div className="badges__overall">
+          <div className="badges__overall-head">
+            <span>Collection progress</span>
+            <strong>
+              {earned.length}/{all.length}
+            </strong>
+          </div>
+          <ProgressBar value={completion} size="md" label="Badge collection progress" />
+          <p className="badges__overall-foot">
+            {all.length - earned.length} still to unlock
+          </p>
         </div>
-        <ProgressBar value={completion} size="md" label="Badge collection progress" />
+
+        {levels ? (
+          <>
+            <LevelMeter title="Reader level" level={levels.reader} unit="chapters read" />
+            <LevelMeter title="Author level" level={levels.author} unit="words written" />
+          </>
+        ) : null}
       </div>
 
       <div className="page-tabs">
@@ -75,9 +136,9 @@ export function BadgesPage() {
       </div>
 
       <TabPanel id={filter}>
-        {badges.status === 'error' ? (
-          <ErrorState message={badges.error} onRetry={badges.reload} />
-        ) : badges.status === 'loading' ? (
+        {collection.status === 'error' ? (
+          <ErrorState message={collection.error} onRetry={collection.reload} />
+        ) : collection.status === 'loading' ? (
           <div className="card-grid card-grid--tight">
             {Array.from({ length: 8 }, (_, index) => (
               <Skeleton key={index} height="12rem" radius="var(--radius-lg)" />
@@ -99,7 +160,7 @@ export function BadgesPage() {
               ) : (
                 <div className="card-grid card-grid--tight">
                   {earnedShown.map((entry) => (
-                    <BadgeTile key={entry.badge.id} entry={entry} />
+                    <BadgeTile key={entry.badge.code} entry={entry} />
                   ))}
                 </div>
               )}
@@ -107,11 +168,19 @@ export function BadgesPage() {
 
             <section className="page-section">
               <SectionHead title="Locked" subtitle={`${lockedShown.length} to go`} />
-              <div className="card-grid card-grid--tight">
-                {lockedShown.map((entry) => (
-                  <BadgeTile key={entry.badge.id} entry={entry} />
-                ))}
-              </div>
+              {lockedShown.length === 0 ? (
+                <EmptyState
+                  size="sm"
+                  icon="check-circle"
+                  title="Every badge in this category is yours"
+                />
+              ) : (
+                <div className="card-grid card-grid--tight">
+                  {lockedShown.map((entry) => (
+                    <BadgeTile key={entry.badge.code} entry={entry} />
+                  ))}
+                </div>
+              )}
             </section>
           </>
         )}

@@ -435,28 +435,37 @@ namespace engagement {
 }
 
 namespace gamification {
-  model Badge {
-    id          String   @id @default(uuid())
-    name        String   @unique
-    description String?
-    imageUrl    String?
-    createdAt   DateTime @default(now())
-
-    users UserBadge[]
-  }
-
+  /// One badge one reader has earned, and when.
+  ///
+  /// There is deliberately no `Badge` table beside this one. The catalogue --
+  /// what each badge is called, which metric earns it and at what threshold --
+  /// is declared in `services/gamification.ts`, because every one of those
+  /// fields is read by code that would have to change anyway: a threshold is
+  /// only meaningful next to the SQL that computes the metric. A table would
+  /// be a second copy of that declaration, synced by something, and wrong
+  /// whenever the sync had not run. The same reasoning
+  /// `challenges.WritingChallenge` gives for having no status column.
+  ///
+  /// So this table records only what the catalogue cannot: the fact of an
+  /// award. `code` is the catalogue key, unenforced by any foreign key --
+  /// retiring a badge therefore leaves its rows behind rather than cascading a
+  /// delete through somebody's history, and the read path simply stops
+  /// mentioning it.
   model UserBadge {
     id       String   @id @default(uuid())
     userId   String
-    badgeId  String
+
+    /// `BadgeDefinition.code` in `services/gamification.ts`.
+    code     String
+
     earnedAt DateTime @default(now())
 
-    user  auth.User
+    user auth.User
       @relation(fields: [userId], references: [id])
-    badge Badge
-      @relation(fields: [badgeId], references: [id])
 
-    @@unique([userId, badgeId])
+    /// What makes awarding idempotent: the engine inserts and lets this
+    /// swallow a re-award, rather than reading first and racing itself.
+    @@unique([userId, code])
   }
 }
 

@@ -1,0 +1,238 @@
+[
+  {
+    "id": "dropTable.userBadge",
+    "label": "Drop table \"userBadge\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "table",
+        "name": "userBadge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"userBadge\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop table \"userBadge\"",
+        "sql": "DROP TABLE \"gamification\".\"userBadge\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"userBadge\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropTable.badge",
+    "label": "Drop table \"badge\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "table",
+        "name": "badge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"badge\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"badge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop table \"badge\"",
+        "sql": "DROP TABLE \"gamification\".\"badge\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"badge\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"badge\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.userBadge",
+    "label": "Create table \"userBadge\"",
+    "summary": "Creates table \"userBadge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "table",
+        "name": "userBadge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"userBadge\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"userBadge\"",
+        "sql": "CREATE TABLE \"gamification\".\"userBadge\" (\n  \"code\" text NOT NULL,\n  \"earnedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"userBadge\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.userBadge.userBadge_userId_code_key",
+    "label": "Add unique constraint on \"userBadge\" (userId, code)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "unique",
+        "name": "userBadge_userId_code_key",
+        "table": "userBadge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"userBadge_userId_code_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "userBadge_userId_code_key",
+          "gamification",
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"userBadge_userId_code_key\"",
+        "sql": "ALTER TABLE \"gamification\".\"userBadge\" ADD CONSTRAINT \"userBadge_userId_code_key\" UNIQUE (\"userId\", \"code\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"userBadge_userId_code_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "userBadge_userId_code_key",
+          "gamification",
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.userBadge.userBadge_userId_idx_a489d58a",
+    "label": "Create index \"userBadge_userId_idx_a489d58a\" on \"userBadge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "index",
+        "name": "userBadge_userId_idx_a489d58a",
+        "table": "userBadge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"userBadge_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"userBadge_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"userBadge_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"userBadge_userId_idx_a489d58a\" ON \"gamification\".\"userBadge\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"userBadge_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"gamification\".\"userBadge_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.userBadge.userBadge_userId_fkey",
+    "label": "Add foreign key \"userBadge_userId_fkey\" on \"userBadge\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "gamification",
+        "objectType": "foreignKey",
+        "name": "userBadge_userId_fkey",
+        "table": "userBadge"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"userBadge_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "userBadge_userId_fkey",
+          "gamification",
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"userBadge_userId_fkey\"",
+        "sql": "ALTER TABLE \"gamification\".\"userBadge\"\nADD CONSTRAINT \"userBadge_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"userBadge_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "userBadge_userId_fkey",
+          "gamification",
+          "\"gamification\".\"userBadge\""
+        ]
+      }
+    ]
+  }
+]

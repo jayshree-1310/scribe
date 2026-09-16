@@ -22,6 +22,7 @@ import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
 import { deleteAll } from "../prisma/delete-all.js";
 import { discardUpload } from "./uploads.js";
+import { evaluateBadges } from "./gamification.js";
 import { getStory, listStories, toIso, type Page, type Story } from "./stories.js";
 
 /**
@@ -593,6 +594,9 @@ export async function publishStory(
     }
   });
 
+  // Stories published, and the author level's words-written figure.
+  evaluateBadges(userId);
+
   return getStory(storyId, userId);
 }
 
@@ -639,6 +643,11 @@ export async function publishChapter(
 
     await touchStory(tx, chapter.storyId, timestamp);
   });
+
+  // Chapters published. Not on `updateChapter`, which is called on every
+  // autosave: words written is re-counted by the next publish either way, and
+  // eleven aggregates per keystroke is not a trade worth making.
+  evaluateBadges(userId);
 
   return loadChapter(chapterId);
 }

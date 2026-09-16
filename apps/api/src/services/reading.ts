@@ -15,6 +15,7 @@
 import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
+import { evaluateBadges } from "./gamification.js";
 import { getStoriesByIds, toIso, type Story } from "./stories.js";
 
 /* Shapes returned to the client ----------------------------------------- */
@@ -274,6 +275,16 @@ export async function recordProgress(
   });
 
   const readingStreak = await recordStreak(userId);
+
+  /**
+   * The reader-side badge metrics all move here: the streak above, and the
+   * chapter and story counts, which come from the `engagement.ChapterRead`
+   * events the reader page records a moment earlier. A save that beats its own
+   * chapter-read event by a few milliseconds simply awards on the next one --
+   * every evaluation recomputes every metric, and this fires on each debounced
+   * save.
+   */
+  evaluateBadges(userId);
 
   return {
     progress: toProgress(saved, chapter.chapterNumber),

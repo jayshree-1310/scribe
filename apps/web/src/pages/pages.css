@@ -679,8 +679,19 @@
 
 /* Badges ------------------------------------------------------------------ */
 
-.badges__overall {
+/*
+ * Collection progress and the two levels, side by side on a wide screen and
+ * stacked on a narrow one. `auto-fit` rather than three fixed columns: the row
+ * has to survive a phone, where three 14rem tracks do not fit.
+ */
+.badges__meters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-4);
   margin-bottom: var(--space-8);
+}
+
+.badges__overall {
   padding: var(--space-5);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -699,6 +710,12 @@
 .badges__overall-head strong {
   color: var(--text);
   font-variant-numeric: tabular-nums;
+}
+
+.badges__overall-foot {
+  margin-top: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
 }
 
 /* Channel detail and posts ------------------------------------------------ */

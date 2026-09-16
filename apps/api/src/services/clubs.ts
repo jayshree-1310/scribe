@@ -22,6 +22,7 @@ import { or } from "@prisma/orm-postgres/orm-client";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
+import { evaluateBadges } from "./gamification.js";
 import { getStoriesByIds, toIso, type Story } from "./stories.js";
 
 /**
@@ -1115,6 +1116,9 @@ export async function createDiscussion(
 
   const [discussion] = await hydrateDiscussions([row as DiscussionRow], true);
   if (!discussion) throw HttpError.notFound(DISCUSSION_NOT_FOUND);
+
+  // Club posts is a badge metric. Unawaited, like every other evaluation call.
+  evaluateBadges(userId);
 
   return discussion;
 }
