@@ -8,8 +8,8 @@
 #
 # Every resource here is on a free plan, which costs nothing and constrains
 # three things: `postgres` is external because Render deletes free databases
-# after 30 days, uploads do not persist because free instances cannot mount a
-# disk, and the API sleeps after 15 minutes idle (~50s cold start).
+# after 30 days, uploads go to an object store because free instances cannot
+# mount a disk, and the API sleeps after 15 minutes idle (~50s cold start).
 #
 # These three services already exist, created by hand (a project's New menu has
 # no Blueprint entry). Names here match the live ones, so applying this adopts
@@ -115,12 +115,38 @@ services:
       # forwarded address can be trusted for rate-limit bucketing.
       - key: TRUST_PROXY
         value: "1"
-      # No disk on a free instance, so this directory is wiped on every deploy
-      # and on each spin-down. Uploaded avatars and video do not survive;
-      # everything else is in Postgres and unaffected. `createStorage` in
-      # lib/storage.ts is where an object-store backend would replace this.
+      # Only a fallback now. A free instance mounts no disk, so this directory
+      # is wiped on every deploy and every spin-down — uploads written here
+      # survive minutes, not days. The S3 block below is what makes them
+      # durable; this stays set so the API still starts if the bucket is
+      # unconfigured.
       - key: UPLOAD_DIR
         value: /var/lib/scribe/uploads
+
+      # --- Uploaded files --------------------------------------------------
+      # Any S3-compatible object store, chosen by `createStorage` in
+      # lib/storage.ts: set S3_BUCKET and uploads go there instead of the disk
+      # above. Cloudflare R2 is the cheapest fit — free tier, and no egress
+      # charges, which is what matters for images on a page.
+      #
+      # S3_PUBLIC_BASE_URL is the *read* origin (an R2 custom domain, or the
+      # bucket's public URL), not the endpoint above: rows store an address the
+      # browser fetches. Setting the bucket without it fails the health check
+      # at boot rather than accepting uploads nothing can read.
+      #
+      # Serve the bucket publicly through its own configuration — an R2 public
+      # bucket or custom domain — rather than per-object ACLs, which R2 does
+      # not implement.
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_PUBLIC_BASE_URL
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
       # The web app is on a different origin now, so avatar URLs the API hands
       # out must be absolute. Set to this service's own URL.
       - key: PUBLIC_UPLOAD_BASE_URL

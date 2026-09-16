@@ -29,10 +29,25 @@ export const ABSOLUTE_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
 /** Concurrent sessions kept per user; the oldest is evicted beyond this. */
 const MAX_SESSIONS_PER_USER = 10;
 
+/**
+ * `SameSite` has to account for the web app and the API being separate origins
+ * in production (a static site and a web service, on different hosts), which
+ * makes every call from the browser cross-site. `lax` withholds the cookie on
+ * cross-site *fetches* — it only rides along on top-level navigations — so
+ * `POST /api/auth/refresh` arrived without one and every session ended at the
+ * access token's fifteen minutes, or at the first reload.
+ *
+ * `none` is what sends it, and browsers only accept that paired with `Secure`,
+ * so the two move together. Development keeps `lax`: it is served over plain
+ * HTTP through Vite's proxy, where the pair would be rejected outright and
+ * nothing is cross-site to begin with.
+ */
+const crossSite = process.env.NODE_ENV === "production";
+
 const refreshCookieOptions = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax" as const,
+  secure: crossSite,
+  sameSite: crossSite ? ("none" as const) : ("lax" as const),
   path: "/api/auth",
 };
 

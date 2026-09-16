@@ -1,18 +1,28 @@
 /**
  * Where uploaded files live.
  *
- * One narrow interface with a local-filesystem implementation, because dev
- * needs uploads to work with no credentials at all. `S3_BUCKET`-style storage
- * plugs in at `createStorage` below without any caller changing: everything
- * outside this module knows only `put`, `remove` and the public URL it gets
- * back.
+ * One narrow interface with two implementations, chosen by `createStorage`
+ * below: the local filesystem when nothing is configured, because dev needs
+ * uploads to work with no credentials at all, and any S3-compatible object
+ * store when `S3_BUCKET` is set. Everything outside this module knows only
+ * `put`, `putStream`, `remove` and the public URL it gets back.
+ *
+ * The local backend is not durable on a host with no persistent disk — a free
+ * Render instance wipes it on every deploy and every spin-down — so a
+ * deployment that accepts uploads wants the object store.
  */
 
+import {
+  DeleteObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { Upload } from "@aws-sdk/lib-storage";
 import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { Readable } from "node:stream";
+import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 
 export interface StoredFile {
@@ -149,4 +159,145 @@ function localStorageBackend(): Storage {
   };
 }
 
-export const storage: Storage = localStorageBackend();
+/* Object storage ------------------------------------------------------- */
+
+/**
+ * Read origin for stored objects, e.g. an R2 custom domain or the bucket's
+ * public URL. Required alongside `S3_BUCKET`: the backend hands rows a URL a
+ * browser can fetch, and a bucket endpoint is for writing, not reading. It is
+ * also what `remove` matches on to recognise its own URLs.
+ */
+const S3_PUBLIC_BASE_URL = (process.env["S3_PUBLIC_BASE_URL"] ?? "").replace(
+  /\/$/,
+  "",
+);
+
+function s3StorageBackend(bucket: string): Storage {
+  if (!S3_PUBLIC_BASE_URL) {
+    throw new Error(
+      "S3_BUCKET is set but S3_PUBLIC_BASE_URL is not. Uploads would be " +
+        "stored with no address a browser could read them from.",
+    );
+  }
+
+  const endpoint = process.env["S3_ENDPOINT"];
+
+  const client = new S3Client({
+    // R2 and most S3-compatible stores ignore the region but require one to be
+    // present; `auto` is what Cloudflare documents. AWS proper needs the real
+    // region, so it stays overridable.
+    region: process.env["S3_REGION"] ?? "auto",
+    ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
+    credentials: {
+      accessKeyId: process.env["S3_ACCESS_KEY_ID"] ?? "",
+      secretAccessKey: process.env["S3_SECRET_ACCESS_KEY"] ?? "",
+    },
+  });
+
+  /** Same shape the local backend uses, so URLs read alike across backends. */
+  function newKey(prefix: string, extension: string): string {
+    return `${prefix}/${randomUUID()}${extension}`;
+  }
+
+  function urlFor(key: string): string {
+    return `${S3_PUBLIC_BASE_URL}/${key}`;
+  }
+
+  /**
+   * Objects are served publicly through bucket configuration — an R2 public
+   * bucket or custom domain, an S3 bucket policy — rather than a per-object
+   * ACL, because R2 does not implement ACLs and rejects the header outright.
+   */
+  return {
+    async put({ prefix, data, extension, contentType }) {
+      const key = newKey(prefix, extension);
+
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: data,
+          ContentType: contentType,
+        }),
+      );
+
+      return { key, url: urlFor(key) };
+    },
+
+    async putStream({ prefix, data, extension, contentType }) {
+      const key = newKey(prefix, extension);
+      let bytes = 0;
+
+      // Counted in the pipeline for the same reason the local backend does it:
+      // a `data` listener would start the flow before the consumer is attached.
+      async function* counting(source: AsyncIterable<Buffer>) {
+        for await (const chunk of source) {
+          bytes += chunk.length;
+          yield chunk;
+        }
+      }
+
+      // `Upload` switches to multipart on its own once the body outgrows one
+      // part, which is what makes a video upload work without knowing its
+      // length in advance.
+      const upload = new Upload({
+        client,
+        params: {
+          Bucket: bucket,
+          Key: key,
+          Body: Readable.from(counting(data)),
+          ContentType: contentType,
+        },
+      });
+
+      try {
+        await upload.done();
+      } catch (error) {
+        // Mirrors the local backend's contract: a caller that aborts the
+        // stream to enforce a size cap must not leave an object behind.
+        // `abort` clears an in-flight multipart; the delete covers the case
+        // where a single-part write had already landed.
+        await upload.abort().catch(() => {});
+        await client
+          .send(new DeleteObjectCommand({ Bucket: bucket, Key: key }))
+          .catch(() => {});
+
+        throw error;
+      }
+
+      return { key, bytes, url: urlFor(key) };
+    },
+
+    async remove(url) {
+      // Anything this backend did not write is ignored rather than failing:
+      // Google avatar URLs sit in the same column, and so do rows written
+      // before the store was switched over.
+      const marker = `${S3_PUBLIC_BASE_URL}/`;
+      if (!url.startsWith(marker)) return;
+
+      const key = url.slice(marker.length);
+      if (key.length === 0) return;
+
+      try {
+        await client.send(
+          new DeleteObjectCommand({ Bucket: bucket, Key: key }),
+        );
+      } catch {
+        // Already gone, or the store is briefly unreachable. Removing a file
+        // is best-effort cleanup; the row no longer points at it either way.
+      }
+    },
+  };
+}
+
+/**
+ * Picks the backend from the environment, so dev and test need no credentials
+ * and a deployment opts in by setting `S3_BUCKET`.
+ */
+export function createStorage(): Storage {
+  const bucket = process.env["S3_BUCKET"];
+
+  return bucket ? s3StorageBackend(bucket) : localStorageBackend();
+}
+
+export const storage: Storage = createStorage();

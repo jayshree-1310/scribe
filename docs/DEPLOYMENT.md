@@ -271,10 +271,53 @@ copy.
 Re-run the dump commands in that README before any future migration so you
 carry current data rather than the September snapshot.
 
+## Uploaded files
+
+`createStorage` in `apps/api/src/lib/storage.ts` picks the backend from the
+environment. Unset, uploads go to `UPLOAD_DIR` on the local filesystem, which
+is what development wants and what the free tier cannot keep: no disk can be
+mounted, so that directory is wiped on every deploy and every spin-down. An
+instance sleeps after 15 minutes idle, so a cover uploaded through Author
+Studio is typically gone within the hour.
+
+Setting `S3_BUCKET` switches every upload — covers, avatars, chapter audio and
+video — to an S3-compatible object store instead. Cloudflare R2 is the cheapest
+fit: 10 GB free, and no egress charges, which is what matters for images on a
+page.
+
+| Variable | Value |
+| --- | --- |
+| `S3_BUCKET` | Bucket name, e.g. `scribe-media` |
+| `S3_ENDPOINT` | `https://<account-id>.r2.cloudflarestorage.com` (omit for AWS) |
+| `S3_PUBLIC_BASE_URL` | The **read** origin: an R2 custom domain, or the bucket's public URL |
+| `S3_ACCESS_KEY_ID` | R2 API token id |
+| `S3_SECRET_ACCESS_KEY` | R2 API token secret |
+| `S3_REGION` | Optional; defaults to `auto`, which is what R2 wants |
+
+`S3_PUBLIC_BASE_URL` is required alongside the bucket and is not the endpoint:
+the endpoint is where the API writes, while rows store an address a browser
+fetches. Setting one without the other throws at startup, so a misconfigured
+deployment fails its health check rather than accepting uploads nothing can
+read.
+
+Make the bucket readable through its own configuration — an R2 public bucket or
+a custom domain, an S3 bucket policy — rather than per-object ACLs, which R2
+does not implement and rejects.
+
+`PUBLIC_UPLOAD_BASE_URL` only applies to the local backend and is ignored once
+a bucket is set, since `S3_PUBLIC_BASE_URL` already gives absolute URLs.
+
+### Rows written before the switch
+
+Switching backends does not rewrite existing rows: a story whose `coverUrl` is
+`/uploads/covers/….png` still points at a file the instance no longer has.
+Re-upload through the app, or patch the row once the file is in the bucket.
+Nothing errors in the meantime — `remove` ignores any URL it did not write, so
+replacing one of these never fails on cleanup, and the same is true of the
+Google profile-picture URLs that share the `avatarUrl` column.
+
 ## What is still missing
 
-Uploads have nowhere durable to live. `createStorage` in
-`apps/api/src/lib/storage.ts` is the seam: the `Storage` interface is already
-narrow (`put`, `putStream`, `remove`), so an object-store backend replaces the
-local-filesystem one without any caller changing. Cloudflare R2 gives 10 GB
-free.
+Nothing blocking. The free tier's remaining constraints are the API's ~50s cold
+start after 15 minutes idle, and Neon deleting an unused free database after
+30 days.
