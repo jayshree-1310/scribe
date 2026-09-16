@@ -160,9 +160,13 @@ export async function interpret(
     feature: "scribble.intent",
     system: intentSystemPrompt(genres, context),
     messages: [{ role: "user", content: message }],
-    // Filters are a few dozen tokens. A cap this low also stops a model that
-    // has decided to write an essay from burning a minute of CPU on it.
-    maxTokens: 200,
+    /**
+     * Filters are a few dozen tokens, but a reasoning model spends its budget
+     * thinking before it writes any of them -- at 200 `gpt-oss-120b` used 196
+     * on reasoning and emitted nothing. The cap is a runaway guard, not a
+     * target, so it can afford the headroom.
+     */
+    maxTokens: 600,
     ...(signal ? { signal } : {}),
   });
 
@@ -453,7 +457,7 @@ function narrationRequest(
         ].join("\n"),
       },
     ],
-    maxTokens: 700,
+    maxTokens: 1500,
     ...(signal ? { signal } : {}),
   };
 }

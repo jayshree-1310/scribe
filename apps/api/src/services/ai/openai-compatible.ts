@@ -121,6 +121,11 @@ function bodyFor(
       ...request.messages,
     ],
     max_tokens: request.maxTokens ?? config.maxTokens,
+    // Omitted unless configured: a server that does not know the parameter
+    // rejects the whole request rather than ignoring it.
+    ...(config.reasoningEffort
+      ? { reasoning_effort: config.reasoningEffort }
+      : {}),
     stream,
     ...(stream ? { stream_options: { include_usage: true } } : {}),
   });

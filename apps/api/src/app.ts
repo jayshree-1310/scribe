@@ -29,6 +29,7 @@ import storiesRouter from "./routes/stories.js";
 import uploadsRouter from "./routes/uploads.js";
 import usersRouter from "./routes/users.js";
 import { UPLOAD_ROOT, UPLOAD_URL_PREFIX } from "./lib/storage.js";
+import { describeAiConfig } from "./services/ai/config.js";
 
 const app = express();
 
@@ -76,6 +77,11 @@ app.get("/health", (_req, res) => {
   res.status(200).json({
     status: "ok",
     service: "scribe-api",
+    // Which provider is selected and whether its credential is present. No
+    // key, no URL; see `describeAiConfig`. Present so a deployment that is
+    // still defaulting to the local provider can be spotted in one request
+    // rather than inferred from a 503 that every AI failure shares.
+    ai: describeAiConfig(),
   });
 });
 

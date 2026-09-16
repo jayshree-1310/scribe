@@ -28,6 +28,8 @@ export interface AiConfig {
   baseUrl: string;
   /** Absent for `ollama`, which needs no credential. */
   apiKey: string | undefined;
+  /** Only sent when set; see `readEffort`. */
+  reasoningEffort: "low" | "medium" | "high" | undefined;
   model: string;
   /** Cheaper/faster model for bulk work: extraction, classification, titles. */
   fastModel: string;
@@ -57,6 +59,20 @@ const DEFAULTS = {
   dailyTokenBudget: 200_000,
 };
 
+/**
+ * How much a reasoning model may think before answering.
+ *
+ * Unset for providers that do not take the parameter -- a server that has
+ * never seen it rejects the whole request. It matters for the models that do:
+ * `gpt-oss-120b` spent 196 of a 200-token budget reasoning and returned an
+ * empty completion, which surfaced as "the assistant's reply could not be
+ * understood". Nothing here wants deliberation; it wants a JSON object.
+ */
+function readEffort(): "low" | "medium" | "high" | undefined {
+  const raw = process.env["AI_REASONING_EFFORT"]?.trim().toLowerCase();
+  return raw === "low" || raw === "medium" || raw === "high" ? raw : undefined;
+}
+
 function readInt(name: string, fallback: number): number {
   const raw = process.env[name];
   if (raw === undefined || raw.trim() === "") return fallback;
@@ -83,6 +99,7 @@ export function loadAiConfig(): AiConfig {
       "",
     ),
     apiKey: process.env["AI_API_KEY"]?.trim() || undefined,
+    reasoningEffort: readEffort(),
     model,
     // Falls back to the main model rather than to a hardcoded name: a
     // single-model setup should not silently call something that is not pulled.
@@ -105,6 +122,38 @@ export function loadAiConfig(): AiConfig {
  * credential the provider requires is missing, which is a 503 we can report
  * without a round trip.
  */
+/**
+ * A description of the AI setup safe to serve publicly, for `/health`.
+ *
+ * Carries no key and no URL -- only which provider is selected, which model,
+ * and whether a required credential is present. That is enough to tell the
+ * three failures apart from outside the box, which otherwise all surface as
+ * the same 503: a deployment still defaulting to `ollama` because
+ * `AI_PROVIDER` was never set, a hosted provider with no key, and a provider
+ * that is configured but unreachable.
+ */
+export function describeAiConfig(config: AiConfig = loadAiConfig()): {
+  provider: AiProviderName;
+  model: string;
+  /** Host only -- enough to see what is being called, without a path or key. */
+  endpoint: string;
+  configured: boolean;
+} {
+  let endpoint: string;
+  try {
+    endpoint = new URL(config.baseUrl).host;
+  } catch {
+    endpoint = "invalid";
+  }
+
+  return {
+    provider: config.provider,
+    model: config.model,
+    endpoint,
+    configured: isAiConfigured(config),
+  };
+}
+
 export function isAiConfigured(config: AiConfig = loadAiConfig()): boolean {
   // Hosted providers need a credential, and a missing one is a 503 we can
   // report without spending a round trip to learn it.

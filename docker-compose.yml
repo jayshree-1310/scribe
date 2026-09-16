@@ -59,7 +59,13 @@ services:
       # Inside the network the model server answers on its service name. Left
       # to `apps/api/.env` this would point at the container's own localhost,
       # where nothing is listening.
-      AI_BASE_URL: http://ollama:11434
+      # AI_BASE_URL is deliberately NOT set here.
+      #
+      # `dotenv` never overwrites a variable that already exists, so anything
+      # Compose injects silently wins over `apps/api/.env` -- which made
+      # pointing the API at a hosted provider look like it had no effect, and
+      # produced a 404 from Ollama rather than an error naming the cause.
+      # One file owns the AI settings instead; see `apps/api/.env.example`.
       # Uploads go to a volume rather than the bind-mounted source tree: the
       # container writes as root, and files it left in the working tree would
       # then be unwritable by anything running on the host (`pnpm test`).
