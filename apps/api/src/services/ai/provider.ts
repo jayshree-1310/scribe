@@ -14,6 +14,7 @@
 import { HttpError } from "../../lib/http-error.js";
 import { isAiConfigured, loadAiConfig, type AiConfig } from "./config.js";
 import { createOllamaProvider } from "./ollama.js";
+import { createOpenAiCompatibleProvider } from "./openai-compatible.js";
 import type { AiProvider, AiRequest } from "./types.js";
 import { logAiUsage } from "./usage.js";
 
@@ -23,6 +24,8 @@ function build(config: AiConfig): AiProvider {
   switch (config.provider) {
     case "ollama":
       return createOllamaProvider(config);
+    case "openai":
+      return createOpenAiCompatibleProvider(config);
     case "anthropic":
       // Deliberately absent. The local provider is the one this project can
       // run for free, and an abstraction over two implementations written

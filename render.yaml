@@ -63,6 +63,39 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      # --- Scribble ---------------------------------------------------
+      # There is no model server here. Ollama is the local default and needs
+      # gigabytes of RAM plus a disk to keep weights on; a free instance has
+      # neither, so the deployed API answered every AI request with the "model
+      # server not reachable" 503 until these were set.
+      #
+      # `openai` means any host speaking the OpenAI chat-completions format,
+      # chosen by AI_BASE_URL rather than by vendor. Groq's free tier is the
+      # cheapest way in and needs an account but no card:
+      #
+      #   AI_BASE_URL  https://api.groq.com/openai/v1
+      #   AI_MODEL     llama-3.3-70b-versatile
+      #
+      # OpenRouter's free models work the same way:
+      #
+      #   AI_BASE_URL  https://openrouter.ai/api/v1
+      #   AI_MODEL     meta-llama/llama-3.3-70b-instruct:free
+      #
+      # Leave AI_API_KEY unset and every AI route answers 503 and says so;
+      # nothing else in the app is affected.
+      - key: AI_PROVIDER
+        value: openai
+      - key: AI_BASE_URL
+        sync: false
+      - key: AI_MODEL
+        sync: false
+      - key: AI_API_KEY
+        sync: false
+      # Hosted inference is far quicker than a local CPU, so the local
+      # two-minute default would only ever hide a hung request.
+      - key: AI_TIMEOUT_MS
+        value: "45000"
+
       - key: JWT_ACCESS_EXPIRES_IN
         value: 15m
       - key: JWT_REFRESH_EXPIRES_IN

@@ -12,7 +12,13 @@
  * scope.
  */
 
-export const AI_PROVIDERS = ["ollama", "anthropic"] as const;
+/**
+ * `openai` means "anything speaking the OpenAI chat-completions wire format" —
+ * Groq, OpenRouter, Together, vLLM — selected by `AI_BASE_URL`, not by vendor.
+ * It is the only one that can serve a deployment with no model server of its
+ * own; see `openai-compatible.ts`.
+ */
+export const AI_PROVIDERS = ["ollama", "openai", "anthropic"] as const;
 
 export type AiProviderName = (typeof AI_PROVIDERS)[number];
 
@@ -100,7 +106,11 @@ export function loadAiConfig(): AiConfig {
  * without a round trip.
  */
 export function isAiConfigured(config: AiConfig = loadAiConfig()): boolean {
-  if (config.provider === "anthropic") return config.apiKey !== undefined;
+  // Hosted providers need a credential, and a missing one is a 503 we can
+  // report without spending a round trip to learn it.
+  if (config.provider === "anthropic" || config.provider === "openai") {
+    return config.apiKey !== undefined && config.baseUrl.length > 0;
+  }
   // Self-hosted: no credential, and the base URL always has a default.
   return config.baseUrl.length > 0;
 }
