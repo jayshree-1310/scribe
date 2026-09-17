@@ -15,6 +15,7 @@ import { db } from "../prisma/db.js";
 import { deleteAll } from "../prisma/delete-all.js";
 import { flushAnalytics } from "../services/analytics.js";
 import { flushBadges } from "../services/gamification.js";
+import { flushNotifications } from "../services/notifications.js";
 import { DEV_USER_HEADER } from "../middleware/current-user.js";
 import { slugify } from "../lib/slug.js";
 
@@ -762,9 +763,13 @@ export class TestApi {
      * below and the user delete at the end breaches
      * `userBadge_userId_fkey` -- a teardown failure with nothing in the test
      * body to explain it. The same is true of an analytics event and
-     * `storyView_userId_fkey`.
+     * `storyView_userId_fkey`, and of a notification fan-out and
+     * `notification_userId_fkey`.
      */
     await Promise.all([flushBadges(), flushAnalytics()]);
+    // After the badges, never alongside: an award issues a notification as it
+    // lands. See `flushNotifications`.
+    await flushNotifications();
 
     /**
      * Rows a suite created *through the API* -- an authored story, its
@@ -928,6 +933,21 @@ export class TestApi {
       );
       await deleteAll(() =>
         db.orm.gamification.UserBadge.where((row) => row.userId.eq(userId)),
+      );
+      /**
+       * Both sides of the notification table: the rows addressed to this
+       * fixture and the rows its actions put in somebody else's list. Only the
+       * first is obvious, and it is the second -- a reply notifying a seeded
+       * user, say -- that breaches `notification_actorId_fkey` at the user
+       * delete below.
+       */
+      await deleteAll(() =>
+        db.orm.notifications.Notification.where((row) => row.userId.eq(userId)),
+      );
+      await deleteAll(() =>
+        db.orm.notifications.Notification.where((row) =>
+          row.actorId.eq(userId),
+        ),
       );
     }
 

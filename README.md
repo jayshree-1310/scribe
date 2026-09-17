@@ -777,6 +777,34 @@ function of one metric against a ladder — a reader ladder and an author one �
 recomputed from scratch on every evaluation rather than stored, so nothing can
 be left stale.
 
+### Notifications — `routes/notifications.ts`
+
+```text
+GET  /api/notifications                # paginated, newest first, + unread count
+GET  /api/notifications?unread=true    # narrows the list; the count stays whole
+POST /api/notifications/:id/read       # answers the new unread count
+POST /api/notifications/read-all
+```
+
+Five things are announced: a new post in a channel you subscribe to, a reply to
+your comment or club thread, a new thread in a club you belong to, a story newly
+listed by an author you follow, and a badge you earned. Services call a single
+`notify()` in `services/notifications.ts` after the write they are reporting;
+routes never insert a notification themselves.
+
+Fan-out is one `INSERT ... SELECT` per event whose `SELECT` *is* the audience,
+so a channel with ten thousand subscribers is one statement and no array in the
+API's memory — and the actor is excluded by the same `WHERE`, which is what
+makes "never notify somebody about their own action" a property of the query
+rather than a filter somebody has to remember. Like analytics events and badge
+awards, it is fire-and-forget: `notify()` returns `void` so no handler can wait
+on it, and a failed fan-out can never fail the write it followed.
+
+The bell polls on an interval for now. Everything that knows that is `subscribe`
+in `apps/web/src/hooks/useNotifications.ts`, which takes a callback and returns
+a teardown — the contract an `EventSource` or a websocket already has — so
+moving to push is rewriting that one function.
+
 ### Scribble (GenAI) — `routes/ai.ts`
 
 ```text
@@ -826,7 +854,7 @@ everyone out and forgets some counters; it loses no content.
 Prisma provides schema management, type-safe queries and migrations. The schema
 lives in `apps/api/src/prisma/contract.prisma`, organised into namespaces
 (`auth`, `content`, `engagement`, `gamification`, `challenges`, `clubs`,
-`channels`, `library`); generated types land in
+`channels`, `library`, `notifications`); generated types land in
 `src/prisma/contract.d.ts` via `pnpm --filter api contract:emit`, and every
 schema change is accompanied by a checked-in migration under
 `apps/api/migrations/app/`.
@@ -847,11 +875,11 @@ docker compose exec api pnpm --filter api test
 docker compose exec api pnpm --filter api test routes/authoring
 ```
 
-Covered today, across 23 suites: auth (incl. Google and the password/email
+Covered today, across 24 suites: auth (incl. Google and the password/email
 flows), account, books, library, stories, authoring, uploads, storage, reading
 progress, clubs, channels, comments + ratings, public profiles + follows,
-writing challenges, author analytics and badges, plus Scribble, the AI provider
-seam and its streaming JSON scanner.
+writing challenges, author analytics, badges and notifications, plus Scribble,
+the AI provider seam and its streaming JSON scanner.
 
 No test calls a real model provider — a fake one lives in
 `services/ai/testing.ts` — and none writes to a real object store: the Vitest

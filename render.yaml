@@ -54,6 +54,24 @@ services:
       # connection string (it already carries `?sslmode=require`).
       - key: DATABASE_URL
         sync: false
+      # The same database on its DIRECT endpoint (drop `-pooler` from the
+      # hostname above). Only the boot-time migration uses it; the app keeps
+      # running on the pooled URL.
+      #
+      # It cannot share DATABASE_URL: that one is PgBouncer in transaction
+      # mode, which breaks the DDL a migration performs. The container refuses
+      # to start rather than attempt DDL through the pooler, so this must be
+      # set — see `scripts/migrate-on-boot.mjs` and docs/DEPLOYMENT.md.
+      - key: MIGRATE_DATABASE_URL
+        sync: false
+      # Migrations run on boot by default. A migration that drops or destroys
+      # schema is refused unless MIGRATE_ALLOW_DESTRUCTIVE is set to "true" for
+      # that one deploy: `prisma db migrate` has no confirmation prompt of its
+      # own, and an unattended instance should not drop a table because a
+      # planner decided to. Set it, deploy, then unset it.
+      #
+      # MIGRATE_ON_BOOT=false disables the whole step if a release ever needs
+      # to start against a database somebody else is migrating.
       - key: REDIS_URL
         fromService:
           type: keyvalue

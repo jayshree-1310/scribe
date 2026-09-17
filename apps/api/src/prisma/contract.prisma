@@ -36,6 +36,30 @@ enum ReadingStatus {
   FINISHED
 }
 
+/// What happened, and therefore how a notification reads and where it links.
+///
+/// A closed set the database enforces, unlike `gamification.UserBadge.code`,
+/// which is a deliberately unconstrained key into a catalogue that grows. The
+/// difference is who owns the list: a badge is one row in an array anybody can
+/// extend, while each of these five names a fan-out query in
+/// `services/notifications.ts` that knows the audience for it. A sixth is a
+/// migration *and* a resolver, and requiring both is what keeps the column
+/// from holding a value nothing can render.
+enum NotificationType {
+  @@type("pg/text@1")
+
+  // A new post in a channel the recipient subscribes to.
+  CHANNEL_POST
+  // A reply to a story comment or a club thread the recipient wrote.
+  COMMENT_REPLY
+  // A new thread in a club the recipient belongs to.
+  CLUB_DISCUSSION
+  // A story newly listed by an author the recipient follows.
+  NEW_STORY
+  // A badge the recipient earned. The one type with no actor.
+  BADGE_EARNED
+}
+
 namespace auth {
   model User {
     id        String   @id @default(uuid())
@@ -114,6 +138,10 @@ namespace auth {
     clubDiscussions  clubs.ClubDiscussion[]
     channels         channels.BroadcastChannel[]
     subscriptions    channels.ChannelSubscriber[]
+    /// Notifications addressed to this account.
+    notifications    notifications.Notification[] @relation("NotificationRecipient")
+    /// Notifications this account caused somebody else to receive.
+    notified         notifications.Notification[] @relation("NotificationActor")
   }
 }
 
@@ -712,5 +740,71 @@ namespace library {
     // The shelf tabs read by user, filtered by status, newest first.
     @@index([userId, status, addedAt])
     @@index([storyId])
+  }
+}
+
+namespace notifications {
+  /// One thing that happened, addressed to one person.
+  ///
+  /// Three decisions are written into these columns.
+  ///
+  /// **The actor is a foreign key; the subject is a copy.** `actorId` joins to
+  /// `auth.User` on every read, so a renamed handle or a changed avatar is
+  /// current wherever it appears. `title`, `excerpt` and `href` are captured
+  /// at fan-out time and never refreshed, because the alternative is five
+  /// different joins for five types and a list that breaks the day somebody
+  /// deletes a story. A notification is a record of a moment; reading the
+  /// moment's wording back as it was is right, and reading a stale name for
+  /// the person is not.
+  ///
+  /// **`href` is a path, not an id.** What a notification links to is a
+  /// decision about the web app's routes, and the route is already known at
+  /// the point the row is written. Storing the pieces instead would put a
+  /// second copy of the routing table in the client.
+  ///
+  /// **There is no payload blob.** Every type renders the same three fields,
+  /// which is what makes one dropdown able to draw all five. A `jsonb` column
+  /// would let a type carry something extra and nothing would render it.
+  model Notification {
+    id      String           @id @default(uuid())
+
+    /// Who this is for. Every query starts here.
+    userId  String
+
+    type    NotificationType
+
+    /// Who did it, or null for `BADGE_EARNED` -- the one type nobody else
+    /// caused. Never the recipient: the fan-out excludes the actor in the
+    /// same statement that selects the audience, so no row here says somebody
+    /// did something to themselves.
+    actorId String?
+
+    /// What it happened to: the channel's name, the club's name, the story's
+    /// title, the badge's name.
+    title   String
+
+    /// A line of the thing itself -- the post's title, the reply's body -- cut
+    /// to `EXCERPT_LENGTH` in `services/notifications.ts`. Null where the type
+    /// has no body to quote.
+    excerpt String?
+
+    /// Where clicking it goes, as a web-app path.
+    href    String
+
+    /// Null until read. Null *is* the unread flag rather than a boolean
+    /// beside a timestamp, which would be two answers to one question.
+    readAt    DateTime?
+
+    createdAt DateTime  @default(now())
+
+    user  auth.User
+      @relation("NotificationRecipient", fields: [userId], references: [id])
+    actor auth.User?
+      @relation("NotificationActor", fields: [actorId], references: [id])
+
+    /// The list: one person's notifications, newest first.
+    @@index([userId, createdAt])
+    /// The unread count, and the mark-all-read sweep.
+    @@index([userId, readAt])
   }
 }

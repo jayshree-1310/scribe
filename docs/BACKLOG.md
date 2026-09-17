@@ -64,6 +64,7 @@ Paste this block at the top of any task prompt below.
 | Writing challenges + leaderboard (Task 11) | `services/challenges.ts`, `services/roles.ts` |
 | Author analytics (Task 8) | `services/analytics.ts`, `engagement.StoryView` in `contract.prisma` |
 | Badges & levels (Task 12) | `services/gamification.ts`, `gamification.UserBadge` in `contract.prisma` |
+| Notifications (Task 14) | `services/notifications.ts`, `notifications.Notification` in `contract.prisma` |
 
 ### What is left
 
@@ -72,10 +73,9 @@ is the order to do them in, and the reason for each position.
 
 | # | Task | Why here |
 |---|---|---|
-| 1 | **14** — notifications | All four dependencies — 3, 9, 10, 13 — have landed, so every event it fans out from is real, and 12 has now landed too: "a badge earned" is one of its five notification types, and the browser-local `newlyEarnedSince` in `data/gamification-api.ts` is the placeholder it replaces. |
-| 2 | **15** — moderation & reporting | The role it needs a moderator to be is now `auth.User.isAdmin`, landed with 11 and read only in `services/roles.ts`. The content to moderate is all there: 3's comments join 9's discussions and 10's posts. |
-| 3 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed), ratings (landed with 3) and follows (landed with 13). Late because a recommender is worth building once there is signal to rank on. |
-| 4 | **17** — retire the mock layer | Last by definition. |
+| 1 | **15** — moderation & reporting | The role it needs a moderator to be is now `auth.User.isAdmin`, landed with 11 and read only in `services/roles.ts`. The content to moderate is all there: 3's comments join 9's discussions and 10's posts — and 14 has now added a fourth read path over the same text, since a notification freezes an excerpt of whatever it announced. |
+| 2 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed), ratings (landed with 3) and follows (landed with 13). Late because a recommender is worth building once there is signal to rank on. |
+| 3 | **17** — retire the mock layer | Last by definition. |
 
 ### One shared shape, settled
 
@@ -100,39 +100,6 @@ than inventing a third. Concretely, as `services/clubs.ts`,
 Three independent implementations is still the outcome worth avoiding — 15 would
 then have three different read paths to audit for hidden content, and that is
 exactly where a moderation bug hides.
-
----
-
-## Task 14 — Notifications
-
-Depends on Tasks 3, 9, 10, 13 — **all four have landed**, so every event it
-fans out from is real: a new club discussion, a new channel post, a new story
-comment, and now "a new story by an author you follow", which
-`engagement.Follow` is what makes addressable. `clubs.ClubDiscussion.parentId`
-and `engagement.Comment.parentId` are what make "a reply to your comment"
-expressible for club threads and for story comments respectively.
-
-**Prompt:**
-
-> There is no notification system. Add one, driven by events that already exist
-> or are being added: a new post in a channel you subscribe to, a reply to your
-> comment, activity in a club you belong to, a new story by an author you follow,
-> a badge earned.
->
-> Add a `Notification` model (recipient, type, payload, readAt, createdAt) plus a
-> migration, and a single `notify()` in `services/notifications.ts` that the
-> other services call — do not scatter inserts across routes. Fan-out to
-> subscribers must not block the originating request and must not fail it.
->
-> API: `GET /api/notifications` (paginated, unread count), `POST
-> /api/notifications/:id/read`, `POST /api/notifications/read-all`.
->
-> FE: a bell with an unread badge in `components/layout/TopBar.tsx` and a
-> dropdown list using the existing `DropdownMenu`. Poll on an interval for now
-> and leave a clearly marked seam for websockets/SSE later.
->
-> Tests: fan-out to the right recipients only, no self-notification for your own
-> actions, unread count accuracy after partial reads.
 
 ---
 
@@ -164,7 +131,11 @@ decision, because the role itself landed with 11 as `auth.User.isAdmin`.
 > migrate.
 >
 > Soft-hide rather than hard-delete content so a wrong call is reversible; hidden
-> content must disappear from every public read path — audit them all.
+> content must disappear from every public read path — audit them all. That now
+> includes `notifications.Notification.excerpt`, which is a *copy* of the text
+> taken at fan-out time and so cannot be hidden by hiding the row it came from:
+> decide whether a hidden comment's notification is swept, blanked or left
+> alone, and say which.
 >
 > FE: a report action in the comment/discussion/post overflow menus with a reason
 > dialog. A moderator UI is out of scope for this task unless the API work lands
@@ -354,16 +325,72 @@ folding into whichever task next touches that surface.
   `.people-list` drops to one column and a long display name has to clamp
   rather than push the "Following" badge off the row.
 
+### Notifications (Task 14)
+
+- **The bell polls, so a notification is up to a minute late.** Deliberate, and
+  the whole of what makes it a poll is `subscribe` in
+  `hooks/useNotifications.ts` — handed a callback, returns a teardown, which is
+  the contract an `EventSource` or a websocket already has. Replacing the
+  transport is rewriting that function; the reconciling around it already
+  assumes rows can arrive at any moment. What has not been proved is the
+  reconnect behaviour a push transport needs and a poll does not have.
+- **There is no notifications *page*.** The dropdown holds the newest twelve
+  and there is no "see all", so a reader who ignores the bell for a week loses
+  the tail of it. `GET /api/notifications` is already paginated, so this is a
+  route and a list component and no API work at all.
+- **There is no way to turn any of it off.** No per-type preference, no mute:
+  the only lever is leaving the club or unsubscribing from the channel. That is
+  honest at five types and gets worse with each one added, and preferences want
+  the same table Task 16 is adding for genres — which is the argument for doing
+  it there rather than inventing a second settings model here.
+- **A club thread is one row per member, written at post time.** One statement,
+  but a club of ten thousand members is ten thousand rows for every thread, and
+  nothing digests or batches them. The fix when it matters is a fan-out-on-read
+  for large audiences — keeping the event once and joining membership at query
+  time — which is a different table, not a tuning knob on this one.
+- **Somebody who joins after the fact hears nothing.** Fan-out is at write
+  time, so subscribing to a channel today shows none of yesterday's posts.
+  Correct rather than a gap, but it is the property that makes the row count
+  above unavoidable.
+- **The excerpt is frozen and the actor is not.** A renamed channel keeps its
+  old name in notifications already sent, because `title` and `excerpt` are
+  copies taken at fan-out time — a record of the moment, deliberately. The
+  actor is a foreign key and so always current. The consequence Task 15 has to
+  answer for is in its prompt: hiding a comment does not hide the copy of it
+  sitting in somebody's bell.
+- **`total` and `unreadCount` are two statements, not one snapshot.** A
+  notification landing between them can make a page's arithmetic momentarily
+  inconsistent — nineteen items on a page of twenty, say, with the count
+  claiming twenty-one. Self-correcting on the next read, and closing it means
+  one query computing both.
+- **Nothing prunes the table.** The same note the analytics event tables carry,
+  and for the same reason: a row per recipient per event only ever grows, and
+  there is no retention policy. Read notifications older than some horizon are
+  the obvious first thing to drop, since nothing reads them.
+- **The drain order is load-bearing and only a comment enforces it.** A badge
+  award issues a notification as it lands, so `flushBadges()` must settle
+  before `flushNotifications()` starts — draining the two in parallel loses the
+  badge notification about one time in ten. Every call site awaits them in
+  order and says why, but nothing in the types stops the next one getting it
+  wrong.
+- **Dev identity:** the bell shows whoever `readerHeaders()` names when there
+  is no session, so a dev without one sees the dev user's notifications. The
+  same gap clubs, channels, comments, profiles and challenges have, and it goes
+  with the dev header.
+- **Unseen in a browser:** the dropdown at phone width, where it is pinned to
+  `min(22rem, 100vw - 1.5rem)`; the `9+` badge on the bell; the optimistic
+  mark-read rollback, which has only ever been exercised on the happy path; and
+  a notification whose actor deleted their account, which should keep its text
+  and lose the face beside it.
+
 ### Badges and levels (Task 12)
 
-- **A newly earned badge is announced by the browser, not by the server.**
-  A badge is awarded by whichever event moved its metric, and the reader is
-  somewhere else when that happens. Until Task 14 there is nowhere to deliver
-  that, so `newlyEarnedSince` in `data/gamification-api.ts` keeps the codes it
-  has already shown in `localStorage` and toasts the difference the next time
-  the badges page loads. Per browser, per account: a second device
-  announces the same badge again, and a cleared store swallows one toast. The
-  award itself is never at risk — only the telling.
+- **~~A newly earned badge is announced by the browser, not by the server.~~**
+  Closed by Task 14. The `localStorage` diff in `newlyEarnedSince` and the
+  toast on `/badges` are both gone; the award now writes a `BADGE_EARNED`
+  notification as it lands, which reaches the reader wherever they are and on
+  every device. What is left of the gap is the delay: the bell polls, so the
+  telling is up to a minute late.
 - **`streakDays` is the current streak, not the longest.** Nothing stores a
   longest, so "read 30 days in a row" is only earnable while the run is still
   alive: a reader who managed 40 days last year and evaluates today at 3 does
@@ -392,16 +419,14 @@ folding into whichever task next touches that surface.
   without anybody drawing the line.
 - **Nothing tells a reader their level went up.** The two ladders are visible
   on the badges page and the level number on the profile header, but crossing
-  a step is silent. It is the same gap the badge toast fills and the same
-  place Task 14 closes it.
-- **The toast only fires on `/badges`.** `ProfilePage`'s badges tab reads the
-  same list and does not diff it, so a reader who never opens the badges page
-  is never told. Deliberate — one announcement point is easier to replace than
-  two — but it is the reason the page is the only place a badge "arrives".
+  a step is silent. Task 14 did *not* close this, though it closed the badge
+  half of it: a level is derived on every evaluation rather than awarded, so
+  there is no "it just happened" moment to hang a notification on the way
+  `insertBadge`'s returned row is. Storing the last-announced level on
+  `auth.User` would make one, and that is a migration rather than a rule.
 - **Unseen in a browser:** the three-meter row on `BadgesPage` at phone width,
-  where `.badges__meters` drops to one column; the badges tab on somebody
-  else's profile with nothing earned; and the toast itself, which has never
-  fired outside a fresh `localStorage`.
+  where `.badges__meters` drops to one column; and the badges tab on somebody
+  else's profile with nothing earned.
 
 ### Writing challenges (Task 11)
 

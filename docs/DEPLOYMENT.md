@@ -27,10 +27,15 @@ API sleeps after 15 minutes idle.
 
 ## Current state
 
-The database is done. Neon holds the schema, all 344 rows and the signed
-contract marker; `prisma db verify` returns `ok: true` with both hashes
-matching what the repo emits. There is no pending migration — do not run
-`prisma db migrate`.
+Neon holds the schema, all 344 rows and the signed contract marker.
+
+The database migrates itself on deploy — see [Migrations](#migrations).
+
+An earlier version of this section said there was no pending migration and not
+to run `prisma db migrate`. That was true on 2026-09-15 and stopped being true
+the next day; it is why the badges 500 below went unnoticed for two days. Do
+not restate the database's state here — run `prisma migration status` and let
+it answer.
 
 ## 1. Key Value store
 
@@ -187,6 +192,84 @@ password. Update `DATABASE_URL` on `scribe-new` immediately, then:
 ```bash
 rm backups/neon.url
 ```
+
+## Migrations
+
+**Migrations apply themselves on deploy.** The container runs
+[`apps/api/scripts/migrate-on-boot.mjs`](../apps/api/scripts/migrate-on-boot.mjs)
+before the server, and a release that cannot migrate never becomes healthy —
+so Render keeps the previous one serving instead of putting up an instance that
+500s. Adding a migration is just committing it.
+
+Running it in the container rather than as a Render pre-deploy command is
+forced: that hook is paid-tier only.
+
+Three things make this safe to run on every boot, cold starts included:
+
+- **It is idempotent.** `prisma_contract.contract` holds one row per applied
+  contract state, so a database already at the target reports *"Already up to
+  date — nothing to run"* and issues no DDL. Nothing re-applies.
+- **The target is the contract in the image.** Both the migrations and the
+  contract ship in it, so the destination is by construction what this
+  release's code expects. No `production` ref to remember to advance — that
+  would be the same class of mistake that caused the outage.
+- **Destructive migrations are refused.** `prisma db migrate` has no
+  confirmation prompt of its own, so the script reads each pending migration's
+  `ops.json`, and any `destructive` operation stops the boot with the drops
+  named. Additive migrations, which is nearly all of them, pass straight
+  through.
+
+### Required environment
+
+| Variable | Why |
+| --- | --- |
+| `MIGRATE_DATABASE_URL` | The same database on its **direct** endpoint. `DATABASE_URL` is Neon's pooled host, and PgBouncer in transaction mode breaks migration DDL — see [Pooled vs direct](#pooled-vs-direct-neon-endpoints). The container refuses to start rather than attempt DDL through the pooler. |
+| `MIGRATE_ALLOW_DESTRUCTIVE` | Set to `true` for a single deploy to let a migration that drops something through. Take a backup first, then unset it. |
+| `MIGRATE_ON_BOOT` | `false` disables the step, for a release that must start against a database somebody else is migrating. |
+
+### Asking what is about to run
+
+```bash
+NODE_OPTIONS="--dns-result-order=ipv4first --network-family-autoselection-attempt-timeout=2000" \
+DATABASE_URL="<neon direct url>" pnpm --filter api exec prisma migration status
+```
+
+`migration status` reads the live marker as its origin and reports each
+migration as `applied` or `pending`. `prisma migration log` shows the applied
+history. Neither writes anything.
+
+### Applying by hand
+
+`backups/migrate-neon.sh` does the same thing from a laptop, and additionally
+takes a `pg_dump` first. Use it for the initial catch-up on a database that is
+behind, or when you want the backup. It reads the connection string from
+`backups/neon.url` — one line, the direct host; `backups/` is gitignored — and
+passes it through the environment rather than `--db`, so it reaches neither
+shell history nor the process list. It pins `--to` the contract the deployed
+image carries, since a working tree can be ahead of what is running.
+
+### Badges answered 500 on every request (2026-09-17)
+
+The symptom: `GET /api/users/<name>/badges` and `GET /api/badges` returned
+`internal_error` while `/health` and `/api/stories` were fine — so not CORS,
+not auth, not the instance.
+
+Commit `14cda7f` re-keyed `gamification.userBadge` from a `badgeId` foreign key
+onto a `code` column and dropped the `gamification.badge` catalogue, which now
+lives in `services/gamification.ts`. Its migration never reached Neon, so the
+deployed code selected a column the table did not have. Two migrations were
+pending in all — `20260915T1011` (`engagement.chapterRead`, `engagement.storyView`)
+and `20260916T1041` — because the database had sat at `efd4d8e5` since the
+first deployment.
+
+Fixed by running the migration above. Both dropped tables were empty, as the
+migration's own comment predicts: nothing ever wrote `userBadge` under the old
+schema, since the award engine arrived with the new one.
+
+The ORM runtime does not check the contract marker, so a marker mismatch never
+announces itself — only `prisma db verify` sees it, and only a query against a
+missing column fails. That is the general shape of this bug: the drift is
+silent until one route touches it.
 
 ## Things that bite
 

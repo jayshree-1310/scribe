@@ -59,10 +59,32 @@ COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=prod-deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY apps/api/package.json ./apps/api/package.json
-# Migrations and the Prisma config travel with the image so `prisma db
-# migrate` can be run against a deployed release.
+# Migrations, the contract and the Prisma config travel with the image so the
+# release can migrate its own database at boot -- see
+# apps/api/scripts/migrate-on-boot.mjs. The contract is what names the target,
+# so shipping it beside the migrations is what makes the target always equal
+# what this release's code expects.
 COPY apps/api/prisma.config.ts ./apps/api/prisma.config.ts
 COPY apps/api/migrations ./apps/api/migrations
+COPY apps/api/src/prisma/contract.prisma ./apps/api/src/prisma/contract.prisma
+COPY apps/api/src/prisma/contract.json ./apps/api/src/prisma/contract.json
+COPY apps/api/scripts/migrate-on-boot.mjs ./apps/api/scripts/migrate-on-boot.mjs
+COPY apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoint.sh
+# `COPY` preserves the host's modes, and this repo's files are group-readable
+# only (`-rw-rw----`), so every one of them arrives unreadable by the
+# unprivileged `node` user that runs the container. `dist/` escapes it by being
+# built inside the image; everything copied from the host does not. Normalise
+# the modes rather than the umask on fifteen developer machines.
+#
+# `a+rX` is a capital X on purpose: read for everyone, execute only where it
+# already applies -- directories, which need it to be traversed at all.
+RUN chmod -R a+rX \
+      ./apps/api/migrations \
+      ./apps/api/src \
+      ./apps/api/scripts \
+      ./apps/api/prisma.config.ts \
+      ./apps/api/package.json \
+ && chmod 0755 ./apps/api/docker-entrypoint.sh
 # Uploads are written at runtime by the unprivileged user, and a volume
 # mounted here inherits this ownership — without it the first avatar upload
 # fails on a root-owned directory.
@@ -70,6 +92,8 @@ RUN mkdir -p /var/lib/scribe/uploads && chown -R node:node /var/lib/scribe
 USER node
 WORKDIR /app/apps/api
 EXPOSE 3000
-HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=3 \
+# start-period covers migrations now, not just boot: the container is not
+# unhealthy while it is applying DDL it was told to apply.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=90s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node", "dist/server.js"]
+CMD ["./docker-entrypoint.sh"]

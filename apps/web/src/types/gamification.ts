@@ -61,7 +61,8 @@ export interface BadgeCollection {
   /**
    * Awarded by the evaluation this request ran. Empty whenever an earlier
    * event already awarded them, so it is not on its own a reliable "what is
-   * new" -- see `newlyEarnedSince` in `data/gamification-api.ts`.
+   * new" -- which is why announcing a badge is the notification system's job
+   * and not this field's. Kept because the API sends it.
    */
   newlyEarned: Badge[]
 }

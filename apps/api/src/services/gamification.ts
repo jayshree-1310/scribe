@@ -50,6 +50,7 @@ import { or } from "@prisma/orm-postgres/orm-client";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
 import { logger } from "../lib/logger.js";
+import { notify } from "./notifications.js";
 import { toIso } from "./stories.js";
 
 /* The catalogue ---------------------------------------------------------- */
@@ -574,6 +575,25 @@ async function evaluate(userId: string): Promise<Evaluation> {
 
     earnedAt.set(badge.code, at);
     newlyEarned.push(summarise(badge));
+
+    /**
+     * Told to the reader wherever they are, which is the point: a badge is
+     * awarded by whichever event moved its metric, and they are almost never
+     * looking at the badges page when that happens.
+     *
+     * Inside the loop and keyed on `at !== null`, so exactly one notification
+     * exists per award -- `insertBadge` returns a row only for the insert that
+     * really landed, so two evaluations racing on the same badge produce one
+     * call here rather than two. The name and description travel with the
+     * event because the catalogue is this file's array and not a table; see
+     * `NotificationEvent` for why that is the one event carrying text.
+     */
+    notify({
+      event: "badge-earned",
+      userId,
+      name: badge.name,
+      description: badge.description,
+    });
   }
 
   await writeLevels(userId, levelsFor(metrics));

@@ -7,6 +7,7 @@ import { Button } from '../ui/Button'
 import { DropdownMenu, MenuItem, MenuSeparator } from '../ui/DropdownMenu'
 import { Icon } from '../ui/Icon'
 import { Logo } from './Logo'
+import { NotificationBell } from './NotificationBell'
 import { Tooltip } from '../ui/Tooltip'
 
 interface TopBarProps {
@@ -74,15 +75,7 @@ export function TopBar({ onOpenNav, title }: TopBarProps) {
           />
         </Tooltip>
 
-        <Tooltip placement="bottom" label="Notifications">
-          <Button
-            variant="ghost"
-            iconOnly
-            aria-label="Notifications, 3 unread"
-            startIcon={<Icon name="bell" size="1.15rem" />}
-            className="topbar__bell"
-          />
-        </Tooltip>
+        <NotificationBell enabled={Boolean(user)} />
 
         {user ? (
           <DropdownMenu

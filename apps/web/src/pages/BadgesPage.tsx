@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useAsync } from '../hooks/useAsync'
-import { useAuth } from '../lib/auth'
-import { useToast } from '../lib/toast'
-import { getBadges, newlyEarnedSince } from '../data/gamification-api'
+import { getBadges } from '../data/gamification-api'
 import type { BadgeCategory, LevelProgress } from '../types/gamification'
 import { AppShell } from '../components/layout/AppShell'
 import { SectionHead, StatTile } from '../components/ui/Card'
@@ -48,31 +46,23 @@ function LevelMeter({
   )
 }
 
+/**
+ * The badges page no longer announces anything.
+ *
+ * It used to diff the earned list against what this browser had already shown
+ * and toast the difference, because a badge is awarded by whichever event
+ * moved its metric and the reader is almost never here when that happens. The
+ * server now says so itself, as a `BADGE_EARNED` notification in the bell —
+ * which reaches them wherever they are, on every device, rather than only on
+ * the next visit to this page in this browser. Keeping the toast as well would
+ * announce every badge twice.
+ */
 export function BadgesPage() {
-  const { session } = useAuth()
-  const { showToast } = useToast()
   const collection = useAsync(() => getBadges(), [])
   const [filter, setFilter] = useState<Filter>('all')
 
   const all = collection.data?.badges ?? []
   const earned = all.filter((entry) => entry.earned)
-
-  /**
-   * Announce anything earned since this browser last showed the reader their
-   * badges — which is where a badge awarded while they were elsewhere finally
-   * surfaces. See `newlyEarnedSince`; a notification system replaces it.
-   */
-  const userId = session?.user.id ?? null
-  useEffect(() => {
-    if (!userId || collection.status !== 'ready') return
-
-    for (const badge of newlyEarnedSince(userId, earned)) {
-      showToast({ message: `Badge earned: ${badge.name}`, tone: 'success' })
-    }
-    // `earned` is derived from the loaded data, so the status change is what
-    // says there is something new to compare.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, collection.status])
 
   const shown =
     filter === 'all' ? all : all.filter((entry) => entry.badge.category === filter)

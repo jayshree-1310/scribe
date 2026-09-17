@@ -23,6 +23,7 @@ import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
 import { evaluateBadges } from "./gamification.js";
+import { notify } from "./notifications.js";
 import { getStoriesByIds, toIso, type Story } from "./stories.js";
 
 /**
@@ -1119,6 +1120,11 @@ export async function createDiscussion(
 
   // Club posts is a badge metric. Unawaited, like every other evaluation call.
   evaluateBadges(userId);
+
+  // The club for a new thread, or the person replied to for a reply --
+  // `services/notifications.ts` decides which from the row, so this call does
+  // not have to know that a club's audience and a reply's are different.
+  notify({ event: "club-discussion", actorId: userId, discussionId: discussion.id });
 
   return discussion;
 }

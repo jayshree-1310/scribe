@@ -24,6 +24,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1133.0",
     "@aws-sdk/lib-storage": "^3.1133.0",
+    "@prisma/cli-engine": "0.2.3",
     "@prisma/orm-postgres": "8.0.0-rc.8",
     "argon2": "^0.45.1",
     "cors": "^2.8.6",
@@ -34,17 +35,16 @@
     "jsonwebtoken": "^9.0.3",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
+    "prisma": "8.0.0-rc.10",
     "redis": "^6.2.1",
     "temporal-polyfill": "^1.0.4",
     "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@prisma/cli-engine": "0.2.3",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.13.3",
-    "prisma": "8.0.0-rc.10",
     "tsx": "^4.23.13",
     "typescript": "~6.0.3",
     "vitest": "^4.1.11"

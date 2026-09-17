@@ -23,6 +23,7 @@ import { uniqueSlug } from "../lib/slug.js";
 import { deleteAll } from "../prisma/delete-all.js";
 import { discardUpload } from "./uploads.js";
 import { evaluateBadges } from "./gamification.js";
+import { notify } from "./notifications.js";
 import { getStory, listStories, toIso, type Page, type Story } from "./stories.js";
 
 /**
@@ -569,7 +570,7 @@ export async function publishStory(
 ): Promise<Story> {
   const timestamp = now();
 
-  await db.transaction(async (tx) => {
+  const newlyListed = await db.transaction(async (tx) => {
     const story = await ownedStory(tx, storyId, userId);
 
     const published = await tx.orm.content.Chapter.select("id")
@@ -586,16 +587,28 @@ export async function publishStory(
     // Already listed: keep the original date. Re-publishing after an
     // unpublish is a correction, not a new release, and moving the date would
     // shuffle the story back to the top of "recently published".
-    if (story.listedAt === null || story.listedAt === undefined) {
-      await tx.orm.content.Story.where((row) => row.id.eq(storyId)).update({
-        listedAt: timestamp,
-        updatedAt: timestamp,
-      });
-    }
+    if (story.listedAt !== null && story.listedAt !== undefined) return false;
+
+    await tx.orm.content.Story.where((row) => row.id.eq(storyId)).update({
+      listedAt: timestamp,
+      updatedAt: timestamp,
+    });
+
+    return true;
   });
 
   // Stories published, and the author level's words-written figure.
   evaluateBadges(userId);
+
+  /**
+   * Followers hear about a release, and only about a release. The same
+   * transition `listedAt` records: an author who unlists a story to fix a typo
+   * and lists it again has not written a second story, and telling everybody
+   * twice is how an author learns not to fix the typo.
+   */
+  if (newlyListed) {
+    notify({ event: "story-listed", actorId: userId, storyId });
+  }
 
   return getStory(storyId, userId);
 }

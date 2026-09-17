@@ -60,6 +60,10 @@
       "model": "Multimedia",
       "namespace": "content"
     },
+    "notification": {
+      "model": "Notification",
+      "namespace": "notifications"
+    },
     "rating": {
       "model": "Rating",
       "namespace": "engagement"
@@ -383,6 +387,36 @@
                 "to": {
                   "model": "WritingChallenge",
                   "namespace": "challenges"
+                }
+              },
+              "notifications": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "Notification",
+                  "namespace": "notifications"
+                }
+              },
+              "notified": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "actorId"
+                  ]
+                },
+                "to": {
+                  "model": "Notification",
+                  "namespace": "notifications"
                 }
               },
               "ratings": {
@@ -3170,6 +3204,148 @@
           }
         }
       },
+      "notifications": {
+        "models": {
+          "Notification": {
+            "fields": {
+              "actorId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "excerpt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "href": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "readAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "title": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "type": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "NotificationType",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "actor": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "actorId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              },
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "actorId": {
+                  "column": "actorId"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "excerpt": {
+                  "column": "excerpt"
+                },
+                "href": {
+                  "column": "href"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "readAt": {
+                  "column": "readAt"
+                },
+                "title": {
+                  "column": "title"
+                },
+                "type": {
+                  "column": "type"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "notifications",
+              "table": "notification"
+            }
+          }
+        }
+      },
       "public": {
         "enum": {
           "ClubRole": {
@@ -3220,6 +3396,31 @@
               {
                 "name": "LINK",
                 "value": "LINK"
+              }
+            ]
+          },
+          "NotificationType": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "CHANNEL_POST",
+                "value": "CHANNEL_POST"
+              },
+              {
+                "name": "COMMENT_REPLY",
+                "value": "COMMENT_REPLY"
+              },
+              {
+                "name": "CLUB_DISCUSSION",
+                "value": "CLUB_DISCUSSION"
+              },
+              {
+                "name": "NEW_STORY",
+                "value": "NEW_STORY"
+              },
+              {
+                "name": "BADGE_EARNED",
+                "value": "BADGE_EARNED"
               }
             ]
           },
@@ -5850,6 +6051,156 @@
         "id": "library",
         "kind": "postgres-schema"
       },
+      "notifications": {
+        "entries": {
+          "table": {
+            "notification": {
+              "checks": [
+                {
+                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED')",
+                  "name": "notification_type_check_822839ba",
+                  "prefix": "notification_type_check"
+                }
+              ],
+              "columns": {
+                "actorId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "excerpt": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "href": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "readAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "title": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "type": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "NotificationType",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "userId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "notifications",
+                    "tableName": "notification"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "source": {
+                    "columns": [
+                      "actorId"
+                    ],
+                    "namespaceId": "notifications",
+                    "tableName": "notification"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "actorId"
+                  ],
+                  "name": "notification_actorId_idx_a58f6b4b",
+                  "prefix": "notification_actorId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId",
+                    "createdAt"
+                  ],
+                  "name": "notification_userId_createdAt_idx_f726f04a",
+                  "prefix": "notification_userId_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "notification_userId_idx_a489d58a",
+                  "prefix": "notification_userId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId",
+                    "readAt"
+                  ],
+                  "name": "notification_userId_readAt_idx_8bd92969",
+                  "prefix": "notification_userId_readAt_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
+          }
+        },
+        "id": "notifications",
+        "kind": "postgres-schema"
+      },
       "public": {
         "entries": {
           "table": {},
@@ -5878,6 +6229,16 @@
                 "LINK"
               ]
             },
+            "NotificationType": {
+              "kind": "valueSet",
+              "values": [
+                "CHANNEL_POST",
+                "COMMENT_REPLY",
+                "CLUB_DISCUSSION",
+                "NEW_STORY",
+                "BADGE_EARNED"
+              ]
+            },
             "ReadingStatus": {
               "kind": "valueSet",
               "values": [
@@ -5892,10 +6253,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "f524128153dff34109d41322c22f18344d1294cc5be6da4a0deb68ffca7a2fea"
+    "storageHash": "11d6ef717b2370af5ad1259bedf477b5be0c19fa40b50801150ff67db90b4d5b"
   },
   "execution": {
-    "executionHash": "26001048bff02d2a901fda896d2619ac23edf09be6e9d99cc6fe59c08fa9fc6a",
+    "executionHash": "f57472f93ce08d999f9a5627a1f3da0cf284cfedaf9b3e18e379f602ac4c77b1",
     "mutations": {
       "defaults": [
         {
@@ -6050,6 +6411,17 @@
             "column": "id",
             "namespace": "content",
             "table": "multimedia"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "notifications",
+            "table": "notification"
           }
         },
         {

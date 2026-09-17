@@ -29,6 +29,7 @@ import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
 import { evaluateBadges } from "./gamification.js";
+import { notify } from "./notifications.js";
 import { findVisibleStoryId, toIso } from "./stories.js";
 
 /**
@@ -414,6 +415,14 @@ export async function createComment(
   // next caller of this function cannot forget it, and unawaited because a
   // badge is never worth making somebody wait to see their own comment.
   evaluateBadges(userId);
+
+  /**
+   * Whoever was replied to, if anybody. Fired for every comment rather than
+   * only when `parentId` was supplied: `notifyCommentParent` joins the parent
+   * row, so a top-level comment selects nobody and this stays one rule instead
+   * of the same condition written in two places.
+   */
+  notify({ event: "story-comment", actorId: userId, commentId: comment.id });
 
   return comment;
 }

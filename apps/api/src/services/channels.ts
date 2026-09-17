@@ -16,6 +16,7 @@ import { or } from "@prisma/orm-postgres/orm-client";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
+import { notify } from "./notifications.js";
 import { toIso } from "./stories.js";
 
 /**
@@ -627,6 +628,14 @@ export async function createPost(
 
   const row = await postsBase().where((post) => post.id.eq(postId)).first();
   if (!row) throw HttpError.notFound(POST_NOT_FOUND);
+
+  /**
+   * The point of a channel. Unawaited: a channel with ten thousand
+   * subscribers is one statement, but it is still not something an author
+   * should watch a spinner for -- and a fan-out that failed must not make the
+   * post look like it failed, because it did not.
+   */
+  notify({ event: "channel-post", actorId: userId, postId });
 
   return toPost(row);
 }

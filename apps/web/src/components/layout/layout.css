@@ -312,20 +312,160 @@ a.logo:hover .logo__mark {
   margin-left: auto;
 }
 
-.topbar__bell {
+/* The dot used to be an unconditional `::after` here, which said "you have
+   something" to everybody forever. It is now a count the bell only draws when
+   there is one -- see `NotificationBell`. */
+.topbar__bell-icon {
   position: relative;
+  display: inline-grid;
+  place-items: center;
 }
 
-.topbar__bell::after {
-  content: '';
+.topbar__bell-count {
   position: absolute;
-  top: 0.62rem;
-  right: 0.6rem;
-  width: 0.4rem;
-  height: 0.4rem;
+  /* Pinned to the icon's top-right corner and allowed to grow leftward, so
+     "9+" does not push the bell off centre the way a centred badge would. */
+  top: -0.35rem;
+  right: -0.45rem;
+  min-width: 1rem;
+  padding: 0 0.22rem;
   border-radius: var(--radius-full);
   background-color: var(--brand);
   box-shadow: 0 0 0 2px var(--bg);
+  color: var(--brand-fg);
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1rem;
+  text-align: center;
+}
+
+/* The dropdown sits against the right edge of the viewport on a phone, where
+   a 20rem panel hung off a button near the corner would otherwise overflow. */
+.notifications {
+  width: min(22rem, calc(100vw - var(--space-6)));
+}
+
+.notifications__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-bottom: 1px solid var(--border);
+}
+
+.notifications__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.notifications__clear {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--brand);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.notifications__clear:hover {
+  text-decoration: underline;
+}
+
+.notifications__note {
+  margin: 0;
+  padding: var(--space-4) var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.notifications__list {
+  /* Roughly six rows before it scrolls: enough that the bell is useful on its
+     own, short enough that the panel never runs off the screen. */
+  max-height: 24rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.notification {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.notification:hover {
+  background-color: var(--surface-2);
+}
+
+.notification__face {
+  flex-shrink: 0;
+}
+
+/* Stands in for the avatar on the one type with no actor. */
+.notification__icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  background-color: var(--surface-2);
+  color: var(--brand);
+}
+
+.notification__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  /* Without this a long title refuses to wrap and widens the whole panel. */
+  min-width: 0;
+}
+
+.notification__line {
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+
+.is-unread .notification__line {
+  font-weight: 600;
+}
+
+.notification__excerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+
+.notification__when {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.notification__dot {
+  flex-shrink: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.4rem;
+  border-radius: var(--radius-full);
+  background-color: var(--brand);
 }
 
 .topbar__avatar-btn {

@@ -15,6 +15,7 @@ import { sniffImage } from "../lib/image.js";
 import { revokeAllSessions } from "../lib/sessions.js";
 import { storage } from "../lib/storage.js";
 import { flushBadges } from "./gamification.js";
+import { flushNotifications } from "./notifications.js";
 
 /** The profile shape the account endpoints return. Written out field by field
  * rather than spread from the row, so adding a column — `passwordHash` being
@@ -366,16 +367,29 @@ export async function deleteAccount(
   const avatarUrl = (await loadProfile(userId)).avatarUrl;
 
   /**
-   * Settle any badge evaluation still in flight before the transaction opens.
+   * Settle any badge evaluation or notification fan-out still in flight before
+   * the transaction opens.
    *
-   * `evaluateBadges` is fire-and-forget, so a comment posted a moment ago can
-   * still be about to insert a `gamification.UserBadge` row. Landing between
-   * the sweep of that table below and the `auth.User` delete at the end, it
-   * breaches `userBadge_userId_fkey` and fails the whole deletion -- a 500 on
-   * the one request that must not need retrying. Draining first is enough:
-   * nothing issues a new evaluation for an account that is being deleted.
+   * Both are fire-and-forget, so a comment posted a moment ago can still be
+   * about to insert a `gamification.UserBadge` row or a
+   * `notifications.Notification` one. Landing between the sweep of that table
+   * below and the `auth.User` delete at the end, it breaches
+   * `userBadge_userId_fkey` or `notification_userId_fkey` and fails the whole
+   * deletion -- a 500 on the one request that must not need retrying. Draining
+   * first is enough: nothing issues a new evaluation for an account that is
+   * being deleted.
+   *
+   * The notification case is the wider of the two, because a fan-out writes
+   * rows for *other* people: a reply this account posted a moment ago is about
+   * to name it as the actor in somebody else's list, and that row breaches
+   * `notification_actorId_fkey` instead. The sweep below therefore clears both
+   * columns, and this drain is what stops one arriving after it.
    */
   await flushBadges();
+  // After the badges, never alongside: an award issues a notification as it
+  // lands, so a parallel drain can return before that row exists. See
+  // `flushNotifications`.
+  await flushNotifications();
 
   await db.transaction(async (tx) => {
     const stories = await tx.orm.content.Story.select("id")
@@ -438,6 +452,13 @@ export async function deleteAccount(
     );
     await deleteAll(() =>
       tx.orm.gamification.UserBadge.where((row) => row.userId.eq(userId)),
+    );
+    // Addressed to them, and caused by them. See the drain above.
+    await deleteAll(() =>
+      tx.orm.notifications.Notification.where((row) => row.userId.eq(userId)),
+    );
+    await deleteAll(() =>
+      tx.orm.notifications.Notification.where((row) => row.actorId.eq(userId)),
     );
     await deleteAll(() =>
       tx.orm.clubs.ClubMembership.where((row) => row.userId.eq(userId)),
