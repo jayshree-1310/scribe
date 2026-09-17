@@ -115,6 +115,38 @@ describe("createStorage", () => {
   });
 });
 
+describe("describeStorage", () => {
+  it("reports the local disk when no bucket is configured", async () => {
+    const { describeStorage } = await loadStorage({});
+
+    expect(describeStorage()).toEqual({ backend: "local", publicHost: null });
+  });
+
+  it("reports the object store and where it serves from", async () => {
+    const { describeStorage } = await loadStorage(BUCKET);
+
+    expect(describeStorage()).toEqual({
+      backend: "s3",
+      publicHost: "media.example.com",
+    });
+  });
+
+  it("names no secret", async () => {
+    const { describeStorage } = await loadStorage({
+      ...BUCKET,
+      S3_ACCESS_KEY_ID: "AKIAEXAMPLE",
+      S3_SECRET_ACCESS_KEY: "s3cr3t",
+    });
+
+    const described = JSON.stringify(describeStorage());
+
+    expect(described).not.toContain("AKIAEXAMPLE");
+    expect(described).not.toContain("s3cr3t");
+    // The bucket name is not published in a path-style URL either.
+    expect(described).not.toContain("scribe-media");
+  });
+});
+
 describe("the object store backend", () => {
   it("writes under the prefix and returns a public URL", async () => {
     const { createStorage } = await loadStorage(BUCKET);

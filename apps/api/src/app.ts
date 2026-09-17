@@ -29,7 +29,7 @@ import readingRouter from "./routes/reading.js";
 import storiesRouter from "./routes/stories.js";
 import uploadsRouter from "./routes/uploads.js";
 import usersRouter from "./routes/users.js";
-import { UPLOAD_ROOT, UPLOAD_URL_PREFIX } from "./lib/storage.js";
+import { UPLOAD_ROOT, UPLOAD_URL_PREFIX, describeStorage } from "./lib/storage.js";
 import { describeAiConfig } from "./services/ai/config.js";
 
 const app = express();
@@ -83,6 +83,9 @@ app.get("/health", (_req, res) => {
     // still defaulting to the local provider can be spotted in one request
     // rather than inferred from a 503 that every AI failure shares.
     ai: describeAiConfig(),
+    // Likewise for uploads: an object store and this instance's own disk are
+    // indistinguishable from outside until a file vanishes on the next deploy.
+    storage: describeStorage(),
   });
 });
 

@@ -73,7 +73,10 @@ function transportError(cause: unknown, config: AiConfig): HttpError {
 }
 
 /** Maps a non-2xx response. The provider's own message never reaches a client. */
-async function responseError(response: Response): Promise<HttpError> {
+async function responseError(
+  response: Response,
+  model: string,
+): Promise<HttpError> {
   const detail = await response.text().catch(() => "");
 
   if (response.status === 401 || response.status === 403) {
@@ -91,7 +94,13 @@ async function responseError(response: Response): Promise<HttpError> {
   }
 
   if (response.status === 404) {
-    return HttpError.unavailable("The configured model is not available.");
+    // Names the model on purpose. Providers retire ids, and "not available"
+    // on its own is indistinguishable from a wrong URL or a dead key -- the
+    // reader never sees this text, but whoever is reading a log or a curl
+    // needs the one fact that identifies the fix.
+    return HttpError.unavailable(
+      `The configured model "${model}" is not available from this provider.`,
+    );
   }
 
   const error = HttpError.upstream("The model could not complete that request.");
@@ -154,7 +163,9 @@ export function createOpenAiCompatibleProvider(
       throw transportError(cause, config);
     }
 
-    if (!response.ok) throw await responseError(response);
+    if (!response.ok) {
+      throw await responseError(response, request.model ?? config.model);
+    }
 
     return response;
   }

@@ -301,3 +301,35 @@ export function createStorage(): Storage {
 }
 
 export const storage: Storage = createStorage();
+
+/**
+ * Which backend is live, for `/health`.
+ *
+ * Same purpose as `describeAiConfig`: the difference between a deployment
+ * writing to an object store and one silently still on its own disk is
+ * invisible from outside until a file disappears hours later. A host is all
+ * this reports — no key, no bucket path — and it is a host the API already
+ * publishes in every upload URL it hands out.
+ */
+export function describeStorage(): {
+  backend: "s3" | "local";
+  /** Where uploads are served from; null when URLs are host-relative. */
+  publicHost: string | null;
+} {
+  const base = process.env["S3_BUCKET"] ? S3_PUBLIC_BASE_URL : PUBLIC_BASE_URL;
+
+  let publicHost: string | null = null;
+
+  if (base) {
+    try {
+      publicHost = new URL(base).host;
+    } catch {
+      publicHost = "invalid";
+    }
+  }
+
+  return {
+    backend: process.env["S3_BUCKET"] ? "s3" : "local",
+    publicHost,
+  };
+}
