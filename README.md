@@ -805,6 +805,41 @@ in `apps/web/src/hooks/useNotifications.ts`, which takes a callback and returns
 a teardown — the contract an `EventSource` or a websocket already has — so
 moving to push is rewriting that one function.
 
+### Preferences & recommendations — `routes/preferences.ts`, `routes/recommendations.ts`
+
+```text
+GET  /api/account/preferences       # genres, length, mutes, onboarding state
+PUT  /api/account/preferences       # partial; a list that is sent is replaced
+GET  /api/recommendations?limit=…   # a ranked list + why each story is on it
+GET  /api/recommendations/authors   # writers to follow, for onboarding
+```
+
+`auth.UserPreference` is one row per reader with two junctions beside it —
+`GenrePreference` and `NotificationMute`. **The row does not exist until the
+reader answers something**, which is what `onboardingComplete: false` means and
+why the web app can gate its onboarding flow on a column rather than on local
+state: a refresh halfway through resumes instead of skipping. Every read
+tolerates the row's absence and answers with defaults.
+
+One table, two customers. The recommender ranks on the genres and the length;
+the notification fan-out filters on the mutes, in the same `WHERE` that selects
+each audience — so a muted type is never written rather than written and
+hidden.
+
+The ranking is **one SQL statement and one documented scoring function**
+(`WEIGHTS` in `services/recommendations.ts`): a preferred genre is worth more
+than every other term combined, then a followed author, then the genres implied
+by the reader's shelves, reading history and ratings, then length fit, then the
+story's own rating, freshness and popularity. It is deterministic — no
+randomness, no per-request shuffle, `id` as the final tie-break — so two
+identical requests return the same order and a rail cannot jump under somebody.
+Stories the reader has already met, drafts, catalogue editions and their own
+work are excluded in the candidate set rather than filtered afterwards.
+
+A reader with no signal at all gets `listStories({ sort: "trending" })` instead
+of an almost-trending degenerate ranking, and the response says which of the two
+ran in `basis`, so the shelf can be worded honestly.
+
 ### Scribble (GenAI) — `routes/ai.ts`
 
 ```text
@@ -854,7 +889,7 @@ everyone out and forgets some counters; it loses no content.
 Prisma provides schema management, type-safe queries and migrations. The schema
 lives in `apps/api/src/prisma/contract.prisma`, organised into namespaces
 (`auth`, `content`, `engagement`, `gamification`, `challenges`, `clubs`,
-`channels`, `library`, `notifications`); generated types land in
+`channels`, `library`, `notifications`, `moderation`); generated types land in
 `src/prisma/contract.d.ts` via `pnpm --filter api contract:emit`, and every
 schema change is accompanied by a checked-in migration under
 `apps/api/migrations/app/`.
@@ -875,11 +910,12 @@ docker compose exec api pnpm --filter api test
 docker compose exec api pnpm --filter api test routes/authoring
 ```
 
-Covered today, across 24 suites: auth (incl. Google and the password/email
+Covered today, across 27 suites: auth (incl. Google and the password/email
 flows), account, books, library, stories, authoring, uploads, storage, reading
 progress, clubs, channels, comments + ratings, public profiles + follows,
-writing challenges, author analytics, badges and notifications, plus Scribble,
-the AI provider seam and its streaming JSON scanner.
+writing challenges, author analytics, badges, notifications, moderation, and
+preferences + recommendations, plus Scribble, the AI provider seam and its
+streaming JSON scanner.
 
 No test calls a real model provider — a fake one lives in
 `services/ai/testing.ts` — and none writes to a real object store: the Vitest

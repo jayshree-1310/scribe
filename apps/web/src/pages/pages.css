@@ -359,15 +359,25 @@
   gap: var(--space-1);
 }
 
-.discussion__foot button {
+/* Direct children only; see the note on `.comment__actions > button`. */
+.discussion__foot > button {
   border: 0;
   background: none;
   color: var(--brand);
   font-weight: 600;
 }
 
-.discussion__foot button:hover {
+.discussion__foot > button:hover {
   text-decoration: underline;
+}
+
+.discussion__foot > .dropdown {
+  margin-left: auto;
+}
+
+/* The overflow menu sits at the end of a post's header, past the byline. */
+.post__head > .dropdown {
+  margin-left: auto;
 }
 
 /*

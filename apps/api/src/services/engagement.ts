@@ -5,14 +5,18 @@
  * `services/channels.ts` followed, deliberately rather than inventing a third:
  * one table for threads and replies told apart by a nullable `parentId`,
  * replies capped at one level deep, a `Page<T>` ordered newest-first with `id`
- * as the tie-breaker, and an author summary of exactly four fields. Moderation
- * (Task 15) then has one read path per surface to audit instead of three.
+ * as the tie-breaker, and an author summary of exactly four fields. That is
+ * what left moderation one read path per surface to audit instead of three.
  *
- * The one place this diverges from clubs is who may delete. A club resolves
- * "moderator" from a membership row; a story has no membership table, so there
- * is no moderator to resolve and delete is the comment's author alone. The
- * story's author is deliberately *not* given the power here -- that is a
- * moderation rule, and Task 15 owns the role decision that would justify it.
+ * The one place this diverges from clubs is who may delete, and that question
+ * is now answered. A club resolves "moderator" from a membership row; a story
+ * has no membership table, so delete here is the comment's author alone. The
+ * story's author is still *not* given the power, deliberately: a writer who
+ * could delete criticism of their own work would be moderating the thing they
+ * are least able to judge, and the case that motivates it -- abuse under
+ * somebody's story -- is what `POST /api/reports` and the queue in
+ * `services/moderation.ts` are for. What a moderator does instead of deleting
+ * is hide: `hiddenAt` on the row, filtered out of every read below.
  *
  * Ratings keep `content.Story.ratingAverage` and `ratingCount` in step inside
  * the same transaction as every write. Those columns are not the read path --
@@ -30,6 +34,7 @@ import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
 import { evaluateBadges } from "./gamification.js";
 import { notify } from "./notifications.js";
+import { assertNotSuspended } from "./roles.js";
 import { findVisibleStoryId, toIso } from "./stories.js";
 
 /**
@@ -199,6 +204,15 @@ interface CommentRow {
   updatedAt: unknown;
 }
 
+/**
+ * Hidden comments are absent from every read that goes through here, which is
+ * every read that shows a comment's text. The filter is in the base rather
+ * than at each call site deliberately: there is no caller that wants a hidden
+ * row, so the way to get one wrong is to forget, and this is the shape that
+ * cannot be forgotten. The two reads that do *not* use it -- the reply count
+ * below and the parent lookup in `createComment` -- carry the same filter and
+ * say so. See `services/moderation.ts`.
+ */
 function commentsBase(client: Orm = db) {
   return client.orm.engagement.Comment.select(
     "id",
@@ -209,7 +223,7 @@ function commentsBase(client: Orm = db) {
     "content",
     "createdAt",
     "updatedAt",
-  );
+  ).where((row) => row.hiddenAt.isNull());
 }
 
 async function hydrateComments(
@@ -225,6 +239,9 @@ async function hydrateComments(
     // One query for the whole page's replies rather than one per thread.
     const replies = await db.orm.engagement.Comment.select("parentId")
       .where((row) => row.parentId.in(rows.map((thread) => thread.id)))
+      // Hidden replies do not count, or a thread offers to show three replies
+      // and opens on two.
+      .where((row) => row.hiddenAt.isNull())
       .all();
 
     for (const reply of replies) {
@@ -347,6 +364,10 @@ export async function createComment(
   slugOrId: string,
   input: CommentInput,
 ): Promise<Comment> {
+  // One of the four write seams a suspension stops; see the header of
+  // `services/moderation.ts` for the list.
+  await assertNotSuspended(userId);
+
   const storyId = await visibleStoryId(slugOrId, userId);
   const timestamp = now();
 
@@ -362,6 +383,10 @@ export async function createComment(
         "parentId",
       )
         .where((row) => row.id.eq(input.parentId as string))
+        // A hidden thread is gone as far as anybody but a moderator is
+        // concerned, so replying to one 404s rather than quietly attaching a
+        // visible reply to something nobody can read.
+        .where((row) => row.hiddenAt.isNull())
         .first();
 
       if (!parent || parent.storyId !== storyId) {
@@ -429,7 +454,8 @@ export async function createComment(
 
 /**
  * Deletes a thread or a reply. Its author alone -- see the module header for
- * why there is no moderator branch here yet.
+ * why a story's author is not a moderator of its comments, and
+ * `services/moderation.ts` for what a moderator does instead.
  */
 export async function deleteComment(
   userId: string,

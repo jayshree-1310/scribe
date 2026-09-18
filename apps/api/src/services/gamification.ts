@@ -398,6 +398,12 @@ export function levelsFor(metrics: Metrics): Levels {
  * `countVisibleStoriesBy` applies: a seeded catalogue edition carries a real
  * author column and nobody on Scribe wrote it, so counting it would hand
  * somebody a writing badge for an import.
+ *
+ * `hiddenAt IS NULL` on the two figures counting somebody's own posts, for the
+ * neighbouring reason: credit for something a moderator took down is credit
+ * for nothing. A badge already awarded is kept -- `UserBadge` is a record of
+ * the award, not of the metric -- so this changes what is earnable from here,
+ * not what was earned. See `services/moderation.ts`.
  */
 export async function metricsFor(userId: string): Promise<Metrics> {
   const plan = db.raw.sql`
@@ -410,13 +416,15 @@ export async function metricsFor(userId: string): Promise<Metrics> {
         WHERE r."userId" = ${userId})::int                       AS "chaptersRead",
       (SELECT COUNT(*)
          FROM "engagement"."comment" AS c
-        WHERE c."userId" = ${userId})::int                       AS "commentsPosted",
+        WHERE c."userId" = ${userId}
+          AND c."hiddenAt" IS NULL)::int                         AS "commentsPosted",
       (SELECT COUNT(*)
          FROM "engagement"."rating" AS t
         WHERE t."userId" = ${userId})::int                       AS "ratingsGiven",
       (SELECT COUNT(*)
          FROM "clubs"."clubDiscussion" AS d
-        WHERE d."userId" = ${userId})::int                       AS "clubPosts",
+        WHERE d."userId" = ${userId}
+          AND d."hiddenAt" IS NULL)::int                         AS "clubPosts",
       (SELECT COUNT(*)
          FROM "engagement"."follow" AS f
         WHERE f."followingId" = ${userId})::int                  AS "followers",

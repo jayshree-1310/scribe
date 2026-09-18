@@ -1,0 +1,404 @@
+[
+  {
+    "id": "table.genrePreference",
+    "label": "Create table \"genrePreference\"",
+    "summary": "Creates table \"genrePreference\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "table",
+        "name": "genrePreference"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"genrePreference\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"genrePreference\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"genrePreference\"",
+        "sql": "CREATE TABLE \"auth\".\"genrePreference\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"genreId\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"userId\", \"genreId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"genrePreference\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"genrePreference\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.notificationMute",
+    "label": "Create table \"notificationMute\"",
+    "summary": "Creates table \"notificationMute\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "table",
+        "name": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"notificationMute\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"notificationMute\"",
+        "sql": "CREATE TABLE \"auth\".\"notificationMute\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"type\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"userId\", \"type\"),\n  CONSTRAINT \"notificationMute_type_check_822839ba\" CHECK (\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"notificationMute\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.userPreference",
+    "label": "Create table \"userPreference\"",
+    "summary": "Creates table \"userPreference\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "table",
+        "name": "userPreference"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"userPreference\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"userPreference\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"userPreference\"",
+        "sql": "CREATE TABLE \"auth\".\"userPreference\" (\n  \"contentLength\" text DEFAULT 'ANY' NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"onboardingCompletedAt\" timestamptz,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"userId\"),\n  CONSTRAINT \"userPreference_contentLength_check_e152cea5\" CHECK (\"contentLength\" IN ('SHORT', 'MEDIUM', 'LONG', 'ANY'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"userPreference\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"userPreference\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.genrePreference.genrePreference_genreId_idx_8fce6a7b",
+    "label": "Create index \"genrePreference_genreId_idx_8fce6a7b\" on \"genrePreference\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "index",
+        "name": "genrePreference_genreId_idx_8fce6a7b",
+        "table": "genrePreference"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"genrePreference_genreId_idx_8fce6a7b\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"genrePreference_genreId_idx_8fce6a7b\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"genrePreference_genreId_idx_8fce6a7b\"",
+        "sql": "CREATE INDEX \"genrePreference_genreId_idx_8fce6a7b\" ON \"auth\".\"genrePreference\" (\"genreId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"genrePreference_genreId_idx_8fce6a7b\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"genrePreference_genreId_idx_8fce6a7b\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.genrePreference.genrePreference_userId_idx_a489d58a",
+    "label": "Create index \"genrePreference_userId_idx_a489d58a\" on \"genrePreference\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "index",
+        "name": "genrePreference_userId_idx_a489d58a",
+        "table": "genrePreference"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"genrePreference_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"genrePreference_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"genrePreference_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"genrePreference_userId_idx_a489d58a\" ON \"auth\".\"genrePreference\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"genrePreference_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"genrePreference_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.notificationMute.notificationMute_userId_idx_a489d58a",
+    "label": "Create index \"notificationMute_userId_idx_a489d58a\" on \"notificationMute\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "index",
+        "name": "notificationMute_userId_idx_a489d58a",
+        "table": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"notificationMute_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"notificationMute_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"notificationMute_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"notificationMute_userId_idx_a489d58a\" ON \"auth\".\"notificationMute\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"notificationMute_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"notificationMute_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.genrePreference.genrePreference_userId_fkey",
+    "label": "Add foreign key \"genrePreference_userId_fkey\" on \"genrePreference\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "foreignKey",
+        "name": "genrePreference_userId_fkey",
+        "table": "genrePreference"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"genrePreference_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "genrePreference_userId_fkey",
+          "auth",
+          "\"auth\".\"genrePreference\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"genrePreference_userId_fkey\"",
+        "sql": "ALTER TABLE \"auth\".\"genrePreference\"\nADD CONSTRAINT \"genrePreference_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"genrePreference_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "genrePreference_userId_fkey",
+          "auth",
+          "\"auth\".\"genrePreference\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.genrePreference.genrePreference_genreId_fkey",
+    "label": "Add foreign key \"genrePreference_genreId_fkey\" on \"genrePreference\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "foreignKey",
+        "name": "genrePreference_genreId_fkey",
+        "table": "genrePreference"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"genrePreference_genreId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "genrePreference_genreId_fkey",
+          "auth",
+          "\"auth\".\"genrePreference\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"genrePreference_genreId_fkey\"",
+        "sql": "ALTER TABLE \"auth\".\"genrePreference\"\nADD CONSTRAINT \"genrePreference_genreId_fkey\"\nFOREIGN KEY (\"genreId\")\nREFERENCES \"content\".\"genre\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"genrePreference_genreId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "genrePreference_genreId_fkey",
+          "auth",
+          "\"auth\".\"genrePreference\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.notificationMute.notificationMute_userId_fkey",
+    "label": "Add foreign key \"notificationMute_userId_fkey\" on \"notificationMute\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "foreignKey",
+        "name": "notificationMute_userId_fkey",
+        "table": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"notificationMute_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_userId_fkey",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"notificationMute_userId_fkey\"",
+        "sql": "ALTER TABLE \"auth\".\"notificationMute\"\nADD CONSTRAINT \"notificationMute_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"notificationMute_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_userId_fkey",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.userPreference.userPreference_userId_fkey",
+    "label": "Add foreign key \"userPreference_userId_fkey\" on \"userPreference\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "foreignKey",
+        "name": "userPreference_userId_fkey",
+        "table": "userPreference"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"userPreference_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "userPreference_userId_fkey",
+          "auth",
+          "\"auth\".\"userPreference\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"userPreference_userId_fkey\"",
+        "sql": "ALTER TABLE \"auth\".\"userPreference\"\nADD CONSTRAINT \"userPreference_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"userPreference_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "userPreference_userId_fkey",
+          "auth",
+          "\"auth\".\"userPreference\""
+        ]
+      }
+    ]
+  }
+]

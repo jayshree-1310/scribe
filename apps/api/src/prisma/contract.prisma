@@ -60,6 +60,91 @@ enum NotificationType {
   BADGE_EARNED
 }
 
+/// Which of the three kinds of user-written text a row is about.
+///
+/// One vocabulary, deliberately shared by two columns in two namespaces:
+/// `moderation.Report.targetType` says what was reported, and
+/// `notifications.Notification.sourceType` says what a notification quoted.
+/// They have to agree, because hiding a reported comment is what sweeps the
+/// notifications that copied it -- two spellings of the same three values
+/// would mean a sweep that silently matched nothing.
+///
+/// A reader is not on the list. Every report points at something somebody
+/// wrote, and suspending its author is one of the things a moderator may do
+/// about it -- see `services/moderation.ts` for why that is an action rather
+/// than a fourth target.
+enum ReportTarget {
+  @@type("pg/text@1")
+
+  COMMENT
+  CLUB_DISCUSSION
+  CHANNEL_POST
+}
+
+/// Why a reader says something should not be there.
+///
+/// A closed set rather than free text, because the queue is read by somebody
+/// triaging dozens of rows and "what kind of problem is this?" has to be
+/// sortable. `OTHER` carries `Report.details`, which is where the free text
+/// that would otherwise be here lives.
+enum ReportReason {
+  @@type("pg/text@1")
+
+  SPAM
+  HARASSMENT
+  HATE
+  SEXUAL
+  VIOLENCE
+  SPOILER
+  OTHER
+}
+
+/// Whether a report is still waiting for somebody.
+///
+/// Two values, not four: *what was done* is `Report.action`, which is a
+/// separate question with a separate answer. Folding them into one column
+/// would mean `DISMISSED` and `HIDDEN` were both "not open" and nothing could
+/// ask the first question without enumerating the second.
+enum ReportStatus {
+  @@type("pg/text@1")
+
+  OPEN
+  RESOLVED
+}
+
+/// What a moderator did about it. Null while the report is open.
+///
+/// `DISMISS` is not "do nothing": it restores content an earlier call hid and
+/// lifts a suspension that same report imposed, which is what makes a wrong
+/// call reversible. See `services/moderation.ts`.
+enum ReportAction {
+  @@type("pg/text@1")
+
+  DISMISS
+  HIDE
+  SUSPEND
+}
+
+/// How long a work a reader wants to be handed.
+///
+/// Four names rather than a word count, because the reader is answering "what
+/// do you feel like?" and not "how many words?". Turning a story's length into
+/// one of these happens in exactly one place -- `LENGTH_BUCKETS` in
+/// `services/recommendations.ts` -- so the boundaries can move without this
+/// vocabulary changing.
+///
+/// `ANY` is a real answer and the default. It says "do not rank me on length",
+/// which is a different thing from never having been asked; the absence of a
+/// `UserPreference` row is what says that.
+enum ContentLength {
+  @@type("pg/text@1")
+
+  SHORT
+  MEDIUM
+  LONG
+  ANY
+}
+
 namespace auth {
   model User {
     id        String   @id @default(uuid())
@@ -100,6 +185,18 @@ namespace auth {
     /// `scripts/grant-admin.ts`; there is no endpoint that sets it, so no
     /// request can escalate itself.
     isAdmin       Boolean @default(false)
+
+    /// When a moderator suspended this account, or null for an account in
+    /// good standing. A timestamp rather than a boolean for the reason
+    /// `Notification.readAt` is one: it answers "is it?" and "since when?"
+    /// with one column instead of two that can disagree.
+    ///
+    /// Suspension stops an account *writing* -- comments, club threads,
+    /// channel posts, reports -- and nothing else; a suspended reader still
+    /// reads. `assertNotSuspended` in `services/roles.ts` is the only place
+    /// this is read, and the list of write seams that call it is in the
+    /// header of `services/moderation.ts`.
+    suspendedAt   DateTime?
 
     readingStreak Int     @default(0)
 
@@ -142,6 +239,100 @@ namespace auth {
     notifications    notifications.Notification[] @relation("NotificationRecipient")
     /// Notifications this account caused somebody else to receive.
     notified         notifications.Notification[] @relation("NotificationActor")
+    /// Reports this account filed.
+    reportsFiled     moderation.Report[] @relation("ReportReporter")
+    /// Reports this account resolved, as a moderator.
+    reportsResolved  moderation.Report[] @relation("ReportResolver")
+    /// Absent until the reader answers something. See `UserPreference`.
+    preference       UserPreference?
+    genrePreferences GenrePreference[]
+    notificationMutes NotificationMute[]
+  }
+
+  /// One reader's settings: what they want recommended, and what they would
+  /// rather not be told about.
+  ///
+  /// **A row per account, not columns on `User`.** `User` is who somebody is;
+  /// this is what they answered. The distinction pays at exactly one moment --
+  /// a row that does not exist means "never asked", which no default on a
+  /// column can express, and which is the whole of how the web app knows to
+  /// show onboarding rather than skip it.
+  ///
+  /// **One table, two customers.** `services/recommendations.ts` ranks on the
+  /// genres and the length; `services/notifications.ts` filters its fan-out on
+  /// the mutes. Task 14 left notification preferences unbuilt on the argument
+  /// that they wanted this table rather than a second settings model beside
+  /// it, and that is why this is not called `RecommendationPreference`. The
+  /// third customer follows the same rule: a preference is a row here.
+  ///
+  /// Every read tolerates the row's absence and answers with the defaults in
+  /// `services/preferences.ts`, so nothing has to create one to read one.
+  model UserPreference {
+    /// The account, and the key: there is one row per reader, so a surrogate
+    /// id would only be a second way to address the same thing.
+    userId String @id
+
+    contentLength ContentLength @default(ANY)
+
+    /// When onboarding was finished, or null while it has not been.
+    ///
+    /// A timestamp rather than a boolean, the way `Notification.readAt` and
+    /// `User.suspendedAt` are: one column answering "is it?" and "when?"
+    /// cannot disagree with itself. The web app gates the flow on this rather
+    /// than on local state, so a refresh halfway through resumes instead of
+    /// skipping to the feed.
+    onboardingCompletedAt DateTime?
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+
+    user auth.User
+      @relation(fields: [userId], references: [id])
+  }
+
+  /// A genre the reader said they like.
+  ///
+  /// The junction `content.StoryGenre` already is on the other side of the
+  /// same question, and deliberately the same shape: a composite key and no
+  /// surrogate id, so saying "Fantasy" twice is a no-op rather than a second
+  /// row, and replacing the whole set is a delete and an insert with nothing
+  /// to reconcile.
+  ///
+  /// Hung off `auth.User` rather than off `UserPreference`, like every other
+  /// per-reader table in this contract: a reader who picked genres and never
+  /// finished onboarding has rows here and may have no settings row at all,
+  /// and neither fact should depend on the other.
+  model GenrePreference {
+    userId    String
+    genreId   String
+    createdAt DateTime @default(now())
+
+    user  auth.User
+      @relation(fields: [userId], references: [id])
+    genre content.Genre
+      @relation(fields: [genreId], references: [id])
+
+    @@id([userId, genreId])
+    /// Everybody who likes one genre -- how author suggestions are found.
+    @@index([genreId])
+  }
+
+  /// One notification type one reader does not want.
+  ///
+  /// Rows for what is *off*, rather than a column per type that is on.
+  /// `NotificationType` grows a value whenever a sixth thing becomes worth
+  /// telling somebody about, and a column per type would make each of those a
+  /// migration. An account with no rows here hears about everything, which is
+  /// what an account that has never opened settings should do.
+  model NotificationMute {
+    userId    String
+    type      NotificationType
+    createdAt DateTime @default(now())
+
+    user auth.User
+      @relation(fields: [userId], references: [id])
+
+    @@id([userId, type])
   }
 }
 
@@ -248,7 +439,9 @@ namespace content {
     hue       Int      @default(268)
     createdAt DateTime @default(now())
 
-    stories StoryGenre[]
+    stories     StoryGenre[]
+    /// Readers who named this genre during onboarding.
+    preferredBy auth.GenrePreference[]
   }
 
   model StoryGenre {
@@ -281,6 +474,13 @@ namespace engagement {
     chapterId String?
     parentId  String?
     content   String
+
+    /// When a moderator hid this, or null for a visible comment. The row
+    /// stays so a wrong call is one update away from being reversed, and
+    /// every public read path filters on it -- see `services/moderation.ts`
+    /// for the full list.
+    hiddenAt  DateTime?
+
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now())
 
@@ -642,6 +842,10 @@ namespace clubs {
     /// Null for a top-level thread; the thread's id for a reply.
     parentId  String?
 
+    /// When a moderator hid this. The same column, meaning the same thing, as
+    /// `engagement.Comment.hiddenAt` and `channels.ChannelPost.hiddenAt`.
+    hiddenAt  DateTime?
+
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now())
 
@@ -704,6 +908,11 @@ namespace channels {
     title     String
 
     content   String
+
+    /// When a moderator hid this. The same column, meaning the same thing, as
+    /// `engagement.Comment.hiddenAt` and `clubs.ClubDiscussion.hiddenAt`.
+    hiddenAt  DateTime?
+
     postedAt  DateTime @default(now())
     updatedAt DateTime @default(now())
 
@@ -791,6 +1000,19 @@ namespace notifications {
     /// Where clicking it goes, as a web-app path.
     href    String
 
+    /// The row `excerpt` was copied from, when that row is one a moderator
+    /// can hide -- null for `NEW_STORY` and `BADGE_EARNED`, which quote
+    /// nothing hideable.
+    ///
+    /// The excerpt is a *copy*, so hiding the comment it came from does not
+    /// hide it; without these two columns there would be no way to find the
+    /// copies at all. `hideContent` in `services/moderation.ts` deletes the
+    /// rows they match, and that file says why deleting rather than blanking.
+    /// Null on every row written before moderation landed, which is honest:
+    /// those copies cannot be found and are left alone.
+    sourceType ReportTarget?
+    sourceId   String?
+
     /// Null until read. Null *is* the unread flag rather than a boolean
     /// beside a timestamp, which would be two answers to one question.
     readAt    DateTime?
@@ -806,5 +1028,65 @@ namespace notifications {
     @@index([userId, createdAt])
     /// The unread count, and the mark-all-read sweep.
     @@index([userId, readAt])
+    /// The sweep when a moderator hides the thing a notification quoted.
+    @@index([sourceType, sourceId])
+  }
+}
+
+namespace moderation {
+  /// One reader saying one thing should not be there.
+  ///
+  /// **The target is polymorphic and therefore not a foreign key.**
+  /// `targetType` plus `targetId` names a row in one of three tables, and no
+  /// constraint can express that. The cost is real and bounded: deleting a
+  /// comment leaves a report pointing at nothing, so `listReports` hydrates
+  /// targets tolerantly and renders a missing one as gone. The alternative --
+  /// three nullable columns with three foreign keys, exactly one of them set
+  /// -- moves the same "exactly one" rule from the service into a CHECK
+  /// nothing else could read, and triples again the day a fourth surface
+  /// wants reporting.
+  ///
+  /// **One open report per reporter per target, enforced in the service.**
+  /// A unique index cannot say "only while open", because a target resolved
+  /// today may legitimately be reported again tomorrow. `createReport` writes
+  /// through an `INSERT ... WHERE NOT EXISTS`; see that function for the race
+  /// that leaves and why resolving sweeps every open report on the target.
+  ///
+  /// **`status` and `action` are two questions.** Whether anybody still has
+  /// to look at this, and what was done. Folding them into one column would
+  /// make "show me the queue" enumerate the resolutions.
+  model Report {
+    id         String       @id @default(uuid())
+    reporterId String
+    targetType ReportTarget
+    targetId   String
+    reason     ReportReason
+
+    /// What the reporter typed, cut to `DETAILS_MAX_LENGTH` in the service.
+    /// Null when they only picked a reason.
+    details    String?
+
+    status     ReportStatus @default(OPEN)
+
+    /// Null while open.
+    action     ReportAction?
+    /// What the moderator wrote when resolving. Never shown to the reporter.
+    note       String?
+    resolvedById String?
+    resolvedAt   DateTime?
+
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @default(now())
+
+    reporter   auth.User  @relation("ReportReporter", fields: [reporterId], references: [id])
+    resolvedBy auth.User? @relation("ReportResolver", fields: [resolvedById], references: [id])
+
+    /// The queue: open first, newest first.
+    @@index([status, createdAt])
+    /// Duplicate detection, and resolving every open report on one target.
+    @@index([targetType, targetId, status])
+    /// A reporter's own history, which is what a moderator checks before
+    /// trusting the tenth report from the same account in an hour.
+    @@index([reporterId])
   }
 }

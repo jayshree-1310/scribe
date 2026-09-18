@@ -15,7 +15,11 @@ import { db } from "../prisma/db.js";
 import { deleteAll } from "../prisma/delete-all.js";
 import { flushAnalytics } from "../services/analytics.js";
 import { flushBadges } from "../services/gamification.js";
-import { flushNotifications } from "../services/notifications.js";
+import {
+  flushNotifications,
+  type NotificationType,
+} from "../services/notifications.js";
+import { deletePreferencesFor } from "../services/preferences.js";
 import { DEV_USER_HEADER } from "../middleware/current-user.js";
 import { slugify } from "../lib/slug.js";
 
@@ -448,9 +452,115 @@ export class TestApi {
     return entry.id;
   }
 
+  /* Preferences ---------------------------------------------------------- */
+
+  /**
+   * Preferences written straight to the tables rather than through `PUT
+   * /api/account/preferences`.
+   *
+   * A recommendation suite spends most of its setup describing a reader's
+   * taste, and routing every one of those through the endpoint would test the
+   * endpoint a hundred times and the ranking once. The suite that covers the
+   * endpoint uses the endpoint.
+   */
+  async setPreferences(
+    userId: string,
+    input: {
+      genreIds?: string[];
+      contentLength?: "SHORT" | "MEDIUM" | "LONG" | "ANY";
+      mutedNotificationTypes?: NotificationType[];
+      onboardingComplete?: boolean;
+    },
+  ): Promise<void> {
+    const completedAt =
+      input.onboardingComplete === true ? Temporal.Now.instant() : null;
+
+    const existing = await db.orm.auth.UserPreference.select("userId")
+      .where((row) => row.userId.eq(userId))
+      .first();
+
+    if (existing) {
+      await db.orm.auth.UserPreference.where((row) => row.userId.eq(userId)).update({
+        contentLength: input.contentLength ?? "ANY",
+        onboardingCompletedAt: completedAt,
+        updatedAt: Temporal.Now.instant(),
+      });
+    } else {
+      await db.orm.auth.UserPreference.create({
+        userId,
+        contentLength: input.contentLength ?? "ANY",
+        onboardingCompletedAt: completedAt,
+      });
+    }
+
+    if (input.genreIds) {
+      await deleteAll(() =>
+        db.orm.auth.GenrePreference.where((row) => row.userId.eq(userId)),
+      );
+      for (const genreId of input.genreIds) {
+        await db.orm.auth.GenrePreference.create({ userId, genreId });
+      }
+    }
+
+    if (input.mutedNotificationTypes) {
+      await deleteAll(() =>
+        db.orm.auth.NotificationMute.where((row) => row.userId.eq(userId)),
+      );
+      for (const type of input.mutedNotificationTypes) {
+        await db.orm.auth.NotificationMute.create({ userId, type });
+      }
+    }
+  }
+
   /** Makes a fixture account an administrator, which no endpoint can do. */
   async setAdmin(userId: string, isAdmin = true): Promise<void> {
     await db.orm.auth.User.where((user) => user.id.eq(userId)).update({ isAdmin });
+  }
+
+  /* Moderation ----------------------------------------------------------- */
+
+  /**
+   * Whether a fixture account is suspended, for asserting what a resolve did.
+   *
+   * Read straight from the column rather than inferred from a refused write:
+   * a test that proved suspension only by watching a comment 403 could not
+   * tell a suspension from any other reason the post was refused.
+   */
+  async readSuspended(userId: string): Promise<boolean> {
+    const user = await db.orm.auth.User.select("suspendedAt")
+      .where((row) => row.id.eq(userId))
+      .first();
+
+    if (!user) throw new Error(`no such fixture user: ${userId}`);
+
+    return user.suspendedAt !== null && user.suspendedAt !== undefined;
+  }
+
+  /** Suspends a fixture account directly, for testing what a suspension stops. */
+  async setSuspended(userId: string, suspended = true): Promise<void> {
+    await db.orm.auth.User.where((user) => user.id.eq(userId)).update({
+      suspendedAt: suspended ? Temporal.Now.instant() : null,
+    });
+  }
+
+  /**
+   * How many notifications quote one piece of content.
+   *
+   * The only way to see the sweep that hiding performs: the copies live in
+   * other people's lists, so no endpoint the test can call as one reader
+   * answers "are they gone for everybody?".
+   */
+  async countNotificationsFor(
+    sourceType: "COMMENT" | "CLUB_DISCUSSION" | "CHANNEL_POST",
+    sourceId: string,
+  ): Promise<number> {
+    const totals = await db.orm.notifications.Notification.where((row) =>
+      row.sourceType.eq(sourceType),
+    )
+      .where((row) => row.sourceId.eq(sourceId))
+      .aggregate((aggregate) => ({ total: aggregate.count() }));
+
+    return totals.total;
   }
 
   /* Channels ------------------------------------------------------------- */
@@ -899,6 +1009,21 @@ export class TestApi {
     }
 
     /**
+     * Both ends of `moderation.Report`, before the user delete at the end.
+     * Deleted rather than detached, unlike `deleteAccount`: a test run leaves
+     * no record worth keeping, and a resolved report whose moderator is a
+     * fixture would otherwise outlive the run holding a dangling target id.
+     */
+    for (const userId of this.created.users) {
+      await deleteAll(() =>
+        db.orm.moderation.Report.where((row) => row.reporterId.eq(userId)),
+      );
+      await deleteAll(() =>
+        db.orm.moderation.Report.where((row) => row.resolvedById.eq(userId)),
+      );
+    }
+
+    /**
      * Both ends of the follow graph. Swept by user rather than by tracked id:
      * a fixture user can follow, or be followed by, a *seeded* account, and
      * only one of the two columns names a row this run created.
@@ -934,6 +1059,10 @@ export class TestApi {
       await deleteAll(() =>
         db.orm.gamification.UserBadge.where((row) => row.userId.eq(userId)),
       );
+      // The three preference tables. `GenrePreference` also references
+      // `content.Genre`, so these have to go before the genre sweep below as
+      // well as before the user delete at the end.
+      await deletePreferencesFor(db, userId);
       /**
        * Both sides of the notification table: the rows addressed to this
        * fixture and the rows its actions put in somebody else's list. Only the

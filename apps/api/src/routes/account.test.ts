@@ -300,6 +300,20 @@ describe.skipIf(!available)("DELETE /api/account/me", () => {
     const user = await createDeletable("d3", "open sesame please");
 
     const genreId = await api.createGenre("dg");
+
+    /**
+     * Preferences included: all three tables carry a foreign key to
+     * `auth.User`, and `genrePreference` a second one to `content.Genre`, so
+     * a reader who had answered anything would fail the whole deletion on
+     * `genrePreference_userId_fkey` if `deleteAccount` forgot them.
+     */
+    await api.setPreferences(user.id, {
+      genreIds: [genreId],
+      contentLength: "LONG",
+      mutedNotificationTypes: ["CHANNEL_POST"],
+      onboardingComplete: true,
+    });
+
     const story = await api.createStory({
       title: "A story to be unpublished by deletion",
       authorId: user.id,

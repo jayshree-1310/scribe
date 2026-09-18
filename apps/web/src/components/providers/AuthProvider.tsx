@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import {
-  AuthContext,
-  SESSION_STORAGE_KEY,
-  type OnboardingAnswers,
-} from '../../lib/auth'
+import { AuthContext, SESSION_STORAGE_KEY } from '../../lib/auth'
 import { db } from '../../data/api'
 import { getMyAccount, type AccountProfile } from '../../data/account-api'
 import {
@@ -25,6 +21,10 @@ import type { Session, User } from '../../types/domain'
  * follower counts, reading stats) still come from the mock profile, because no
  * endpoint serves them yet. Every sign-in path goes through here, so all of
  * them produce the same shape.
+ *
+ * `onboardingComplete` deliberately does *not* land on the user: it is a
+ * property of the session's routing, not of the person, and it is read from
+ * the profile at each of the call sites below.
  */
 function toUser(profile: AccountProfile): User {
   return {
@@ -73,13 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [initialising, setInitialising] = useState(session !== null)
 
   const start = useCallback((user: User, onboarded: boolean): Session => {
-    const next: Session = {
-      user,
-      onboarded,
-      favoriteGenreIds: [],
-      followedAuthorIds: [],
-      wantsToWrite: false,
-    }
+    const next: Session = { user, onboarded }
     setSession(next)
     persist(next)
     return next
@@ -130,21 +124,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const profile = await getMyAccount()
 
-        setSession((current) => {
-          // Onboarding state is local for now, so it is carried across rather
-          // than reset by a reload.
-          const next: Session = {
-            ...(current ?? {
-              onboarded: true,
-              favoriteGenreIds: [],
-              followedAuthorIds: [],
-              wantsToWrite: false,
-            }),
-            user: toUser(profile),
-          } as Session
-          persist(next)
-          return next
-        })
+        // The API decides whether onboarding is finished, so a reader who
+        // closed the tab halfway through is put back into the flow rather
+        // than let past it by a stale cached session.
+        const next: Session = {
+          user: toUser(profile),
+          onboarded: profile.onboardingComplete,
+        }
+        setSession(next)
+        persist(next)
       } catch {
         // A transport failure is not proof the session is invalid — dropping
         // it would sign people out every time the network hiccups — so the
@@ -163,8 +151,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async ({ email, password }: { email: string; password: string; remember: boolean }) => {
       await signInWithPassword({ email, password })
 
-      const user = toUser(await getMyAccount())
-      start(user, true)
+      const profile = await getMyAccount()
+      const user = toUser(profile)
+      // Signing in does not mean onboarding was done: an account that never
+      // finished it lands back in the flow, wherever it signed in from.
+      start(user, profile.onboardingComplete)
       return user
     },
     [start],
@@ -175,7 +166,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await registerWithPassword(input)
 
       const user = toUser(await getMyAccount())
-      // New accounts land in onboarding rather than the feed.
+      // New accounts land in onboarding rather than the feed. No request is
+      // needed to know that: nothing has answered anything yet.
       start(user, false)
       return user
     },
@@ -195,22 +187,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const idToken = await requestGoogleIdToken()
     const { created } = await signInWithGoogleIdToken(idToken)
 
-    const user = toUser(await getMyAccount())
-    start(user, !created)
+    const profile = await getMyAccount()
+    const user = toUser(profile)
+    // A brand-new account has nothing saved and goes to onboarding; a
+    // returning one is trusted to the flag the API answers with.
+    start(user, created ? false : profile.onboardingComplete)
     return { user, created }
   }, [start])
 
-  const completeOnboarding = useCallback((answers: OnboardingAnswers) => {
+  /**
+   * Called by `OnboardingPage` after the API has been told, so the redirect
+   * out of the flow does not bounce off `RequireAuth` while the next
+   * `/account/me` is still in flight. Nothing is saved here -- the page saves
+   * each step as the reader takes it.
+   */
+  const completeOnboarding = useCallback(() => {
     setSession((current) => {
       if (!current) return current
-      const next: Session = {
-        ...current,
-        onboarded: true,
-        favoriteGenreIds: answers.favoriteGenreIds,
-        followedAuthorIds: answers.followedAuthorIds,
-        wantsToWrite: answers.wantsToWrite,
-        user: { ...current.user, isAuthor: current.user.isAuthor || answers.wantsToWrite },
-      }
+      const next: Session = { ...current, onboarded: true }
       persist(next)
       return next
     })
@@ -219,7 +213,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const adoptProfile = useCallback((profile: AccountProfile) => {
     setSession((current) => {
       if (!current) return current
-      const next: Session = { ...current, user: toUser(profile) }
+      const next: Session = {
+        ...current,
+        user: toUser(profile),
+        onboarded: profile.onboardingComplete,
+      }
       persist(next)
       return next
     })

@@ -1,5 +1,6 @@
 /**
- * The signed-in reader's own account: profile fields and avatar.
+ * The signed-in reader's own account: profile fields and avatar. Their
+ * preferences sit under the same prefix in `routes/preferences.ts`.
  *
  * Every route needs a user, so the whole router sits behind `requireUser` and
  * each handler reads the id back from `res.locals` rather than trusting
@@ -37,6 +38,9 @@ const updateSchema = z
     email: emailSchema.optional(),
     displayName: z.string().trim().max(60, "Use at most 60 characters.").optional(),
     bio: z.string().trim().max(BIO_MAX, `Use at most ${BIO_MAX} characters.`).optional(),
+    // Onboarding's last question, and the settings toggle beside it. A
+    // display flag rather than a permission -- see `ProfileUpdate`.
+    isAuthor: z.boolean().optional(),
   })
   // An empty body is a no-op the caller almost certainly did not mean, and
   // answering 200 to it hides a broken form.

@@ -794,34 +794,42 @@ The flagship. Everything so far exists to make this possible.
 
 ## Task AI 11 — AI recommendations
 
-Overlaps `BACKLOG.md` Task 16 — **do that one first** and extend it here rather
-than building a second recommender. Distinct from Task AI 1.5: Scribble answers a
+Extends `BACKLOG.md` Task 16, which **has landed** — extend it rather than
+building a second recommender. Distinct from Task AI 1.5: Scribble answers a
 question a reader asked, this ranks for a reader who asked nothing. Once both
 exist, Scribble's retrieval stage can call this scorer instead of `listBooks`.
 
+What is already there: `services/recommendations.ts` ranks in one SQL statement
+against the weights in `WEIGHTS`, returns a `reason` per item derived from the
+dominant term, and falls back to trending for a reader with no signal. So three
+of the four things below are in place and this task is the semantic signal plus
+the diversity caps.
+
 **Prompt:**
 
-> Task 16 produces a deterministic recommendation score from preferences,
-> shelves, history and ratings. Add a semantic signal to it.
+> `services/recommendations.ts` produces a deterministic recommendation score
+> from preferences, shelves, history, ratings and follows. Add a semantic
+> signal to it.
 >
 > Use the story embeddings from Task AI 7 to compute content similarity, and
-> blend it into Task 16's existing scoring function — one function, one
-> documented set of weights, still deterministic given the same inputs. Do not
-> add a second endpoint; extend `GET /api/recommendations`.
+> blend it into that existing scoring function as one more weighted term —
+> one function, one documented set of weights, still deterministic given the
+> same inputs, still ranked in SQL. Do not add a second endpoint; extend `GET
+> /api/recommendations`.
 >
-> Then earn it: return a short reason per recommendation ("similar in tone to X
-> on your Finished shelf"), derived from the signal that actually dominated the
-> score, not generated prose. A reason the code cannot justify is worse than no
-> reason.
+> Then earn it: the `reason` a recommendation already carries is picked from
+> the term that dominated the score, so a similarity term needs its own wording
+> ("similar in tone to X on your Finished shelf") derived from the same place —
+> not generated prose. A reason the code cannot justify is worse than no reason.
 >
-> Also handle what a similarity score does badly: cold start (no signal → fall
-> back to trending, which Task 16 already does), and diversity (ten
-> near-identical stories is a worse shelf than five varied ones — cap per author
-> and per genre).
+> Also handle what a similarity score does badly: diversity — ten
+> near-identical stories is a worse shelf than five varied ones, so cap per
+> author and per genre. (Cold start is already handled: no signal falls back to
+> trending and says so in `basis`.)
 >
-> Tests: cold start returns trending; a shelved story shifts the ranking in the
-> expected direction; the stated reason matches the dominant signal; diversity
-> caps hold.
+> Tests: a shelved story shifts the ranking in the expected direction; the
+> stated reason matches the dominant signal; diversity caps hold; the
+> cold-start path is unchanged.
 >
 > Learn: content-based recommendation, hybrid ranking, cold start, explainability
 > and evaluating recommendation quality.
@@ -831,8 +839,13 @@ exist, Scribble's retrieval stage can call this scorer instead of `listBooks`.
 ## Task AI 12 — Content moderation
 
 **Depends on `BACKLOG.md` Task 3 (comments) and Task 15 (reports and the
-moderator role).** Without them there is nothing to moderate and nowhere for a
-decision to go.
+moderator role), both landed.** So there is now something to moderate and
+somewhere for a decision to go: `moderation.Report`, `ReportTarget`, the
+`hiddenAt` column on all three content tables, and `assertAdmin` /
+`assertNotSuspended` in `services/roles.ts`. Read the header of
+`services/moderation.ts` before writing any of this — in particular the
+audited list of read paths that filter on `hiddenAt`, which a classifier
+hiding content on its own has to satisfy exactly as a human moderator does.
 
 **Prompt:**
 
@@ -845,9 +858,13 @@ decision to go.
 > moderation decision has to be explainable months later.
 >
 > Store decisions against the target — reuse Task 15's `Report` model where it
-> fits rather than inventing a parallel table. Three outcomes: allow, hold for
-> human review, reject. Thresholds are config, not magic numbers in a
-> conditional.
+> fits rather than inventing a parallel table. It already has `targetType` /
+> `targetId`, a reason, a status and an action, and the thing it lacks for this
+> is a reporter that is not a person: `reporterId` is `NOT NULL` and points at
+> `auth.User`, so a classifier's finding needs either a service account or a
+> nullable column, and which of the two is the first decision this task makes.
+> Three outcomes: allow, hold for human review, reject. Thresholds are config,
+> not magic numbers in a conditional.
 >
 > Two rules that matter more than the classifier:
 > - **Moderation failure must not block the app.** If the provider is down,

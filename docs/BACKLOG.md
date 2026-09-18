@@ -2,8 +2,9 @@
 
 What is left to build, and in what order. Derived from the gap between the
 frontend surface (`apps/web/src/pages`) and the API (`apps/api/src/routes`).
-Most of that gap is closed; `data/api.ts` is down to one mock function, and
-Task 17 is the sweep that removes it.
+That gap is now closed: `data/api.ts` has no mock functions left, only the
+`db.currentUser` re-export `AuthProvider` still leans on, and Task 17 is the
+sweep that removes it.
 
 **Landed tasks are not kept here.** Each one's decisions live in the header of
 the service that owns them — that is the file somebody changing the behaviour
@@ -65,17 +66,18 @@ Paste this block at the top of any task prompt below.
 | Author analytics (Task 8) | `services/analytics.ts`, `engagement.StoryView` in `contract.prisma` |
 | Badges & levels (Task 12) | `services/gamification.ts`, `gamification.UserBadge` in `contract.prisma` |
 | Notifications (Task 14) | `services/notifications.ts`, `notifications.Notification` in `contract.prisma` |
+| Moderation & reporting (Task 15) | `services/moderation.ts`, `services/roles.ts`, `moderation.Report` in `contract.prisma` |
+| Preferences & recommendations (Task 16) | `services/preferences.ts`, `services/recommendations.ts`, `auth.UserPreference` in `contract.prisma` |
 
 ### What is left
 
-Tasks are numbered by when they were written down, not by when to do them. This
-is the order to do them in, and the reason for each position.
+One task, and it was always going to be the last one: nothing else can be
+removed from the mock layer until everything that read it has somewhere else to
+read from.
 
 | # | Task | Why here |
 |---|---|---|
-| 1 | **15** — moderation & reporting | The role it needs a moderator to be is now `auth.User.isAdmin`, landed with 11 and read only in `services/roles.ts`. The content to moderate is all there: 3's comments join 9's discussions and 10's posts — and 14 has now added a fourth read path over the same text, since a notification freezes an excerpt of whatever it announced. |
-| 2 | **16** — onboarding preferences & recommendations | Scores over reading history (landed), library shelves (landed), ratings (landed with 3) and follows (landed with 13). Late because a recommender is worth building once there is signal to rank on. |
-| 3 | **17** — retire the mock layer | Last by definition. |
+| 1 | **17** — retire the mock layer | Last by definition, and now the only one left. |
 
 ### One shared shape, settled
 
@@ -97,79 +99,12 @@ than inventing a third. Concretely, as `services/clubs.ts`,
   write succeeds; delete is author-or-moderator, resolved from the membership
   row rather than a creator column.
 
-Three independent implementations is still the outcome worth avoiding — 15 would
-then have three different read paths to audit for hidden content, and that is
-exactly where a moderation bug hides.
-
----
-
-## Task 15 — Moderation & reporting
-
-Depends on Tasks 3 and 9, **both landed**, so comments, club discussions and
-channel posts all exist as user-generated content with no reporting path. Their
-public read paths are `listComments` in `services/engagement.ts`,
-`listDiscussions` in `services/clubs.ts` and `listPosts` in
-`services/channels.ts` — all three need auditing for hidden content when this
-lands. `services/engagement.ts` is also where the story-author-as-moderator
-question was deferred to; answering it is what is left of this task's role
-decision, because the role itself landed with 11 as `auth.User.isAdmin`.
-
-**Prompt:**
-
-> Comments, club discussions and channel posts are all user-generated with no
-> reporting or moderation path.
->
-> Add a `Report` model (reporter, target type, target id, reason, status,
-> resolvedBy, timestamps) plus a migration, and `POST /api/reports` (rate-limited,
-> one open report per user per target). Add a moderator view: `GET
-> /api/moderation/reports` with filters and `POST /api/moderation/reports/:id/resolve`
-> taking an action (dismiss, hide content, suspend user). The role already
-> exists — `auth.User.isAdmin`, landed with Task 11 and read only through
-> `assertAdmin` in `services/roles.ts`. Call that; do not invent a second
-> notion of staff. Splitting it into a `MODERATOR` / `ADMIN` distinction is
-> fair game *if* the two get genuinely different powers here — say which, and
-> migrate.
->
-> Soft-hide rather than hard-delete content so a wrong call is reversible; hidden
-> content must disappear from every public read path — audit them all. That now
-> includes `notifications.Notification.excerpt`, which is a *copy* of the text
-> taken at fan-out time and so cannot be hidden by hiding the row it came from:
-> decide whether a hidden comment's notification is swept, blanked or left
-> alone, and say which.
->
-> FE: a report action in the comment/discussion/post overflow menus with a reason
-> dialog. A moderator UI is out of scope for this task unless the API work lands
-> early.
->
-> Tests: duplicate report rejection, hidden content absent from every public
-> list endpoint, non-moderator blocked from the moderation routes.
-
----
-
-## Task 16 — Onboarding preferences & real recommendations
-
-**Prompt:**
-
-> `apps/web/src/pages/OnboardingPage.tsx` collects genre preferences and throws
-> them away — there is no user-preferences model — and `getRecommendedStories`
-> in `data/api.ts` fakes personalisation by filtering the mock list.
->
-> Add persisted preferences: favourite genres (many-to-many against
-> `content.Genre`), preferred content length, and whether onboarding is complete,
-> plus a migration. `PUT /api/account/preferences` and `GET`.
->
-> Then `GET /api/recommendations` producing a real ranked list from the caller's
-> preferred genres, library shelves, reading history and ratings, with a
-> documented, deterministic scoring function in one place, and a sensible
-> cold-start fallback to trending for a user with no signal. Rank in SQL where
-> practical.
->
-> FE: wire the onboarding flow to save and redirect, gate the flow on the
-> `onboardingComplete` flag rather than local state so a refresh mid-flow behaves,
-> and point `pages/HomePage.tsx` recommendation shelves at the real endpoint.
->
-> Tests: cold-start returns trending rather than an empty list, preference
-> changes visibly change the ranking, already-finished books are excluded.
+Three independent implementations was the outcome worth avoiding, and 15 is
+where that paid: hiding content had one filter to add per surface rather than
+three shapes to reason about, and the audit list in the header of
+`services/moderation.ts` is eleven lines rather than a research project. The
+next surface that takes user-written text follows the same shape and adds one
+line to that list.
 
 ---
 
@@ -177,34 +112,32 @@ decision, because the role itself landed with 11 as `auth.User.isAdmin`.
 
 Final cleanup. Do last.
 
-**Mostly done already.** The story, chapter, book, shelf, comment, rating,
-reading-history, club, channel and challenge fixtures are gone from
-`mock-db.ts` (832 lines down to ~177), along with the author aggregates that
-invented view series and read counts — and those now have a real replacement to
-point at rather than a missing endpoint, since Task 8 landed `GET
-/api/author/analytics`. `data/api.ts` is down to two functions.
-What remains is the data whose features have no endpoints: badges, and the
-author directory (`db.authors`) — plus `db.currentUser`, which `AuthProvider`
-still uses for the presentational half of a session (avatar hue, follower
-counts, reading stats) that `auth.User` has no columns for. Each goes with its
-own task; this one is the final sweep.
+**Almost done already.** Everything with an endpoint has left `mock-db.ts`:
+the story, chapter, book, shelf, comment, rating, reading-history, club,
+channel, challenge and badge fixtures, the author aggregates that invented
+view series and read counts, the hand-written genre list, and — with Task 16 —
+the author directory, whose one consumer now reads
+`GET /api/recommendations/authors`. The file is 832 lines down to ~53 and
+`data/api.ts` has no functions left at all.
 
-Two of those now have a real replacement to point at rather than a missing
-endpoint. `db.authors` survives only for `OnboardingPage`'s author picker:
-`GET /api/users/:username` serves a profile and follows are real, so what that
-step still lacks is somewhere to *persist* its answers — Task 16. And the
-session's `followerCount` / `followingCount` are now computable, so
-`AuthProvider.toUser` no longer needs the mock for them; `ProfilePage` already
-bypasses it and asks the API for its own numbers.
+What survives is exactly one object. `db.currentUser` fills the presentational
+half of a session — avatar hue, follower and following counts, reading stats —
+that `auth.User` has no columns for, and `AuthProvider.toUser` spreads it under
+the real profile so those fields have *something*. Every page that shows a real
+number already bypasses it: `ProfilePage` asks the API for its own counts,
+`BadgesPage` for its own progress, the author pages for their own analytics. So
+this is a `User` type to narrow rather than an endpoint to wait for.
 
-The club, channel, challenge and badge types also left `types/domain.ts` for
-`types/clubs.ts`, `types/channels.ts`, `types/challenges.ts` and
-`types/gamification.ts`, which mirror the API the way `types/stories.ts` does. That is the pattern this task's
-reconciliation should finish, not undo.
+The club, channel, challenge, badge, moderation, preference and recommendation
+types also left `types/domain.ts` for `types/clubs.ts`, `types/channels.ts`,
+`types/challenges.ts`, `types/gamification.ts`, `types/moderation.ts`,
+`types/preferences.ts` and `types/recommendations.ts`, which mirror the API the
+way `types/stories.ts` does. That is the pattern this task's reconciliation
+should finish, not undo.
 
 **Prompt:**
 
-> Once the other tasks have landed, remove the mock data layer entirely.
+> Every other task has landed. Remove the mock data layer entirely.
 >
 > Verify nothing imports `apps/web/src/data/api.ts` or `data/mock-db.ts`, then
 > delete both. Reconcile `apps/web/src/types/domain.ts` (mock-shaped) with
@@ -338,11 +271,13 @@ folding into whichever task next touches that surface.
   and there is no "see all", so a reader who ignores the bell for a week loses
   the tail of it. `GET /api/notifications` is already paginated, so this is a
   route and a list component and no API work at all.
-- **There is no way to turn any of it off.** No per-type preference, no mute:
-  the only lever is leaving the club or unsubscribing from the channel. That is
-  honest at five types and gets worse with each one added, and preferences want
-  the same table Task 16 is adding for genres — which is the argument for doing
-  it there rather than inventing a second settings model here.
+- **~~There is no way to turn any of it off.~~** Closed by Task 16, which
+  built `auth.NotificationMute` beside the genre preferences rather than a
+  second settings model, and put the filter in the fan-out: a muted type is
+  never written, so nothing is stored that nobody asked for. What is left of
+  the gap is that a mute is not retroactive, and that the enforcement is a
+  clause five statements each have to carry — a sixth resolver that forgets it
+  is a type nobody can turn off.
 - **A club thread is one row per member, written at post time.** One statement,
   but a club of ten thousand members is ten thousand rows for every thread, and
   nothing digests or batches them. The fix when it matters is a fan-out-on-read
@@ -355,9 +290,11 @@ folding into whichever task next touches that surface.
 - **The excerpt is frozen and the actor is not.** A renamed channel keeps its
   old name in notifications already sent, because `title` and `excerpt` are
   copies taken at fan-out time — a record of the moment, deliberately. The
-  actor is a foreign key and so always current. The consequence Task 15 has to
-  answer for is in its prompt: hiding a comment does not hide the copy of it
-  sitting in somebody's bell.
+  actor is a foreign key and so always current. The consequence — hiding a
+  comment does not hide the copy of it sitting in somebody's bell — is answered
+  by Task 15, which added `sourceType` / `sourceId` to the row and deletes the
+  copies when the thing they quote is hidden. Rows written before that
+  migration carry null and cannot be found, which is the one case still open.
 - **`total` and `unreadCount` are two statements, not one snapshot.** A
   notification landing between them can make a page's arithmetic momentarily
   inconsistent — nineteen items on a page of twenty, say, with the count
@@ -382,6 +319,119 @@ folding into whichever task next touches that surface.
   mark-read rollback, which has only ever been exercised on the happy path; and
   a notification whose actor deleted their account, which should keep its text
   and lose the face beside it.
+
+### Preferences and recommendations (Task 16)
+
+- **The scoring weights have never been tuned against real behaviour.** Every
+  number in `WEIGHTS` is a judgement — an explicitly chosen genre is worth more
+  than everything else combined, popularity is worth almost nothing — and the
+  tests pin the *ordering those weights produce*, not the weights. Nothing
+  measures whether a reader clicks what the ranker put first, because nothing
+  records a click on a recommendation. The first thing to add before touching a
+  weight is that event.
+- **The ranking is a full scan of every listed Scribe story.** One statement,
+  correctly indexed on nothing in particular: `candidate` filters on `source`
+  and `listedAt`, and the per-story genre and taste sub-selects run for each
+  survivor. Fine at today's row counts and the wrong shape at a hundred
+  thousand stories, where the answer is a materialised candidate set or a
+  precomputed per-reader list refreshed on a schedule — not a faster query.
+- **A story is excluded the moment a reader *opens* it.** The "already met"
+  filter is any library row, any reading-history row or any rating, and reading
+  history is written on the first debounced scroll. So a story somebody opened
+  and abandoned after a paragraph never comes back, which is the same rule as
+  finishing it. Distinguishing the two means reading `progress`, and the
+  threshold would be a guess.
+- **Catalogue editions are never recommended, only listened to.** The same rule
+  `getRelatedStories` states, and it means the home page's personalised rail and
+  its catalogue rails answer different questions from the same shelf data. A
+  reader whose library is entirely imported books gets recommendations that
+  share their genres and none of their format. Whether that is right is a
+  product question nobody has asked yet.
+- **`POST /api/library` cannot shelve a Scribe story.** Not this task's code,
+  but this task is where it showed up: `addToLibrary` accepts any `Story` id,
+  writes the row, and then 404s hydrating the response through `getBook`, which
+  is catalogue-only. The caller is told it failed and the row is there. So the
+  "already finished" exclusion reaches a *story* through reading history and a
+  *book* through the shelf, and `routes/recommendations.test.ts` says so where
+  it tests both.
+- **Author suggestions rank by matching stories, not by matching well.** An
+  author with one story in a preferred genre outranks one with nine, because
+  the ordering is `matches DESC` and a tie falls to follower count. Worth a
+  ratio rather than a count the day anybody has more than a handful of stories.
+- **Onboarding saves per step, so a half-finished flow leaves half a row.**
+  Deliberate — it is what makes a refresh resume — but it means a reader who
+  quits at the author step has genres saved and `onboardingCompletedAt` null,
+  and is put back at step *one* rather than where they stopped. Storing the
+  furthest step reached would fix it, and it is a column rather than a rule.
+- **Every existing account is sent through onboarding once.** Nobody has a
+  preference row, and an absent row means "never asked" — which is the honest
+  reading and also a one-time interruption for every reader who signed up
+  before this landed. The alternative was backfilling a completed row for the
+  whole userbase, which would have been a lie about all of them rather than an
+  inconvenience to all of them.
+- **A mute is not retroactive.** Turning a type off stops the fan-out writing
+  new rows and leaves everything already in the bell. Correct, and the opposite
+  of what `hideContent` does to the copies of hidden content — worth knowing
+  they differ.
+- **Unseen in a browser:** the recommendation rail's reason line under a card
+  at phone width, where `.shelf__reason` has to clamp rather than wrap; the
+  onboarding author step with no suggestions at all, which only happens on a
+  database with no published Scribe stories; and the settings genre chips
+  saving one at a time on a throttled connection, where `aria-busy` is the only
+  feedback a click gets.
+
+### Moderation and reporting (Task 15)
+
+- **There is no moderator UI.** `GET /api/moderation/reports` and the resolve
+  endpoint are covered by tests and reachable with a token, and the only way to
+  make an administrator is still `pnpm --filter api admin:grant`. So the queue
+  has never been read by a person, and the filters, the target excerpts and the
+  "content no longer exists" case have only ever been exercised by assertions.
+  The same deliberate gap the challenge host UI has, and the same argument: an
+  admin console is its own surface.
+- **Nobody is told their content was hidden.** The author of a hidden comment
+  sees it vanish from the list and gets no notification, no banner and no
+  reason; `AuthorChannelsPage` simply stops showing a hidden post, and
+  `ownedPost` then 404s an edit of it. That is a deliberate omission rather
+  than an oversight — a sixth `NotificationType` and a wording decision about
+  how much of the reason to reveal — but it is the thing a moderated writer
+  will ask about first.
+- **Nor is the reporter.** A report is filed and the reader hears nothing more,
+  whichever way it went. Honest today, and the obvious first thing to add if
+  people stop reporting because it feels like a void.
+- **A suspension can only be lifted through the report that imposed it.**
+  `DISMISS` on that row clears `auth.User.suspendedAt`; there is no endpoint
+  that lifts a suspension on its own, and no way to suspend somebody without a
+  report to hang it on. If the report is later deleted with the reporter's
+  account, the suspension outlives its undo and the only way back is a
+  statement against the database. A `POST /api/moderation/users/:id/reinstate`
+  is the fix, and it is a route rather than a rule.
+- **Suspension is not a sign-out.** It is checked at four write seams, so a
+  suspended account keeps a valid session and everything it can read. Nothing
+  in the types makes a fifth write seam call `assertNotSuspended`; the list in
+  the header of `services/moderation.ts` is enforced by somebody reading it.
+- **Hiding a thread does not hide its replies.** Deliberate — a reply is
+  somebody else's words — but the replies become unreachable, because the only
+  way a reader lists them is by opening the thread that is now gone. They are
+  neither hidden nor visible, which is a third state nothing names.
+- **The duplicate-report rule has a race.** One open report per reporter per
+  target is an `INSERT ... WHERE NOT EXISTS`, not a unique index, because no
+  index can say "unique only while open". Two requests in the same instant can
+  both pass it. Resolving sweeps every open report on the target, so the
+  leftover costs a moderator nothing — but the rule is a convention the service
+  keeps rather than one the database enforces.
+- **Notifications written before the migration cannot be swept.** `sourceType`
+  and `sourceId` are null on every row that predates Task 15, so hiding a
+  comment from before it landed leaves the copy in somebody's bell. Nothing can
+  be done about those rows: an excerpt is a prefix of a body, not a key.
+- **Nothing prunes resolved reports.** The same note the notification and
+  analytics tables carry. A resolved report is read by nobody and kept
+  forever.
+- **Unseen in a browser:** the reason dialog at phone width, where seven
+  radio rows and a textarea have to fit above the fold with the footer still
+  reachable; the overflow menu inside `.comment-replies`, which is a narrow
+  indented column; and the menu on the last post of a long channel feed, where
+  `DropdownMenu` has to flip to the top side.
 
 ### Badges and levels (Task 12)
 
@@ -454,8 +504,10 @@ folding into whichever task next touches that surface.
 - **Withdrawing is impossible once a challenge closes.** Deliberate: a closed
   board is a result, and a row leaving it would renumber everybody below.
   Nothing yet offers the other thing a writer might want — removing an entry
-  from a finished board — which is Task 15's territory rather than a fourth
-  state here.
+  from a finished board. Task 15 did not take it up: a challenge entry is not
+  one of the three things `ReportTarget` names, and the queue acts on text
+  somebody wrote rather than on a place in a ranking. It is still a fifth
+  target type and a fourth action whenever somebody wants it.
 - **Dev identity:** the entry the detail page shows is the caller's, and with
   no session the API answers for whoever `readerHeaders()` names. So a dev
   without a real session sees the dev user's entry and can withdraw it — the

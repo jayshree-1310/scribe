@@ -24,6 +24,7 @@ import {
 } from '../types/engagement'
 import { useAuth } from '../lib/auth'
 import { AppShell } from '../components/layout/AppShell'
+import { ReportMenu } from '../components/moderation/ReportMenu'
 import { Avatar } from '../components/ui/Avatar'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Card, SectionHead } from '../components/ui/Card'
@@ -610,7 +611,7 @@ export function StoryDetailPage() {
                       </p>
                       <p className="comment__text">{comment.content}</p>
 
-                      <p className="comment__actions">
+                      <div className="comment__actions">
                         <span>
                           <Icon name="comment" size="0.9em" />
                           {formatCount(comment.replyCount)}{' '}
@@ -648,7 +649,18 @@ export function StoryDetailPage() {
                             Delete
                           </button>
                         ) : null}
-                      </p>
+                        {/*
+                          Hidden on the caller's own comment: the API refuses
+                          a self-report, and an action that always fails is
+                          worse than no action. They have Delete instead.
+                        */}
+                        <ReportMenu
+                          targetType="COMMENT"
+                          targetId={comment.id}
+                          noun="comment"
+                          hidden={comment.user.id === myId}
+                        />
+                      </div>
 
                       {open ? (
                         replies.status === 'loading' ? (
@@ -664,16 +676,22 @@ export function StoryDetailPage() {
                                     <span>{formatRelative(reply.createdAt)}</span>
                                   </p>
                                   <p className="comment__text">{reply.content}</p>
-                                  {reply.user.id === myId ? (
-                                    <p className="comment__actions">
+                                  <div className="comment__actions">
+                                    {reply.user.id === myId ? (
                                       <button
                                         type="button"
                                         onClick={() => onDeleteComment(reply)}
                                       >
                                         Delete
                                       </button>
-                                    </p>
-                                  ) : null}
+                                    ) : null}
+                                    <ReportMenu
+                                      targetType="COMMENT"
+                                      targetId={reply.id}
+                                      noun="reply"
+                                      hidden={reply.user.id === myId}
+                                    />
+                                  </div>
                                 </div>
                               </li>
                             ))}

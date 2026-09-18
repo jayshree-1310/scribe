@@ -1,9 +1,10 @@
 /**
  * Client-side session state.
  *
- * Sign-in, registration and the profile the session carries all come from the
- * API; what is still local is the onboarding answers and the presentational
- * fields the mock supplies (`AuthProvider` explains which).
+ * Sign-in, registration, the profile the session carries and whether
+ * onboarding is finished all come from the API. What is still local is the
+ * presentational half of a `User` that the mock supplies -- `AuthProvider`
+ * explains which fields and why.
  */
 
 import { createContext, useContext } from 'react'
@@ -11,13 +12,6 @@ import type { AccountProfile } from '../data/account-api'
 import type { Session, User } from '../types/domain'
 
 export const SESSION_STORAGE_KEY = 'scribe:session'
-
-export interface OnboardingAnswers {
-  favoriteGenreIds: string[]
-  followedAuthorIds: string[]
-  interests: string[]
-  wantsToWrite: boolean
-}
 
 export interface GoogleSignInResult {
   user: User
@@ -36,7 +30,17 @@ export interface AuthContextValue {
     password: string
   }) => Promise<User>
   signInWithGoogle: () => Promise<GoogleSignInResult>
-  completeOnboarding: (answers: OnboardingAnswers) => void
+  /**
+   * Records locally that the flow is finished, once the API has been told.
+   *
+   * `OnboardingPage` owns the saving -- every step of it writes through
+   * `data/preferences-api.ts` as the reader advances, so a refresh resumes --
+   * and calls this afterwards so the session agrees without waiting for the
+   * next `/account/me`. The server's `onboardingComplete` is the truth; this
+   * only stops `RequireAuth` bouncing the reader straight back into the flow
+   * they just finished.
+   */
+  completeOnboarding: () => void
   /**
    * Folds a freshly saved profile back into the session, so the avatar in the
    * top bar and the name on the profile page change the moment settings are

@@ -1,0 +1,631 @@
+[
+  {
+    "id": "schema.moderation",
+    "label": "Create schema \"moderation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"moderation\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"moderation\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "table.report",
+    "label": "Create table \"report\"",
+    "summary": "Creates table \"report\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "moderation",
+        "objectType": "table",
+        "name": "report"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"report\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"moderation\".\"report\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"report\"",
+        "sql": "CREATE TABLE \"moderation\".\"report\" (\n  \"action\" text,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"details\" text,\n  \"id\" text NOT NULL,\n  \"note\" text,\n  \"reason\" text NOT NULL,\n  \"reporterId\" text NOT NULL,\n  \"resolvedAt\" timestamptz,\n  \"resolvedById\" text,\n  \"status\" text DEFAULT 'OPEN' NOT NULL,\n  \"targetId\" text NOT NULL,\n  \"targetType\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"report_action_check_5f2de721\" CHECK (\"action\" IN ('DISMISS', 'HIDE', 'SUSPEND')),\n  CONSTRAINT \"report_reason_check_735e3aeb\" CHECK (\"reason\" IN ('SPAM', 'HARASSMENT', 'HATE', 'SEXUAL', 'VIOLENCE', 'SPOILER', 'OTHER')),\n  CONSTRAINT \"report_status_check_2a206a64\" CHECK (\"status\" IN ('OPEN', 'RESOLVED')),\n  CONSTRAINT \"report_targetType_check_2c6acd2f\" CHECK (\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"report\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"moderation\".\"report\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.auth.user.suspendedAt",
+    "label": "Add column \"suspendedAt\" to \"user\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "column",
+        "name": "suspendedAt",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"suspendedAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "user",
+          "suspendedAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"suspendedAt\"",
+        "sql": "ALTER TABLE \"auth\".\"user\" ADD COLUMN \"suspendedAt\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"suspendedAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "user",
+          "suspendedAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.channels.channelPost.hiddenAt",
+    "label": "Add column \"hiddenAt\" to \"channelPost\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "channels",
+        "objectType": "column",
+        "name": "hiddenAt",
+        "table": "channelPost"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"hiddenAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "channels",
+          "channelPost",
+          "hiddenAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"hiddenAt\"",
+        "sql": "ALTER TABLE \"channels\".\"channelPost\" ADD COLUMN \"hiddenAt\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"hiddenAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "channels",
+          "channelPost",
+          "hiddenAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.clubs.clubDiscussion.hiddenAt",
+    "label": "Add column \"hiddenAt\" to \"clubDiscussion\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "clubs",
+        "objectType": "column",
+        "name": "hiddenAt",
+        "table": "clubDiscussion"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"hiddenAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "clubs",
+          "clubDiscussion",
+          "hiddenAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"hiddenAt\"",
+        "sql": "ALTER TABLE \"clubs\".\"clubDiscussion\" ADD COLUMN \"hiddenAt\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"hiddenAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "clubs",
+          "clubDiscussion",
+          "hiddenAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.engagement.comment.hiddenAt",
+    "label": "Add column \"hiddenAt\" to \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "column",
+        "name": "hiddenAt",
+        "table": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"hiddenAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "engagement",
+          "comment",
+          "hiddenAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"hiddenAt\"",
+        "sql": "ALTER TABLE \"engagement\".\"comment\" ADD COLUMN \"hiddenAt\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"hiddenAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "engagement",
+          "comment",
+          "hiddenAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.notifications.notification.sourceId",
+    "label": "Add column \"sourceId\" to \"notification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "column",
+        "name": "sourceId",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"sourceId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "notifications",
+          "notification",
+          "sourceId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"sourceId\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" ADD COLUMN \"sourceId\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"sourceId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "notifications",
+          "notification",
+          "sourceId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.notifications.notification.sourceType",
+    "label": "Add column \"sourceType\" to \"notification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "column",
+        "name": "sourceType",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"sourceType\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "notifications",
+          "notification",
+          "sourceType"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"sourceType\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" ADD COLUMN \"sourceType\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"sourceType\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "notifications",
+          "notification",
+          "sourceType"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notification.notification_sourceType_check_18693ee1",
+    "label": "Add check constraint \"notification_sourceType_check_18693ee1\" on \"notification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_sourceType_check_18693ee1",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_sourceType_check_18693ee1\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_sourceType_check_18693ee1",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notification_sourceType_check_18693ee1\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" ADD CONSTRAINT \"notification_sourceType_check_18693ee1\" CHECK (\"sourceType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_sourceType_check_18693ee1\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_sourceType_check_18693ee1",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.report.report_reporterId_idx_aa245831",
+    "label": "Create index \"report_reporterId_idx_aa245831\" on \"report\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "moderation",
+        "objectType": "index",
+        "name": "report_reporterId_idx_aa245831",
+        "table": "report"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"report_reporterId_idx_aa245831\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"moderation\".\"report_reporterId_idx_aa245831\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"report_reporterId_idx_aa245831\"",
+        "sql": "CREATE INDEX \"report_reporterId_idx_aa245831\" ON \"moderation\".\"report\" (\"reporterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"report_reporterId_idx_aa245831\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"moderation\".\"report_reporterId_idx_aa245831\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.report.report_resolvedById_idx_fc75edc7",
+    "label": "Create index \"report_resolvedById_idx_fc75edc7\" on \"report\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "moderation",
+        "objectType": "index",
+        "name": "report_resolvedById_idx_fc75edc7",
+        "table": "report"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"report_resolvedById_idx_fc75edc7\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"moderation\".\"report_resolvedById_idx_fc75edc7\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"report_resolvedById_idx_fc75edc7\"",
+        "sql": "CREATE INDEX \"report_resolvedById_idx_fc75edc7\" ON \"moderation\".\"report\" (\"resolvedById\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"report_resolvedById_idx_fc75edc7\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"moderation\".\"report_resolvedById_idx_fc75edc7\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.report.report_status_createdAt_idx_58610442",
+    "label": "Create index \"report_status_createdAt_idx_58610442\" on \"report\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "moderation",
+        "objectType": "index",
+        "name": "report_status_createdAt_idx_58610442",
+        "table": "report"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"report_status_createdAt_idx_58610442\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"moderation\".\"report_status_createdAt_idx_58610442\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"report_status_createdAt_idx_58610442\"",
+        "sql": "CREATE INDEX \"report_status_createdAt_idx_58610442\" ON \"moderation\".\"report\" (\"status\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"report_status_createdAt_idx_58610442\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"moderation\".\"report_status_createdAt_idx_58610442\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.report.report_targetType_targetId_status_idx_f4be9279",
+    "label": "Create index \"report_targetType_targetId_status_idx_f4be9279\" on \"report\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "moderation",
+        "objectType": "index",
+        "name": "report_targetType_targetId_status_idx_f4be9279",
+        "table": "report"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"report_targetType_targetId_status_idx_f4be9279\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"moderation\".\"report_targetType_targetId_status_idx_f4be9279\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"report_targetType_targetId_status_idx_f4be9279\"",
+        "sql": "CREATE INDEX \"report_targetType_targetId_status_idx_f4be9279\" ON \"moderation\".\"report\" (\"targetType\", \"targetId\", \"status\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"report_targetType_targetId_status_idx_f4be9279\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"moderation\".\"report_targetType_targetId_status_idx_f4be9279\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.notification.notification_sourceType_sourceId_idx_9b8c3bc3",
+    "label": "Create index \"notification_sourceType_sourceId_idx_9b8c3bc3\" on \"notification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "index",
+        "name": "notification_sourceType_sourceId_idx_9b8c3bc3",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"notification_sourceType_sourceId_idx_9b8c3bc3\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"notifications\".\"notification_sourceType_sourceId_idx_9b8c3bc3\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"notification_sourceType_sourceId_idx_9b8c3bc3\"",
+        "sql": "CREATE INDEX \"notification_sourceType_sourceId_idx_9b8c3bc3\" ON \"notifications\".\"notification\" (\"sourceType\", \"sourceId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"notification_sourceType_sourceId_idx_9b8c3bc3\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"notifications\".\"notification_sourceType_sourceId_idx_9b8c3bc3\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.report.report_reporterId_fkey",
+    "label": "Add foreign key \"report_reporterId_fkey\" on \"report\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "moderation",
+        "objectType": "foreignKey",
+        "name": "report_reporterId_fkey",
+        "table": "report"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"report_reporterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "report_reporterId_fkey",
+          "moderation",
+          "\"moderation\".\"report\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"report_reporterId_fkey\"",
+        "sql": "ALTER TABLE \"moderation\".\"report\"\nADD CONSTRAINT \"report_reporterId_fkey\"\nFOREIGN KEY (\"reporterId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"report_reporterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "report_reporterId_fkey",
+          "moderation",
+          "\"moderation\".\"report\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.report.report_resolvedById_fkey",
+    "label": "Add foreign key \"report_resolvedById_fkey\" on \"report\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "moderation",
+        "objectType": "foreignKey",
+        "name": "report_resolvedById_fkey",
+        "table": "report"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"report_resolvedById_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "report_resolvedById_fkey",
+          "moderation",
+          "\"moderation\".\"report\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"report_resolvedById_fkey\"",
+        "sql": "ALTER TABLE \"moderation\".\"report\"\nADD CONSTRAINT \"report_resolvedById_fkey\"\nFOREIGN KEY (\"resolvedById\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"report_resolvedById_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "report_resolvedById_fkey",
+          "moderation",
+          "\"moderation\".\"report\""
+        ]
+      }
+    ]
+  }
+]

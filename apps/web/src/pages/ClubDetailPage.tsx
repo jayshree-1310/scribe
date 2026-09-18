@@ -15,6 +15,7 @@ import {
 } from '../types/clubs'
 import { storyAuthorName } from '../types/stories'
 import { AppShell } from '../components/layout/AppShell'
+import { ReportMenu } from '../components/moderation/ReportMenu'
 import { Avatar } from '../components/ui/Avatar'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Card, SectionHead } from '../components/ui/Card'
@@ -382,7 +383,7 @@ export function ClubDetailPage() {
                           {formatRelative(thread.createdAt)}
                         </p>
                         <p className="discussion__text">{thread.body}</p>
-                        <p className="discussion__foot">
+                        <div className="discussion__foot">
                           <span>
                             <Icon name="comment" size="0.9em" />
                             {formatCount(thread.replyCount)}{' '}
@@ -422,7 +423,20 @@ export function ClubDetailPage() {
                               Delete
                             </button>
                           ) : null}
-                        </p>
+                          {/*
+                            A club moderator can already delete this; reporting
+                            it escalates to a platform moderator, which is a
+                            different and sometimes necessary thing. Hidden
+                            only on the caller's own words, which the API
+                            refuses a report of.
+                          */}
+                          <ReportMenu
+                            targetType="CLUB_DISCUSSION"
+                            targetId={thread.id}
+                            noun="thread"
+                            hidden={thread.user.id === myId}
+                          />
+                        </div>
 
                         {open ? (
                           replies.status === 'loading' ? (
@@ -438,6 +452,14 @@ export function ClubDetailPage() {
                                       {formatRelative(reply.createdAt)}
                                     </p>
                                     <p className="discussion__text">{reply.body}</p>
+                                    <div className="discussion__foot">
+                                      <ReportMenu
+                                        targetType="CLUB_DISCUSSION"
+                                        targetId={reply.id}
+                                        noun="reply"
+                                        hidden={reply.user.id === myId}
+                                      />
+                                    </div>
                                   </div>
                                 </li>
                               ))}

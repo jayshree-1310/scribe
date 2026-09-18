@@ -16,6 +16,7 @@ import { revokeAllSessions } from "../lib/sessions.js";
 import { storage } from "../lib/storage.js";
 import { flushBadges } from "./gamification.js";
 import { flushNotifications } from "./notifications.js";
+import { deletePreferencesFor, hasCompletedOnboarding } from "./preferences.js";
 
 /** The profile shape the account endpoints return. Written out field by field
  * rather than spread from the row, so adding a column — `passwordHash` being
@@ -34,6 +35,18 @@ export interface AccountProfile {
   authorLevel: number;
   joinedAt: string;
   /**
+   * Whether this reader has been through onboarding.
+   *
+   * Carried on the profile rather than left to `GET
+   * /api/account/preferences`, because it is the flag the web app gates its
+   * routing on and the profile is already fetched on every page load. One
+   * request answers "who is this?" and "where do they belong?" together;
+   * splitting it would flash the feed before the redirect. The column behind
+   * it is `auth.UserPreference.onboardingCompletedAt` -- see
+   * `services/preferences.ts` for why an absent row means "never asked".
+   */
+  onboardingComplete: boolean;
+  /**
    * Whether this account can be signed into with a password at all. A
    * Google-only account has none (`contract.prisma`), so the settings form
    * has to offer "set a password" rather than "change your password" — and
@@ -47,6 +60,15 @@ export interface ProfileUpdate {
   email?: string | undefined;
   displayName?: string | undefined;
   bio?: string | undefined;
+  /**
+   * Self-declared, and deliberately one-way in practice: the authoring and
+   * channel endpoints already set it to `true` the first time somebody
+   * publishes. Accepting it here is what makes onboarding's last question --
+   * "do you write too?" -- an answer that survives a reload rather than a
+   * local flag. It is a display flag and gates nothing: every author-side
+   * endpoint authorises on ownership of the row it is about.
+   */
+  isAuthor?: boolean | undefined;
 }
 
 /** Largest avatar we accept, before any re-encoding. */
@@ -80,21 +102,24 @@ const PROFILE_COLUMNS = [
   "passwordHash",
 ] as const;
 
-function toProfile(row: {
-  id: string;
-  username: string;
-  email: string;
-  emailVerified: boolean;
-  displayName: string | null;
-  avatarUrl: string | null;
-  bio: string | null;
-  isAuthor: boolean;
-  readingStreak: number;
-  readerLevel: number;
-  authorLevel: number;
-  createdAt: unknown;
-  passwordHash: string | null;
-}): AccountProfile {
+function toProfile(
+  row: {
+    id: string;
+    username: string;
+    email: string;
+    emailVerified: boolean;
+    displayName: string | null;
+    avatarUrl: string | null;
+    bio: string | null;
+    isAuthor: boolean;
+    readingStreak: number;
+    readerLevel: number;
+    authorLevel: number;
+    createdAt: unknown;
+    passwordHash: string | null;
+  },
+  onboardingComplete: boolean,
+): AccountProfile {
   return {
     id: row.id,
     username: row.username,
@@ -108,14 +133,21 @@ function toProfile(row: {
     readerLevel: row.readerLevel,
     authorLevel: row.authorLevel,
     joinedAt: toIso(row.createdAt),
+    onboardingComplete,
     hasPassword: row.passwordHash !== null,
   };
 }
 
 async function loadProfile(userId: string): Promise<AccountProfile> {
-  const row = await db.orm.auth.User.select(...PROFILE_COLUMNS)
-    .where((u) => u.id.eq(userId))
-    .first();
+  // Two statements in parallel rather than a join: the onboarding flag lives
+  // in a different table whose row may not exist, and the profile is read on
+  // every page load, so the cost worth minimising is the round trips.
+  const [row, onboardingComplete] = await Promise.all([
+    db.orm.auth.User.select(...PROFILE_COLUMNS)
+      .where((u) => u.id.eq(userId))
+      .first(),
+    hasCompletedOnboarding(userId),
+  ]);
 
   /**
    * A live access token for a deleted account: the token is valid, the account
@@ -124,7 +156,7 @@ async function loadProfile(userId: string): Promise<AccountProfile> {
    */
   if (!row) throw HttpError.unauthorized("Your account no longer exists.");
 
-  return toProfile(row);
+  return toProfile(row, onboardingComplete);
 }
 
 export function getProfile(userId: string): Promise<AccountProfile> {
@@ -189,6 +221,10 @@ export async function updateProfile(
 
   if (update.bio !== undefined) {
     changes["bio"] = update.bio.length > 0 ? update.bio : null;
+  }
+
+  if (update.isAuthor !== undefined && update.isAuthor !== current.isAuthor) {
+    changes["isAuthor"] = update.isAuthor;
   }
 
   if (Object.keys(changes).length === 0) return current;
@@ -453,6 +489,8 @@ export async function deleteAccount(
     await deleteAll(() =>
       tx.orm.gamification.UserBadge.where((row) => row.userId.eq(userId)),
     );
+    // The three preference tables, all of which key on `auth.User`.
+    await deletePreferencesFor(tx, userId);
     // Addressed to them, and caused by them. See the drain above.
     await deleteAll(() =>
       tx.orm.notifications.Notification.where((row) => row.userId.eq(userId)),
@@ -460,6 +498,37 @@ export async function deleteAccount(
     await deleteAll(() =>
       tx.orm.notifications.Notification.where((row) => row.actorId.eq(userId)),
     );
+
+    /**
+     * Both ends of `moderation.Report`, and deliberately not the same way.
+     *
+     * The reports this account *filed* go with it: they are its own words
+     * about somebody else, and a queue entry whose author no longer exists is
+     * a complaint nobody can follow up.
+     *
+     * The reports it *resolved* stay, with the name dropped. They are the
+     * record of a decision taken about a third party's content, and that
+     * decision did not stop being true because the moderator left; deleting
+     * them would quietly reopen nothing and lose the only trace of why a
+     * comment is hidden. Null satisfies `report_resolvedById_fkey`, which is
+     * what makes keeping them possible at all.
+     */
+    await deleteAll(() =>
+      tx.orm.moderation.Report.where((row) => row.reporterId.eq(userId)),
+    );
+
+    // One update per row, the way the loops above are: `update()` changes one
+    // row per call in this client, the same property `deleteAll` exists for.
+    const resolved = await tx.orm.moderation.Report.select("id")
+      .where((row) => row.resolvedById.eq(userId))
+      .all();
+
+    for (const { id } of resolved) {
+      await tx.orm.moderation.Report.where((row) => row.id.eq(id)).update({
+        resolvedById: null,
+        updatedAt: Temporal.Now.instant(),
+      });
+    }
     await deleteAll(() =>
       tx.orm.clubs.ClubMembership.where((row) => row.userId.eq(userId)),
     );

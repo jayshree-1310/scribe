@@ -18,6 +18,15 @@ import {
   setPassword as setAccountPassword,
   signOutEverywhere,
 } from '../data/auth-api'
+import { getPreferences, savePreferences } from '../data/preferences-api'
+import { getGenres } from '../data/stories-api'
+import {
+  CONTENT_LENGTH_OPTIONS,
+  type ContentLength,
+  type Preferences,
+} from '../types/preferences'
+import type { NotificationType } from '../types/notifications'
+import { useAsync } from '../hooks/useAsync'
 import { THEME_PREFERENCES, useTheme, type ThemePreference } from '../lib/theme'
 import {
   FONT_SIZES,
@@ -35,12 +44,14 @@ import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { Dialog } from '../components/ui/Dialog'
 import { Icon, type IconName } from '../components/ui/Icon'
+import { SelectableChip } from '../components/ui/Chip'
 import { Select } from '../components/ui/Select'
 import { Switch } from '../components/ui/Checkbox'
 import { SegmentedControl } from '../components/ui/Tabs'
 import { PasswordField, TextField } from '../components/ui/TextField'
 import { PasswordStrength } from '../components/ui/PasswordStrength'
-import { EmptyState } from '../components/ui/States'
+import { EmptyState, ErrorState } from '../components/ui/States'
+import { Skeleton } from '../components/ui/Skeleton'
 import './pages.css'
 
 interface Section {
@@ -87,6 +98,15 @@ const SECTIONS: Section[] = [
     description: 'Defaults for the reader. You can also change these while reading.',
   },
   {
+    id: 'taste',
+    label: 'Recommendations',
+    blurb: 'Genres, length',
+    icon: 'compass',
+    title: 'Recommendations',
+    description:
+      'What we rank "Recommended for you" on. Saved as you change it.',
+  },
+  {
     id: 'notifications',
     label: 'Notifications',
     blurb: "What's worth a ping",
@@ -111,7 +131,10 @@ const SECTIONS: Section[] = [
  */
 const NAV_GROUPS: { label: string; ids: string[] }[] = [
   { label: 'Account', ids: ['account', 'security'] },
-  { label: 'Preferences', ids: ['appearance', 'reading', 'notifications', 'privacy'] },
+  {
+    label: 'Preferences',
+    ids: ['appearance', 'reading', 'taste', 'notifications', 'privacy'],
+  },
 ]
 
 const THEME_ICONS = { light: 'sun', dark: 'moon', system: 'monitor' } as const
@@ -120,6 +143,45 @@ const THEME_LABELS: Record<ThemePreference, string> = {
   dark: 'Dark',
   system: 'System',
 }
+
+/**
+ * The five `NotificationType` values, worded as a reader would recognise them.
+ *
+ * Exactly the API's enum and in the order the bell tends to fill up: a sixth
+ * type is a row here and nothing else, because the mute is enforced in the
+ * fan-out rather than by anything this page knows.
+ */
+const NOTIFICATION_SETTINGS: {
+  type: NotificationType
+  label: string
+  description: string
+}[] = [
+  {
+    type: 'COMMENT_REPLY',
+    label: 'Replies to you',
+    description: 'When somebody answers your comment or your club thread.',
+  },
+  {
+    type: 'CHANNEL_POST',
+    label: 'Channel posts',
+    description: 'New announcements from channels you subscribe to.',
+  },
+  {
+    type: 'CLUB_DISCUSSION',
+    label: 'Club discussions',
+    description: 'New threads in book clubs you have joined.',
+  },
+  {
+    type: 'NEW_STORY',
+    label: 'New stories',
+    description: 'When an author you follow lists something new.',
+  },
+  {
+    type: 'BADGE_EARNED',
+    label: 'Badges',
+    description: 'When you earn one.',
+  },
+]
 
 const VISIBILITY_OPTIONS = [
   { value: 'public', label: 'Everyone' },
@@ -225,13 +287,25 @@ export function SettingsPage() {
   const [verificationSent, setVerificationSent] = useState(false)
   const [signingOutAll, setSigningOutAll] = useState(false)
 
-  const [notifications, setNotifications] = useState({
-    comments: true,
-    ratings: true,
-    clubs: true,
-    challenges: false,
-    authorUpdates: true,
-  })
+  /**
+   * Taste and mutes, both rows in `auth.UserPreference` and its two junctions.
+   *
+   * Loaded once and then edited locally, with every change written straight
+   * through: there is no Save button on this section because there is nothing
+   * to lose by getting it wrong -- a chip is one click to put back, unlike the
+   * profile above, which is a form somebody fills in and then decides about.
+   */
+  const savedPreferences = useAsync(() => getPreferences(), [])
+  const genres = useAsync(() => getGenres(), [])
+
+  const [taste, setTaste] = useState<Preferences | null>(null)
+  const [savingTaste, setSavingTaste] = useState(false)
+
+  useEffect(() => {
+    if (savedPreferences.status === 'ready' && savedPreferences.data) {
+      setTaste(savedPreferences.data)
+    }
+  }, [savedPreferences.status, savedPreferences.data])
 
   const [privacy, setPrivacy] = useState({
     profileVisibility: 'public',
@@ -258,6 +332,35 @@ export function SettingsPage() {
 
   function clearError(field: string) {
     setErrors((current) => ({ ...current, [field]: '' }))
+  }
+
+  /**
+   * Writes one preference change and keeps what came back.
+   *
+   * Optimistic: the control moves first and the response replaces the whole
+   * object, so a rejected write puts the reader back where the server says
+   * they are rather than where the click left them.
+   */
+  async function writeTaste(
+    change: Partial<Pick<Preferences, 'genreIds' | 'contentLength' | 'mutedNotificationTypes'>>,
+    previous: Preferences,
+  ): Promise<void> {
+    setTaste({ ...previous, ...change })
+    setSavingTaste(true)
+    try {
+      setTaste(await savePreferences(change))
+    } catch (cause) {
+      setTaste(previous)
+      showToast({
+        tone: 'error',
+        message:
+          cause instanceof ApiError
+            ? cause.message
+            : 'That did not save. Check your connection and try again.',
+      })
+    } finally {
+      setSavingTaste(false)
+    }
   }
 
   /** Folds a freshly written profile back into the session. */
@@ -902,42 +1005,132 @@ export function SettingsPage() {
           ) : null}
 
           {/* Notifications ------------------------------------------ */}
+          {active.id === 'taste' ? (
+            <>
+              <Panel
+                title="Genres you like"
+                description="Stories in these are ranked first. Pick as many as you like."
+              >
+                {genres.status === 'error' ? (
+                  <ErrorState message={genres.error} onRetry={genres.reload} />
+                ) : genres.status === 'loading' || taste === null ? (
+                  <div className="chip-row">
+                    {Array.from({ length: 8 }, (_, index) => (
+                      <Skeleton
+                        key={index}
+                        width="7rem"
+                        height="2.75rem"
+                        radius="var(--radius-full)"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  // `aria-busy` rather than disabled controls: a chip that
+                  // stopped responding mid-click would feel broken, and the
+                  // write is optimistic anyway.
+                  <div className="chip-row" aria-busy={savingTaste}>
+                    {genres.data?.map((genre) => {
+                      const chosen = taste.genreIds.includes(genre.id)
+                      return (
+                        <SelectableChip
+                          key={genre.id}
+                          hue={genre.hue}
+                          selected={chosen}
+                          onToggle={() =>
+                            void writeTaste(
+                              {
+                                genreIds: chosen
+                                  ? taste.genreIds.filter((id) => id !== genre.id)
+                                  : [...taste.genreIds, genre.id],
+                              },
+                              taste,
+                            )
+                          }
+                        >
+                          {genre.name}
+                        </SelectableChip>
+                      )
+                    })}
+                  </div>
+                )}
+              </Panel>
+
+              <Panel
+                title="Length"
+                description="How long a story you want to be handed."
+              >
+                {taste === null ? (
+                  <Skeleton height="2.5rem" />
+                ) : (
+                  // A select rather than the segmented control the theme and
+                  // reader panels use: four options with labels this long do
+                  // not fit a segmented row at phone width.
+                  <Select
+                    label="Preferred length"
+                    value={taste.contentLength}
+                    options={CONTENT_LENGTH_OPTIONS.map((option) => ({
+                      value: option.id,
+                      label: `${option.label} — ${option.detail.toLowerCase()}`,
+                    }))}
+                    onChange={(value) =>
+                      void writeTaste(
+                        { contentLength: value as ContentLength },
+                        taste,
+                      )
+                    }
+                  />
+                )}
+              </Panel>
+            </>
+          ) : null}
+
+          {/* Notifications ------------------------------------------- */}
           {active.id === 'notifications' ? (
-            <Panel title="Email and in-app">
-              <div className="settings__switches">
-                <Switch
-                  checked={notifications.comments}
-                  onChange={(value) => setNotifications((c) => ({ ...c, comments: value }))}
-                  label="Comments"
-                  description="Replies to your comments and comments on your stories."
+            <Panel
+              title="What reaches your bell"
+              description={
+                <>
+                  Turning one off stops the notification being written at all,
+                  so it will not be waiting for you later. It does not change
+                  what you are subscribed to — leaving a club or unsubscribing
+                  from a channel is still its own action.
+                </>
+              }
+            >
+              {savedPreferences.status === 'error' ? (
+                <ErrorState
+                  message={savedPreferences.error}
+                  onRetry={savedPreferences.reload}
                 />
-                <Switch
-                  checked={notifications.ratings}
-                  onChange={(value) => setNotifications((c) => ({ ...c, ratings: value }))}
-                  label="Ratings and reviews"
-                  description="When someone rates or reviews your work."
-                />
-                <Switch
-                  checked={notifications.clubs}
-                  onChange={(value) => setNotifications((c) => ({ ...c, clubs: value }))}
-                  label="Book clubs"
-                  description="New discussions in clubs you've joined."
-                />
-                <Switch
-                  checked={notifications.challenges}
-                  onChange={(value) => setNotifications((c) => ({ ...c, challenges: value }))}
-                  label="Writing challenges"
-                  description="Deadlines, results and new prompts."
-                />
-                <Switch
-                  checked={notifications.authorUpdates}
-                  onChange={(value) =>
-                    setNotifications((c) => ({ ...c, authorUpdates: value }))
-                  }
-                  label="Author updates"
-                  description="New chapters and channel posts from authors you follow."
-                />
-              </div>
+              ) : taste === null ? (
+                <Skeleton height="10rem" />
+              ) : (
+                <div className="settings__switches" aria-busy={savingTaste}>
+                  {NOTIFICATION_SETTINGS.map((setting) => {
+                    const on = !taste.mutedNotificationTypes.includes(setting.type)
+                    return (
+                      <Switch
+                        key={setting.type}
+                        checked={on}
+                        onChange={() =>
+                          void writeTaste(
+                            {
+                              mutedNotificationTypes: on
+                                ? [...taste.mutedNotificationTypes, setting.type]
+                                : taste.mutedNotificationTypes.filter(
+                                    (type) => type !== setting.type,
+                                  ),
+                            },
+                            taste,
+                          )
+                        }
+                        label={setting.label}
+                        description={setting.description}
+                      />
+                    )
+                  })}
+                </div>
+              )}
             </Panel>
           ) : null}
 

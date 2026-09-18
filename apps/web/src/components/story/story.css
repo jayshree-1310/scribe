@@ -323,6 +323,20 @@
   scroll-snap-align: start;
 }
 
+/*
+ * Why a card is on a recommendation shelf, under the card it explains.
+ * Clamped to one line: the reason is a hint rather than a sentence, and a
+ * second line would push the covers in the row out of alignment.
+ */
+.shelf__reason {
+  margin: var(--space-2) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .shelf__controls {
   position: absolute;
   top: -3rem;

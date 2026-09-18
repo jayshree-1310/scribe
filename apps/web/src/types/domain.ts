@@ -48,13 +48,19 @@ export interface UserStats {
   minutesReadThisWeek: number
 }
 
-/** The signed-in user, plus the preferences captured during onboarding. */
+/**
+ * The signed-in user, and whether they have been through onboarding.
+ *
+ * The onboarding *answers* used to live here too -- genres, followed authors,
+ * a "do you write?" flag -- and were thrown away on every reload because
+ * nothing persisted them. They are rows now (`auth.UserPreference` and the
+ * follow graph), read through `data/preferences-api.ts` by the two surfaces
+ * that care. What is left is the one bit `RequireAuth` routes on, mirrored
+ * from `AccountProfile.onboardingComplete` so a redirect costs no request.
+ */
 export interface Session {
   user: User
   onboarded: boolean
-  favoriteGenreIds: string[]
-  followedAuthorIds: string[]
-  wantsToWrite: boolean
 }
 
 /* content ------------------------------------------------------------- */

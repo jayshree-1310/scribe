@@ -7,6 +7,7 @@ import * as channelsApi from '../data/channels-api'
 import { channelAuthorName, type ChannelPost } from '../types/channels'
 import { paragraphsOf } from '../types/stories'
 import { AppShell } from '../components/layout/AppShell'
+import { ReportMenu } from '../components/moderation/ReportMenu'
 import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -222,6 +223,19 @@ export function ChannelDetailPage() {
                         {post.updatedAt !== post.postedAt ? ' · edited' : ''}
                       </p>
                     </div>
+                    {/*
+                      Always offered here, unlike the comment surfaces: a
+                      channel is one-way, so the only person who could be
+                      reporting their own post is the channel's author, and
+                      they are reading their own feed from
+                      `AuthorChannelsPage` rather than this page. The API
+                      refuses it either way.
+                    */}
+                    <ReportMenu
+                      targetType="CHANNEL_POST"
+                      targetId={post.id}
+                      noun="post"
+                    />
                   </header>
 
                   <h2 className="post__title">{post.title}</h2>

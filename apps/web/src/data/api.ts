@@ -1,34 +1,24 @@
 /**
  * What is left of the mock data layer.
  *
- * Stories, chapters, books, shelves, comments, ratings, reading history,
- * clubs, channels, challenges and badges all come from the API now -- see
- * `data/stories-api.ts`, `data/books-api.ts`, `data/account-api.ts`,
- * `data/clubs-api.ts`, `data/channels-api.ts`, `data/challenges-api.ts` and
- * `data/gamification-api.ts`. What remains here is the one feature with no
- * endpoint yet: the author directory `OnboardingPage` picks from, which wants
- * somewhere to persist its answers (Task 16) rather than another read.
+ * One export, and it is not a fetch. Stories, chapters, books, shelves,
+ * comments, ratings, reading history, clubs, channels, challenges, badges,
+ * notifications, reports, preferences, recommendations and the author
+ * directory all come from the API now -- see `data/stories-api.ts`,
+ * `data/books-api.ts`, `data/account-api.ts`, `data/preferences-api.ts` and
+ * `data/recommendations-api.ts` among the rest.
+ *
+ * The author directory was the last *function* here, read by the onboarding
+ * author picker. Task 16 replaced it with `GET /api/recommendations/authors`,
+ * which ranks real accounts by the genres the reader just saved -- so the step
+ * follows people who exist instead of fixtures who do not.
+ *
+ * What survives is `db.currentUser`, for the one consumer that needs it
+ * directly: `AuthProvider` fills the presentational half of a session (avatar
+ * hue, follower counts, reading stats) that `auth.User` has no columns for.
+ * Task 17 is the sweep that removes it.
  */
 
 import * as db from './mock-db'
-import type { User } from '../types/domain'
 
-/** Simulated round-trip, kept short enough not to slow development down. */
-const LATENCY_MS = 260
-
-function delay<T>(value: T, ms = LATENCY_MS): Promise<T> {
-  return new Promise((resolve) => setTimeout(() => resolve(value), ms))
-}
-
-/* Reference data ------------------------------------------------------- */
-
-export function getAuthors(): Promise<User[]> {
-  return delay(db.authors, 140)
-}
-
-/**
- * The remaining fixtures, for the one consumer that needs them directly:
- * `AuthProvider` fills the presentational half of a session (avatar hue,
- * follower counts, reading stats) that the API does not carry yet.
- */
 export { db }

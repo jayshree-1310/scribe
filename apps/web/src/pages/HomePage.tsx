@@ -6,6 +6,7 @@ import * as books from '../data/books-api'
 import * as challengesApi from '../data/challenges-api'
 import * as clubsApi from '../data/clubs-api'
 import * as reading from '../data/reading-api'
+import * as recommendationsApi from '../data/recommendations-api'
 import type { Book, Discover } from '../types/books'
 import { AppShell } from '../components/layout/AppShell'
 import { ButtonLink } from '../components/ui/Button'
@@ -15,6 +16,7 @@ import { EmptyState, ErrorState } from '../components/ui/States'
 import { ProgressBar } from '../components/ui/Progress'
 import { Skeleton } from '../components/ui/Skeleton'
 import { BookCard, BookCardSkeleton } from '../components/books/BookCard'
+import { StoryCard, StoryCardSkeleton } from '../components/story/StoryCard'
 import { StoryShelf } from '../components/story/StoryShelf'
 import { ContinueCard } from '../components/story/ContinueCard'
 import { ChallengeCard, ClubCard } from '../components/story/Cards'
@@ -34,6 +36,14 @@ export function HomePage() {
    * target, that one is the set of books they chose to shelve.
    */
   const inProgressStories = useAsync(() => reading.getContinueReading(4), [])
+  /**
+   * The personalised rail, ranked server-side from this reader's genres,
+   * shelves, reading history, ratings and follows. It answers trending when
+   * they have given it nothing to rank on, and says which of the two it did
+   * in `basis` -- so the shelf below can be worded honestly rather than
+   * promising personalisation to somebody who just signed up.
+   */
+  const recommended = useAsync(() => recommendationsApi.getRecommendations(12), [])
   const clubs = useAsync(() => clubsApi.listClubs({ limit: 6 }), [])
   const challenges = useAsync(() => challengesApi.getChallenges(), [])
 
@@ -45,15 +55,10 @@ export function HomePage() {
   const [rails, setRails] = useState<{
     source: Discover
     trending: Book[]
-    recommended: Book[]
   } | null>(null)
 
   if (discover.status === 'ready' && discover.data && rails?.source !== discover.data) {
-    setRails({
-      source: discover.data,
-      trending: discover.data.trending,
-      recommended: discover.data.recommended,
-    })
+    setRails({ source: discover.data, trending: discover.data.trending })
   }
 
   /** Reflects a shelf change on every rail the book appears in. */
@@ -62,13 +67,7 @@ export function HomePage() {
       list.map((book) => (book.id === bookId ? { ...book, libraryStatus: status } : book))
 
     setRails((current) =>
-      current === null
-        ? current
-        : {
-            ...current,
-            trending: update(current.trending),
-            recommended: update(current.recommended),
-          },
+      current === null ? current : { ...current, trending: update(current.trending) },
     )
 
     // The "currently reading" shelf is defined by status, so it has to reload.
@@ -92,6 +91,9 @@ export function HomePage() {
   const suggestedClubs =
     clubs.data?.items.filter((club) => club.membership === null) ?? []
   const activeChallenges = challenges.data?.active ?? []
+  const picks = recommended.data?.items ?? []
+  /** False on the cold-start path, which is trending rather than personal. */
+  const personalised = recommended.data?.basis === 'personal'
 
   /** Rail body: skeletons while loading, cards once there are any. */
   function rail(label: string, items: Book[] | undefined) {
@@ -230,17 +232,47 @@ export function HomePage() {
         )}
       </section>
 
-      {/* Highly rated ---------------------------------------------------- */}
+      {/* Recommended ----------------------------------------------------- */}
       <section className="page-section">
         <SectionHead
-          title="Highly rated"
-          subtitle="The books readers finish and then recommend."
-          to="/discover?sort=top-rated"
+          title={personalised ? 'Recommended for you' : 'Trending on Scribe'}
+          subtitle={
+            personalised
+              ? 'Ranked from the genres you picked, your shelves and what you have been reading.'
+              : 'Tell us what you like in Settings and this shelf becomes yours.'
+          }
+          to="/discover"
         />
-        {discover.status === 'error' ? (
-          <ErrorState message={discover.error} onRetry={discover.reload} />
+
+        {recommended.status === 'error' ? (
+          <ErrorState message={recommended.error} onRetry={recommended.reload} />
+        ) : recommended.status === 'ready' && picks.length === 0 ? (
+          /*
+            Only reachable once a reader has met everything listed on Scribe,
+            since the cold-start path answers trending rather than nothing. The
+            catalogue rails below are still worth pointing at.
+          */
+          <EmptyState
+            icon="compass"
+            size="sm"
+            title="Nothing new to suggest"
+            description="You have already met every story on Scribe. The catalogue below is a good place to go next."
+          />
         ) : (
-          rail('Highly rated books', rails?.recommended)
+          <StoryShelf label="Recommended stories">
+            {recommended.status === 'loading'
+              ? Array.from({ length: 6 }, (_, index) => (
+                  <li key={index}>
+                    <StoryCardSkeleton />
+                  </li>
+                ))
+              : picks.map((item) => (
+                  <li key={item.story.id}>
+                    <StoryCard story={item.story} />
+                    <p className="shelf__reason">{item.reason}</p>
+                  </li>
+                ))}
+          </StoryShelf>
         )}
       </section>
 

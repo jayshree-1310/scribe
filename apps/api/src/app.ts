@@ -25,8 +25,11 @@ import clubsRouter from "./routes/clubs.js";
 import engagementRouter from "./routes/engagement.js";
 import gamificationRouter from "./routes/gamification.js";
 import libraryRouter from "./routes/library.js";
+import moderationRouter from "./routes/moderation.js";
 import notificationsRouter from "./routes/notifications.js";
+import preferencesRouter from "./routes/preferences.js";
 import readingRouter from "./routes/reading.js";
+import recommendationsRouter from "./routes/recommendations.js";
 import storiesRouter from "./routes/stories.js";
 import uploadsRouter from "./routes/uploads.js";
 import usersRouter from "./routes/users.js";
@@ -112,6 +115,11 @@ app.use(
 );
 
 app.use("/api/account", accountRouter);
+/**
+ * Reader preferences. A second router on `/api/account`, matching none of the
+ * paths above; see the header of `routes/preferences.ts`.
+ */
+app.use("/api/account", preferencesRouter);
 app.use("/api/ai", aiRouter);
 app.use("/api/auth", authRouter);
 // Passwords and email verification, split out of `auth.ts` to keep it
@@ -130,6 +138,7 @@ app.use("/api/clubs", clubsRouter);
 app.use("/api/library", libraryRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/reading", readingRouter);
+app.use("/api/recommendations", recommendationsRouter);
 app.use("/api/stories", storiesRouter);
 app.use("/api/uploads", uploadsRouter);
 /**
@@ -149,6 +158,13 @@ app.use("/api", engagementRouter);
  * which matches neither; see the header of `routes/gamification.ts`.
  */
 app.use("/api", gamificationRouter);
+/**
+ * Reporting and the moderation queue. Mounted at the root for the same reason
+ * again: `/api/reports` is the reader's half and `/api/moderation/reports` the
+ * staff half, and they are one service. See the header of
+ * `routes/moderation.ts`.
+ */
+app.use("/api", moderationRouter);
 
 app.use(notFoundHandler);
 app.use(errorHandler);

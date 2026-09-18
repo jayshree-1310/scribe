@@ -471,6 +471,9 @@ async function rangeTotals(
               JOIN mine ON mine."id" = c."storyId"
              WHERE c."createdAt" >= (${window.from}::date) AT TIME ZONE 'UTC'
                AND c."createdAt" <  ((${window.to}::date) + 1) AT TIME ZONE 'UTC'
+               -- A comment a moderator hid is not engagement the author
+               -- received. See services/moderation.ts.
+               AND c."hiddenAt" IS NULL
            )::int                                                        AS "comments",
            (SELECT COUNT(*)
               FROM "engagement"."rating" AS t

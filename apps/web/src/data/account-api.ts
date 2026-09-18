@@ -24,6 +24,12 @@ export interface AccountProfile {
   authorLevel: number
   joinedAt: string
   /**
+   * Whether this reader has been through onboarding. Carried here rather than
+   * left to `/account/preferences` because it is what `RequireAuth` routes on,
+   * and the profile is already fetched on every page load.
+   */
+  onboardingComplete: boolean
+  /**
    * Whether this account can be signed into with a password at all. Google
    * accounts start without one, so the settings form offers "set a password"
    * rather than "change your password".
@@ -37,6 +43,8 @@ export interface AccountUpdate {
   email?: string
   displayName?: string
   bio?: string
+  /** Self-declared, and what onboarding's "do you write too?" step saves. */
+  isAuthor?: boolean
 }
 
 export function getMyAccount(): Promise<AccountProfile> {

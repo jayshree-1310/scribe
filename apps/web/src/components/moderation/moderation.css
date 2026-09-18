@@ -1,0 +1,74 @@
+/* ==========================================================================
+   Reporting
+
+   The reason list inside `ReportMenu`'s dialog, and nothing else. The overflow
+   trigger is a plain `.btn` and the menu is `.dropdown`, both already styled in
+   `ui.css`; where those sit in a row is the surface's business and lives with
+   that surface's rules.
+   ========================================================================== */
+
+.report-reasons {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: 0;
+}
+
+.report-reasons__legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/*
+ * The whole row is the hit target, not just the dot: these are read on a phone
+ * with a thumb, and seven small circles in a column is the shape that gets
+ * mis-tapped.
+ */
+.report-reason {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.report-reason:hover {
+  background: var(--surface-hover);
+}
+
+.report-reason:has(.report-reason__input:checked) {
+  background: var(--surface-3);
+}
+
+/* Keyboard focus lands on the input, so the ring has to be drawn on the row. */
+.report-reason:has(.report-reason__input:focus-visible) {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.report-reason__input {
+  margin-top: 0.2rem;
+  accent-color: var(--brand);
+  flex: none;
+}
+
+.report-reason__body {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.report-reason__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.report-reason__hint {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}

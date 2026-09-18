@@ -17,6 +17,7 @@ import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
 import { notify } from "./notifications.js";
+import { assertNotSuspended } from "./roles.js";
 import { toIso } from "./stories.js";
 
 /**
@@ -163,6 +164,10 @@ async function hydrate(
 
   const posts = await db.orm.channels.ChannelPost.select("channelId")
     .where((row) => row.channelId.in(channelIds))
+    // Hidden posts are left out of the count for the same reason they are
+    // left out of the feed: a card claiming nine posts above a feed of eight
+    // looks like a pagination bug. See `services/moderation.ts`.
+    .where((row) => row.hiddenAt.isNull())
     .all();
 
   const subscriberCounts = new Map<string, number>();
@@ -549,6 +554,13 @@ function toPost(row: {
   };
 }
 
+/**
+ * Hidden posts are absent from every read that goes through here -- the feed,
+ * and the read-back a write answers with. In the base rather than at each call
+ * site because no caller wants a hidden row, so the only way to get it wrong
+ * is to forget. `ownedPost` carries the same filter and says why.
+ * See `services/moderation.ts`.
+ */
 function postsBase() {
   return db.orm.channels.ChannelPost.select(
     "id",
@@ -557,7 +569,7 @@ function postsBase() {
     "content",
     "postedAt",
     "updatedAt",
-  );
+  ).where((row) => row.hiddenAt.isNull());
 }
 
 /** A channel's feed: newest first, public. */
@@ -610,6 +622,10 @@ export async function createPost(
   slugOrId: string,
   input: PostInput,
 ): Promise<ChannelPost> {
+  // One of the four write seams a suspension stops; see the header of
+  // `services/moderation.ts` for the list.
+  await assertNotSuspended(userId);
+
   const timestamp = now();
 
   const postId = await db.transaction(async (tx) => {
@@ -652,6 +668,15 @@ async function ownedPost(
 ): Promise<{ id: string; channelId: string }> {
   const post = await client.orm.channels.ChannelPost.select("id", "channelId")
     .where((row) => row.id.eq(postId))
+    /**
+     * A hidden post is not the author's to edit or delete either. Editing one
+     * changes text nobody can read; deleting one destroys what a moderator
+     * may still have open reports about. 404 rather than 403, because from
+     * every other angle the post is already gone -- and because this runs
+     * before the write, which is what keeps `updatePost` from applying a
+     * change and then failing to read it back.
+     */
+    .where((row) => row.hiddenAt.isNull())
     .first();
 
   if (!post) throw HttpError.notFound(POST_NOT_FOUND);

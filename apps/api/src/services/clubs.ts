@@ -24,6 +24,7 @@ import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
 import { evaluateBadges } from "./gamification.js";
 import { notify } from "./notifications.js";
+import { assertNotSuspended } from "./roles.js";
 import { getStoriesByIds, toIso, type Story } from "./stories.js";
 
 /**
@@ -225,9 +226,12 @@ async function hydrate(
 
   // Top-level threads only: a reply is not a discussion in its own right, and
   // counting both would make the number disagree with the list beside it.
+  // Hidden threads are left out for the same reason -- a card reading "12
+  // discussions" above a list of eleven looks like a pagination bug.
   const threads = await db.orm.clubs.ClubDiscussion.select("clubId")
     .where((row) => row.clubId.in(clubIds))
     .where((row) => row.parentId.isNull())
+    .where((row) => row.hiddenAt.isNull())
     .all();
 
   const memberCounts = new Map<string, number>();
@@ -955,7 +959,11 @@ export async function listDiscussions(
     "parentId",
     "createdAt",
     "updatedAt",
-  ).where((row) => row.clubId.eq(club.id));
+  )
+    .where((row) => row.clubId.eq(club.id))
+    // Hidden threads and replies are absent from this list and from the count
+    // above it. See `services/moderation.ts`.
+    .where((row) => row.hiddenAt.isNull());
 
   collection =
     parentId === undefined
@@ -1017,6 +1025,9 @@ async function hydrateDiscussions(
     // One query for the whole page's replies rather than one per thread.
     const replies = await db.orm.clubs.ClubDiscussion.select("parentId")
       .where((row) => row.parentId.in(rows.map((thread) => thread.id)))
+      // Hidden replies do not count, or a thread offers to show three replies
+      // and opens on two.
+      .where((row) => row.hiddenAt.isNull())
       .all();
 
     for (const reply of replies) {
@@ -1057,6 +1068,10 @@ export async function createDiscussion(
   slugOrId: string,
   input: { body: string; parentId?: string | undefined },
 ): Promise<Discussion> {
+  // One of the four write seams a suspension stops; see the header of
+  // `services/moderation.ts` for the list.
+  await assertNotSuspended(userId);
+
   const timestamp = now();
 
   const discussionId = await db.transaction(async (tx) => {
@@ -1077,6 +1092,9 @@ export async function createDiscussion(
         "parentId",
       )
         .where((row) => row.id.eq(input.parentId as string))
+        // A hidden thread is gone as far as anybody but a moderator is
+        // concerned, so replying to one 404s.
+        .where((row) => row.hiddenAt.isNull())
         .first();
 
       if (!parent || parent.clubId !== club.id) {

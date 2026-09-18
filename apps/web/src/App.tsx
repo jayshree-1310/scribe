@@ -58,12 +58,25 @@ const router = createBrowserRouter(
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
       <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
-      <Route path="/onboarding" element={<OnboardingPage />} />
+
       <Route path="/for-writers" element={<ForWritersPage />} />
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/privacy" element={<PrivacyPage />} />
 
       {/* Browsing and reading require an account. --------- */}
+      {/*
+        Onboarding is gated in both directions: an account that has not
+        finished it cannot reach anything else, and one that has cannot come
+        back. See `RequireAuth`.
+      */}
+      <Route
+        path="/onboarding"
+        element={
+          <RequireAuth>
+            <OnboardingPage />
+          </RequireAuth>
+        }
+      />
       <Route
         path="/discover"
         element={

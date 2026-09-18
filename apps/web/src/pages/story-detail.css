@@ -329,15 +329,25 @@
   gap: 0.1875rem;
 }
 
-.comment__actions button {
+/*
+ * Direct children only. The overflow menu at the end of the row is a real
+ * `.btn`, and a descendant selector here would repaint it as a text link --
+ * the same reason `.discussion__foot` scopes its own rule.
+ */
+.comment__actions > button {
   border: 0;
   background: none;
   color: var(--brand);
   font-weight: 600;
 }
 
-.comment__actions button:hover {
+.comment__actions > button:hover {
   text-decoration: underline;
+}
+
+/* Pushed to the end of the row, away from the actions people mean to press. */
+.comment__actions > .dropdown {
+  margin-left: auto;
 }
 
 /*

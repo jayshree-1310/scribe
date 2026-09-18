@@ -1,8 +1,7 @@
 /**
  * Books + Library data access.
  *
- * Unlike `data/api.ts`, which serves the rest of the app from `mock-db.ts`,
- * every function here talks to the real Scribe API through the shared fetch
+ * Every function here talks to the real Scribe API through the shared fetch
  * wrapper, so errors arrive as `ApiError` with a message safe to show.
  */
 

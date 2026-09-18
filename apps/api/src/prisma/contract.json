@@ -52,6 +52,10 @@
       "model": "Genre",
       "namespace": "content"
     },
+    "genrePreference": {
+      "model": "GenrePreference",
+      "namespace": "auth"
+    },
     "libraryEntry": {
       "model": "LibraryEntry",
       "namespace": "library"
@@ -64,6 +68,10 @@
       "model": "Notification",
       "namespace": "notifications"
     },
+    "notificationMute": {
+      "model": "NotificationMute",
+      "namespace": "auth"
+    },
     "rating": {
       "model": "Rating",
       "namespace": "engagement"
@@ -71,6 +79,10 @@
     "readingHistory": {
       "model": "ReadingHistory",
       "namespace": "engagement"
+    },
+    "report": {
+      "model": "Report",
+      "namespace": "moderation"
     },
     "story": {
       "model": "Story",
@@ -92,6 +104,10 @@
       "model": "UserBadge",
       "namespace": "gamification"
     },
+    "userPreference": {
+      "model": "UserPreference",
+      "namespace": "auth"
+    },
     "writingChallenge": {
       "model": "WritingChallenge",
       "namespace": "challenges"
@@ -101,6 +117,141 @@
     "namespaces": {
       "auth": {
         "models": {
+          "GenrePreference": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "genreId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "genre": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "genreId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Genre",
+                  "namespace": "content"
+                }
+              },
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "genreId": {
+                  "column": "genreId"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "auth",
+              "table": "genrePreference"
+            }
+          },
+          "NotificationMute": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "type": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "NotificationType",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "type": {
+                  "column": "type"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "auth",
+              "table": "notificationMute"
+            }
+          },
           "User": {
             "fields": {
               "authorLevel": {
@@ -202,6 +353,13 @@
                 }
               },
               "streakLastReadAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "suspendedAt": {
                 "nullable": true,
                 "type": {
                   "codecId": "pg/timestamptz-temporal@1",
@@ -374,6 +532,21 @@
                   "namespace": "engagement"
                 }
               },
+              "genrePreferences": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "GenrePreference",
+                  "namespace": "auth"
+                }
+              },
               "hostedChallenges": {
                 "cardinality": "1:N",
                 "on": {
@@ -387,6 +560,21 @@
                 "to": {
                   "model": "WritingChallenge",
                   "namespace": "challenges"
+                }
+              },
+              "notificationMutes": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "NotificationMute",
+                  "namespace": "auth"
                 }
               },
               "notifications": {
@@ -419,6 +607,21 @@
                   "namespace": "notifications"
                 }
               },
+              "preference": {
+                "cardinality": "1:1",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "userId"
+                  ]
+                },
+                "to": {
+                  "model": "UserPreference",
+                  "namespace": "auth"
+                }
+              },
               "ratings": {
                 "cardinality": "1:N",
                 "on": {
@@ -447,6 +650,36 @@
                 "to": {
                   "model": "ReadingHistory",
                   "namespace": "engagement"
+                }
+              },
+              "reportsFiled": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "reporterId"
+                  ]
+                },
+                "to": {
+                  "model": "Report",
+                  "namespace": "moderation"
+                }
+              },
+              "reportsResolved": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "resolvedById"
+                  ]
+                },
+                "to": {
+                  "model": "Report",
+                  "namespace": "moderation"
                 }
               },
               "storyViews": {
@@ -527,6 +760,9 @@
                 "streakLastReadAt": {
                   "column": "streakLastReadAt"
                 },
+                "suspendedAt": {
+                  "column": "suspendedAt"
+                },
                 "updatedAt": {
                   "column": "updatedAt"
                 },
@@ -536,6 +772,89 @@
               },
               "namespaceId": "auth",
               "table": "user"
+            }
+          },
+          "UserPreference": {
+            "fields": {
+              "contentLength": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ContentLength",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "onboardingCompletedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "contentLength": {
+                  "column": "contentLength"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "onboardingCompletedAt": {
+                  "column": "onboardingCompletedAt"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "auth",
+              "table": "userPreference"
             }
           }
         }
@@ -968,6 +1287,13 @@
                   "kind": "scalar"
                 }
               },
+              "hiddenAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -1021,6 +1347,9 @@
                 },
                 "content": {
                   "column": "content"
+                },
+                "hiddenAt": {
+                  "column": "hiddenAt"
                 },
                 "id": {
                   "column": "id"
@@ -1300,6 +1629,13 @@
                   "kind": "scalar"
                 }
               },
+              "hiddenAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -1401,6 +1737,9 @@
                 },
                 "createdAt": {
                   "column": "createdAt"
+                },
+                "hiddenAt": {
+                  "column": "hiddenAt"
                 },
                 "id": {
                   "column": "id"
@@ -1730,6 +2069,21 @@
               }
             },
             "relations": {
+              "preferredBy": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "genreId"
+                  ]
+                },
+                "to": {
+                  "model": "GenrePreference",
+                  "namespace": "auth"
+                }
+              },
               "stories": {
                 "cardinality": "1:N",
                 "on": {
@@ -2442,6 +2796,13 @@
                   "kind": "scalar"
                 }
               },
+              "hiddenAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -2565,6 +2926,9 @@
                 },
                 "createdAt": {
                   "column": "createdAt"
+                },
+                "hiddenAt": {
+                  "column": "hiddenAt"
                 },
                 "id": {
                   "column": "id"
@@ -3204,6 +3568,206 @@
           }
         }
       },
+      "moderation": {
+        "models": {
+          "Report": {
+            "fields": {
+              "action": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ReportAction",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "details": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "note": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "reason": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ReportReason",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "reporterId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "resolvedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "resolvedById": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "status": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ReportStatus",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "targetId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "targetType": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ReportTarget",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "reporter": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "reporterId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              },
+              "resolvedBy": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "resolvedById"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "action": {
+                  "column": "action"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "details": {
+                  "column": "details"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "note": {
+                  "column": "note"
+                },
+                "reason": {
+                  "column": "reason"
+                },
+                "reporterId": {
+                  "column": "reporterId"
+                },
+                "resolvedAt": {
+                  "column": "resolvedAt"
+                },
+                "resolvedById": {
+                  "column": "resolvedById"
+                },
+                "status": {
+                  "column": "status"
+                },
+                "targetId": {
+                  "column": "targetId"
+                },
+                "targetType": {
+                  "column": "targetType"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "moderation",
+              "table": "report"
+            }
+          }
+        }
+      },
       "notifications": {
         "models": {
           "Notification": {
@@ -3248,6 +3812,26 @@
                 "type": {
                   "codecId": "pg/timestamptz-temporal@1",
                   "kind": "scalar"
+                }
+              },
+              "sourceId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "sourceType": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ReportTarget",
+                  "namespaceId": "public",
+                  "plane": "domain"
                 }
               },
               "title": {
@@ -3330,6 +3914,12 @@
                 "readAt": {
                   "column": "readAt"
                 },
+                "sourceId": {
+                  "column": "sourceId"
+                },
+                "sourceType": {
+                  "column": "sourceType"
+                },
                 "title": {
                   "column": "title"
                 },
@@ -3362,6 +3952,27 @@
               {
                 "name": "MEMBER",
                 "value": "MEMBER"
+              }
+            ]
+          },
+          "ContentLength": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "SHORT",
+                "value": "SHORT"
+              },
+              {
+                "name": "MEDIUM",
+                "value": "MEDIUM"
+              },
+              {
+                "name": "LONG",
+                "value": "LONG"
+              },
+              {
+                "name": "ANY",
+                "value": "ANY"
               }
             ]
           },
@@ -3440,6 +4051,86 @@
                 "value": "FINISHED"
               }
             ]
+          },
+          "ReportAction": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "DISMISS",
+                "value": "DISMISS"
+              },
+              {
+                "name": "HIDE",
+                "value": "HIDE"
+              },
+              {
+                "name": "SUSPEND",
+                "value": "SUSPEND"
+              }
+            ]
+          },
+          "ReportReason": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "SPAM",
+                "value": "SPAM"
+              },
+              {
+                "name": "HARASSMENT",
+                "value": "HARASSMENT"
+              },
+              {
+                "name": "HATE",
+                "value": "HATE"
+              },
+              {
+                "name": "SEXUAL",
+                "value": "SEXUAL"
+              },
+              {
+                "name": "VIOLENCE",
+                "value": "VIOLENCE"
+              },
+              {
+                "name": "SPOILER",
+                "value": "SPOILER"
+              },
+              {
+                "name": "OTHER",
+                "value": "OTHER"
+              }
+            ]
+          },
+          "ReportStatus": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "OPEN",
+                "value": "OPEN"
+              },
+              {
+                "name": "RESOLVED",
+                "value": "RESOLVED"
+              }
+            ]
+          },
+          "ReportTarget": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "COMMENT",
+                "value": "COMMENT"
+              },
+              {
+                "name": "CLUB_DISCUSSION",
+                "value": "CLUB_DISCUSSION"
+              },
+              {
+                "name": "CHANNEL_POST",
+                "value": "CHANNEL_POST"
+              }
+            ]
           }
         },
         "models": {}
@@ -3451,6 +4142,159 @@
       "auth": {
         "entries": {
           "table": {
+            "genrePreference": {
+              "columns": {
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "genreId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "userId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "genrePreference"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "source": {
+                    "columns": [
+                      "genreId"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "genrePreference"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "genre"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "genreId"
+                  ],
+                  "name": "genrePreference_genreId_idx_8fce6a7b",
+                  "prefix": "genrePreference_genreId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "genrePreference_userId_idx_a489d58a",
+                  "prefix": "genrePreference_userId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "userId",
+                  "genreId"
+                ]
+              },
+              "uniques": []
+            },
+            "notificationMute": {
+              "checks": [
+                {
+                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED')",
+                  "name": "notificationMute_type_check_822839ba",
+                  "prefix": "notificationMute_type_check"
+                }
+              ],
+              "columns": {
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "type": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "NotificationType",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "userId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "notificationMute"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "notificationMute_userId_idx_a489d58a",
+                  "prefix": "notificationMute_userId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "userId",
+                  "type"
+                ]
+              },
+              "uniques": []
+            },
             "user": {
               "columns": {
                 "authorLevel": {
@@ -3556,6 +4400,11 @@
                   "nativeType": "timestamptz",
                   "nullable": true
                 },
+                "suspendedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
                 "updatedAt": {
                   "codecId": "pg/timestamptz-temporal@1",
                   "default": {
@@ -3595,6 +4444,85 @@
                   ]
                 }
               ]
+            },
+            "userPreference": {
+              "checks": [
+                {
+                  "expression": "\"contentLength\" IN ('SHORT', 'MEDIUM', 'LONG', 'ANY')",
+                  "name": "userPreference_contentLength_check_e152cea5",
+                  "prefix": "userPreference_contentLength_check"
+                }
+              ],
+              "columns": {
+                "contentLength": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "ANY"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ContentLength",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "onboardingCompletedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "userId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "userPreference"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "userId"
+                ]
+              },
+              "uniques": []
             }
           }
         },
@@ -3963,6 +4891,11 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "hiddenAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
                 "id": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -4273,6 +5206,11 @@
                   },
                   "nativeType": "timestamptz",
                   "nullable": false
+                },
+                "hiddenAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
                 },
                 "id": {
                   "codecId": "pg/text@1",
@@ -5199,6 +6137,11 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "hiddenAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
                 "id": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -6051,11 +6994,228 @@
         "id": "library",
         "kind": "postgres-schema"
       },
+      "moderation": {
+        "entries": {
+          "table": {
+            "report": {
+              "checks": [
+                {
+                  "expression": "\"action\" IN ('DISMISS', 'HIDE', 'SUSPEND')",
+                  "name": "report_action_check_5f2de721",
+                  "prefix": "report_action_check"
+                },
+                {
+                  "expression": "\"reason\" IN ('SPAM', 'HARASSMENT', 'HATE', 'SEXUAL', 'VIOLENCE', 'SPOILER', 'OTHER')",
+                  "name": "report_reason_check_735e3aeb",
+                  "prefix": "report_reason_check"
+                },
+                {
+                  "expression": "\"status\" IN ('OPEN', 'RESOLVED')",
+                  "name": "report_status_check_2a206a64",
+                  "prefix": "report_status_check"
+                },
+                {
+                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST')",
+                  "name": "report_targetType_check_2c6acd2f",
+                  "prefix": "report_targetType_check"
+                }
+              ],
+              "columns": {
+                "action": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ReportAction",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "details": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "note": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "reason": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ReportReason",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "reporterId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "resolvedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "resolvedById": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "status": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "OPEN"
+                  },
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ReportStatus",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "targetId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "targetType": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ReportTarget",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "reporterId"
+                    ],
+                    "namespaceId": "moderation",
+                    "tableName": "report"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "source": {
+                    "columns": [
+                      "resolvedById"
+                    ],
+                    "namespaceId": "moderation",
+                    "tableName": "report"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "reporterId"
+                  ],
+                  "name": "report_reporterId_idx_aa245831",
+                  "prefix": "report_reporterId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "resolvedById"
+                  ],
+                  "name": "report_resolvedById_idx_fc75edc7",
+                  "prefix": "report_resolvedById_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "status",
+                    "createdAt"
+                  ],
+                  "name": "report_status_createdAt_idx_58610442",
+                  "prefix": "report_status_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "targetType",
+                    "targetId",
+                    "status"
+                  ],
+                  "name": "report_targetType_targetId_status_idx_f4be9279",
+                  "prefix": "report_targetType_targetId_status_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            }
+          }
+        },
+        "id": "moderation",
+        "kind": "postgres-schema"
+      },
       "notifications": {
         "entries": {
           "table": {
             "notification": {
               "checks": [
+                {
+                  "expression": "\"sourceType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST')",
+                  "name": "notification_sourceType_check_18693ee1",
+                  "prefix": "notification_sourceType_check"
+                },
                 {
                   "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED')",
                   "name": "notification_type_check_822839ba",
@@ -6096,6 +7256,22 @@
                   "codecId": "pg/timestamptz-temporal@1",
                   "nativeType": "timestamptz",
                   "nullable": true
+                },
+                "sourceId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "sourceType": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ReportTarget",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
                 },
                 "title": {
                   "codecId": "pg/text@1",
@@ -6164,6 +7340,15 @@
                 },
                 {
                   "columns": [
+                    "sourceType",
+                    "sourceId"
+                  ],
+                  "name": "notification_sourceType_sourceId_idx_9b8c3bc3",
+                  "prefix": "notification_sourceType_sourceId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
                     "userId",
                     "createdAt"
                   ],
@@ -6213,6 +7398,15 @@
                 "MEMBER"
               ]
             },
+            "ContentLength": {
+              "kind": "valueSet",
+              "values": [
+                "SHORT",
+                "MEDIUM",
+                "LONG",
+                "ANY"
+              ]
+            },
             "ContentSource": {
               "kind": "valueSet",
               "values": [
@@ -6246,6 +7440,41 @@
                 "READING",
                 "FINISHED"
               ]
+            },
+            "ReportAction": {
+              "kind": "valueSet",
+              "values": [
+                "DISMISS",
+                "HIDE",
+                "SUSPEND"
+              ]
+            },
+            "ReportReason": {
+              "kind": "valueSet",
+              "values": [
+                "SPAM",
+                "HARASSMENT",
+                "HATE",
+                "SEXUAL",
+                "VIOLENCE",
+                "SPOILER",
+                "OTHER"
+              ]
+            },
+            "ReportStatus": {
+              "kind": "valueSet",
+              "values": [
+                "OPEN",
+                "RESOLVED"
+              ]
+            },
+            "ReportTarget": {
+              "kind": "valueSet",
+              "values": [
+                "COMMENT",
+                "CLUB_DISCUSSION",
+                "CHANNEL_POST"
+              ]
             }
           }
         },
@@ -6253,10 +7482,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "11d6ef717b2370af5ad1259bedf477b5be0c19fa40b50801150ff67db90b4d5b"
+    "storageHash": "a135d3d172d0ed837fd0fcb5011904b62ef3ed3c04ab348025ae1d0c8681d14f"
   },
   "execution": {
-    "executionHash": "f57472f93ce08d999f9a5627a1f3da0cf284cfedaf9b3e18e379f602ac4c77b1",
+    "executionHash": "58bcd8791f1bf956db3e0406a1dba3023721b98f79d32347cf51690ea1fce423",
     "mutations": {
       "defaults": [
         {
@@ -6444,6 +7673,17 @@
             "column": "id",
             "namespace": "engagement",
             "table": "readingHistory"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "moderation",
+            "table": "report"
           }
         },
         {

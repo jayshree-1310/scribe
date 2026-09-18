@@ -1,7 +1,7 @@
 /**
  * Notifications: the one place anything is told to anybody.
  *
- * Five things are decided here and nowhere else.
+ * Six things are decided here and nowhere else.
  *
  * - **There is one `notify()`, and the services call it.** Not the routes:
  *   `createComment` has two callers' worth of reasons to exist and exactly one
@@ -24,9 +24,25 @@
  *   `<> actor` in that `WHERE`, so it is a property of the statement and not a
  *   filter somebody has to remember. `BADGE_EARNED` is the deliberate
  *   exception and the only type with a null actor: nobody else caused it.
+ * - **A mute is part of the audience, not a filter after it.** Every resolver
+ *   carries `NOT EXISTS (... auth."notificationMute" ...)` for the type it
+ *   writes, in the same `WHERE` that selects the recipients -- so a muted
+ *   reader is never a row, rather than a row nobody shows. Filtering on the
+ *   read side would have meant storing what somebody asked not to be told and
+ *   trusting five query paths to remember; this way the rule is enforced by
+ *   the one statement that could break it. The preferences behind it are
+ *   `services/preferences.ts`, and the cost is one indexed lookup per
+ *   recipient. The list of types that honour a mute is therefore exactly the
+ *   list of resolvers below, and a sixth type that forgets the clause is a
+ *   type nobody can turn off.
  * - **The actor is a join; the subject is a copy.** See the header of
  *   `notifications.Notification` in the contract for why those two fields are
- *   treated differently.
+ *   treated differently. Because the excerpt is a copy, every fan-out that
+ *   quotes something a moderator can hide also records *what* it quoted, in
+ *   `sourceType` / `sourceId`. That is the only handle `hideContent` in
+ *   `services/moderation.ts` has on the copies, and without it hiding a
+ *   comment would leave it legible in somebody's bell. `NEW_STORY` and
+ *   `BADGE_EARNED` quote nothing hideable and leave both null.
  *
  * `notify` is fire-and-forget by construction: it returns `void`, so a handler
  * *cannot* await it, and it swallows its own failures into the log. Nobody
@@ -228,7 +244,8 @@ async function fanOut(event: NotificationEvent): Promise<void> {
 async function notifySubscribers(postId: string): Promise<void> {
   const plan = db.raw.sql`
     INSERT INTO "notifications"."notification"
-      ("id", "userId", "type", "actorId", "title", "excerpt", "href", "createdAt")
+      ("id", "userId", "type", "actorId", "title", "excerpt", "href",
+       "sourceType", "sourceId", "createdAt")
     SELECT gen_random_uuid()::text,
            sub."userId",
            'CHANNEL_POST',
@@ -236,12 +253,19 @@ async function notifySubscribers(postId: string): Promise<void> {
            ch."name",
            left(post."title", ${EXCERPT_LENGTH}),
            '/channels/' || ch."slug",
+           'CHANNEL_POST',
+           post."id",
            now()
       FROM "channels"."channelPost" AS post
       JOIN "channels"."broadcastChannel" AS ch ON ch."id" = post."channelId"
       JOIN "channels"."channelSubscriber" AS sub ON sub."channelId" = ch."id"
      WHERE post."id" = ${postId}
        AND sub."userId" <> ch."authorId"
+       AND NOT EXISTS (
+             SELECT 1 FROM "auth"."notificationMute" AS mute
+              WHERE mute."userId" = sub."userId"
+                AND mute."type" = 'CHANNEL_POST'
+           )
   `.affectedCount().build();
 
   await db.runtime().query(plan);
@@ -262,7 +286,8 @@ async function notifySubscribers(postId: string): Promise<void> {
 async function notifyCommentParent(commentId: string): Promise<void> {
   const plan = db.raw.sql`
     INSERT INTO "notifications"."notification"
-      ("id", "userId", "type", "actorId", "title", "excerpt", "href", "createdAt")
+      ("id", "userId", "type", "actorId", "title", "excerpt", "href",
+       "sourceType", "sourceId", "createdAt")
     SELECT gen_random_uuid()::text,
            parent."userId",
            'COMMENT_REPLY',
@@ -273,6 +298,8 @@ async function notifyCommentParent(commentId: string): Promise<void> {
              WHEN chapter."id" IS NULL THEN '/story/' || story."slug"
              ELSE '/read/' || story."slug" || '/' || chapter."chapterNumber"
            END,
+           'COMMENT',
+           reply."id",
            now()
       FROM "engagement"."comment" AS reply
       JOIN "engagement"."comment" AS parent ON parent."id" = reply."parentId"
@@ -280,6 +307,11 @@ async function notifyCommentParent(commentId: string): Promise<void> {
       LEFT JOIN "content"."chapter" AS chapter ON chapter."id" = reply."chapterId"
      WHERE reply."id" = ${commentId}
        AND parent."userId" <> reply."userId"
+       AND NOT EXISTS (
+             SELECT 1 FROM "auth"."notificationMute" AS mute
+              WHERE mute."userId" = parent."userId"
+                AND mute."type" = 'COMMENT_REPLY'
+           )
   `.affectedCount().build();
 
   await db.runtime().query(plan);
@@ -302,7 +334,8 @@ async function notifyCommentParent(commentId: string): Promise<void> {
 async function notifyClub(discussionId: string): Promise<void> {
   const thread = db.raw.sql`
     INSERT INTO "notifications"."notification"
-      ("id", "userId", "type", "actorId", "title", "excerpt", "href", "createdAt")
+      ("id", "userId", "type", "actorId", "title", "excerpt", "href",
+       "sourceType", "sourceId", "createdAt")
     SELECT gen_random_uuid()::text,
            member."userId",
            'CLUB_DISCUSSION',
@@ -310,6 +343,8 @@ async function notifyClub(discussionId: string): Promise<void> {
            club."name",
            left(post."body", ${EXCERPT_LENGTH}),
            '/clubs/' || club."slug",
+           'CLUB_DISCUSSION',
+           post."id",
            now()
       FROM "clubs"."clubDiscussion" AS post
       JOIN "clubs"."bookClub" AS club ON club."id" = post."clubId"
@@ -317,11 +352,17 @@ async function notifyClub(discussionId: string): Promise<void> {
      WHERE post."id" = ${discussionId}
        AND post."parentId" IS NULL
        AND member."userId" <> post."userId"
+       AND NOT EXISTS (
+             SELECT 1 FROM "auth"."notificationMute" AS mute
+              WHERE mute."userId" = member."userId"
+                AND mute."type" = 'CLUB_DISCUSSION'
+           )
   `.affectedCount().build();
 
   const reply = db.raw.sql`
     INSERT INTO "notifications"."notification"
-      ("id", "userId", "type", "actorId", "title", "excerpt", "href", "createdAt")
+      ("id", "userId", "type", "actorId", "title", "excerpt", "href",
+       "sourceType", "sourceId", "createdAt")
     SELECT gen_random_uuid()::text,
            parent."userId",
            'COMMENT_REPLY',
@@ -329,12 +370,19 @@ async function notifyClub(discussionId: string): Promise<void> {
            club."name",
            left(post."body", ${EXCERPT_LENGTH}),
            '/clubs/' || club."slug",
+           'CLUB_DISCUSSION',
+           post."id",
            now()
       FROM "clubs"."clubDiscussion" AS post
       JOIN "clubs"."clubDiscussion" AS parent ON parent."id" = post."parentId"
       JOIN "clubs"."bookClub" AS club ON club."id" = post."clubId"
      WHERE post."id" = ${discussionId}
        AND parent."userId" <> post."userId"
+       AND NOT EXISTS (
+             SELECT 1 FROM "auth"."notificationMute" AS mute
+              WHERE mute."userId" = parent."userId"
+                AND mute."type" = 'COMMENT_REPLY'
+           )
   `.affectedCount().build();
 
   await db.runtime().query(thread);
@@ -367,6 +415,11 @@ async function notifyFollowers(storyId: string): Promise<void> {
      WHERE story."id" = ${storyId}
        AND story."listedAt" IS NOT NULL
        AND follow."followerId" <> story."authorId"
+       AND NOT EXISTS (
+             SELECT 1 FROM "auth"."notificationMute" AS mute
+              WHERE mute."userId" = follow."followerId"
+                AND mute."type" = 'NEW_STORY'
+           )
   `.affectedCount().build();
 
   await db.runtime().query(plan);
@@ -392,14 +445,19 @@ async function notifyEarner(
   const plan = db.raw.sql`
     INSERT INTO "notifications"."notification"
       ("id", "userId", "type", "actorId", "title", "excerpt", "href", "createdAt")
-    VALUES (gen_random_uuid()::text,
-            ${userId},
-            'BADGE_EARNED',
-            NULL,
-            ${name},
-            left(${description}::text, ${EXCERPT_LENGTH}),
-            '/badges',
-            now())
+    SELECT gen_random_uuid()::text,
+           ${userId},
+           'BADGE_EARNED',
+           NULL,
+           ${name},
+           left(${description}::text, ${EXCERPT_LENGTH}),
+           '/badges',
+           now()
+     WHERE NOT EXISTS (
+             SELECT 1 FROM "auth"."notificationMute" AS mute
+              WHERE mute."userId" = ${userId}
+                AND mute."type" = 'BADGE_EARNED'
+           )
   `.affectedCount().build();
 
   await db.runtime().query(plan);
