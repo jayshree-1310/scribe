@@ -17,6 +17,7 @@ import { parseOrThrow } from "../lib/validate.js";
 import { requireUser, requireUserId } from "../middleware/current-user.js";
 import {
   MAX_PAGE_SIZE,
+  clearRead,
   listNotifications,
   markAllRead,
   markRead,
@@ -66,9 +67,9 @@ router.get("/", async (req, res, next) => {
 });
 
 /**
- * Both write routes answer with the fresh unread count rather than 204: the
- * only thing the client redraws afterwards is the bell, and this request has
- * already touched the number it needs.
+ * Every write route here answers with the fresh unread count rather than 204:
+ * the only thing the client redraws afterwards is the bell, and each of these
+ * requests has already touched the number it needs.
  */
 router.post("/:id/read", async (req, res, next) => {
   try {
@@ -83,6 +84,27 @@ router.post("/:id/read", async (req, res, next) => {
 router.post("/read-all", async (_req, res, next) => {
   try {
     res.json(await markAllRead(requireUserId(res)));
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Throws away everything the caller has already read.
+ *
+ * `DELETE /read` rather than `POST /clear`: this removes rows, and the method
+ * that says so is the one a reader of the route table should not have to look
+ * up. The path is the same `/read` the mark-all route posts to, deliberately
+ * -- one noun, two verbs, "mark mine read" and "delete my read ones".
+ *
+ * Answers with the unread count like the two above, which this cannot have
+ * changed: nothing unread is touched. It comes back so the bell settles on the
+ * server's number rather than the browser's, which is the same reason the
+ * other two send it.
+ */
+router.delete("/read", async (_req, res, next) => {
+  try {
+    res.json(await clearRead(requireUserId(res)));
   } catch (error) {
     next(error);
   }

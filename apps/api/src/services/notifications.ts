@@ -1,7 +1,7 @@
 /**
  * Notifications: the one place anything is told to anybody.
  *
- * Six things are decided here and nowhere else.
+ * Seven things are decided here and nowhere else.
  *
  * - **There is one `notify()`, and the services call it.** Not the routes:
  *   `createComment` has two callers' worth of reasons to exist and exactly one
@@ -43,6 +43,13 @@
  *   `services/moderation.ts` has on the copies, and without it hiding a
  *   comment would leave it legible in somebody's bell. `NEW_STORY` and
  *   `BADGE_EARNED` quote nothing hideable and leave both null.
+ * - **Nothing is kept forever, and the reader can say when.** Every row here
+ *   is a pointer to content that outlives it, so a notification is the one
+ *   thing in this codebase that is safe to delete on a timer. Two ceilings do
+ *   it -- a week after it was read, a month after it arrived either way -- and
+ *   `clearRead` lets somebody who does not want to wait empty the read half
+ *   now. The sweep rides on the list read rather than a scheduler; see
+ *   `maybePrune` for what that buys and what it costs.
  *
  * `notify` is fire-and-forget by construction: it returns `void`, so a handler
  * *cannot* await it, and it swallows its own failures into the log. Nobody
@@ -572,6 +579,15 @@ export async function listNotifications(
   userId: string,
   query: NotificationQuery,
 ): Promise<NotificationPage> {
+  /**
+   * The retention sweep rides here, on the one request every reader makes
+   * anyway, rather than in a scheduler. Awaited before the reads below so the
+   * page and the count cannot include rows this is about to delete, throttled
+   * to once an hour per account, and silent about its own failures. See
+   * `maybePrune`.
+   */
+  await maybePrune(userId);
+
   const mine = () =>
     db.orm.notifications.Notification.where((row) => row.userId.eq(userId));
 
@@ -759,6 +775,156 @@ export async function markAllRead(
        SET "readAt" = now()
      WHERE "userId" = ${userId}
        AND "readAt" IS NULL
+  `.affectedCount().build();
+
+  await db.runtime().query(plan);
+
+  return { unreadCount: await countUnread(userId) };
+}
+
+/* Clearing and retention -------------------------------------------------- */
+
+/**
+ * How long a notification survives.
+ *
+ * Two ceilings, because "read" and "old" are different reasons to let
+ * something go. A notification somebody has read has done its job: it is kept
+ * a week so that "what was that reply again?" is still answerable, and the
+ * clock starts at `readAt` rather than `createdAt` so a fortnight-old row read
+ * this morning is not swept tonight. An unread one is kept a month and then
+ * dropped anyway -- a reader who has not opened the bell in thirty days is not
+ * about to act on what is in it, and without that second ceiling the table has
+ * no bound at all for exactly the accounts that generate the most rows.
+ *
+ * Both are deliberately generous. The thing being deleted is a pointer to
+ * content that still exists: every notification's `href` outlives it, so a
+ * swept row costs somebody a trip to the story rather than the story itself.
+ */
+const READ_RETENTION_DAYS = 7;
+const MAX_RETENTION_DAYS = 30;
+
+/**
+ * How often one account's expired rows are swept.
+ *
+ * There is no scheduler here -- no cron, no worker, nothing that has to be
+ * deployed alongside the API -- so the sweep rides on the request that was
+ * going to read the list anyway. Once an hour per account is the throttle that
+ * makes that affordable: a reader who refreshes the bell every sixty seconds
+ * pays for one extra `DELETE` in sixty polls, and the rows are found by the
+ * `[userId, readAt]` index either way.
+ *
+ * The consequence to know about: sweeping is driven by *reading*, so an
+ * abandoned account's rows are never swept. That is the right trade for now --
+ * an account nobody opens also stops accruing notifications the moment it
+ * stops being followed -- and the day it is not, this is the one function to
+ * call from a job instead.
+ */
+const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+
+/**
+ * When each account was last swept, in this process's memory.
+ *
+ * In memory rather than a column, because being wrong is free in both
+ * directions: a restart, or a second API instance, means an account is swept
+ * twice in an hour instead of once, and the second sweep deletes nothing. A
+ * column would be a migration and a write on the read path to avoid a `DELETE`
+ * that matches no rows.
+ */
+const lastPruned = new Map<string, number>();
+
+/**
+ * How many accounts that map will track before it is emptied.
+ *
+ * A bound rather than an eviction policy: the entries are worth nothing
+ * individually -- losing one costs a single no-op `DELETE` -- so the cheap
+ * thing to do when the map grows is drop the lot rather than sort it by age.
+ * Ten thousand keys is a few hundred kilobytes and far more concurrent readers
+ * than this runs on.
+ */
+const MAX_TRACKED_ACCOUNTS = 10_000;
+
+/**
+ * Deletes one account's expired notifications.
+ *
+ * Exported and unthrottled, so a test can assert the retention rule without
+ * waiting an hour and a future job can call it per user. `listNotifications`
+ * goes through `maybePrune` instead.
+ *
+ * Raw SQL for `markAllRead`'s reason: the ORM's `delete` writes one row per
+ * call however many the predicate matches, and this is a bulk sweep.
+ */
+export async function pruneExpired(userId: string): Promise<void> {
+  const plan = db.raw.sql`
+    DELETE FROM "notifications"."notification"
+     WHERE "userId" = ${userId}
+       AND (
+             ("readAt" IS NOT NULL
+              AND "readAt" < now() - make_interval(days => ${READ_RETENTION_DAYS}::int))
+          OR "createdAt" < now() - make_interval(days => ${MAX_RETENTION_DAYS}::int)
+       )
+  `.affectedCount().build();
+
+  await db.runtime().query(plan);
+}
+
+/**
+ * Sweeps this account if it has not been swept in the last hour.
+ *
+ * Awaited by its caller rather than fired and forgotten, so the list and the
+ * count that follow it cannot describe rows this statement is about to remove.
+ * It swallows its own failures: a sweep is housekeeping, and a reader should
+ * never be shown an error because the tidying failed.
+ */
+async function maybePrune(userId: string): Promise<void> {
+  const now = Date.now();
+  const previous = lastPruned.get(userId);
+
+  if (previous !== undefined && now - previous < PRUNE_INTERVAL_MS) return;
+
+  // Stamped before the await, not after: two requests arriving together should
+  // produce one sweep, and the second should skip on what the first recorded
+  // rather than on what it eventually finishes.
+  if (lastPruned.size >= MAX_TRACKED_ACCOUNTS) lastPruned.clear();
+  lastPruned.set(userId, now);
+
+  try {
+    await pruneExpired(userId);
+  } catch (error: unknown) {
+    logger.warn({ err: error, userId }, "notifications: prune failed");
+  }
+}
+
+/**
+ * Forgets every account's sweep stamp.
+ *
+ * For the tests, which create a user, read their list -- sweeping them -- and
+ * then need the next read to sweep again. Nothing in the running app calls it.
+ */
+export function resetPruneThrottle(): void {
+  lastPruned.clear();
+}
+
+/**
+ * Deletes everything this account has read, and answers with the unread count.
+ *
+ * The count rather than the remaining list, for the reason `markRead` gives:
+ * the bell is what redraws, and the client already knows which of its rows
+ * were read. It is also unchanged by definition -- this touches no unread row
+ * -- so the number comes back purely to settle any read this browser has not
+ * seen yet.
+ *
+ * Deliberately narrower than "clear all": an unread notification is something
+ * somebody has not seen, and a button that threw those away would lose the
+ * reply they opened the bell to find. Unread rows leave via `markAllRead` and
+ * then this, or via the thirty-day ceiling above.
+ */
+export async function clearRead(
+  userId: string,
+): Promise<{ unreadCount: number }> {
+  const plan = db.raw.sql`
+    DELETE FROM "notifications"."notification"
+     WHERE "userId" = ${userId}
+       AND "readAt" IS NOT NULL
   `.affectedCount().build();
 
   await db.runtime().query(plan);

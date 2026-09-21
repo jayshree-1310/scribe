@@ -76,8 +76,17 @@ interface NotificationBellProps {
 
 export function NotificationBell({ enabled }: NotificationBellProps) {
   const navigate = useNavigate()
-  const { items, unreadCount, loading, error, refresh, markRead, markAllRead } =
-    useNotifications(enabled)
+  const {
+    items,
+    unreadCount,
+    loading,
+    error,
+    refresh,
+    markRead,
+    markAllRead,
+    clearRead,
+    hasRead,
+  } = useNotifications(enabled)
 
   function onOpen(notification: Notification): void {
     if (notification.readAt === null) markRead(notification.id)
@@ -134,15 +143,39 @@ export function NotificationBell({ enabled }: NotificationBellProps) {
       <div className="notifications">
         <div className="notifications__head">
           <p className="notifications__title">Notifications</p>
-          {unreadCount > 0 ? (
-            <button
-              type="button"
-              className="notifications__clear"
-              onClick={markAllRead}
-            >
-              Mark all read
-            </button>
-          ) : null}
+
+          {/*
+            * Two actions, each shown only when it would do something: "mark
+            * all read" with nothing unread is a no-op, and "clear read" with
+            * nothing read is a button that empties an empty set. Rendering
+            * them disabled instead would mean a permanently greyed pair on a
+            * quiet account, which reads as broken rather than as idle.
+            *
+            * The clearing one is second and phrased as "read" rather than
+            * "all" on purpose: it deletes, and the only thing standing between
+            * a misclick and a lost reply is that the row had to be read first.
+            */}
+          <span className="notifications__actions">
+            {unreadCount > 0 ? (
+              <button
+                type="button"
+                className="notifications__clear"
+                onClick={markAllRead}
+              >
+                Mark all read
+              </button>
+            ) : null}
+            {hasRead ? (
+              <button
+                type="button"
+                className="notifications__clear"
+                onClick={clearRead}
+                title="Delete the notifications you have already read"
+              >
+                Clear read
+              </button>
+            ) : null}
+          </span>
         </div>
 
         {loading ? (

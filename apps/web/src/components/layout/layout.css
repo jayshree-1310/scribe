@@ -361,6 +361,15 @@ a.logo:hover .logo__mark {
   color: var(--text);
 }
 
+/* The two header actions sit together so `notifications__head`'s
+   space-between still pushes the pair against the right edge when only one of
+   them is rendered. */
+.notifications__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 .notifications__clear {
   border: 0;
   background: none;

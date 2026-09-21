@@ -219,6 +219,15 @@ Three things make this safe to run on every boot, cold starts included:
   named. Additive migrations, which is nearly all of them, pass straight
   through.
 
+  One exemption: a check constraint dropped and re-added on the same table in
+  the same migration. Widening an enumerated `CHECK` — adding a notification
+  type, say — plans as a drop followed by an add, and the planner classes
+  every `DROP CONSTRAINT` destructive without looking at what follows. A
+  `CHECK` holds no data, so the drop destroys nothing, and a narrowing
+  replacement cannot slip through either: Postgres validates existing rows
+  when adding a check constraint, so an expression some row violates fails the
+  migration and the deploy. An *unpaired* check drop is still refused.
+
 ### Required environment
 
 | Variable | Why |

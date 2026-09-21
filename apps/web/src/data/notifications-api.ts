@@ -56,3 +56,19 @@ export async function markAllNotificationsRead(): Promise<number> {
 
   return unreadCount
 }
+
+/**
+ * Deletes every notification this reader has already read.
+ *
+ * Read ones only, deliberately -- see `clearRead` in the API service. The
+ * answer is the unread count, which this cannot have changed; it comes back so
+ * the bell can settle on the server's number rather than the browser's.
+ */
+export async function clearReadNotifications(): Promise<number> {
+  const { unreadCount } = await request<{ unreadCount: number }>(
+    '/notifications/read',
+    { method: 'DELETE', headers: readerHeaders() },
+  )
+
+  return unreadCount
+}

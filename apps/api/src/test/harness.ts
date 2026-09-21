@@ -580,6 +580,40 @@ export class TestApi {
     return totals.total;
   }
 
+  /**
+   * Moves one account's notifications back in time.
+   *
+   * The only way to test retention without waiting a week. It rewrites
+   * `createdAt` and, where the row has one, `readAt` -- both, because the two
+   * ceilings in `services/notifications.ts` read different columns and a
+   * helper that shifted one of them could only ever exercise half the rule.
+   *
+   * Raw SQL rather than the ORM for `markAllRead`'s reason: `update` writes one
+   * row per call, and this is meant to move a whole list at once.
+   */
+  async backdateNotifications(userId: string, days: number): Promise<void> {
+    const plan = db.raw.sql`
+      UPDATE "notifications"."notification"
+         SET "createdAt" = "createdAt" - make_interval(days => ${days}::int),
+             "readAt" = CASE
+               WHEN "readAt" IS NULL THEN NULL
+               ELSE "readAt" - make_interval(days => ${days}::int)
+             END
+       WHERE "userId" = ${userId}
+    `.affectedCount().build();
+
+    await db.runtime().query(plan);
+  }
+
+  /** How many notification rows one account holds, read or not. */
+  async countNotifications(userId: string): Promise<number> {
+    const totals = await db.orm.notifications.Notification.where((row) =>
+      row.userId.eq(userId),
+    ).aggregate((aggregate) => ({ total: aggregate.count() }));
+
+    return totals.total;
+  }
+
   /* Channels ------------------------------------------------------------- */
 
   async createChannel(input: {

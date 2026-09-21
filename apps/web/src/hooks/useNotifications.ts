@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  clearReadNotifications,
   getNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -64,6 +65,10 @@ export interface NotificationsState {
   refresh: () => void
   markRead: (id: string) => void
   markAllRead: () => void
+  /** Deletes the read ones. Unread rows are left alone; see the API service. */
+  clearRead: () => void
+  /** True when there is something for `clearRead` to remove. */
+  hasRead: boolean
 }
 
 /**
@@ -209,6 +214,22 @@ export function useNotifications(enabled: boolean): NotificationsState {
       })
   }, [items, refresh])
 
+  /**
+   * Drops the read rows optimistically, and re-reads if the server disagrees.
+   *
+   * The rollback is a `refresh()` rather than a restore of `previous`, unlike
+   * `markRead`'s: a failed delete may have removed some rows and not others,
+   * so the browser's copy of the list is the one thing that definitely is not
+   * the truth. `markAllRead` rolls back the same way and for the same reason.
+   */
+  const clearRead = useCallback(() => {
+    setItems((current) => current.filter((item) => item.readAt === null))
+
+    clearReadNotifications()
+      .then((count) => setUnreadCount(count))
+      .catch(() => refresh())
+  }, [refresh])
+
   return {
     items,
     unreadCount,
@@ -217,5 +238,7 @@ export function useNotifications(enabled: boolean): NotificationsState {
     refresh,
     markRead,
     markAllRead,
+    clearRead,
+    hasRead: items.some((item) => item.readAt !== null),
   }
 }

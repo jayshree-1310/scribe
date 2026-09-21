@@ -78,6 +78,51 @@ function resultOf(stdout) {
 }
 
 /**
+ * The table a check-constraint operation belongs to, or null for anything
+ * else. Schema-qualified, because two schemas may hold a table of the same
+ * name -- `notification` exists under `notifications` and could as easily
+ * exist under `auth`.
+ */
+function checkConstraintTable(op) {
+  const details = op?.target?.details;
+  if (details?.objectType !== "checkConstraint") return null;
+  return `${details.schema}.${details.table}`;
+}
+
+/**
+ * Drops the planner calls destructive but which cannot lose data: a CHECK
+ * dropped and re-added on the same table in the same migration.
+ *
+ * Widening an enumerated CHECK is a swap, not a removal -- adding a
+ * notification type plans as `DROP CONSTRAINT ... IN (five values)` followed
+ * by `ADD CONSTRAINT ... IN (six values)`, and the planner classes every
+ * `DROP CONSTRAINT` destructive without looking at what follows it. Left
+ * alone, that stops a deploy every time the notification enum grows.
+ *
+ * Exempting the pair is safe in both directions. A CHECK holds no data, so
+ * dropping one destroys nothing; it only relaxes validation, and a
+ * same-migration replacement redefines that validation rather than dropping
+ * it. Nor can a *narrowing* replacement slip through: Postgres validates
+ * existing rows when adding a check constraint, so a new expression some row
+ * violates fails the migration and the deploy, which is the safe direction.
+ *
+ * An unpaired drop is still destructive -- validation genuinely going away is
+ * a decision worth a human.
+ */
+function pairedCheckConstraintSwaps(ops) {
+  const readded = new Set();
+
+  for (const op of ops) {
+    if (op?.operationClass !== "destructive") {
+      const table = checkConstraintTable(op);
+      if (table) readded.add(table);
+    }
+  }
+
+  return readded;
+}
+
+/**
  * How many operations in a migration drop or otherwise destroy something.
  *
  * Read from the migration's own `ops.json`, which classifies every operation
@@ -89,7 +134,19 @@ async function destructiveOps(dirName) {
 
   try {
     const ops = JSON.parse(await readFile(file, "utf8"));
-    return ops.filter((op) => op?.operationClass === "destructive");
+    const swaps = pairedCheckConstraintSwaps(ops);
+
+    return ops.filter((op) => {
+      if (op?.operationClass !== "destructive") return false;
+
+      const table = checkConstraintTable(op);
+      if (table && swaps.has(table)) {
+        console.log(`migrate:   (${op.id} is a check-constraint swap, not a loss)`);
+        return false;
+      }
+
+      return true;
+    });
   } catch (error) {
     // A migration whose classification cannot be read is treated as
     // destructive: the gate below then asks for a human, which is the safe

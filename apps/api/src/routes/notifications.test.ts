@@ -1,7 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TestApi, databaseAvailable } from "../test/harness.js";
 import { flushBadges } from "../services/gamification.js";
-import { flushNotifications } from "../services/notifications.js";
+import {
+  flushNotifications,
+  pruneExpired,
+  resetPruneThrottle,
+} from "../services/notifications.js";
 import type { Notification, NotificationPage } from "../services/notifications.js";
 
 const api = new TestApi();
@@ -451,6 +455,218 @@ describe.skipIf(!available)("reading and counting", () => {
     // Read, not gone: the list is a history.
     expect(after.total).toBe(3);
     expect(after.items.every((item) => item.readAt !== null)).toBe(true);
+  });
+});
+
+describe.skipIf(!available)("clearing", () => {
+  let clearer: string;
+  /** Subscribed to the same channel, and never the one doing the clearing. */
+  let neighbour: string;
+
+  beforeAll(async () => {
+    if (!available) return;
+
+    clearer = await api.createUser("nclear");
+    // Distinct in its first four characters, which is all that survives the
+    // harness's 30-character username: `nclearby` would collide with `nclear`.
+    neighbour = await api.createUser("nkeep");
+    await api.subscribeToChannel({ channelId: channel.id, userId: clearer });
+    await api.subscribeToChannel({ channelId: channel.id, userId: neighbour });
+
+    for (const title of ["Keep", "Drop A", "Drop B"]) {
+      const response = await api.request(
+        `/api/channels/${channel.slug}/posts`,
+        { method: "POST", as: author, body: { title, content: "Body." } },
+      );
+      expect(response.status).toBe(201);
+    }
+    await settle();
+
+    // The neighbour reads everything, so their whole list is exactly what a
+    // `DELETE` that forgot its `userId` would destroy.
+    const read = await api.request("/api/notifications/read-all", {
+      method: "POST",
+      as: neighbour,
+    });
+    expect(read.status).toBe(200);
+  });
+
+  it("deletes the read ones and leaves the unread alone", async () => {
+    const before = await inbox(clearer);
+    expect(before.total).toBe(3);
+
+    // Newest first, so this reads "Drop B" and "Drop A" and leaves "Keep".
+    for (const item of before.items.slice(0, 2)) {
+      const read = await api.request(
+        `/api/notifications/${item.id}/read`,
+        { method: "POST", as: clearer },
+      );
+      expect(read.status).toBe(200);
+    }
+
+    const cleared = await api.request<{ unreadCount: number }>(
+      "/api/notifications/read",
+      { method: "DELETE", as: clearer },
+    );
+
+    expect(cleared.status).toBe(200);
+    // Unchanged by definition: clearing touches nothing unread.
+    expect(cleared.body.unreadCount).toBe(1);
+
+    const after = await inbox(clearer);
+    expect(after.total).toBe(1);
+    expect(after.items.map((item) => item.excerpt)).toEqual(["Keep"]);
+    expect(after.items[0]?.readAt).toBeNull();
+  });
+
+  it("is a no-op when nothing has been read", async () => {
+    const response = await api.request<{ unreadCount: number }>(
+      "/api/notifications/read",
+      { method: "DELETE", as: clearer },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body.unreadCount).toBe(1);
+    expect(await api.countNotifications(clearer)).toBe(1);
+  });
+
+  it("clears only the caller's", async () => {
+    // Every one of the neighbour's is read, and the `DELETE`s above ran as
+    // `clearer`. A statement that forgot its `userId` would have emptied this.
+    const theirs = await inbox(neighbour);
+
+    expect(theirs.total).toBe(3);
+    expect(theirs.items.every((item) => item.readAt !== null)).toBe(true);
+  });
+
+  it("turns away a caller with no session", async () => {
+    const response = await api.request("/api/notifications/read", {
+      method: "DELETE",
+    });
+
+    expect(response.status).toBe(401);
+  });
+});
+
+describe.skipIf(!available)("retention", () => {
+  let aged: string;
+
+  beforeAll(async () => {
+    if (!available) return;
+
+    aged = await api.createUser("naged");
+    await api.subscribeToChannel({ channelId: channel.id, userId: aged });
+
+    for (const title of ["Old read", "Old unread", "Recent"]) {
+      const response = await api.request(
+        `/api/channels/${channel.slug}/posts`,
+        { method: "POST", as: author, body: { title, content: "Body." } },
+      );
+      expect(response.status).toBe(201);
+    }
+    await settle();
+  });
+
+  it("drops a read notification a week after it was read", async () => {
+    const before = await inbox(aged);
+    expect(before.total).toBe(3);
+
+    const [recent, unread, read] = before.items;
+    expect(read?.excerpt).toBe("Old read");
+
+    const marked = await api.request(`/api/notifications/${read?.id}/read`, {
+      method: "POST",
+      as: aged,
+    });
+    expect(marked.status).toBe(200);
+
+    // Everything eight days back: past the read ceiling, nowhere near the
+    // thirty-day one, so only the row that was read should go.
+    await api.backdateNotifications(aged, 8);
+    await pruneExpired(aged);
+
+    const after = await inbox(aged);
+    expect(after.total).toBe(2);
+    expect(after.items.map((item) => item.id).sort()).toEqual(
+      [recent?.id, unread?.id].sort(),
+    );
+    // Untouched, so the bell still says there are two things to look at.
+    expect(after.unreadCount).toBe(2);
+  });
+
+  it("keeps a read notification that is only a day old", async () => {
+    const [newest] = (await inbox(aged)).items;
+
+    const marked = await api.request(`/api/notifications/${newest?.id}/read`, {
+      method: "POST",
+      as: aged,
+    });
+    expect(marked.status).toBe(200);
+
+    await api.backdateNotifications(aged, 1);
+    await pruneExpired(aged);
+
+    expect(await api.countNotifications(aged)).toBe(2);
+  });
+
+  it("drops an unread notification after a month", async () => {
+    // Both remaining rows are now nine and thirty-one days old respectively
+    // once this lands; the ceiling is on `createdAt` and ignores `readAt`.
+    await api.backdateNotifications(aged, 31);
+    await pruneExpired(aged);
+
+    expect(await api.countNotifications(aged)).toBe(0);
+  });
+
+  it("sweeps on a list read, without being asked", async () => {
+    const swept = await api.createUser("nswept");
+    await api.subscribeToChannel({ channelId: channel.id, userId: swept });
+
+    const response = await api.request(
+      `/api/channels/${channel.slug}/posts`,
+      { method: "POST", as: author, body: { title: "Stale", content: "Body." } },
+    );
+    expect(response.status).toBe(201);
+    await settle();
+
+    await api.backdateNotifications(swept, 40);
+
+    // The throttle is per account and stamped on the first read, so a fixture
+    // that has never listed is swept by its first request either way; clearing
+    // it keeps this test honest if that setup ever changes.
+    resetPruneThrottle();
+
+    expect((await inbox(swept)).total).toBe(0);
+    expect(await api.countNotifications(swept)).toBe(0);
+  });
+
+  it("sweeps at most once an hour for one account", async () => {
+    const throttled = await api.createUser("nthrottle");
+    await api.subscribeToChannel({ channelId: channel.id, userId: throttled });
+
+    const response = await api.request(
+      `/api/channels/${channel.slug}/posts`,
+      { method: "POST", as: author, body: { title: "Fresh", content: "Body." } },
+    );
+    expect(response.status).toBe(201);
+    await settle();
+
+    resetPruneThrottle();
+    // First read stamps the throttle and sweeps nothing: the row is new.
+    expect((await inbox(throttled)).total).toBe(1);
+
+    // Now age it past both ceilings. The next read is inside the hour, so the
+    // row survives -- which is what proves the throttle is doing something.
+    await api.backdateNotifications(throttled, 40);
+    expect(await api.countNotifications(throttled)).toBe(1);
+
+    const second = await inbox(throttled);
+    expect(second.total).toBe(1);
+    expect(await api.countNotifications(throttled)).toBe(1);
+
+    // And it goes the moment the throttle is out of the way.
+    resetPruneThrottle();
+    expect((await inbox(throttled)).total).toBe(0);
   });
 });
 
