@@ -26,6 +26,7 @@ import type { Notification, NotificationType } from '../../types/notifications'
 const TYPE_ICONS: Record<NotificationType, IconName> = {
   CHANNEL_POST: 'megaphone',
   COMMENT_REPLY: 'comment',
+  STORY_COMMENT: 'comment',
   CLUB_DISCUSSION: 'users',
   NEW_STORY: 'book',
   BADGE_EARNED: 'medal',
@@ -49,6 +50,10 @@ function describe(notification: Notification): string {
       return `${who} posted in ${notification.title}`
     case 'COMMENT_REPLY':
       return `${who} replied to you in ${notification.title}`
+    case 'STORY_COMMENT':
+      // "on" rather than "in": this one is about the reader's own story, and
+      // the reply above is about a conversation inside somebody's.
+      return `${who} commented on ${notification.title}`
     case 'CLUB_DISCUSSION':
       return `${who} started a thread in ${notification.title}`
     case 'NEW_STORY':

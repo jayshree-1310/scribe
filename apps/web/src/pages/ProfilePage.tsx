@@ -250,6 +250,22 @@ export function ProfilePage() {
   // Everything the endpoint returns is earned; there is no locked half here.
   const earnedBadges = badges.data ?? []
   const myClubs = clubs.data ?? []
+  const earnedReading = reading.data ?? []
+  /**
+   * The activity feed is two shelves interleaved, so it is only whole once
+   * both have answered and only honest if neither failed. Read as a pair
+   * rather than per-list: half a reading history looks exactly like a complete
+   * one, and nothing on the row says which shelf it came from.
+   */
+  const activityState =
+    reading.status === 'error'
+      ? reading
+      : completed.status === 'error'
+        ? completed
+        : reading.status === 'loading' || completed.status === 'loading'
+          ? null
+          : undefined
+  const activity = [...earnedReading, ...(completed.data ?? [])]
 
   const tabs = [
     { id: 'overview' as const, label: 'Overview' },
@@ -400,13 +416,31 @@ export function ProfilePage() {
 
           {isMe ? (
             <>
+              {/*
+                `reading.data?.length === 0` was the whole test here, which
+                reads as "the shelf is empty" and is in fact only true once the
+                request has answered. A failure left `data` null, so neither
+                branch matched the reader's situation and the page rendered an
+                empty `<ul>`: no covers, no empty state, no error — a heading
+                over nothing at all.
+              */}
               <section className="page-section">
                 <SectionHead title="Currently reading" to="/library" linkLabel="Library" />
-                {reading.data?.length === 0 ? (
+                {reading.status === 'error' ? (
+                  <ErrorState message={reading.error} onRetry={reading.reload} />
+                ) : reading.status === 'loading' ? (
+                  <ul className="mini-shelf">
+                    {Array.from({ length: 4 }, (_, index) => (
+                      <li key={index}>
+                        <Skeleton height="6.5rem" radius="var(--radius-md)" />
+                      </li>
+                    ))}
+                  </ul>
+                ) : earnedReading.length === 0 ? (
                   <EmptyState size="sm" icon="book-open" title="Nothing in progress" />
                 ) : (
                   <ul className="mini-shelf">
-                    {reading.data?.slice(0, 6).map((entry) => (
+                    {earnedReading.slice(0, 6).map((entry) => (
                       <li key={entry.id}>
                         <Link to={`/book/${entry.book.id}`}>
                           <StoryCover story={entry.book} size="sm" />
@@ -419,11 +453,28 @@ export function ProfilePage() {
 
               <section className="page-section">
                 <SectionHead title="Recent badges" />
-                <div className="card-grid card-grid--tight">
-                  {earnedBadges.slice(0, 4).map((entry) => (
-                    <BadgeTile key={entry.badge.code} entry={entry} />
-                  ))}
-                </div>
+                {badges.status === 'error' ? (
+                  <ErrorState message={badges.error} onRetry={badges.reload} />
+                ) : badges.status === 'loading' ? (
+                  <div className="card-grid card-grid--tight">
+                    {Array.from({ length: 4 }, (_, index) => (
+                      <Skeleton key={index} height="12rem" radius="var(--radius-lg)" />
+                    ))}
+                  </div>
+                ) : earnedBadges.length === 0 ? (
+                  <EmptyState
+                    size="sm"
+                    icon="medal"
+                    title="No badges yet"
+                    description="Read, write and join in — they arrive on their own."
+                  />
+                ) : (
+                  <div className="card-grid card-grid--tight">
+                    {earnedBadges.slice(0, 4).map((entry) => (
+                      <BadgeTile key={entry.badge.code} entry={entry} />
+                    ))}
+                  </div>
+                )}
               </section>
             </>
           ) : data.storyCount === 0 ? (
@@ -502,31 +553,53 @@ export function ProfilePage() {
       ) : null}
 
       {/* The caller's own sections -------------------------------------- */}
+      {/*
+        Had no states at all: two shelves spread into one list, and whatever
+        came out was rendered. Loading, failed and genuinely empty were one
+        outcome on screen — an empty card with a border round it.
+      */}
       {tab === 'activity' ? (
         <TabPanel id="activity">
-          <Card padded={false}>
-            <ul className="activity">
-              {[...(reading.data ?? []), ...(completed.data ?? [])].map((entry) => (
-                <li key={entry.id}>
-                  <span className="activity__icon">
-                    <Icon
-                      name={entry.status === 'FINISHED' ? 'check-circle' : 'book-open'}
-                      size="1rem"
-                    />
-                  </span>
-                  <span className="activity__body">
-                    <span>
-                      {READING_STATUS_LABELS[entry.status]}{' '}
-                      <Link to={`/book/${entry.book.id}`}>{entry.book.title}</Link>
+          {activityState ? (
+            <ErrorState message={activityState.error} onRetry={activityState.reload} />
+          ) : activityState === null ? (
+            <Skeleton height="14rem" radius="var(--radius-lg)" />
+          ) : activity.length === 0 ? (
+            <EmptyState
+              icon="book-open"
+              title="Nothing read yet"
+              description="Shelve a book and everything you read shows up here."
+              action={
+                <ButtonLink variant="primary" to="/discover">
+                  Find a book
+                </ButtonLink>
+              }
+            />
+          ) : (
+            <Card padded={false}>
+              <ul className="activity">
+                {activity.map((entry) => (
+                  <li key={entry.id}>
+                    <span className="activity__icon">
+                      <Icon
+                        name={entry.status === 'FINISHED' ? 'check-circle' : 'book-open'}
+                        size="1rem"
+                      />
                     </span>
-                    <span className="activity__when">
-                      {formatRelative(entry.updatedAt)}
+                    <span className="activity__body">
+                      <span>
+                        {READING_STATUS_LABELS[entry.status]}{' '}
+                        <Link to={`/book/${entry.book.id}`}>{entry.book.title}</Link>
+                      </span>
+                      <span className="activity__when">
+                        {formatRelative(entry.updatedAt)}
+                      </span>
                     </span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </Card>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
         </TabPanel>
       ) : null}
 

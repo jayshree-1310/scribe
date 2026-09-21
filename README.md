@@ -5,11 +5,12 @@ discover, read and shelve stories; authors write, publish and manage them.
 
 The project is a rebuild with a production-oriented architecture — **React,
 Node.js, TypeScript, PostgreSQL, Prisma and Docker** — and is under active
-development. The frontend is complete as a design surface; the backend is being
-filled in behind it, page by page, and the in-repo mock layer is down to its
-last two callers. The section
-[Where the project actually stands](#-where-the-project-actually-stands) says
-which parts are real today.
+development. The frontend was built first as a complete design surface against
+an in-repo mock layer, and the backend was then filled in behind it page by
+page. **That mock layer is now gone** — every screen reads a real endpoint, and
+`data/api.ts`, `data/mock-db.ts` and `types/domain.ts` have been deleted. The
+section [Where the project actually stands](#-where-the-project-actually-stands)
+says what each area runs on today.
 
 A deployment runs on Render's free tier — [web](https://scribe-web-7mpz.onrender.com),
 [API](https://scribe-new.onrender.com/health). The API sleeps after 15 minutes
@@ -17,31 +18,51 @@ idle, so the first request after a quiet spell takes a while to answer.
 
 ## 📍 Where the project actually stands
 
-| Area                                                                      | State                                                |
-| ------------------------------------------------------------------------- | ---------------------------------------------------- |
-| Auth — email signup/login, refresh rotation, logout, Google sign-in       | **Real API**                                         |
-| Passwords & email verification — forgot/reset, change, set, verify        | **Real API**                                         |
-| Account — profile edits, avatar upload, account deletion                  | **Real API**                                         |
-| Catalogue books — discover, filter, detail, related                       | **Real API**                                         |
-| My Library — shelve, update, remove                                       | **Real API**                                         |
-| Stories & chapters — public reading                                       | **Real API**                                         |
-| Author studio — stories, chapters, reorder, publish/unpublish, multimedia | **Real API**                                         |
-| Uploads — images (`kind=cover`) and chapter audio/video (`kind=media`)    | **Real API**                                         |
-| Home feed, public profiles & follows, clubs, channels                     | **Real API**                                         |
-| Comments, ratings, reading progress & streak                              | **Real API**                                         |
-| Writing challenges & leaderboard                                          | **Real API**                                         |
-| Author analytics — view / chapter-read events, daily series, per-story    | **Real API**                                         |
-| Badges, reader & author levels                                            | **Real API**                                         |
-| Scribble — the GenAI discovery concierge, JSON and streaming              | **Real API**                                         |
-| Onboarding answers                                                        | **Mock** (`apps/web/src/data/api.ts` + `mock-db.ts`) |
-| Notifications, moderation, recommendations                                | Not built — see `docs/BACKLOG.md`                    |
-| The rest of the GenAI roadmap (AI 3 – AI 20)                              | Not built — see `docs/AI-BACKLOG.md`                 |
+| Area                                                                      | State                                |
+| ------------------------------------------------------------------------- | ------------------------------------ |
+| Auth — email signup/login, refresh rotation, logout, Google sign-in       | **Real API**                         |
+| Passwords & email verification — forgot/reset, change, set, verify        | **Real API**                         |
+| Account — profile edits, avatar upload, account deletion                  | **Real API**                         |
+| Catalogue books — discover, filter, detail, related                       | **Real API**                         |
+| My Library — shelve, update, remove                                       | **Real API**                         |
+| Stories & chapters — public reading                                       | **Real API**                         |
+| Author studio — stories, chapters, reorder, publish/unpublish, multimedia | **Real API**                         |
+| Uploads — images (`kind=cover`) and chapter audio/video (`kind=media`)    | **Real API**                         |
+| Home feed, public profiles & follows, clubs, channels                     | **Real API**                         |
+| Comments, ratings, reading progress & streak                              | **Real API**                         |
+| Writing challenges & leaderboard                                          | **Real API**                         |
+| Author analytics — view / chapter-read events, daily series, per-story    | **Real API**                         |
+| Badges, reader & author levels                                            | **Real API**                         |
+| Notifications — fan-out, bell, per-type mutes                             | **Real API**                         |
+| Moderation — reporting, the queue, hiding content, suspensions            | **Real API**                         |
+| Onboarding, genre preferences & ranked recommendations                    | **Real API**                         |
+| Scribble — the GenAI discovery concierge, JSON and streaming              | **Real API**                         |
+| The rest of the GenAI roadmap (AI 3 – AI 20)                              | Not built — see `docs/AI-BACKLOG.md` |
+
+Every row above the last one is served by the API.
+
+**"Real API" is a claim about the mechanism, not about the content.** The mock
+layer that is gone was a fake _transport_: fixtures held in the browser, handed
+back by stub functions behind a fixed 260ms delay, with no request and no
+database. What a development database holds instead is seeded sample content —
+`seed:books`, `seed:stories` and `seed:challenges` below — which is real rows in
+Postgres, read through the real endpoints, paginated and ranked and deletable
+like anything a reader writes. The stories on the home page are those rows.
+
+Two things about them are worth knowing. Their `viewCount` and `likeCount` are
+invented starting values rather than counted events, so a seeded story's "all
+time" figure is a number somebody typed and every increment after it is a real,
+deduplicated view — `docs/BACKLOG.md` keeps that note under the analytics open
+questions. And no seeded account can be signed into — the authors and
+`seed:books`'s demo reader all carry a password hash that is not a hash of
+anything, so no password can ever match it.
 
 The planning documents drive the work, and all of them are grounded in the
 current tree rather than in the abstract:
 
-- `docs/BACKLOG.md` — the gap between the frontend surface and the API, as
-  self-contained tasks.
+- `docs/BACKLOG.md` — what closing the gap between the frontend surface and the
+  API took, task by task. All of it has landed; what is still live in there is
+  the list of open questions the test suite cannot reach.
 - `docs/AI-BACKLOG.md` — the GenAI roadmap (AI 0 – AI 20). AI 0 (the provider
   seam) and AI 1.5 (Scribble, streaming included) have landed.
 - `docs/ai-architecture.md` — how an AI request travels through the seam, and
@@ -57,7 +78,21 @@ current tree rather than in the abstract:
 - Browse and discover stories and catalogue books, filtered by genre
 - Read stories chapter by chapter
 - Shelve stories in a personal library with a status per shelf item
-- Related-title suggestions
+- Resume where you stopped, with a reading streak counted across days
+- Related-title suggestions, and a personalised rail ranked server-side from
+  your genres, shelves, history, ratings and follows — which answers trending,
+  and says so, before you have given it anything to rank on
+- Pick your genres at signup in a resumable onboarding flow, and change them
+  later in settings
+- Comment on stories and chapters, reply one level deep, and rate what you read
+- Follow authors, see public profiles, and join book clubs and broadcast
+  channels
+- Enter writing challenges and appear on their leaderboards
+- A notification bell for replies, channel posts, club threads, new stories
+  from authors you follow and badges you earn — with a per-type mute that
+  stops the row being written rather than hiding it afterwards
+- Report a comment, a club thread or a channel post; moderators resolve the
+  queue, hide content and suspend accounts
 - Earn badges and a reader level from what you actually read, comment on and
   rate — awarded server-side, visible on your own profile and on other people's
 - Ask **Scribble**, a conversational concierge, for something to read — see
@@ -183,7 +218,7 @@ plain language. It is the feature most worth understanding before reading
 in the next paragraph.
 
 Scribble is the chat bubble in the corner of the app. A reader types something
-human — *"fantasy books for kids"*, *"something short and finished"* — and gets
+human — _"fantasy books for kids"_, _"something short and finished"_ — and gets
 back real books from Scribe's own database, each with one line on why it might
 suit them.
 
@@ -197,14 +232,14 @@ It does this most confidently when the real library is small, which ours is.
 
 So the model is given two narrow jobs and nothing else:
 
-| Job | What the model does | What it never touches |
-| --- | --- | --- |
-| **Routing** | Turns a sentence into search filters | — |
+| Job           | What the model does                           | What it never touches                  |
+| ------------- | --------------------------------------------- | -------------------------------------- |
+| **Routing**   | Turns a sentence into search filters          | —                                      |
 | **Narrating** | Writes one sentence about a row it was handed | Title, author, description, cover, URL |
 
 Title, author, description, cover and URL are copied off the database row and
-never pass through a completion. That makes invented books *structurally
-impossible* rather than something a prompt has to argue against.
+never pass through a completion. That makes invented books _structurally
+impossible_ rather than something a prompt has to argue against.
 
 ### The three stages
 
@@ -228,8 +263,8 @@ reader's sentence
 assemble in code: `reason` from the model, every other field from the row
 ```
 
-Stage 2 has no model in it at all. The stage that decides *what gets
-recommended* is `services/books.ts` and `services/stories.ts` — the same
+Stage 2 has no model in it at all. The stage that decides _what gets
+recommended_ is `services/books.ts` and `services/stories.ts` — the same
 functions the ordinary Discover page calls.
 
 ### Walking through one question
@@ -246,14 +281,14 @@ goes out.
 **3. The route checks everything before spending anything.** `routes/ai.ts`
 applies `requireUser`, a per-user rate limit (20 questions per 10 minutes) and
 Zod validation (1–500 characters) — in that order, so an anonymous or abusive
-caller never reaches a model call. An abort signal is wired to the *response*
+caller never reaches a model call. An abort signal is wired to the _response_
 closing, so a reader who navigates away stops the generation instead of leaving
 it running for an answer nobody will read.
 
 **4. Stage 1 — intent.** `interpret()` in `services/ai/scribble.ts` sends one
-completion built from `services/ai/prompts/scribble.ts`: *"You translate a
+completion built from `services/ai/prompts/scribble.ts`: _"You translate a
 reader's request into search filters. Reply with JSON only. These are the only
-genres that exist: …"*, with the real list from `listGenres()` injected.
+genres that exist: …"_, with the real list from `listGenres()` injected.
 
 - The model picks a genre **by name from a closed list**, never by id. A uuid is
   exactly the kind of token a small model transposes a character of; a name
@@ -289,8 +324,8 @@ Three properties worth knowing:
   `kidsAppropriate` are never relaxed: they are what the reader actually asked
   for, and falling back past a request for children's books to the adult shelf
   is the one failure here that would genuinely matter.
-- **A relaxed search is reported, never hidden.** The UI says *"I couldn't find
-  anything for 'Dune' — these are the closest."* Substituting other books
+- **A relaxed search is reported, never hidden.** The UI says _"I couldn't find
+  anything for 'Dune' — these are the closest."_ Substituting other books
   silently is the difference between a helpful fallback and a wrong answer.
 
 Results are ordered by **trending, not rating**: both services read "highest
@@ -335,10 +370,10 @@ sentence about them is missing.
 
 Measured end to end against `llama3.2:3b` on a laptop CPU:
 
-| | Time |
-| --- | --- |
-| Book cards ready — retrieval has answered | **5.5s** |
-| Finished reply — the model has written every sentence | **97s** |
+|                                                       | Time     |
+| ----------------------------------------------------- | -------- |
+| Book cards ready — retrieval has answered             | **5.5s** |
+| Finished reply — the model has written every sentence | **97s**  |
 
 The cards are known before the model has written a word. Making a reader watch
 a spinner for 97 seconds when there were real books at 5.5 is the whole argument
@@ -360,7 +395,7 @@ Two pieces make that work:
   semantic events, emitting a `pick` the moment one `{ id, reason }` object
   closes. It is a byte-wise scanner rather than a regex or a `JSON.parse` per
   delta, because a chunk boundary lands mid-uuid, mid-escape or between a key
-  and its colon often enough that anything simpler is wrong *intermittently* —
+  and its colon often enough that anything simpler is wrong _intermittently_ —
   the worst way for a parser to be wrong.
 - **Headers are flushed late, on purpose.** Nothing is written until intent and
   retrieval have both succeeded, because every provider-availability failure is
@@ -371,12 +406,12 @@ Two pieces make that work:
   terminal `done` is a failure the client treats as one.
 
 **Streaming is never retried.** Once a delta has reached the client a retry
-would make the reply restart mid-sentence. The JSON route *does* retry transient
+would make the reply restart mid-sentence. The JSON route _does_ retry transient
 failures, which is why both routes exist rather than one built on the other.
 
 ### Follow-up questions
 
-Ask *"which of those are thrillers?"* and Scribble narrows the previous search
+Ask _"which of those are thrillers?"_ and Scribble narrows the previous search
 instead of starting over. What the client sends back is the **interpreted
 filters** of the last turn — not the previous prose, and not the previous result
 ids:
@@ -385,7 +420,7 @@ ids:
   inspectable. Rewriting "thriller ones" into a standalone sentence needs a
   second model call and fails invisibly when it guesses wrong.
 - Re-querying with merged filters finds every book matching both. Filtering the
-  previous *ids* could only ever return a subset of one capped page, so
+  previous _ids_ could only ever return a subset of one capped page, so
   "thrillers by A" would miss A's thrillers that did not fit in the first five
   results.
 
@@ -403,14 +438,14 @@ is what `mode` is for.
 A missing or broken AI setup is a runtime 503, never a failure to boot: the API
 serves every non-AI route on a machine that has never heard of a model server.
 
-| Situation | Status | What the API message names |
-| --- | --- | --- |
-| Provider needs a key and has none | 503 | that AI is not configured |
-| Model server unreachable | 503 | `docker compose --profile ai up -d ollama` |
-| Model not pulled | 503 | `ollama pull <model>` |
-| Model server busy | 429 | try again shortly |
-| Model server timed out | 504 | — |
-| Model answered, unusably | 502 | — |
+| Situation                         | Status | What the API message names                 |
+| --------------------------------- | ------ | ------------------------------------------ |
+| Provider needs a key and has none | 503    | that AI is not configured                  |
+| Model server unreachable          | 503    | `docker compose --profile ai up -d ollama` |
+| Model not pulled                  | 503    | `ollama pull <model>`                      |
+| Model server busy                 | 429    | try again shortly                          |
+| Model server timed out            | 504    | —                                          |
+| Model answered, unusably          | 502    | —                                          |
 
 Retries cover 503, 504 and 429 only — "the same request may work in a moment".
 A 502 is never retried, because asking again the same way tends to fail the
@@ -421,13 +456,13 @@ prompt can contain somebody's unpublished chapter; upstream detail goes to the
 log and the client gets a fixed sentence. The widget then translates even that
 into the reader's half: the 503 naming a docker command is right for a
 developer reading a log and alarming in a chat bubble, so the reader sees
-*"Scribble is having a rest."*
+_"Scribble is having a rest."_
 
 ### What the reader is promised
 
 Every generated sentence is labelled. A book's own description and Scribble's
-take render differently, and the list carries a notice: *titles come from
-Scribe's library; the notes are AI-generated and can be wrong.* Nothing a
+take render differently, and the list carries a notice: _titles come from
+Scribe's library; the notes are AI-generated and can be wrong._ Nothing a
 machine wrote is ever allowed to read as an author's own words.
 
 The conversation is kept in `localStorage` (the last 12 turns), so it survives a
@@ -436,21 +471,21 @@ cross-device history needs conversation tables — Task AI 10.
 
 ### The files
 
-| File | Responsibility |
-| --- | --- |
-| `apps/api/src/routes/ai.ts` | Both routes: auth, rate limit, Zod, SSE framing |
-| `apps/api/src/services/ai/scribble.ts` | The three stages, and the assembly that drops invented ids |
-| `apps/api/src/services/ai/scribble-types.ts` | The shapes the stages pass between them |
-| `apps/api/src/services/ai/prompts/scribble.ts` | Both prompts, built from server-derived values only |
-| `apps/api/src/services/ai/json-stream.ts` | Incremental reader for the narration call's JSON |
-| `apps/api/src/services/ai/types.ts` | The provider seam — no SDK or vendor type appears in it |
-| `apps/api/src/services/ai/provider.ts` | The one place a client is constructed; retry and usage policy |
-| `apps/api/src/services/ai/ollama.ts` | Local model server over plain HTTP, no SDK, no key |
+| File                                            | Responsibility                                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `apps/api/src/routes/ai.ts`                     | Both routes: auth, rate limit, Zod, SSE framing                                      |
+| `apps/api/src/services/ai/scribble.ts`          | The three stages, and the assembly that drops invented ids                           |
+| `apps/api/src/services/ai/scribble-types.ts`    | The shapes the stages pass between them                                              |
+| `apps/api/src/services/ai/prompts/scribble.ts`  | Both prompts, built from server-derived values only                                  |
+| `apps/api/src/services/ai/json-stream.ts`       | Incremental reader for the narration call's JSON                                     |
+| `apps/api/src/services/ai/types.ts`             | The provider seam — no SDK or vendor type appears in it                              |
+| `apps/api/src/services/ai/provider.ts`          | The one place a client is constructed; retry and usage policy                        |
+| `apps/api/src/services/ai/ollama.ts`            | Local model server over plain HTTP, no SDK, no key                                   |
 | `apps/api/src/services/ai/openai-compatible.ts` | Any OpenAI-format endpoint — Groq, OpenRouter — for deployments with no model server |
-| `apps/api/src/services/ai/config.ts` | Reads `AI_*`; never throws at import |
-| `apps/api/src/services/ai/testing.ts` | `fakeAiProvider()` — no test ever calls a real model |
-| `apps/web/src/data/ai-api.ts` | The client, including the SSE read path |
-| `apps/web/src/components/ai/ScribbleWidget.tsx` | The docked panel, the streamed turn, the labelling |
+| `apps/api/src/services/ai/config.ts`            | Reads `AI_*`; never throws at import                                                 |
+| `apps/api/src/services/ai/testing.ts`           | `fakeAiProvider()` — no test ever calls a real model                                 |
+| `apps/web/src/data/ai-api.ts`                   | The client, including the SSE read path                                              |
+| `apps/web/src/components/ai/ScribbleWidget.tsx` | The docked panel, the streamed turn, the labelling                                   |
 
 Tests live in `apps/api/src/routes/ai.test.ts`,
 `apps/api/src/services/ai/ai.test.ts` and
@@ -487,7 +522,7 @@ is present, without the key or the URL.
 > sentence is labelled as generated.
 
 `docs/ai-architecture.md` traces the same path at the layer below, and
-`docs/AI-BACKLOG.md` § *Task AI 1.5* is the specification it was built from.
+`docs/AI-BACKLOG.md` § _Task AI 1.5_ is the specification it was built from.
 
 ## 🛠️ Tech Stack
 
@@ -560,7 +595,7 @@ scribe/
 │       ├── src/
 │       │   ├── pages/        # incl. pages/author (the author studio)
 │       │   ├── components/   # layout, ui, story, books, charts, ai, settings
-│       │   ├── data/         # *-api.ts (real) + api.ts/mock-db.ts (onboarding)
+│       │   ├── data/         # one *-api.ts per API service
 │       │   ├── hooks/  lib/  types/
 │       │   └── index.css
 │       ├── Dockerfile
@@ -642,11 +677,20 @@ docker compose run --rm api-migrate
 
 ### 5. Optional: seed sample content
 
+Optional in the literal sense: the app runs against an empty database, and
+every list on it then shows its empty state. These write real rows through the
+same models the app writes, and each is idempotent — authors match on username
+and stories on slug, so re-running updates in place rather than duplicating.
+
 ```bash
 docker compose exec api pnpm --filter api seed:books       # catalogue books + a demo reader
 docker compose exec api pnpm --filter api seed:stories     # Scribe stories with chapters
 docker compose exec api pnpm --filter api seed:challenges  # writing challenges, past and upcoming
 ```
+
+The view and like counts these set are invented starting values, not counted
+events — see the note under
+[Where the project actually stands](#-where-the-project-actually-stands).
 
 Writing challenges can only be created by an administrator, and no endpoint
 grants that flag — so it is set against the database:
@@ -1110,7 +1154,7 @@ listed by an author you follow, and a badge you earned. Services call a single
 `notify()` in `services/notifications.ts` after the write they are reporting;
 routes never insert a notification themselves.
 
-Fan-out is one `INSERT ... SELECT` per event whose `SELECT` *is* the audience,
+Fan-out is one `INSERT ... SELECT` per event whose `SELECT` _is_ the audience,
 so a channel with ten thousand subscribers is one statement and no array in the
 API's memory — and the actor is excluded by the same `WHERE`, which is what
 makes "never notify somebody about their own action" a property of the query
@@ -1246,60 +1290,15 @@ The web app has no test suite yet.
 
 ## 📌 Development Roadmap
 
-### Phase 1 — Foundation
+### Phase 1 — Foundation --> Done
 
-- [x] Project setup (pnpm workspaces + Turborepo)
-- [x] Docker development environment
-- [x] PostgreSQL + Redis
-- [x] Prisma configuration and migrations
-- [x] API health check
-- [x] Centralized error handling
-- [x] Structured logging
+### Phase 2 — Authentication --> Done
 
-### Phase 2 — Authentication
+### Phase 3 — Core Platform --> Done
 
-- [x] User signup
-- [x] Login
-- [x] JWT authentication
-- [x] Refresh-token rotation and revocable sessions
-- [x] Logout / logout-all
-- [x] Google sign-in
-- [x] Password reset & email verification
-- [x] Account deletion
-- [x] Role-based authorization (`auth.User.isAdmin`, read only in `services/roles.ts`)
+### Phase 4 — Social Features --> Done
 
-### Phase 3 — Core Platform
-
-- [x] Catalogue browsing and filtering
-- [x] Personal library
-- [x] Story management
-- [x] Chapter management
-- [x] Genres
-- [x] Draft and publishing workflow
-- [x] Reader experience (story detail, chapter reader)
-- [x] Image uploads (covers, avatars)
-- [x] Audio/video uploads for chapter multimedia
-- [x] Public author profiles
-
-### Phase 4 — Social Features
-
-- [x] Comments
-- [x] Ratings
-- [x] Reading history & progress
-- [x] Follows
-- [ ] Notifications
-
-### Phase 5 — Platform Features
-
-- [x] Search and filtering
-- [ ] Real recommendations (mock today)
-- [x] Author analytics on real data
-- [ ] Content moderation & reporting
-- [x] Badges and levels
-- [x] Writing challenges
-- [x] Book clubs
-- [x] Broadcast channels
-- [ ] Retire the mock data layer
+### Phase 5 — Platform Features --> Done
 
 ### Phase 6 — GenAI (`docs/AI-BACKLOG.md`)
 

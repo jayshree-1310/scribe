@@ -2,9 +2,7 @@
  * Writing challenge types.
  *
  * These mirror the API responses in `apps/api/src/services/challenges.ts`
- * exactly, the same way `types/clubs.ts` mirrors the clubs service. Separate
- * from `domain.ts`, which describes the mock layer -- and which no longer
- * carries a challenge shape at all.
+ * exactly, the same way `types/clubs.ts` mirrors the clubs service.
  *
  * What the mock invented and nothing stores, so it is absent here:
  *

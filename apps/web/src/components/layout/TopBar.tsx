@@ -88,7 +88,7 @@ export function TopBar({ onOpenNav, title }: TopBarProps) {
             )}
           >
             <div className="dropdown__header">
-              <p className="dropdown__name">{user.displayName}</p>
+              <p className="dropdown__name">{user.displayName || user.username}</p>
               <p className="dropdown__handle">@{user.username}</p>
             </div>
             <MenuSeparator />

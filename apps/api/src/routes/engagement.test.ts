@@ -423,6 +423,280 @@ describe.skipIf(!available)("deleting comments", () => {
   });
 });
 
+/* Likes ------------------------------------------------------------------ */
+
+describe.skipIf(!available)("chapter likes", () => {
+  it("counts a like once however many times it is sent", async () => {
+    const first = await api.request(`/api/chapters/${chapterId}/like`, {
+      method: "PUT",
+      as: reader,
+    });
+
+    expect(first.status).toBe(200);
+    expect(first.body).toEqual({ count: 1, liked: true });
+
+    // The point of `PUT` over a toggle: sending it again is the same request
+    // and lands in the same state, rather than quietly unliking.
+    const again = await api.request(`/api/chapters/${chapterId}/like`, {
+      method: "PUT",
+      as: reader,
+    });
+
+    expect(again.body).toEqual({ count: 1, liked: true });
+  });
+
+  it("counts each reader separately and answers the caller's own state", async () => {
+    const chapter = await api.createChapter({ storyId, number: 40 });
+
+    await api.request(`/api/chapters/${chapter}/like`, {
+      method: "PUT",
+      as: reader,
+    });
+    const second = await api.request(`/api/chapters/${chapter}/like`, {
+      method: "PUT",
+      as: other,
+    });
+
+    expect(second.body).toEqual({ count: 2, liked: true });
+
+    // The chapter read carries the pair, so the reader's footer draws the
+    // right heart without a second request.
+    const { body } = await api.request(
+      `/api/stories/${storySlug}/chapters/40`,
+      { as: reader },
+    );
+
+    expect(body.chapter.likeCount).toBe(2);
+    expect(body.chapter.likedByMe).toBe(true);
+  });
+
+  it("reports likedByMe false for somebody who has not liked it", async () => {
+    const chapter = await api.createChapter({ storyId, number: 41 });
+
+    await api.request(`/api/chapters/${chapter}/like`, {
+      method: "PUT",
+      as: reader,
+    });
+
+    const [signedIn, anonymous] = await Promise.all([
+      api.request(`/api/stories/${storySlug}/chapters/41`, { as: other }),
+      api.request(`/api/stories/${storySlug}/chapters/41`),
+    ]);
+
+    expect(signedIn.body.chapter.likeCount).toBe(1);
+    expect(signedIn.body.chapter.likedByMe).toBe(false);
+    // Anonymous readers cannot have liked anything, and get `false` rather
+    // than a null every caller would have to branch on.
+    expect(anonymous.body.chapter.likedByMe).toBe(false);
+  });
+
+  it("unlikes, and is silent about unliking what was never liked", async () => {
+    const chapter = await api.createChapter({ storyId, number: 42 });
+
+    await api.request(`/api/chapters/${chapter}/like`, {
+      method: "PUT",
+      as: reader,
+    });
+
+    const removed = await api.request(`/api/chapters/${chapter}/like`, {
+      method: "DELETE",
+      as: reader,
+    });
+    expect(removed.status).toBe(200);
+    expect(removed.body).toEqual({ count: 0, liked: false });
+
+    const never = await api.request(`/api/chapters/${chapter}/like`, {
+      method: "DELETE",
+      as: other,
+    });
+    expect(never.status).toBe(200);
+    expect(never.body).toEqual({ count: 0, liked: false });
+  });
+
+  it("refuses an anonymous like", async () => {
+    const { status } = await api.request(`/api/chapters/${chapterId}/like`, {
+      method: "PUT",
+    });
+
+    expect(status).toBe(401);
+  });
+
+  it("refuses a like on a chapter the caller cannot read", async () => {
+    const hidden = await api.createChapter({ storyId: draftId, number: 1 });
+
+    // A draft's chapter is its author's alone, and a like that answered 200
+    // here would confirm that an unlisted story exists.
+    const stranger = await api.request(`/api/chapters/${hidden}/like`, {
+      method: "PUT",
+      as: reader,
+    });
+    expect(stranger.status).toBe(404);
+
+    const owner = await api.request(`/api/chapters/${hidden}/like`, {
+      method: "PUT",
+      as: author,
+    });
+    expect(owner.status).toBe(200);
+  });
+
+  it("refuses a like from a suspended account", async () => {
+    await api.setSuspended(other);
+    try {
+      const { status } = await api.request(`/api/chapters/${chapterId}/like`, {
+        method: "PUT",
+        as: other,
+      });
+
+      expect(status).toBe(403);
+    } finally {
+      await api.setSuspended(other, false);
+    }
+  });
+});
+
+describe.skipIf(!available)("comment likes", () => {
+  it("counts a like and reports it on the comment", async () => {
+    const story = await api.createStory({ title: "Liked", authorId: author });
+    const comment = await api.createComment({
+      storyId: story.id,
+      userId: reader,
+      content: "Well observed.",
+    });
+
+    const liked = await api.request(`/api/comments/${comment}/like`, {
+      method: "PUT",
+      as: other,
+    });
+    expect(liked.status).toBe(200);
+    expect(liked.body).toEqual({ count: 1, liked: true });
+
+    const mine = await api.request(
+      `/api/stories/${story.slug}/comments`,
+      { as: other },
+    );
+    expect(mine.body.items[0].likeCount).toBe(1);
+    expect(mine.body.items[0].likedByMe).toBe(true);
+
+    // Somebody else's view of the same comment: the count is shared, the
+    // caller's own state is not.
+    const theirs = await api.request(`/api/stories/${story.slug}/comments`, {
+      as: reader,
+    });
+    expect(theirs.body.items[0].likeCount).toBe(1);
+    expect(theirs.body.items[0].likedByMe).toBe(false);
+  });
+
+  it("carries the count onto a reply, listed as a reply", async () => {
+    const story = await api.createStory({ title: "Liked reply", authorId: author });
+    const thread = await api.createComment({
+      storyId: story.id,
+      userId: reader,
+      content: "Thread.",
+    });
+    const reply = await api.createComment({
+      storyId: story.id,
+      userId: other,
+      content: "Reply.",
+      parentId: thread,
+    });
+
+    await api.request(`/api/comments/${reply}/like`, {
+      method: "PUT",
+      as: reader,
+    });
+
+    const { body } = await api.request(
+      `/api/stories/${story.slug}/comments?parentId=${thread}`,
+      { as: reader },
+    );
+
+    expect(body.items[0].likeCount).toBe(1);
+    expect(body.items[0].likedByMe).toBe(true);
+  });
+
+  it("lets somebody like their own comment", async () => {
+    const story = await api.createStory({ title: "Self liked", authorId: author });
+    const comment = await api.createComment({
+      storyId: story.id,
+      userId: reader,
+      content: "Mine.",
+    });
+
+    // Deliberately allowed: a like is a bookmark as much as an endorsement,
+    // and refusing it would be a rule with nothing behind it.
+    const { status, body } = await api.request(
+      `/api/comments/${comment}/like`,
+      { method: "PUT", as: reader },
+    );
+
+    expect(status).toBe(200);
+    expect(body).toEqual({ count: 1, liked: true });
+  });
+
+  it("refuses a like on a comment under a story the caller cannot see", async () => {
+    const comment = await api.createComment({
+      storyId: draftId,
+      userId: author,
+      content: "Note to self.",
+    });
+
+    const { status } = await api.request(`/api/comments/${comment}/like`, {
+      method: "PUT",
+      as: reader,
+    });
+
+    expect(status).toBe(404);
+  });
+
+  it("404s on a comment id that is not one", async () => {
+    const { status } = await api.request(
+      "/api/comments/00000000-0000-4000-8000-000000000000/like",
+      { method: "PUT", as: reader },
+    );
+
+    expect(status).toBe(404);
+  });
+
+  it("lets its own comment be deleted after somebody liked it", async () => {
+    const story = await api.createStory({ title: "Liked then gone", authorId: author });
+    const thread = await api.createComment({
+      storyId: story.id,
+      userId: reader,
+      content: "Goes away.",
+    });
+    const reply = await api.createComment({
+      storyId: story.id,
+      userId: other,
+      content: "So does this.",
+      parentId: thread,
+    });
+
+    await api.request(`/api/comments/${thread}/like`, {
+      method: "PUT",
+      as: other,
+    });
+    await api.request(`/api/comments/${reply}/like`, {
+      method: "PUT",
+      as: reader,
+    });
+
+    /**
+     * The regression this pins: `commentLike_commentId_fkey` refuses the
+     * delete unless the likes on the thread *and* on its replies go first, and
+     * it refuses it only for a comment somebody happened to like.
+     */
+    const { status } = await api.request(`/api/comments/${thread}`, {
+      method: "DELETE",
+      as: reader,
+    });
+
+    expect(status).toBe(204);
+
+    const { body } = await api.request(`/api/stories/${story.slug}/comments`);
+    expect(body.total).toBe(0);
+  });
+});
+
 /* Ratings ---------------------------------------------------------------- */
 
 describe.skipIf(!available)("ratings", () => {

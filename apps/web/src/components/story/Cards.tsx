@@ -13,57 +13,26 @@ import { channelAuthorName, type Channel } from '../../types/channels'
 import { CLUB_ROLE_LABELS, type Club } from '../../types/clubs'
 import type { Challenge } from '../../types/challenges'
 import type { BadgeProgress } from '../../types/gamification'
-import type { User } from '../../types/domain'
 
-/* Author -------------------------------------------------------------- */
-
-export function AuthorCard({ author }: { author: User }) {
-  return (
-    <article className="author-card">
-      <Link className="author-card__link" to={`/profile/${author.username}`}>
-        <Avatar user={author} size="lg" />
-        <span className="author-card__name">{author.displayName}</span>
-        <span className="author-card__handle">@{author.username}</span>
-      </Link>
-      <p className="author-card__bio">{author.bio}</p>
-      <p className="author-card__followers">
-        <Icon name="users" size="0.9em" />
-        {formatCount(author.followerCount)} followers
-      </p>
-    </article>
-  )
-}
-
-/* Genre --------------------------------------------------------------- */
-
-/**
- * Structural, like `GenreChip`: mock genres carry a slug and a blurb, API
- * genres carry an id and neither. Discover accepts either as its filter.
+/* Author ---------------------------------------------------------------
+ *
+ * `AuthorCard` left with the mock layer. Nothing imported it, and the only
+ * shape it fitted was the mock's `User`: it wanted a `bio` and a
+ * `followerCount` on the same object as the handle, which no API response
+ * carries together. The onboarding author picker, the one surface that shows
+ * authors as cards, renders `SuggestedAuthor` inline from
+ * `GET /api/recommendations/authors` instead.
  */
-interface CardGenre {
-  id?: string
-  name: string
-  hue: number
-  storyCount: number
-  slug?: string
-  description?: string
-}
 
-export function GenreCard({ genre }: { genre: CardGenre }) {
-  return (
-    <Link
-      className="genre-card"
-      to={`/discover?genre=${genre.slug ?? genre.id ?? ''}`}
-      style={{ '--genre-hue': genre.hue } as CSSProperties}
-    >
-      <span className="genre-card__name">{genre.name}</span>
-      {genre.description ? (
-        <span className="genre-card__desc">{genre.description}</span>
-      ) : null}
-      <span className="genre-card__count">{formatCount(genre.storyCount)} stories</span>
-    </Link>
-  )
-}
+/* Genre ----------------------------------------------------------------
+ *
+ * `GenreCard` left with the mock layer, for `AuthorCard`'s reason. Nothing
+ * imported it, and the blurb it was built around -- the whole difference
+ * between it and a `GenreChip` -- came only from the mock's hand-written genre
+ * list. `content.Genre` stores a name and a hue, and `GET /api/books/genres`
+ * adds a count; there is no description to render and none was ever written.
+ * The genre list on Discover renders chips.
+ */
 
 /* Challenge ----------------------------------------------------------- */
 

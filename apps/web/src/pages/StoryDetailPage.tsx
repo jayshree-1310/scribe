@@ -24,6 +24,7 @@ import {
 } from '../types/engagement'
 import { useAuth } from '../lib/auth'
 import { AppShell } from '../components/layout/AppShell'
+import { LikeButton } from '../components/engagement/LikeButton'
 import { ReportMenu } from '../components/moderation/ReportMenu'
 import { Avatar } from '../components/ui/Avatar'
 import { Button, ButtonLink } from '../components/ui/Button'
@@ -612,6 +613,13 @@ export function StoryDetailPage() {
                       <p className="comment__text">{comment.content}</p>
 
                       <div className="comment__actions">
+                        <LikeButton
+                          subject="comment"
+                          subjectId={comment.id}
+                          likeCount={comment.likeCount}
+                          likedByMe={comment.likedByMe}
+                          noun="this comment"
+                        />
                         <span>
                           <Icon name="comment" size="0.9em" />
                           {formatCount(comment.replyCount)}{' '}
@@ -677,6 +685,13 @@ export function StoryDetailPage() {
                                   </p>
                                   <p className="comment__text">{reply.content}</p>
                                   <div className="comment__actions">
+                                    <LikeButton
+                                      subject="comment"
+                                      subjectId={reply.id}
+                                      likeCount={reply.likeCount}
+                                      likedByMe={reply.likedByMe}
+                                      noun="this reply"
+                                    />
                                     {reply.user.id === myId ? (
                                       <button
                                         type="button"

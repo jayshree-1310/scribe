@@ -41,8 +41,8 @@ enum ReadingStatus {
 /// A closed set the database enforces, unlike `gamification.UserBadge.code`,
 /// which is a deliberately unconstrained key into a catalogue that grows. The
 /// difference is who owns the list: a badge is one row in an array anybody can
-/// extend, while each of these five names a fan-out query in
-/// `services/notifications.ts` that knows the audience for it. A sixth is a
+/// extend, while each of these six names a fan-out query in
+/// `services/notifications.ts` that knows the audience for it. A seventh is a
 /// migration *and* a resolver, and requiring both is what keeps the column
 /// from holding a value nothing can render.
 enum NotificationType {
@@ -52,6 +52,13 @@ enum NotificationType {
   CHANNEL_POST
   // A reply to a story comment or a club thread the recipient wrote.
   COMMENT_REPLY
+  /// A top-level comment on a story the recipient wrote. Distinct from
+  /// `COMMENT_REPLY`, which answers one comment rather than the work: an
+  /// author wants to hear that somebody said something about their story, and
+  /// a reader who muted replies to themselves has not asked to stop hearing
+  /// about their own stories. A reply produces only `COMMENT_REPLY`, so the
+  /// two never both fire for one comment.
+  STORY_COMMENT
   // A new thread in a club the recipient belongs to.
   CLUB_DISCUSSION
   // A story newly listed by an author the recipient follows.
@@ -219,6 +226,8 @@ namespace auth {
     updatedAt DateTime @default(now())
 
     comments         engagement.Comment[]
+    commentLikes     engagement.CommentLike[]
+    chapterLikes     engagement.ChapterLike[]
     ratings          engagement.Rating[]
     readingHistory   engagement.ReadingHistory[]
     storyViews       engagement.StoryView[]
@@ -414,6 +423,7 @@ namespace content {
       @relation(fields: [storyId], references: [id])
     multimedia     Multimedia[]
     comments       engagement.Comment[]
+    likes          engagement.ChapterLike[]
     readingHistory engagement.ReadingHistory[]
     reads          engagement.ChapterRead[]
 
@@ -493,6 +503,63 @@ namespace engagement {
     parent  Comment?
       @relation("CommentReplies", fields: [parentId], references: [id])
     replies Comment[] @relation("CommentReplies")
+    likes   CommentLike[]
+  }
+
+  /// One reader's like on one comment.
+  ///
+  /// **The pair is the key, and there is no surrogate id.** The same shape
+  /// `auth.GenrePreference` and `content.StoryGenre` use, and for the same
+  /// reason: a like is a fact about a pair rather than an event with its own
+  /// identity, so liking twice conflicts on the primary key instead of
+  /// writing a second row nobody could tell from the first. That is what lets
+  /// `likeComment` insert without reading first and still be idempotent.
+  ///
+  /// **There is no denormalised counter beside it.** Unlike
+  /// `content.Story.ratingAverage`, nothing sorts or ranks on a comment's
+  /// likes -- the only reader is the comment list, which is already paginated
+  /// -- so the count is one grouped aggregate over the page's ids, exactly
+  /// how `replyCount` is gathered in `services/engagement.ts`. A column would
+  /// be a second copy of a number with nothing to keep it honest.
+  model CommentLike {
+    userId    String
+    commentId String
+    createdAt DateTime @default(now())
+
+    user    auth.User
+      @relation(fields: [userId], references: [id])
+    comment Comment
+      @relation(fields: [commentId], references: [id])
+
+    @@id([userId, commentId])
+    /// One page of comments' like counts, in one grouped aggregate.
+    @@index([commentId])
+  }
+
+  /// One reader's like on one chapter.
+  ///
+  /// The same pair-as-key shape as `CommentLike` above, for the same reasons.
+  ///
+  /// **Per chapter rather than per story, because that is where the button
+  /// is.** The reader's footer sits at the end of one chapter, and "I liked
+  /// this" said there is about the chapter just read. `content.Story.likeCount`
+  /// is a separate, seeded catalogue figure that nothing on Scribe writes; it
+  /// is deliberately left alone rather than made to double as the sum of
+  /// these, which would mix a real count into an imported one and could not be
+  /// recomputed from rows.
+  model ChapterLike {
+    userId    String
+    chapterId String
+    createdAt DateTime @default(now())
+
+    user    auth.User
+      @relation(fields: [userId], references: [id])
+    chapter content.Chapter
+      @relation(fields: [chapterId], references: [id])
+
+    @@id([userId, chapterId])
+    /// One chapter's like count, which is what the reader footer draws.
+    @@index([chapterId])
   }
 
   model Rating {

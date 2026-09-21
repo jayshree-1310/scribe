@@ -3,15 +3,18 @@ import { Link } from 'react-router-dom'
 import { cn } from '../../lib/cn'
 import { genreChipStyle } from '../../lib/cover'
 /**
- * A genre only needs a name and a hue to render, and either a slug or an id to
- * link by — Discover accepts both. Kept structural so mock genres (which carry
- * a slug) and API genres (which carry an id) both fit.
+ * A genre only needs a name, a hue and an id to render and link by.
+ *
+ * Structural because the same chip is drawn from three responses -- a story's
+ * genres, a book's, and the genre catalogue -- which agree on these fields and
+ * on nothing else. The `slug` that used to be here as well went with the mock:
+ * only mock genres carried one, so `genre.slug ?? genre.id` had already been
+ * the id for every genre on screen.
  */
 interface ChipGenre {
-  id?: string
+  id: string
   name: string
   hue: number
-  slug?: string
 }
 
 interface GenreChipProps {
@@ -30,7 +33,7 @@ export function GenreChip({ genre, asLink = false, size = 'sm' }: GenreChipProps
       <Link
         className={className}
         style={style}
-        to={`/discover?genre=${genre.slug ?? genre.id ?? ''}`}
+        to={`/discover?genre=${genre.id}`}
       >
         {genre.name}
       </Link>

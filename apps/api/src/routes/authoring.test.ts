@@ -328,6 +328,27 @@ describe.skipIf(!available)("DELETE /api/author/stories/:id", () => {
     });
     await api.createRating({ userId: intruderId, storyId: story.id, rating: 4 });
 
+    /**
+     * A reader's like on the chapter and on a comment under it. Both point at
+     * rows this delete removes, so both have to go first -- and each is its
+     * own foreign key, so a delete that cleared one and forgot the other
+     * would still fail, only for the stories somebody had engaged with.
+     */
+    const comment = await api.createComment({
+      storyId: story.id,
+      userId: intruderId,
+      chapterId: chapter.id,
+      content: "Liked this bit.",
+    });
+    await api.request(`/api/chapters/${chapter.id}/like`, {
+      method: "PUT",
+      as: intruderId,
+    });
+    await api.request(`/api/comments/${comment}/like`, {
+      method: "PUT",
+      as: authorId,
+    });
+
     const { status } = await api.request(`/api/author/stories/${story.id}`, {
       method: "DELETE",
       as: authorId,
@@ -396,8 +417,26 @@ describe.skipIf(!available)("chapter writes", () => {
       created.push(await newChapter(story.id, { title: name, content: name }));
     }
 
+    // Liked, and with a liked comment on it: both are foreign keys into the
+    // chapter this delete removes. See the story delete above.
+    const doomed = created[1]!.id;
+    const comment = await api.createComment({
+      storyId: story.id,
+      userId: intruderId,
+      chapterId: doomed,
+      content: "About this chapter.",
+    });
+    await api.request(`/api/chapters/${doomed}/like`, {
+      method: "PUT",
+      as: intruderId,
+    });
+    await api.request(`/api/comments/${comment}/like`, {
+      method: "PUT",
+      as: authorId,
+    });
+
     const { status, body } = await api.request(
-      `/api/author/chapters/${created[1]!.id}`,
+      `/api/author/chapters/${doomed}`,
       { method: "DELETE", as: authorId },
     );
 

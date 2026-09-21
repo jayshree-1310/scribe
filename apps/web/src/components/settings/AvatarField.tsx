@@ -10,7 +10,7 @@ import { AvatarCropper } from "./AvatarCropper";
 import { Button } from "../ui/Button";
 import { Icon } from "../ui/Icon";
 import { Lightbox } from "../ui/Lightbox";
-import type { User } from "../../types/domain";
+import type { SessionUser } from "../../lib/auth";
 
 /**
  * A picture change the reader has made but not yet saved: a new file to
@@ -21,7 +21,7 @@ export type PendingAvatar =
   { kind: "file"; file: File } | { kind: "remove" } | null;
 
 interface AvatarFieldProps {
-  user: User;
+  user: SessionUser;
   /** The staged change, owned by the form so it saves with everything else. */
   pending: PendingAvatar;
   onPendingChange: (pending: PendingAvatar) => void;

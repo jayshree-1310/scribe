@@ -3,8 +3,6 @@
  *
  * These mirror the API responses in `apps/api/src/services/channels.ts`
  * exactly, the same way `types/stories.ts` mirrors the stories service.
- * Separate from `domain.ts`, which described the mock layer and no longer
- * carries a channel shape.
  *
  * Four fields the mock invented are deliberately absent, because nothing
  * records them: a post's `likeCount` and `commentCount` (channel posts have no

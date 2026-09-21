@@ -3,8 +3,6 @@
  *
  * These mirror the API responses in `apps/api/src/services/gamification.ts`
  * exactly, the same way `types/challenges.ts` mirrors the challenges service.
- * Separate from `domain.ts`, which described the mock layer -- and which no
- * longer carries a badge shape at all.
  *
  * What the mock invented and nothing counts, so it is absent from the
  * catalogue the API serves: "read 500 minutes in a week" (no reading duration

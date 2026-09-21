@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AuthContext, SESSION_STORAGE_KEY } from '../../lib/auth'
-import { db } from '../../data/api'
+import {
+  AuthContext,
+  SESSION_STORAGE_KEY,
+  type Session,
+  type SessionUser,
+} from '../../lib/auth'
 import { getMyAccount, type AccountProfile } from '../../data/account-api'
 import {
   registerWithPassword,
@@ -11,40 +15,23 @@ import {
   signOutRequest,
 } from '../../data/auth-api'
 import { requestGoogleIdToken } from '../../lib/google-identity'
-import type { Session, User } from '../../types/domain'
 
 /**
- * Widens the account the API returns into the profile shape the UI renders.
+ * The account the API returns *is* the session's user.
  *
- * The API owns identity and the profile fields settings can edit — username,
- * email, display name, bio, avatar — while the presentational fields (hue,
- * follower counts, reading stats) still come from the mock profile, because no
- * endpoint serves them yet. Every sign-in path goes through here, so all of
- * them produce the same shape.
+ * There used to be a widening function here that spread a mock profile
+ * underneath it, so an avatar hue, follower counts and a block of reading
+ * aggregates had some value for the pages that read them. Every one of those
+ * pages asks the API for the real number now -- `ProfilePage` for its counts,
+ * `BadgesPage` and `HomePage` for reading progress -- so the widening was
+ * filling in fields nobody read. What it cost was a user type that could not
+ * be checked against anything: a field the API stopped serving would keep its
+ * fixture value rather than fail to compile.
  *
- * `onboardingComplete` deliberately does *not* land on the user: it is a
- * property of the session's routing, not of the person, and it is read from
- * the profile at each of the call sites below.
+ * `onboardingComplete` deliberately does *not* get lifted onto the session's
+ * user: it is a property of the session's routing, not of the person, and each
+ * call site below reads it from the profile into `Session.onboarded`.
  */
-function toUser(profile: AccountProfile): User {
-  return {
-    ...db.currentUser,
-    id: profile.id,
-    username: profile.username,
-    email: profile.email,
-    displayName: profile.displayName ?? profile.username,
-    bio: profile.bio ?? '',
-    avatarUrl: profile.avatarUrl,
-    isAuthor: profile.isAuthor,
-    emailVerified: profile.emailVerified,
-    hasPassword: profile.hasPassword,
-    joinedAt: profile.joinedAt,
-    stats: {
-      ...db.currentUser.stats,
-      readingStreakDays: profile.readingStreak,
-    },
-  }
-}
 
 function readStoredSession(): Session | null {
   try {
@@ -72,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(readStoredSession)
   const [initialising, setInitialising] = useState(session !== null)
 
-  const start = useCallback((user: User, onboarded: boolean): Session => {
+  const start = useCallback((user: SessionUser, onboarded: boolean): Session => {
     const next: Session = { user, onboarded }
     setSession(next)
     persist(next)
@@ -128,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // closed the tab halfway through is put back into the flow rather
         // than let past it by a stale cached session.
         const next: Session = {
-          user: toUser(profile),
+          user: profile,
           onboarded: profile.onboardingComplete,
         }
         setSession(next)
@@ -152,11 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await signInWithPassword({ email, password })
 
       const profile = await getMyAccount()
-      const user = toUser(profile)
       // Signing in does not mean onboarding was done: an account that never
       // finished it lands back in the flow, wherever it signed in from.
-      start(user, profile.onboardingComplete)
-      return user
+      start(profile, profile.onboardingComplete)
+      return profile
     },
     [start],
   )
@@ -165,11 +151,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (input: { username: string; email: string; password: string }) => {
       await registerWithPassword(input)
 
-      const user = toUser(await getMyAccount())
+      const profile = await getMyAccount()
       // New accounts land in onboarding rather than the feed. No request is
       // needed to know that: nothing has answered anything yet.
-      start(user, false)
-      return user
+      start(profile, false)
+      return profile
     },
     [start],
   )
@@ -188,11 +174,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { created } = await signInWithGoogleIdToken(idToken)
 
     const profile = await getMyAccount()
-    const user = toUser(profile)
     // A brand-new account has nothing saved and goes to onboarding; a
     // returning one is trusted to the flag the API answers with.
-    start(user, created ? false : profile.onboardingComplete)
-    return { user, created }
+    start(profile, created ? false : profile.onboardingComplete)
+    return { user: profile, created }
   }, [start])
 
   /**
@@ -215,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!current) return current
       const next: Session = {
         ...current,
-        user: toUser(profile),
+        user: profile,
         onboarded: profile.onboardingComplete,
       }
       persist(next)

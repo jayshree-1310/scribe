@@ -319,12 +319,85 @@ describe.skipIf(!available)("DELETE /api/account/me", () => {
       authorId: user.id,
       genreIds: [genreId],
     });
-    await api.createChapter({ storyId: story.id, number: 1 });
+    const chapterId = await api.createChapter({ storyId: story.id, number: 1 });
 
     // Someone else's rating against that story has to go too, or the story
     // delete would fail on a foreign key.
     const neighbourId = await api.createUser("d5");
     await api.createRating({ userId: neighbourId, storyId: story.id, rating: 4 });
+
+    /**
+     * Likes in all three directions a foreign key can refuse.
+     *
+     * A like this account *gave* on somebody else's chapter is a row no
+     * per-story sweep visits (`chapterLike_userId_fkey`); a like somebody else
+     * gave on *this* account's chapter goes with the chapter
+     * (`chapterLike_chapterId_fkey`); and a like a third party left on a
+     * comment this account wrote under somebody else's story blocks that
+     * comment's delete (`commentLike_commentId_fkey`). Each was a separate
+     * pass in `deleteAccount`, so each is asserted here rather than trusted.
+     */
+    const neighbourStory = await api.createStory({
+      title: "Somebody else's story",
+      authorId: neighbourId,
+    });
+    const neighbourChapter = await api.createChapter({
+      storyId: neighbourStory.id,
+      number: 1,
+    });
+    const neighbourComment = await api.createComment({
+      storyId: neighbourStory.id,
+      userId: user.id,
+      content: "Left on somebody else's story.",
+    });
+
+    await Promise.all([
+      api.request(`/api/chapters/${neighbourChapter}/like`, {
+        method: "PUT",
+        as: user.id,
+      }),
+      api.request(`/api/chapters/${chapterId}/like`, {
+        method: "PUT",
+        as: neighbourId,
+      }),
+      api.request(`/api/comments/${neighbourComment}/like`, {
+        method: "PUT",
+        as: neighbourId,
+      }),
+    ]);
+
+    /**
+     * Reads, views and follows, which is what an account that has actually
+     * used Scribe has most of.
+     *
+     * Every one of these is a foreign key into `auth.User`, `content.Story` or
+     * `content.Chapter`, and none of them was swept before: the suite's
+     * fixtures had only ever been *written* through the harness, so no test
+     * account had ever opened a chapter and the deletion was green while
+     * failing with a 500 for every real account that had. The anonymous read
+     * below is the one that has no `userId` at all, so only the per-story pass
+     * can reach it.
+     */
+    await Promise.all([
+      api.request(`/api/stories/${neighbourStory.slug}/chapters/1`, {
+        as: user.id,
+      }),
+      api.request(`/api/stories/${story.slug}/chapters/1`, { as: neighbourId }),
+      api.request(`/api/stories/${story.slug}/chapters/1`),
+      api.request(`/api/users/${api.usernameOf(neighbourId)}/follow`, {
+        method: "POST",
+        as: user.id,
+      }),
+    ]);
+    await api.request(`/api/users/${user.username}/follow`, {
+      method: "POST",
+      as: neighbourId,
+    });
+
+    // The view and read events are written fire-and-forget, so they have to be
+    // on disk before the deletion opens its transaction. `deleteAccount`
+    // drains them itself; this is what makes the assertion deterministic.
+    await api.settleBackgroundWrites();
 
     const response = await api.request("/api/account/me", {
       method: "DELETE",

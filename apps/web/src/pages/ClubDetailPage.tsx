@@ -441,6 +441,15 @@ export function ClubDetailPage() {
                         {open ? (
                           replies.status === 'loading' ? (
                             <Skeleton height="4rem" radius="var(--radius-md)" />
+                          ) : replies.status === 'error' ? (
+                            /*
+                              Inline rather than an `ErrorState` panel: this is
+                              an indented column inside one thread among many,
+                              and a full failure block with a Try-again button
+                              would outweigh the thread it belongs to. Opening
+                              the thread again re-runs the request.
+                            */
+                            <p className="discussion__text">{replies.error}</p>
                           ) : (
                             <ul className="discussion-replies">
                               {replies.data?.items.map((reply) => (

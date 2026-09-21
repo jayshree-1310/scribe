@@ -6,9 +6,6 @@
  * the one `content.Story` table from opposite sides — imported editions there,
  * stories written on Scribe here (`docs/content-model.md`) — which is why the
  * shared fields are named identically in both files.
- *
- * Separate from `domain.ts`, which describes the mock layer the rest of the app
- * still runs on.
  */
 
 export interface StoryAuthor {
@@ -93,6 +90,14 @@ export interface Chapter extends ChapterSummary {
   /** Neighbouring readable chapters, or null at either edge. */
   previousNumber: number | null
   nextNumber: number | null
+  /**
+   * Readers who liked this chapter, and whether the caller is one of them.
+   * Only on the detail shape: nothing in a chapter list draws a heart, and
+   * carrying it there would cost an aggregate per row.
+   */
+  likeCount: number
+  /** False when signed out, rather than a null every caller would branch on. */
+  likedByMe: boolean
 }
 
 /* Reading progress ----------------------------------------------------- */

@@ -521,6 +521,29 @@ export async function deleteStory(
       await deleteAll(() =>
         tx.orm.content.Multimedia.where((item) => item.chapterId.eq(chapterId)),
       );
+      await deleteAll(() =>
+        tx.orm.engagement.ChapterLike.where((like) =>
+          like.chapterId.eq(chapterId),
+        ),
+      );
+    }
+
+    /**
+     * Likes on this story's comments, before the comments they point at.
+     * Gathered per comment rather than per story because `engagement.CommentLike`
+     * carries no `storyId` -- it is a fact about a comment, and the comment is
+     * the only thing that knows which story it belongs to.
+     */
+    const commented = await tx.orm.engagement.Comment.select("id")
+      .where((row) => row.storyId.eq(storyId))
+      .all();
+
+    for (const comment of commented) {
+      await deleteAll(() =>
+        tx.orm.engagement.CommentLike.where((like) =>
+          like.commentId.eq(comment.id),
+        ),
+      );
     }
 
     // Comments and progress rows carry `storyId` even when they point at a
@@ -809,6 +832,26 @@ export async function deleteChapter(
     await deleteAll(() =>
       tx.orm.content.Multimedia.where((item) => item.chapterId.eq(chapterId)),
     );
+    await deleteAll(() =>
+      tx.orm.engagement.ChapterLike.where((like) =>
+        like.chapterId.eq(chapterId),
+      ),
+    );
+
+    // Likes on this chapter's comments, before the comments go. See the same
+    // pass in `deleteStory` for why this is per comment.
+    const commented = await tx.orm.engagement.Comment.select("id")
+      .where((row) => row.chapterId.eq(chapterId))
+      .all();
+
+    for (const comment of commented) {
+      await deleteAll(() =>
+        tx.orm.engagement.CommentLike.where((like) =>
+          like.commentId.eq(comment.id),
+        ),
+      );
+    }
+
     await deleteAll(() =>
       tx.orm.engagement.Comment.where((row) => row.chapterId.eq(chapterId)),
     );

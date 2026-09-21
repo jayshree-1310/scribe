@@ -1,0 +1,93 @@
+/* ==========================================================================
+   Likes
+
+   One control, two sizes. `.like--pill` is the chapter footer's reaction
+   button; `.like--inline` is the text-sized one that sits in a comment's
+   action row beside Reply and Delete.
+
+   Both draw from the ambient tokens rather than naming colours, so the same
+   markup works on an app page and inside the reader — where `reader.css`
+   redefines those tokens against the reading theme.
+   ========================================================================== */
+
+.like {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-secondary);
+  font-weight: 600;
+  line-height: 1;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.like__count {
+  font-variant-numeric: tabular-nums;
+}
+
+.like:hover {
+  color: var(--brand);
+}
+
+/* The filled heart is the state; the colour is what makes it readable at a
+   glance without counting. */
+.like.is-on {
+  color: var(--brand);
+}
+
+/*
+ * A press that reads as a press. Scoped to the icon rather than the whole
+ * button so the count does not jump under the reader's eye as it changes.
+ */
+.like:not(:disabled):active > svg {
+  transform: scale(0.88);
+}
+
+.like > svg {
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+/* Pill — the chapter footer ---------------------------------------------- */
+
+.like--pill {
+  min-height: 2.5rem;
+  padding: 0 var(--space-4);
+  border-color: var(--border-strong);
+  border-radius: var(--radius-full);
+  font-size: var(--text-base);
+}
+
+.like--pill:hover {
+  border-color: var(--brand);
+  background-color: var(--brand-soft);
+  transform: translateY(-1px);
+}
+
+.like--pill.is-on {
+  border-color: var(--brand-border);
+  background-color: var(--brand-soft);
+}
+
+/* Inline — a comment's action row ---------------------------------------- */
+
+.like--inline {
+  gap: 0.25rem;
+  padding: 0;
+  font-size: var(--text-xs);
+}
+
+/*
+ * `.comment__actions > button` paints every direct child as a brand-coloured
+ * text link and underlines it on hover. That is right for Reply and Delete,
+ * which are words; this one is a heart that already says what it is, and an
+ * underline under a count reads as a link to somewhere.
+ */
+.comment__actions > .like--inline:hover,
+.reader__comment-actions-row > .like--inline:hover {
+  text-decoration: none;
+}

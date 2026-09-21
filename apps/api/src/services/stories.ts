@@ -90,6 +90,14 @@ export interface Chapter extends ChapterSummary {
   /** Neighbouring chapter numbers the caller may read, or null at the edges. */
   previousNumber: number | null;
   nextNumber: number | null;
+  /**
+   * Readers who liked this chapter, and whether the caller is one of them.
+   * On the detail shape and not on `ChapterSummary`: the chapter list would
+   * need an aggregate per row to carry it, and nothing in a list draws it.
+   */
+  likeCount: number;
+  /** False when anonymous, rather than a null every caller would branch on. */
+  likedByMe: boolean;
 }
 
 export interface Page<T> {
@@ -766,7 +774,7 @@ export async function getChapter(
    * `number ± 1`, which would break on an unpublished chapter in the middle
    * or after a deletion left the sequence uneven.
    */
-  const [previous, next, media] = await Promise.all([
+  const [previous, next, media, likes, myLike] = await Promise.all([
     visible
       .select("chapterNumber")
       .where((chapter) => chapter.chapterNumber.lt(number))
@@ -784,6 +792,21 @@ export async function getChapter(
         (item) => item.id.asc(),
       ])
       .all(),
+    /**
+     * Counted from `engagement.ChapterLike` rather than read off a column:
+     * there is no denormalised counter, for the reason the contract gives.
+     * Both of these join the round trip the neighbours and the attachments
+     * are already making, so the chapter read costs no extra latency.
+     */
+    db.orm.engagement.ChapterLike.where((like) => like.chapterId.eq(row.id))
+      .aggregate((aggregate) => ({ total: aggregate.count() })),
+    // Skipped for an anonymous reader, who cannot have liked anything.
+    viewerId === null
+      ? Promise.resolve(null)
+      : db.orm.engagement.ChapterLike.select("userId")
+          .where((like) => like.chapterId.eq(row.id))
+          .where((like) => like.userId.eq(viewerId))
+          .first(),
   ]);
 
   return {
@@ -802,6 +825,46 @@ export async function getChapter(
     })),
     previousNumber: previous?.chapterNumber ?? null,
     nextNumber: next?.chapterNumber ?? null,
+    likeCount: likes.total,
+    likedByMe: myLike !== null && myLike !== undefined,
+  };
+}
+
+/**
+ * The chapter `chapterId` names, if the caller may read it.
+ *
+ * Exported for `services/engagement.ts`, which has to answer "may this caller
+ * see this chapter?" before accepting a like on it -- the same reason
+ * `findVisibleStoryId` above is exported, and answered the same way: through
+ * `findStoryRow` and the `publishedAt` rule `chaptersVisibleTo` applies, so
+ * the two places a draft chapter is hidden cannot drift apart.
+ */
+export async function findVisibleChapter(
+  chapterId: string,
+  viewerId: string | null,
+): Promise<{ id: string; storyId: string; number: number } | null> {
+  const chapter = await db.orm.content.Chapter.select(
+    "id",
+    "storyId",
+    "chapterNumber",
+    "publishedAt",
+  )
+    .where((row) => row.id.eq(chapterId))
+    .first();
+
+  if (!chapter) return null;
+
+  // A draft story hides its chapters from everybody but its author, and this
+  // is where that is decided for every caller.
+  const story = await findStoryRow(chapter.storyId, viewerId);
+  if (!story) return null;
+
+  if (chapter.publishedAt === null && story.authorId !== viewerId) return null;
+
+  return {
+    id: chapter.id,
+    storyId: chapter.storyId,
+    number: chapter.chapterNumber,
   };
 }
 

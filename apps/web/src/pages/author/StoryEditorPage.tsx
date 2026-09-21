@@ -1256,6 +1256,27 @@ export function StoryEditorPage() {
           <div className="editor__details-genres">
             <p className="editor__label">Genres</p>
             {errors.genres ? <p className="editor__error">{errors.genres}</p> : null}
+            {/*
+              A failed genre list showed an empty chip row, and saving then
+              refused with "Pick at least one genre." over nothing to pick --
+              a writer blocked from publishing by a request they were never
+              told about. The list is the only way to satisfy that rule, so
+              its failure is reported where the rule is enforced.
+            */}
+            {genres.status === 'error' ? (
+              <InlineNotice tone="danger">
+                Genres didn't load, so none can be picked.{' '}
+                <Button variant="ghost" size="sm" onClick={genres.reload}>
+                  Try again
+                </Button>
+              </InlineNotice>
+            ) : genres.status === 'loading' ? (
+              <div className="chip-row">
+                {Array.from({ length: 6 }, (_, index) => (
+                  <Skeleton key={index} width="5.5rem" height="2rem" radius="999px" />
+                ))}
+              </div>
+            ) : null}
             <div className="chip-row">
               {genres.data?.map((genre) => (
                 <SelectableChip

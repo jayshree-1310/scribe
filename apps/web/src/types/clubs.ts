@@ -2,9 +2,7 @@
  * Book club types.
  *
  * These mirror the API responses in `apps/api/src/services/clubs.ts` exactly,
- * the same way `types/stories.ts` mirrors the stories service. Separate from
- * `domain.ts`, which describes the mock layer the rest of the app still runs
- * on -- and which no longer carries a club shape at all.
+ * the same way `types/stories.ts` mirrors the stories service.
  *
  * Three fields the mock invented are deliberately absent, because nothing
  * stores them: `isPrivate` (there is no invite or approval flow -- every club

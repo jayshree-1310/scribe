@@ -33,6 +33,18 @@ export function ChannelsPage() {
   const [error, setError] = useState<string | undefined>()
   const [creating, setCreating] = useState(false)
 
+  /**
+   * Both requests, or neither.
+   *
+   * "Discover" is the full list minus the subscribed one, so a failed
+   * `subscribed` does not merely empty the section above it -- it silently
+   * un-filters the section below, offering the reader channels they are
+   * already subscribed to. The two answers only make sense together, so the
+   * page reports the first failure of either rather than rendering half.
+   */
+  const failed =
+    all.status === 'error' ? all : subscribed.status === 'error' ? subscribed : null
+
   const subscribedIds = new Set(
     (subscribed.data?.items ?? []).map((channel) => channel.id),
   )
@@ -93,8 +105,14 @@ export function ChannelsPage() {
         </Button>
       </header>
 
-      {all.status === 'error' ? (
-        <ErrorState message={all.error} onRetry={all.reload} />
+      {failed ? (
+        <ErrorState
+          message={failed.error}
+          onRetry={() => {
+            all.reload()
+            subscribed.reload()
+          }}
+        />
       ) : loading ? (
         <div className="card-grid card-grid--wide">
           {Array.from({ length: 4 }, (_, index) => (

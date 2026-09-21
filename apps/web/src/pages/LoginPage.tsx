@@ -52,7 +52,9 @@ export function LoginPage() {
     setSubmitting(true)
     try {
       const user = await signIn({ email, password, remember })
-      showToast({ message: `Welcome back, ${user.displayName.split(' ')[0]}.` })
+      showToast({
+        message: `Welcome back, ${(user.displayName || user.username).split(' ')[0]}.`,
+      })
       navigate(destination, { replace: true })
     } catch (error) {
       // The form keeps its values so nothing has to be retyped.

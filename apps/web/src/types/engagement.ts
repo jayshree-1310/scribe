@@ -2,10 +2,7 @@
  * Comment and rating types.
  *
  * These mirror the API responses in `apps/api/src/services/engagement.ts`
- * exactly, the same way `types/clubs.ts` mirrors the clubs service. Separate
- * from `domain.ts`, which describes the mock layer the rest of the app still
- * runs on -- and which carries no comment or rating shape at all, the mock
- * functions for both having been removed before this was built.
+ * exactly, the same way `types/clubs.ts` mirrors the clubs service.
  *
  * A comment is deliberately the same shape as a club's `Discussion`: one
  * thread model across every surface that takes user-written text.
@@ -31,6 +28,9 @@ export interface Comment {
   updatedAt: string
   /** Always 0 for a reply: replies are one level deep. */
   replyCount: number
+  likeCount: number
+  /** False when signed out, rather than a null every caller would branch on. */
+  likedByMe: boolean
   user: CommentUser
 }
 
@@ -53,6 +53,16 @@ export interface RatingSummary {
   breakdown: RatingBreakdown
   /** The caller's own score, or null when signed out or not yet rated. */
   mine: number | null
+}
+
+/**
+ * What a like write answers with: the subject's new count, and the caller's
+ * own state. Mirrors `LikeSummary` in the engagement service, and is the same
+ * shape for a chapter and for a comment.
+ */
+export interface LikeSummary {
+  count: number
+  liked: boolean
 }
 
 /** The longest body `POST /api/stories/:id/comments` accepts. */

@@ -2,10 +2,15 @@
  * Public profile and follow-graph types.
  *
  * These mirror the API responses in `apps/api/src/services/users.ts` exactly,
- * the same way `types/clubs.ts` mirrors the clubs service. Separate from
- * `domain.ts`, whose `User` is the mock's shape and carries several fields
- * nothing stores — `avatarHue` (derived from the username by `hueFor`) and a
- * `stats` block of reading aggregates that has no endpoint behind it.
+ * the same way `types/clubs.ts` mirrors the clubs service.
+ *
+ * These are somebody *else's* profile. The signed-in reader's own is
+ * `AccountProfile` in `data/account-api.ts`, which is what a `Session` carries.
+ * There used to be a third shape, the mock's `User`, which both of these were
+ * written to be separate from: it had an `avatarHue` and a `stats` block of
+ * reading aggregates, neither of which anything stores. The hue is derived
+ * from the username by `hueFor`; the aggregates that turned out to be real are
+ * `readingStreak` here and the reader level `GET /api/badges` answers.
  *
  * What a public profile deliberately does *not* carry: `email`,
  * `emailVerified` and `hasPassword`. Those belong to the signed-in reader's

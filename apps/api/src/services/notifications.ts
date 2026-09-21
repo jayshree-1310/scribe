@@ -29,11 +29,11 @@
  *   writes, in the same `WHERE` that selects the recipients -- so a muted
  *   reader is never a row, rather than a row nobody shows. Filtering on the
  *   read side would have meant storing what somebody asked not to be told and
- *   trusting five query paths to remember; this way the rule is enforced by
+ *   trusting six query paths to remember; this way the rule is enforced by
  *   the one statement that could break it. The preferences behind it are
  *   `services/preferences.ts`, and the cost is one indexed lookup per
  *   recipient. The list of types that honour a mute is therefore exactly the
- *   list of resolvers below, and a sixth type that forgets the clause is a
+ *   list of resolvers below, and a seventh type that forgets the clause is a
  *   type nobody can turn off.
  * - **The actor is a join; the subject is a copy.** See the header of
  *   `notifications.Notification` in the contract for why those two fields are
@@ -52,14 +52,21 @@
  * for `deleteAccount`, which cannot open its transaction while a row naming
  * the leaving account is still in flight.
  *
- * **What is deliberately not notified.** A comment on a story is not, though a
- * *reply* to one is: "somebody commented on your story" is a sixth type with a
- * sixth resolver, and the five here are the set Task 14 specified. A rating is
- * not, for the same reason and because a score with no words is not something
- * to interrupt somebody with. A new follower is not -- `services/users.ts`
- * would be the caller, and the profile already shows the count. Each is a row
- * in `NotificationType` and a resolver below, and none of them is a change to
- * anything else.
+ * **One event may have two audiences.** `story-comment` resolves through two
+ * statements, not one: the reply's parent, if it had one, and the story's
+ * author. They are mutually exclusive by construction -- `notifyCommentParent`
+ * joins `reply."parentId"` and so selects nothing for a top-level comment,
+ * while `notifyStoryAuthor` carries `parentId IS NULL` and so selects nothing
+ * for a reply -- so exactly one of the two fires for any comment and nobody
+ * gets told the same thing twice. The alternative, deciding which to run in
+ * `fanOut`, would have put "is this a reply?" in two places.
+ *
+ * **What is deliberately not notified.** A rating is not: a score with no
+ * words is not something to interrupt somebody with. A new follower is not --
+ * `services/users.ts` would be the caller, and the profile already shows the
+ * count. A like is not, for the rating's reason: there is nothing to read.
+ * Each is a row in `NotificationType` and a resolver below, and none of them
+ * is a change to anything else.
  */
 
 import { Temporal } from "temporal-polyfill";
@@ -78,6 +85,7 @@ function now(): Temporal.Instant {
 export const NOTIFICATION_TYPES = [
   "CHANNEL_POST",
   "COMMENT_REPLY",
+  "STORY_COMMENT",
   "CLUB_DISCUSSION",
   "NEW_STORY",
   "BADGE_EARNED",
@@ -224,7 +232,7 @@ async function fanOut(event: NotificationEvent): Promise<void> {
     case "channel-post":
       return notifySubscribers(event.postId);
     case "story-comment":
-      return notifyCommentParent(event.commentId);
+      return notifyComment(event.commentId);
     case "club-discussion":
       return notifyClub(event.discussionId);
     case "story-listed":
@@ -272,6 +280,20 @@ async function notifySubscribers(postId: string): Promise<void> {
 }
 
 /**
+ * Both audiences a story comment can have. See the header for why this is two
+ * statements and why only one of them can match.
+ *
+ * Sequential rather than `Promise.all`: they are two writes to the same table
+ * in the same fan-out, and nothing is waiting on them -- `notify` already made
+ * this fire-and-forget -- so there is no latency to win and one less
+ * connection to hold.
+ */
+async function notifyComment(commentId: string): Promise<void> {
+  await notifyCommentParent(commentId);
+  await notifyStoryAuthor(commentId);
+}
+
+/**
  * A reply on a story, to the author of the comment it answers.
  *
  * Nothing at all for a top-level comment: the join to `parent` is what makes
@@ -311,6 +333,61 @@ async function notifyCommentParent(commentId: string): Promise<void> {
              SELECT 1 FROM "auth"."notificationMute" AS mute
               WHERE mute."userId" = parent."userId"
                 AND mute."type" = 'COMMENT_REPLY'
+           )
+  `.affectedCount().build();
+
+  await db.runtime().query(plan);
+}
+
+/**
+ * A new comment on a story, to the story's author.
+ *
+ * `parentId IS NULL` is what keeps this from doubling up with the reply
+ * notification above: a reply is addressed to whoever wrote what it answers,
+ * and telling the author about it as well would be two rows for one comment --
+ * and three lines in the bell for an author replying under their own story.
+ * The two conditions live in the two statements rather than in `fanOut`, so
+ * "is this a reply?" is asked once, by the row itself.
+ *
+ * The author is joined through `story."authorId"` rather than passed in, for
+ * the reason every resolver here reads its subject back: `createComment` knows
+ * the story id and not who wrote it, and looking it up there would be a round
+ * trip on the request's own path for a row this statement already touches.
+ *
+ * The link is the chapter when the comment has one, as the reply's is -- an
+ * author following "somebody commented" to the story page and then hunting
+ * which of forty chapters it was about is the kind of link people stop
+ * clicking. `sourceType` / `sourceId` are recorded so hiding the comment
+ * sweeps this copy of it; see `hideContent` in `services/moderation.ts`.
+ */
+async function notifyStoryAuthor(commentId: string): Promise<void> {
+  const plan = db.raw.sql`
+    INSERT INTO "notifications"."notification"
+      ("id", "userId", "type", "actorId", "title", "excerpt", "href",
+       "sourceType", "sourceId", "createdAt")
+    SELECT gen_random_uuid()::text,
+           story."authorId",
+           'STORY_COMMENT',
+           comment."userId",
+           story."title",
+           left(comment."content", ${EXCERPT_LENGTH}),
+           CASE
+             WHEN chapter."id" IS NULL THEN '/story/' || story."slug"
+             ELSE '/read/' || story."slug" || '/' || chapter."chapterNumber"
+           END,
+           'COMMENT',
+           comment."id",
+           now()
+      FROM "engagement"."comment" AS comment
+      JOIN "content"."story" AS story ON story."id" = comment."storyId"
+      LEFT JOIN "content"."chapter" AS chapter ON chapter."id" = comment."chapterId"
+     WHERE comment."id" = ${commentId}
+       AND comment."parentId" IS NULL
+       AND story."authorId" <> comment."userId"
+       AND NOT EXISTS (
+             SELECT 1 FROM "auth"."notificationMute" AS mute
+              WHERE mute."userId" = story."authorId"
+                AND mute."type" = 'STORY_COMMENT'
            )
   `.affectedCount().build();
 

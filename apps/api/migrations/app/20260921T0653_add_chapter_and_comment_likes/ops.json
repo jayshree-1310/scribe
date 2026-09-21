@@ -1,0 +1,572 @@
+[
+  {
+    "id": "dropCheckConstraint.notificationMute.notificationMute_type_check_822839ba",
+    "label": "Drop check constraint \"notificationMute_type_check_822839ba\" on \"notificationMute\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "checkConstraint",
+        "name": "notificationMute_type_check_822839ba",
+        "table": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notificationMute_type_check_822839ba\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_822839ba",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"notificationMute_type_check_822839ba\"",
+        "sql": "ALTER TABLE \"auth\".\"notificationMute\" DROP CONSTRAINT \"notificationMute_type_check_822839ba\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notificationMute_type_check_822839ba\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_822839ba",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropCheckConstraint.notification.notification_type_check_822839ba",
+    "label": "Drop check constraint \"notification_type_check_822839ba\" on \"notification\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_type_check_822839ba",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_type_check_822839ba\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_822839ba",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"notification_type_check_822839ba\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" DROP CONSTRAINT \"notification_type_check_822839ba\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_type_check_822839ba\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_822839ba",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.chapterLike",
+    "label": "Create table \"chapterLike\"",
+    "summary": "Creates table \"chapterLike\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "table",
+        "name": "chapterLike"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"chapterLike\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterLike\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"chapterLike\"",
+        "sql": "CREATE TABLE \"engagement\".\"chapterLike\" (\n  \"chapterId\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"userId\", \"chapterId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"chapterLike\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterLike\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.commentLike",
+    "label": "Create table \"commentLike\"",
+    "summary": "Creates table \"commentLike\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "table",
+        "name": "commentLike"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"commentLike\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"commentLike\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"commentLike\"",
+        "sql": "CREATE TABLE \"engagement\".\"commentLike\" (\n  \"commentId\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"userId\", \"commentId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"commentLike\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"commentLike\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notificationMute.notificationMute_type_check_1efec2b5",
+    "label": "Add check constraint \"notificationMute_type_check_1efec2b5\" on \"notificationMute\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "checkConstraint",
+        "name": "notificationMute_type_check_1efec2b5",
+        "table": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notificationMute_type_check_1efec2b5\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_1efec2b5",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notificationMute_type_check_1efec2b5\"",
+        "sql": "ALTER TABLE \"auth\".\"notificationMute\" ADD CONSTRAINT \"notificationMute_type_check_1efec2b5\" CHECK (\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notificationMute_type_check_1efec2b5\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_1efec2b5",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notification.notification_type_check_1efec2b5",
+    "label": "Add check constraint \"notification_type_check_1efec2b5\" on \"notification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_type_check_1efec2b5",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_type_check_1efec2b5\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_1efec2b5",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notification_type_check_1efec2b5\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" ADD CONSTRAINT \"notification_type_check_1efec2b5\" CHECK (\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_type_check_1efec2b5\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_1efec2b5",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapterLike.chapterLike_chapterId_idx_411dd3d6",
+    "label": "Create index \"chapterLike_chapterId_idx_411dd3d6\" on \"chapterLike\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "chapterLike_chapterId_idx_411dd3d6",
+        "table": "chapterLike"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapterLike_chapterId_idx_411dd3d6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterLike_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapterLike_chapterId_idx_411dd3d6\"",
+        "sql": "CREATE INDEX \"chapterLike_chapterId_idx_411dd3d6\" ON \"engagement\".\"chapterLike\" (\"chapterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapterLike_chapterId_idx_411dd3d6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterLike_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapterLike.chapterLike_userId_idx_a489d58a",
+    "label": "Create index \"chapterLike_userId_idx_a489d58a\" on \"chapterLike\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "chapterLike_userId_idx_a489d58a",
+        "table": "chapterLike"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapterLike_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterLike_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapterLike_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"chapterLike_userId_idx_a489d58a\" ON \"engagement\".\"chapterLike\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapterLike_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"chapterLike_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.commentLike.commentLike_commentId_idx_b5a4f615",
+    "label": "Create index \"commentLike_commentId_idx_b5a4f615\" on \"commentLike\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "commentLike_commentId_idx_b5a4f615",
+        "table": "commentLike"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"commentLike_commentId_idx_b5a4f615\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"commentLike_commentId_idx_b5a4f615\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"commentLike_commentId_idx_b5a4f615\"",
+        "sql": "CREATE INDEX \"commentLike_commentId_idx_b5a4f615\" ON \"engagement\".\"commentLike\" (\"commentId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"commentLike_commentId_idx_b5a4f615\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"commentLike_commentId_idx_b5a4f615\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.commentLike.commentLike_userId_idx_a489d58a",
+    "label": "Create index \"commentLike_userId_idx_a489d58a\" on \"commentLike\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "commentLike_userId_idx_a489d58a",
+        "table": "commentLike"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"commentLike_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"commentLike_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"commentLike_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"commentLike_userId_idx_a489d58a\" ON \"engagement\".\"commentLike\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"commentLike_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"commentLike_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chapterLike.chapterLike_userId_fkey",
+    "label": "Add foreign key \"chapterLike_userId_fkey\" on \"chapterLike\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "chapterLike_userId_fkey",
+        "table": "chapterLike"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chapterLike_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterLike_userId_fkey",
+          "engagement",
+          "\"engagement\".\"chapterLike\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chapterLike_userId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"chapterLike\"\nADD CONSTRAINT \"chapterLike_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chapterLike_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterLike_userId_fkey",
+          "engagement",
+          "\"engagement\".\"chapterLike\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chapterLike.chapterLike_chapterId_fkey",
+    "label": "Add foreign key \"chapterLike_chapterId_fkey\" on \"chapterLike\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "chapterLike_chapterId_fkey",
+        "table": "chapterLike"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chapterLike_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterLike_chapterId_fkey",
+          "engagement",
+          "\"engagement\".\"chapterLike\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chapterLike_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"chapterLike\"\nADD CONSTRAINT \"chapterLike_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chapterLike_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterLike_chapterId_fkey",
+          "engagement",
+          "\"engagement\".\"chapterLike\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.commentLike.commentLike_userId_fkey",
+    "label": "Add foreign key \"commentLike_userId_fkey\" on \"commentLike\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "commentLike_userId_fkey",
+        "table": "commentLike"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"commentLike_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "commentLike_userId_fkey",
+          "engagement",
+          "\"engagement\".\"commentLike\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"commentLike_userId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"commentLike\"\nADD CONSTRAINT \"commentLike_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"commentLike_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "commentLike_userId_fkey",
+          "engagement",
+          "\"engagement\".\"commentLike\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.commentLike.commentLike_commentId_fkey",
+    "label": "Add foreign key \"commentLike_commentId_fkey\" on \"commentLike\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "commentLike_commentId_fkey",
+        "table": "commentLike"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"commentLike_commentId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "commentLike_commentId_fkey",
+          "engagement",
+          "\"engagement\".\"commentLike\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"commentLike_commentId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"commentLike\"\nADD CONSTRAINT \"commentLike_commentId_fkey\"\nFOREIGN KEY (\"commentId\")\nREFERENCES \"engagement\".\"comment\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"commentLike_commentId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "commentLike_commentId_fkey",
+          "engagement",
+          "\"engagement\".\"commentLike\""
+        ]
+      }
+    ]
+  }
+]

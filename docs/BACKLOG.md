@@ -2,9 +2,10 @@
 
 What is left to build, and in what order. Derived from the gap between the
 frontend surface (`apps/web/src/pages`) and the API (`apps/api/src/routes`).
-That gap is now closed: `data/api.ts` has no mock functions left, only the
-`db.currentUser` re-export `AuthProvider` still leans on, and Task 17 is the
-sweep that removes it.
+**That gap is closed.** Task 17 deleted `data/api.ts`, `data/mock-db.ts` and
+`types/domain.ts`, so there is no mock data in the repository and every screen
+reads an endpoint. What remains in this document is the record of why things
+are the way they are, and the open questions below.
 
 **Landed tasks are not kept here.** Each one's decisions live in the header of
 the service that owns them — that is the file somebody changing the behaviour
@@ -68,16 +69,17 @@ Paste this block at the top of any task prompt below.
 | Notifications (Task 14) | `services/notifications.ts`, `notifications.Notification` in `contract.prisma` |
 | Moderation & reporting (Task 15) | `services/moderation.ts`, `services/roles.ts`, `moderation.Report` in `contract.prisma` |
 | Preferences & recommendations (Task 16) | `services/preferences.ts`, `services/recommendations.ts`, `auth.UserPreference` in `contract.prisma` |
+| Retiring the mock layer (Task 17) | `lib/auth.ts`, `components/providers/AuthProvider.tsx` |
 
 ### What is left
 
-One task, and it was always going to be the last one: nothing else can be
-removed from the mock layer until everything that read it has somewhere else to
-read from.
+Nothing. Every task in this document has landed, and the last one could only be
+last: nothing could be removed from the mock layer until everything that read
+it had somewhere else to read from.
 
-| # | Task | Why here |
-|---|---|---|
-| 1 | **17** — retire the mock layer | Last by definition, and now the only one left. |
+New work goes in `AI-BACKLOG.md`, or in a new task here written to the house
+rules above. The open questions below are the honest list of what the tests
+cannot reach.
 
 ### One shared shape, settled
 
@@ -108,58 +110,71 @@ line to that list.
 
 ---
 
-## Task 17 — Retire the mock layer
-
-Final cleanup. Do last.
-
-**Almost done already.** Everything with an endpoint has left `mock-db.ts`:
-the story, chapter, book, shelf, comment, rating, reading-history, club,
-channel, challenge and badge fixtures, the author aggregates that invented
-view series and read counts, the hand-written genre list, and — with Task 16 —
-the author directory, whose one consumer now reads
-`GET /api/recommendations/authors`. The file is 832 lines down to ~53 and
-`data/api.ts` has no functions left at all.
-
-What survives is exactly one object. `db.currentUser` fills the presentational
-half of a session — avatar hue, follower and following counts, reading stats —
-that `auth.User` has no columns for, and `AuthProvider.toUser` spreads it under
-the real profile so those fields have *something*. Every page that shows a real
-number already bypasses it: `ProfilePage` asks the API for its own counts,
-`BadgesPage` for its own progress, the author pages for their own analytics. So
-this is a `User` type to narrow rather than an endpoint to wait for.
-
-The club, channel, challenge, badge, moderation, preference and recommendation
-types also left `types/domain.ts` for `types/clubs.ts`, `types/channels.ts`,
-`types/challenges.ts`, `types/gamification.ts`, `types/moderation.ts`,
-`types/preferences.ts` and `types/recommendations.ts`, which mirror the API the
-way `types/stories.ts` does. That is the pattern this task's reconciliation
-should finish, not undo.
-
-**Prompt:**
-
-> Every other task has landed. Remove the mock data layer entirely.
->
-> Verify nothing imports `apps/web/src/data/api.ts` or `data/mock-db.ts`, then
-> delete both. Reconcile `apps/web/src/types/domain.ts` (mock-shaped) with
-> `types/books.ts` and the real API response types — ideally generate or share
-> them from the API rather than maintaining two hand-written copies; if that is
-> too large a change, say so and instead consolidate them into one file with a
-> comment pointing at the API source of truth.
->
-> Audit every page for loading, empty and error states now that latency is real
-> and requests can fail — the mock's fixed 260ms `delay()` and
-> never-fails behaviour hid all of it. Use the existing `components/ui/States.tsx`
-> and `Skeleton.tsx`.
->
-> Confirm the full test suite passes and the app builds.
-
----
-
 ## Open questions from landed work
 
 Things the test suite cannot reach — browser behaviour, real clocks, layout.
 Each is a known gap, not a suspicion: worth confirming by hand, and worth
 folding into whichever task next touches that surface.
+
+### Retiring the mock layer (Task 17)
+
+- **The types are still two hand-written copies, and the task allowed for
+  that.** The instruction preferred generating or sharing the response shapes
+  from the API over maintaining `apps/web/src/types/*` by hand. The services do
+  export them — `PublicProfile`, `FollowEntry` and the rest are declared in
+  `services/users.ts` exactly as `types/users.ts` re-declares them — so the
+  obstacle is packaging, not discipline: `apps/web` is its own workspace with
+  its own `tsc -b`, and importing from `apps/api/src` would put Prisma and
+  Express in the web app's typecheck graph. Doing it properly means a third
+  workspace package holding the response types, imported by both, and every
+  service moving its interfaces into it. That is a refactor of fourteen files
+  and ~1,400 lines across a package boundary, so it was declined rather than
+  half-done. What landed instead is the fallback the task named: one file per
+  service, each headed by the `apps/api/src/services/*.ts` it mirrors, which is
+  the comment pointing at the source of truth.
+- **`Session.user` is `AccountProfile` itself**, aliased as `SessionUser` in
+  `lib/auth.ts` rather than re-declared. So the session cannot drift from
+  `GET /api/account/me`: a field the endpoint stops serving fails to compile at
+  every reader. `Session` deliberately did *not* move into `types/`, because
+  everything there mirrors a service response and this is a client-only
+  wrapper.
+- **The session is still a `localStorage` cache of a profile.** It is
+  revalidated once per load and adopted on save, which was true before this
+  task and is more visible now that nothing fills the gaps: a field the API
+  adds is absent from a stored session until the next `/account/me` answers.
+- **Two components went with the layer rather than being rewritten.**
+  `AuthorCard` and `GenreCard` were unimported, and the fields that gave them
+  their shape — a `bio` and `followerCount` on one object, a genre blurb — are
+  not carried together by any response. Their CSS went with them, the way
+  `.post__foot` did in Task 10.
+- **The home page's weekly reading goal is gone, not replaced.** It ran on
+  `minutesReadThisWeek`, and no reading duration is recorded anywhere, so
+  there was nothing honest to compute. The meter is the reader level now,
+  which is chapters read against the next level's threshold — the same
+  `GET /api/badges` response the badges page draws. Reinstating a time goal
+  means recording time, which is a column and a client that measures it.
+- **`hiatus` left `CardStory` and nothing replaced it.** The API derives three
+  statuses from `listedAt` and `isCompleted`; a story on hold is `ongoing`. The
+  editor's status select already said so (`StoryEditorPage`), so the card was
+  the last place the fourth state was mentioned.
+- **The audit found six surfaces that read `data` where they meant `status`.**
+  Under a mock that never failed and always answered in 260ms, "the list is
+  empty" and "the list has not arrived" and "the list failed" were one
+  condition, and six places had written it that way: the sign-in aside (three
+  covers that pulsed forever on a failure), the home page's clubs and
+  challenges rails, the profile's reading shelf, recent badges and whole
+  activity tab, the channels page (whose failed *subscribed* request silently
+  un-filtered Discover), the challenge entry dialog (an empty story picker that
+  submits an empty id), the dashboard's channel section, and the story editor's
+  genre picker (a writer blocked by "Pick at least one genre" with no chips to
+  pick). Each now reads `status` first. **What has not been proved is that the
+  list is complete** — it was found by reading, not by a test, and nothing in
+  the types stops the next page gating a skeleton on `data`.
+- **Unseen in a browser:** every state above, since provoking them means
+  failing a request. The reader level meter in the home page header at phone
+  width; the sign-in aside with its covers dropped, where `.auth__covers`
+  leaves a gap the quote has to close; and the genre picker's inline retry
+  inside `.editor__details-genres`.
 
 ### Reading progress (Task 2)
 

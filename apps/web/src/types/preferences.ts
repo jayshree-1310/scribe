@@ -2,8 +2,7 @@
  * Reader preference types.
  *
  * These mirror `apps/api/src/services/preferences.ts` exactly, the same way
- * `types/stories.ts` mirrors the stories service. Separate from `domain.ts`,
- * which describes the mock layer the last corner of the app still runs on.
+ * `types/stories.ts` mirrors the stories service.
  */
 
 import type { NotificationType } from './notifications'

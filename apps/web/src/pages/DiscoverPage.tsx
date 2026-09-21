@@ -242,10 +242,12 @@ export function DiscoverPage() {
     initialGenre && UUID.test(initialGenre) ? initialGenre : null,
   )
   /**
-   * Genre chips elsewhere in the app link to `/discover?genre=<slug>`, from
-   * back when this page read the mock data. Hold the slug until the genre list
-   * arrives, then trade it for the real id — the URL sync below rewrites the
-   * query string to the id, so the link canonicalises itself on arrival.
+   * Genre links in the app carry an id, and did not always: while this page
+   * read the mock they carried a slug, and those URLs are bookmarked and
+   * linked from outside. Hold a non-UUID until the genre list arrives, then
+   * trade it for the real id — the URL sync below rewrites the query string to
+   * the id, so an old link canonicalises itself on arrival. `LEGACY_GENRE_SLUGS`
+   * maps the names that have since changed.
    */
   const [pendingGenre, setPendingGenre] = useState<string | null>(
     initialGenre && !UUID.test(initialGenre) ? initialGenre.toLowerCase() : null,

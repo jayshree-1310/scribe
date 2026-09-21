@@ -43,24 +43,37 @@ export function AuthAside({ variant }: { variant: keyof typeof COPY }) {
           <h2>{copy.statement}</h2>
           <p>{copy.lede}</p>
 
-          <div className="auth__covers" aria-hidden="true">
-            {stories.data
-              ? stories.data.map((story, index) => (
-                  <div className="auth__cover" key={story.id} data-index={index}>
-                    <StoryCover story={story} size="lg" />
-                  </div>
-                ))
-              : [0, 1, 2].map((index) => (
-                  <div className="auth__cover" key={index} data-index={index}>
-                    <Skeleton
-                      className="auth__cover-skeleton"
-                      width="100%"
-                      height="100%"
-                      radius="var(--radius-sm)"
-                    />
-                  </div>
-                ))}
-          </div>
+          {/*
+            Three states, not two. The skeletons used to be the `else` of
+            "have the covers arrived", which under a mock that could not fail
+            was the same question as "are they still coming" — against the API
+            it is not, and a failed request left three placeholders pulsing on
+            the sign-in screen for as long as the tab stayed open.
+
+            A failure drops the covers instead of reporting them: this is the
+            decorative half of the page, beside a form that still works, and
+            nothing here is what the visitor came for.
+          */}
+          {stories.status === 'error' ? null : (
+            <div className="auth__covers" aria-hidden="true">
+              {stories.data
+                ? stories.data.map((story, index) => (
+                    <div className="auth__cover" key={story.id} data-index={index}>
+                      <StoryCover story={story} size="lg" />
+                    </div>
+                  ))
+                : [0, 1, 2].map((index) => (
+                    <div className="auth__cover" key={index} data-index={index}>
+                      <Skeleton
+                        className="auth__cover-skeleton"
+                        width="100%"
+                        height="100%"
+                        radius="var(--radius-sm)"
+                      />
+                    </div>
+                  ))}
+            </div>
+          )}
         </div>
 
         <figure className="auth__quote">

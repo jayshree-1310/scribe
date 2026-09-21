@@ -145,9 +145,9 @@ const THEME_LABELS: Record<ThemePreference, string> = {
 }
 
 /**
- * The five `NotificationType` values, worded as a reader would recognise them.
+ * The six `NotificationType` values, worded as a reader would recognise them.
  *
- * Exactly the API's enum and in the order the bell tends to fill up: a sixth
+ * Exactly the API's enum and in the order the bell tends to fill up: a seventh
  * type is a row here and nothing else, because the mute is enforced in the
  * fan-out rather than by anything this page knows.
  */
@@ -160,6 +160,11 @@ const NOTIFICATION_SETTINGS: {
     type: 'COMMENT_REPLY',
     label: 'Replies to you',
     description: 'When somebody answers your comment or your club thread.',
+  },
+  {
+    type: 'STORY_COMMENT',
+    label: 'Comments on your stories',
+    description: 'When a reader says something about something you wrote.',
   },
   {
     type: 'CHANNEL_POST',

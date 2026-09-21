@@ -441,7 +441,46 @@ export async function deleteAccount(
         await deleteAll(() =>
           tx.orm.content.Multimedia.where((item) => item.chapterId.eq(chapterId)),
         );
+        await deleteAll(() =>
+          tx.orm.engagement.ChapterLike.where((like) =>
+            like.chapterId.eq(chapterId),
+          ),
+        );
       }
+
+      /**
+       * Likes on this story's comments, before the comments. Per comment
+       * rather than per story: `engagement.CommentLike` carries no `storyId`,
+       * for the reason `deleteStory` in `services/authoring.ts` gives beside
+       * the same pass.
+       */
+      const commented = await tx.orm.engagement.Comment.select("id")
+        .where((row) => row.storyId.eq(storyId))
+        .all();
+
+      for (const comment of commented) {
+        await deleteAll(() =>
+          tx.orm.engagement.CommentLike.where((like) =>
+            like.commentId.eq(comment.id),
+          ),
+        );
+      }
+
+      /**
+       * The analytics events against this story, whoever generated them.
+       *
+       * Both tables carry `storyId`, so one pass each reaches the chapter-level
+       * rows too -- and both have to, because most of these rows belong to
+       * *nobody*: a signed-out visitor is recorded with a null `userId` and a
+       * salted `visitorKey`, so the per-user sweep further down cannot see them
+       * and `chapterRead_chapterId_fkey` refuses the chapter delete below.
+       */
+      await deleteAll(() =>
+        tx.orm.engagement.ChapterRead.where((row) => row.storyId.eq(storyId)),
+      );
+      await deleteAll(() =>
+        tx.orm.engagement.StoryView.where((row) => row.storyId.eq(storyId)),
+      );
 
       // Everyone's rows against this story, not just the author's: the story
       // is going, and a rating pointing at nothing is a foreign-key error.
@@ -470,7 +509,39 @@ export async function deleteAccount(
       await tx.orm.content.Story.where((row) => row.id.eq(storyId)).delete();
     }
 
-    // What this person left on other people's work.
+    /**
+     * What this person left on other people's work.
+     *
+     * Likes first, in two directions, and both before the comments below.
+     *
+     * The ones they *gave* have to go because a like they left under a seeded
+     * story is a row the per-story sweep above never visited, and
+     * `commentLike_userId_fkey` would refuse the user delete at the end. The
+     * ones they *received* have to go because a comment of theirs on somebody
+     * else's story may have been liked by a third party, and
+     * `commentLike_commentId_fkey` would refuse that comment's delete -- the
+     * failure nobody would see until a real account with a popular comment
+     * asked to leave.
+     */
+    await deleteAll(() =>
+      tx.orm.engagement.CommentLike.where((like) => like.userId.eq(userId)),
+    );
+    await deleteAll(() =>
+      tx.orm.engagement.ChapterLike.where((like) => like.userId.eq(userId)),
+    );
+
+    const theirComments = await tx.orm.engagement.Comment.select("id")
+      .where((row) => row.userId.eq(userId))
+      .all();
+
+    for (const comment of theirComments) {
+      await deleteAll(() =>
+        tx.orm.engagement.CommentLike.where((like) =>
+          like.commentId.eq(comment.id),
+        ),
+      );
+    }
+
     await deleteAll(() =>
       tx.orm.engagement.Comment.where((row) => row.userId.eq(userId)),
     );
@@ -479,6 +550,33 @@ export async function deleteAccount(
     );
     await deleteAll(() =>
       tx.orm.engagement.ReadingHistory.where((row) => row.userId.eq(userId)),
+    );
+    /**
+     * Every story they opened and every chapter they read, on somebody else's
+     * work -- the per-story sweep above only reached their own.
+     *
+     * These are attributed events rather than content: what is lost is the
+     * knowledge that *this account* was one of the visitors, which is exactly
+     * what deleting the account is for. The story's lifetime `viewCount` is a
+     * separate column and is deliberately left where it is: it counts what
+     * happened, and it did happen.
+     */
+    await deleteAll(() =>
+      tx.orm.engagement.ChapterRead.where((row) => row.userId.eq(userId)),
+    );
+    await deleteAll(() =>
+      tx.orm.engagement.StoryView.where((row) => row.userId.eq(userId)),
+    );
+    /**
+     * Both ends of the follow graph. One column names this account and the
+     * other names somebody who stays, so sweeping only one of them leaves
+     * rows that breach `follow_followingId_fkey` at the user delete below.
+     */
+    await deleteAll(() =>
+      tx.orm.engagement.Follow.where((row) => row.followerId.eq(userId)),
+    );
+    await deleteAll(() =>
+      tx.orm.engagement.Follow.where((row) => row.followingId.eq(userId)),
     );
     await deleteAll(() =>
       tx.orm.library.LibraryEntry.where((row) => row.userId.eq(userId)),

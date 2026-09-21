@@ -32,7 +32,7 @@ import './author.css'
 /** The cover art wants a genre hue and a byline; neither is worth a join. */
 function coverFor(
   story: StoryPerformance,
-  author: { displayName: string; username: string } | undefined,
+  author: { displayName: string | null; username: string } | undefined,
 ) {
   return {
     id: story.id,
@@ -219,7 +219,17 @@ export function AuthorDashboardPage() {
               to="/author/channels"
               linkLabel="Manage"
             />
-            {myChannels.length === 0 ? (
+            {/*
+              "No channel yet" is an invitation to make one, so it had better
+              be true. On `length === 0` alone it was also what a failed and an
+              in-flight request said -- and an author who already has a channel
+              being told to start one is the kind of wrong that gets acted on.
+            */}
+            {channels.status === 'error' ? (
+              <ErrorState message={channels.error} onRetry={channels.reload} />
+            ) : channels.status === 'loading' ? (
+              <Skeleton height="9rem" radius="var(--radius-lg)" />
+            ) : myChannels.length === 0 ? (
               <EmptyState
                 size="sm"
                 icon="megaphone"

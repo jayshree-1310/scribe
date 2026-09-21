@@ -11,8 +11,10 @@ import {
   READING_THEME_LABELS,
   READING_WIDTHS,
   READING_WIDTH_LABELS,
+  resolveReadingTheme,
   useReaderPrefs,
 } from '../lib/reader-prefs'
+import { useTheme } from '../lib/theme'
 import { formatCount, formatRelative } from '../lib/format'
 import { renderChapter } from '../lib/chapter-markdown'
 import * as stories from '../data/stories-api'
@@ -22,6 +24,7 @@ import {
   COMMENT_MAX_LENGTH,
   commentUserName,
 } from '../types/engagement'
+import { LikeButton } from '../components/engagement/LikeButton'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
 import { Avatar } from '../components/ui/Avatar'
@@ -41,6 +44,14 @@ export function ReaderPage() {
   const navigate = useNavigate()
   const { showToast } = useToast()
   const { preferences, update } = useReaderPrefs()
+  const { resolved: appTheme } = useTheme()
+
+  /**
+   * The surface to draw. `preferences.theme` may be `auto`, which is a
+   * preference rather than a surface — see `resolveReadingTheme`. Resolved
+   * once here so the error page and the article below cannot disagree.
+   */
+  const surface = resolveReadingTheme(preferences.theme, appTheme)
 
   const story = useAsync(() => stories.getStory(slug), [slug])
   const storyId = story.data?.id
@@ -126,6 +137,13 @@ export function ReaderPage() {
     [storyId, chapterId, commentBody, comments],
   )
 
+  /**
+   * Null until the panel has been opened once: the list is only requested
+   * when it is on screen, so before that there is no count to show and the
+   * button says "Comments" rather than a confident nothing.
+   */
+  const commentTotal = comments.data?.total ?? null
+
   const total = chapters.data?.length ?? 0
   /**
    * Chapter numbers need not be contiguous — an unpublished chapter in the
@@ -180,7 +198,7 @@ export function ReaderPage() {
 
   if (story.status === 'error' || chapter.status === 'error') {
     return (
-      <div className="reader" data-reading-theme={preferences.theme}>
+      <div className="reader" data-reading-theme={surface}>
         <div className="reader__error">
           <ErrorState
             title="We couldn't open that chapter"
@@ -203,7 +221,7 @@ export function ReaderPage() {
   return (
     <div
       className={cn('reader', focusMode && 'is-focus')}
-      data-reading-theme={preferences.theme}
+      data-reading-theme={surface}
       data-font-size={preferences.fontSize}
       data-width={preferences.width}
     >
@@ -303,17 +321,39 @@ export function ReaderPage() {
             {/* Chapter footer ------------------------------------------- */}
             <footer className="reader__footer">
               <div className="reader__reactions">
-                {/* Likes are a story-level counter today; there is no
-                    per-chapter reaction to show or to post. */}
-                <Button startIcon={<Icon name="heart" size="1em" />}>
-                  {formatCount(data?.likeCount ?? 0)}
-                </Button>
-                <Button
+                {/*
+                  A like on the chapter just read, not on the story: the button
+                  is at the end of one chapter, and that is what "I liked this"
+                  said here is about. See `engagement.ChapterLike` in the
+                  contract.
+                */}
+                <LikeButton
+                  subject="chapter"
+                  subjectId={current.id}
+                  likeCount={current.likeCount}
+                  likedByMe={current.likedByMe}
+                  variant="pill"
+                  noun="this chapter"
+                />
+
+                <button
+                  type="button"
+                  className={cn(
+                    'reader__toggle',
+                    showComments && 'is-open',
+                  )}
+                  aria-expanded={showComments}
                   onClick={() => setShowComments((open) => !open)}
-                  startIcon={<Icon name="comment" size="1em" />}
                 >
-                  Comments
-                </Button>
+                  <Icon name="comment" size="1em" />
+                  <span>
+                    {commentTotal === null
+                      ? 'Comments'
+                      : commentTotal === 1
+                        ? '1 comment'
+                        : `${formatCount(commentTotal)} comments`}
+                  </span>
+                </button>
               </div>
 
               <nav className="reader__pager" aria-label="Chapter navigation">
@@ -356,7 +396,10 @@ export function ReaderPage() {
             {/* Comments ------------------------------------------------- */}
             {showComments ? (
               <section className="reader__comments" aria-label="Chapter comments">
-                <h2>Comments on this chapter</h2>
+                <header className="reader__comments-head">
+                  <h2>Comments on this chapter</h2>
+                  <p>Only what readers have said about chapter {current.number}.</p>
+                </header>
 
                 <form className="reader__comment-form" onSubmit={postComment}>
                   <TextField
@@ -399,16 +442,41 @@ export function ReaderPage() {
                     description="Be the first to say something."
                   />
                 ) : (
-                  <ul>
+                  <ul className="reader__comment-list">
                     {comments.data?.items.map((comment) => (
                       <li key={comment.id}>
                         <Avatar user={comment.user} size="sm" />
-                        <div>
+                        <div className="reader__comment-body">
                           <p className="reader__comment-head">
                             <strong>{commentUserName(comment.user)}</strong>
                             <span>{formatRelative(comment.createdAt)}</span>
                           </p>
-                          <p>{comment.content}</p>
+                          <p className="reader__comment-text">
+                            {comment.content}
+                          </p>
+
+                          <div className="reader__comment-actions-row">
+                            <LikeButton
+                              subject="comment"
+                              subjectId={comment.id}
+                              likeCount={comment.likeCount}
+                              likedByMe={comment.likedByMe}
+                              noun="this comment"
+                            />
+                            {/*
+                              The reply count is shown and not acted on: the
+                              panel stays flat, and the link below is where a
+                              conversation is had. A count with no way to open
+                              it still tells a reader there is more there.
+                            */}
+                            {comment.replyCount > 0 ? (
+                              <span className="reader__comment-replies">
+                                <Icon name="comment" size="0.9em" />
+                                {comment.replyCount}{' '}
+                                {comment.replyCount === 1 ? 'reply' : 'replies'}
+                              </span>
+                            ) : null}
+                          </div>
                         </div>
                       </li>
                     ))}

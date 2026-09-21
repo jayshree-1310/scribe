@@ -1,18 +1,23 @@
 /**
- * Comment + rating data access.
+ * Comment, like and rating data access.
  *
  * Talks to the real Scribe API through the shared fetch wrapper, so errors
  * arrive as `ApiError` with a message safe to show. Follows the shape of
  * `books-api.ts`.
  *
  * There were no mock functions to replace here: the mock comment and rating
- * helpers had already been deleted from `data/api.ts`, so every caller of this
+ * helpers had already gone from the mock layer, so every caller of this
  * module is new.
  */
 
 import { request } from '../lib/api-client'
 import { readerHeaders } from './stories-api'
-import type { Comment, CommentPage, RatingSummary } from '../types/engagement'
+import type {
+  Comment,
+  CommentPage,
+  LikeSummary,
+  RatingSummary,
+} from '../types/engagement'
 
 /* Comments --------------------------------------------------------------- */
 
@@ -69,6 +74,49 @@ export async function deleteComment(commentId: string): Promise<void> {
     method: 'DELETE',
     headers: readerHeaders(),
   })
+}
+
+/* Likes ------------------------------------------------------------------ */
+
+/**
+ * `PUT` and `DELETE` rather than one toggle endpoint.
+ *
+ * A toggle's outcome depends on state the caller cannot see, so a retried
+ * request — a double tap, a flaky connection — flips back what it meant to
+ * set. Naming the state removes that: `likeChapter` always ends liked, and
+ * sending it twice is the same request twice.
+ *
+ * Both answer the refreshed `{ count, liked }`, so a page that just liked
+ * redraws from the response rather than re-fetching the chapter.
+ */
+export async function likeChapter(chapterId: string): Promise<LikeSummary> {
+  return request<LikeSummary>(
+    `/chapters/${encodeURIComponent(chapterId)}/like`,
+    { method: 'PUT', headers: readerHeaders() },
+  )
+}
+
+/** Removes the caller's like. Silent when they had not liked it. */
+export async function unlikeChapter(chapterId: string): Promise<LikeSummary> {
+  return request<LikeSummary>(
+    `/chapters/${encodeURIComponent(chapterId)}/like`,
+    { method: 'DELETE', headers: readerHeaders() },
+  )
+}
+
+export async function likeComment(commentId: string): Promise<LikeSummary> {
+  return request<LikeSummary>(
+    `/comments/${encodeURIComponent(commentId)}/like`,
+    { method: 'PUT', headers: readerHeaders() },
+  )
+}
+
+/** Removes the caller's like. Silent when they had not liked it. */
+export async function unlikeComment(commentId: string): Promise<LikeSummary> {
+  return request<LikeSummary>(
+    `/comments/${encodeURIComponent(commentId)}/like`,
+    { method: 'DELETE', headers: readerHeaders() },
+  )
 }
 
 /* Ratings ---------------------------------------------------------------- */

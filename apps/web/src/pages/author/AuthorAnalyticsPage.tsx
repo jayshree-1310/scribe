@@ -43,7 +43,7 @@ import './author.css'
 /** The cover art wants a genre hue and a byline; neither is worth a join. */
 function coverFor(
   story: StoryPerformance,
-  author: { displayName: string; username: string } | undefined,
+  author: { displayName: string | null; username: string } | undefined,
 ) {
   return {
     id: story.id,

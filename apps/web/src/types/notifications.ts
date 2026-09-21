@@ -10,10 +10,11 @@
  * at `/clubs/:slug` and a badge at `/badges`.
  */
 
-/** What happened. The five the API can produce; see `NotificationType`. */
+/** What happened. The six the API can produce; see `NotificationType`. */
 export type NotificationType =
   | 'CHANNEL_POST'
   | 'COMMENT_REPLY'
+  | 'STORY_COMMENT'
   | 'CLUB_DISCUSSION'
   | 'NEW_STORY'
   | 'BADGE_EARNED'

@@ -162,9 +162,7 @@ describe.skipIf(!available)("club discussions", () => {
 describe.skipIf(!available)("story comments", () => {
   let commentId: string;
 
-  it("says nothing about a top-level comment", async () => {
-    const before = (await inbox(author)).total;
-
+  it("tells the story's author about a top-level comment", async () => {
     const response = await api.request<{ comment: { id: string } }>(
       `/api/stories/${story.slug}/comments`,
       { method: "POST", as: reader, body: { content: "Lovely opening." } },
@@ -173,12 +171,49 @@ describe.skipIf(!available)("story comments", () => {
     commentId = response.body.comment.id;
     await settle();
 
-    // Deliberate: "somebody commented on your story" is a sixth type nobody
-    // has asked for yet. See the header of `services/notifications.ts`.
-    expect((await inbox(author)).total).toBe(before);
+    const notification = (await inbox(author)).items.find(
+      (item) => item.type === "STORY_COMMENT",
+    );
+
+    expect(notification).toBeDefined();
+    expect(notification?.title).toBe("Notify Story");
+    expect(notification?.excerpt).toBe("Lovely opening.");
+    expect(notification?.href).toBe(`/story/${story.slug}`);
+    expect(notification?.actor?.id).toBe(reader);
+  });
+
+  it("says nothing about a comment on your own story", async () => {
+    const countStoryComments = async (): Promise<number> =>
+      (await inbox(author)).items.filter(
+        (item) => item.type === "STORY_COMMENT",
+      ).length;
+
+    const before = await countStoryComments();
+
+    const response = await api.request(`/api/stories/${story.slug}/comments`, {
+      method: "POST",
+      as: author,
+      body: { content: "Thanks for reading." },
+    });
+    expect(response.status).toBe(201);
+    await settle();
+
+    /**
+     * Counted by type rather than off `total`, which this comment moves for an
+     * unrelated reason: commenting is a badge metric, so the author may earn
+     * one and be sent a `BADGE_EARNED` in the same breath. Asserting the total
+     * would make this test fail on the badge engine's behaviour rather than on
+     * the rule it is about.
+     */
+    expect(await countStoryComments()).toBe(before);
   });
 
   it("tells the author of the comment a reply answers", async () => {
+    // The story's author is a third party to this reply, and the point of the
+    // assertion below is that they stay one: `STORY_COMMENT` fires on the
+    // thread and not again on every answer to it.
+    const authorBefore = (await inbox(author)).total;
+
     const response = await api.request(`/api/stories/${story.slug}/comments`, {
       method: "POST",
       as: member,
@@ -195,6 +230,22 @@ describe.skipIf(!available)("story comments", () => {
     expect(reply?.title).toBe("Notify Story");
     expect(reply?.excerpt).toBe("Agreed.");
     expect(reply?.actor?.id).toBe(member);
+  });
+
+  it("does not also tell the story's author about a reply", async () => {
+    const before = (await inbox(author)).total;
+
+    const response = await api.request(`/api/stories/${story.slug}/comments`, {
+      method: "POST",
+      as: member,
+      body: { content: "Second that.", parentId: commentId },
+    });
+    expect(response.status).toBe(201);
+    await settle();
+
+    // One comment is one notification: `notifyCommentParent` matched and
+    // `notifyStoryAuthor` did not, because the two conditions are exclusive.
+    expect((await inbox(author)).total).toBe(before);
   });
 
   it("says nothing when somebody replies to themselves", async () => {

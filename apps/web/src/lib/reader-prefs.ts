@@ -7,8 +7,27 @@ import { createContext, useContext } from 'react'
 
 export const READER_STORAGE_KEY = 'scribe:reader'
 
-export const READING_THEMES = ['light', 'sepia', 'dark'] as const
+/**
+ * What a reader can choose, which is not the same as what gets drawn.
+ *
+ * `auto` is a *preference*, not a surface: it means "whatever Scribe is
+ * wearing". The three below it are standing choices that hold whatever the app
+ * theme does — somebody who reads on Sepia wants Sepia at midnight too.
+ *
+ * `auto` is first because it is the default, and the default matters: a reader
+ * who has never opened this control used to get cream paper inside a dark app,
+ * which reads as a bug rather than as a choice nobody made.
+ */
+export const READING_THEMES = ['auto', 'light', 'sepia', 'dark'] as const
 export type ReadingTheme = (typeof READING_THEMES)[number]
+
+/**
+ * What `reader.css` actually styles: the three real surfaces, with `auto`
+ * already resolved away. Separate from `ReadingTheme` so that
+ * `data-reading-theme` cannot be handed a value no rule matches.
+ */
+export const READING_SURFACES = ['light', 'sepia', 'dark'] as const
+export type ReadingSurface = (typeof READING_SURFACES)[number]
 
 export const FONT_SIZES = ['sm', 'md', 'lg', 'xl'] as const
 export type FontSize = (typeof FONT_SIZES)[number]
@@ -24,7 +43,7 @@ export interface ReaderPreferences {
 }
 
 export const DEFAULT_READER_PREFERENCES: ReaderPreferences = {
-  theme: 'sepia',
+  theme: 'auto',
   fontSize: 'md',
   width: 'medium',
   autoplayMultimedia: false,
@@ -60,7 +79,29 @@ export const READING_WIDTH_LABELS: Record<ReadingWidth, string> = {
 }
 
 export const READING_THEME_LABELS: Record<ReadingTheme, string> = {
+  auto: 'Match app',
   light: 'Paper',
   sepia: 'Sepia',
   dark: 'Night',
+}
+
+/**
+ * The surface to draw, given the reader's choice and the app's resolved theme.
+ *
+ * `auto` maps to Paper rather than Sepia in a light app: Sepia is a deliberate
+ * warm cream, and a reader who never asked for it should get the surface that
+ * matches the pages either side of the reader rather than one that announces
+ * itself.
+ *
+ * The app theme is passed in rather than read here so this stays a pure
+ * function — `useTheme` has already resolved `system` against the OS, and
+ * resolving it twice is how the two could disagree for a frame.
+ */
+export function resolveReadingTheme(
+  theme: ReadingTheme,
+  appTheme: 'light' | 'dark',
+): ReadingSurface {
+  if (theme !== 'auto') return theme
+
+  return appTheme === 'dark' ? 'dark' : 'light'
 }

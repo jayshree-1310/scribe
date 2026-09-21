@@ -4,8 +4,8 @@ import { coverArt } from '../../lib/cover'
 
 /**
  * Only what the art needs. Structural rather than tied to one story type,
- * because covers are drawn for both the mock stories the app still reads and
- * the real ones from `types/stories.ts` — whose `displayName` can be null.
+ * because covers are drawn for a `Story`, a catalogue `Book` and the reduced
+ * rows the author pages carry — which agree on these fields and little else.
  */
 interface CoverStory {
   id: string
@@ -32,6 +32,14 @@ interface StoryCoverProps {
  * shelf. Uploaded artwork is never stretched; it fills the panel and crops,
  * because an author's 4:3 photograph distorted to 2:3 looks worse than a crop
  * of it.
+ *
+ * The generated cover is always rendered and the artwork laid over it, rather
+ * than the two being branches of a ternary -- the same shape `Avatar` uses for
+ * a monogram, and for the same reason. A `coverUrl` is a promise about a file
+ * that may not be kept: storage moves, an object is deleted, the reader is
+ * offline. Branching on the column meant that a cover which 404s left a
+ * coloured panel with no title on it, which is worse than either outcome the
+ * design intended.
  */
 export function StoryCover({ story, size = 'md', className }: StoryCoverProps) {
   const hue = story.genres[0]?.hue ?? 268
@@ -42,7 +50,7 @@ export function StoryCover({ story, size = 'md', className }: StoryCoverProps) {
       className={cn(
         'cover',
         `cover--${size}`,
-        story.coverUrl ? 'cover--photo' : `cover--v${art.variant}`,
+        `cover--v${art.variant}`,
         className,
       )}
       style={
@@ -55,17 +63,14 @@ export function StoryCover({ story, size = 'md', className }: StoryCoverProps) {
       aria-hidden="true"
     >
       <span className="cover__spine" />
+      <span className="cover__rule" />
+      <span className="cover__title">{story.title}</span>
+      <span className="cover__author">
+        {story.author.displayName || story.author.username}
+      </span>
       {story.coverUrl ? (
         <img className="cover__art" src={story.coverUrl} alt="" loading="lazy" />
-      ) : (
-        <>
-          <span className="cover__rule" />
-          <span className="cover__title">{story.title}</span>
-          <span className="cover__author">
-            {story.author.displayName || story.author.username}
-          </span>
-        </>
-      )}
+      ) : null}
     </div>
   )
 }

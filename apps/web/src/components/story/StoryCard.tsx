@@ -9,36 +9,32 @@ import { StoryCover } from './StoryCover'
 /**
  * What a card renders, and no more.
  *
- * Structural rather than one concrete story type: the real stories from
- * `types/stories.ts` and the mock ones from `types/domain.ts` differ in the
- * blurb field and in whether a display name exists, and both are on screen
- * until the mock layer is retired. The optional fields below are exactly those
- * differences — everything else is common to both.
+ * Still structural rather than `types/stories.ts`'s `Story`, because a card is
+ * drawn for a catalogue `Book` too and the two rows differ in fields nothing
+ * here reads. It is no longer structural to span *two* story shapes: it used
+ * to carry a `tagline`, a `synopsis` and a `hiatus` status alongside the API's
+ * names for the first two, because the mock spelled them differently. Nothing
+ * supplies those now — `content.Story` has one blurb, called `description`,
+ * and the API derives three statuses from `listedAt` and `isCompleted`.
  */
 export interface CardStory {
   id: string
   slug: string
   title: string
-  status: 'draft' | 'ongoing' | 'completed' | 'hiatus'
+  status: 'draft' | 'ongoing' | 'completed'
   viewCount: number
   chapterCount: number
   ratingAverage: number | null
   ratingCount: number
-  /** Editorial pull quote, mock-only for now; used by the feature variant. */
-  tagline?: string
-  /** The mock's name for the blurb. */
-  synopsis?: string
-  /** The API's name for the same thing. */
   description?: string | null
   author: { username: string; displayName?: string | null }
-  genres: Array<{ id: string; name: string; hue: number; slug?: string }>
+  genres: Array<{ id: string; name: string; hue: number }>
 }
 
 const STATUS_LABELS: Record<CardStory['status'], string> = {
   draft: 'Draft',
   ongoing: 'Ongoing',
   completed: 'Completed',
-  hiatus: 'On hiatus',
 }
 
 interface StoryCardProps {
@@ -62,7 +58,7 @@ export function StoryCard({
 }: StoryCardProps) {
   const to = `/story/${story.slug}`
   const primaryGenre = story.genres[0]
-  const blurb = story.synopsis ?? story.description ?? ''
+  const blurb = story.description ?? ''
   const rating = story.ratingAverage ?? 0
 
   return (
@@ -77,8 +73,6 @@ export function StoryCard({
           {primaryGenre ? <GenreChip genre={primaryGenre} /> : null}
           {story.status === 'completed' ? (
             <StatusBadge tone="success">{STATUS_LABELS.completed}</StatusBadge>
-          ) : story.status === 'hiatus' ? (
-            <StatusBadge tone="warning">{STATUS_LABELS.hiatus}</StatusBadge>
           ) : null}
         </div>
 
@@ -95,10 +89,10 @@ export function StoryCard({
           </p>
         )}
 
+        {/* The feature variant used to prefer a `tagline` here, which only the
+            mock carried; there is one blurb on a story now. */}
         {variant !== 'grid' ? (
-          <p className="story-card__synopsis">
-            {variant === 'feature' ? (story.tagline ?? blurb) : blurb}
-          </p>
+          <p className="story-card__synopsis">{blurb}</p>
         ) : null}
 
         <div className="story-card__stats">

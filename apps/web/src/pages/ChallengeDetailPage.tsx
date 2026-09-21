@@ -346,7 +346,21 @@ export function ChallengeDetailPage() {
         }
       >
         <div className="stack" style={{ gap: 'var(--space-5)' }}>
-          {myStories.data?.length === 0 ? (
+          {/*
+            A failed story list used to render the picker anyway, with nothing
+            in it but "Choose a story…" -- indistinguishable from an account
+            that has written nothing, except that the empty state below would
+            at least have said so. Submitting from it sends an empty id.
+          */}
+          {myStories.status === 'error' ? (
+            <ErrorState
+              title="Your stories didn't load"
+              message={myStories.error}
+              onRetry={myStories.reload}
+            />
+          ) : myStories.status === 'loading' ? (
+            <Skeleton height="3.5rem" radius="var(--radius-md)" />
+          ) : myStories.data?.length === 0 ? (
             <EmptyState
               size="sm"
               icon="pen"

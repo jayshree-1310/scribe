@@ -136,6 +136,23 @@ export class TestApi {
   }
 
   /**
+   * Settles the fire-and-forget writes a request leaves behind.
+   *
+   * A `GET .../chapters/1` returns before its view and read events have
+   * inserted, and a comment returns before its badge evaluation has. A test
+   * that asserts on those rows -- or that performs something they would
+   * breach a foreign key against, which is what account deletion is -- has to
+   * wait for them, and `cleanup` already drains the same three at teardown.
+   *
+   * Badges before notifications, never alongside: an award issues a
+   * notification as it lands. See `flushNotifications`.
+   */
+  async settleBackgroundWrites(): Promise<void> {
+    await Promise.all([flushBadges(), flushAnalytics()]);
+    await flushNotifications();
+  }
+
+  /**
    * The username `createUser` minted for a fixture account.
    *
    * Public profiles are addressed by handle, not by id, so a suite holding
@@ -1056,6 +1073,18 @@ export class TestApi {
       await deleteAll(() =>
         db.orm.engagement.ChapterRead.where((row) => row.userId.eq(userId)),
       );
+      /**
+       * Likes this fixture gave, which can sit on a *seeded* story's chapter
+       * or comment -- rows the per-story sweep below never visits, and which
+       * breach `chapterLike_userId_fkey` / `commentLike_userId_fkey` at the
+       * user delete at the end.
+       */
+      await deleteAll(() =>
+        db.orm.engagement.ChapterLike.where((row) => row.userId.eq(userId)),
+      );
+      await deleteAll(() =>
+        db.orm.engagement.CommentLike.where((row) => row.userId.eq(userId)),
+      );
       await deleteAll(() =>
         db.orm.gamification.UserBadge.where((row) => row.userId.eq(userId)),
       );
@@ -1089,6 +1118,26 @@ export class TestApi {
      * finishing one user at a time deletes a thread whose reply is still
      * pointing at it and breaches `comment_parentId_fkey`.
      */
+    /**
+     * Likes *on* those comments, whoever left them -- a suite routinely has
+     * one fixture like another's comment, and the per-user sweep above only
+     * cleared the likes each fixture gave. A third party's like would breach
+     * `commentLike_commentId_fkey` on the comment delete below.
+     */
+    for (const userId of this.created.users) {
+      const theirs = await db.orm.engagement.Comment.select("id")
+        .where((row) => row.userId.eq(userId))
+        .all();
+
+      for (const comment of theirs) {
+        await deleteAll(() =>
+          db.orm.engagement.CommentLike.where((like) =>
+            like.commentId.eq(comment.id),
+          ),
+        );
+      }
+    }
+
     for (const userId of this.created.users) {
       await deleteAll(() =>
         db.orm.engagement.Comment.where((row) => row.userId.eq(userId)).where(
@@ -1110,6 +1159,26 @@ export class TestApi {
       for (const chapter of chapters) {
         await deleteAll(() =>
           db.orm.content.Multimedia.where((item) => item.chapterId.eq(chapter.id)),
+        );
+        // Anonymous readers cannot like, so every row here belongs to some
+        // account -- but not necessarily one of this run's fixtures.
+        await deleteAll(() =>
+          db.orm.engagement.ChapterLike.where((like) =>
+            like.chapterId.eq(chapter.id),
+          ),
+        );
+      }
+
+      // Likes on this story's comments, before the comments they point at.
+      const commented = await db.orm.engagement.Comment.select("id")
+        .where((row) => row.storyId.eq(storyId))
+        .all();
+
+      for (const comment of commented) {
+        await deleteAll(() =>
+          db.orm.engagement.CommentLike.where((like) =>
+            like.commentId.eq(comment.id),
+          ),
         );
       }
 

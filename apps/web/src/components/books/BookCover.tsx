@@ -25,7 +25,7 @@ export function BookCover({ book, size = 'md', className }: BookCoverProps) {
       className={cn(
         'cover',
         `cover--${size}`,
-        book.coverUrl ? 'cover--photo' : `cover--v${art.variant}`,
+        `cover--v${art.variant}`,
         className,
       )}
       style={
@@ -38,15 +38,12 @@ export function BookCover({ book, size = 'md', className }: BookCoverProps) {
       aria-hidden="true"
     >
       <span className="cover__spine" />
+      <span className="cover__rule" />
+      <span className="cover__title">{book.title}</span>
+      <span className="cover__author">{authorName(book.author)}</span>
       {book.coverUrl ? (
         <img className="cover__art" src={book.coverUrl} alt="" loading="lazy" />
-      ) : (
-        <>
-          <span className="cover__rule" />
-          <span className="cover__title">{book.title}</span>
-          <span className="cover__author">{authorName(book.author)}</span>
-        </>
-      )}
+      ) : null}
     </div>
   )
 }

@@ -3,14 +3,18 @@ import { cn } from '../../lib/cn'
 import { hueFor } from '../../lib/cover'
 
 /**
- * `avatarHue` is a mock-only field: `auth.User` has no such column, so accounts
- * that come from the API derive one from the username instead. Kept optional
- * rather than required so both shapes fit.
+ * Structural rather than one of the API's user shapes, because every one of
+ * them fits it: an `AccountProfile`, a `ProfileUser`, a comment's author
+ * summary and a club member all carry these three fields under these names.
+ *
+ * There used to be an optional `avatarHue` here as well, supplied only by the
+ * mock profile. `auth.User` has no such column and never had one, so the hue
+ * is derived from the username -- which is what every API-sourced avatar was
+ * already doing, and is now what all of them do.
  */
 type AvatarUser = {
   username: string
   displayName?: string | null
-  avatarHue?: number
   avatarUrl?: string | null
 }
 
@@ -34,7 +38,7 @@ function initials(name: string): string {
  * instead of a broken-image icon.
  */
 export function Avatar({ user, size = 'md', className }: AvatarProps) {
-  const hue = user.avatarHue ?? hueFor(user.username)
+  const hue = hueFor(user.username)
 
   return (
     <span

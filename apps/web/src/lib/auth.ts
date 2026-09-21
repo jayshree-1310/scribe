@@ -1,20 +1,50 @@
 /**
  * Client-side session state.
  *
- * Sign-in, registration, the profile the session carries and whether
- * onboarding is finished all come from the API. What is still local is the
- * presentational half of a `User` that the mock supplies -- `AuthProvider`
- * explains which fields and why.
+ * Everything the session carries now comes from the API. It used to be half a
+ * fiction: `AuthProvider` spread a mock profile under the real one so that an
+ * avatar hue, follower counts and a block of reading aggregates had *some*
+ * value, because `auth.User` has no columns for them. Task 17 removed the mock
+ * layer, and with it the widening -- so the session's user is the account
+ * endpoint's own response and nothing else.
+ *
+ * `Session` lives here rather than in `types/` because it is not an API shape:
+ * it is a user plus the one routing bit `RequireAuth` reads. Every type in
+ * `types/` mirrors a service response, and a client-only wrapper among them
+ * would read as one.
  */
 
 import { createContext, useContext } from 'react'
 import type { AccountProfile } from '../data/account-api'
-import type { Session, User } from '../types/domain'
 
 export const SESSION_STORAGE_KEY = 'scribe:session'
 
+/**
+ * The signed-in reader, exactly as `GET /api/account/me` answers.
+ *
+ * Aliased rather than re-declared so there is one hand-written copy of the
+ * shape in the app, next to the request that returns it -- see
+ * `data/account-api.ts`, which is the source of truth for every field.
+ */
+export type SessionUser = AccountProfile
+
+/**
+ * The signed-in user, and whether they have been through onboarding.
+ *
+ * The onboarding *answers* used to live here -- genres, followed authors, a
+ * "do you write?" flag -- and were thrown away on every reload because nothing
+ * persisted them. They are rows now (`auth.UserPreference` and the follow
+ * graph), read through `data/preferences-api.ts` by the two surfaces that
+ * care. What is left is the one bit `RequireAuth` routes on, mirrored from
+ * `AccountProfile.onboardingComplete` so a redirect costs no request.
+ */
+export interface Session {
+  user: SessionUser
+  onboarded: boolean
+}
+
 export interface GoogleSignInResult {
-  user: User
+  user: SessionUser
   /** True when this sign-in created the account, so it needs onboarding. */
   created: boolean
 }
@@ -23,12 +53,16 @@ export interface AuthContextValue {
   session: Session | null
   /** True until the stored session has been read. */
   initialising: boolean
-  signIn: (input: { email: string; password: string; remember: boolean }) => Promise<User>
+  signIn: (input: {
+    email: string
+    password: string
+    remember: boolean
+  }) => Promise<SessionUser>
   register: (input: {
     username: string
     email: string
     password: string
-  }) => Promise<User>
+  }) => Promise<SessionUser>
   signInWithGoogle: () => Promise<GoogleSignInResult>
   /**
    * Records locally that the flow is finished, once the API has been told.

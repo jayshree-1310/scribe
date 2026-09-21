@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../lib/auth'
-import { formatCount, formatMinutes } from '../lib/format'
+import { formatCount } from '../lib/format'
 import * as books from '../data/books-api'
 import * as challengesApi from '../data/challenges-api'
 import * as clubsApi from '../data/clubs-api'
+import { getBadges } from '../data/gamification-api'
 import * as reading from '../data/reading-api'
 import * as recommendationsApi from '../data/recommendations-api'
 import type { Book, Discover } from '../types/books'
@@ -22,8 +23,6 @@ import { ContinueCard } from '../components/story/ContinueCard'
 import { ChallengeCard, ClubCard } from '../components/story/Cards'
 import './pages.css'
 import '../components/books/books.css'
-
-const WEEKLY_GOAL_MINUTES = 400
 
 export function HomePage() {
   const { session } = useAuth()
@@ -46,6 +45,20 @@ export function HomePage() {
   const recommended = useAsync(() => recommendationsApi.getRecommendations(12), [])
   const clubs = useAsync(() => clubsApi.listClubs({ limit: 6 }), [])
   const challenges = useAsync(() => challengesApi.getChallenges(), [])
+  /**
+   * The header's reading numbers, from the same response `/badges` answers.
+   *
+   * They used to come off the session, which carried a fixed `chaptersRead`
+   * and a `minutesReadThisWeek` from the mock profile -- the same two numbers
+   * for every account on the platform. `levels.reader` is the honest version
+   * of the first: it *is* chapters read, counted from reading history, and it
+   * carries the next level's threshold, so the meter has a real goal to fill.
+   *
+   * There is no honest version of the second. Nothing records how long anybody
+   * reads for -- no duration is stored anywhere -- so the weekly-minutes goal
+   * went rather than being computed from something that only looked like it.
+   */
+  const progress = useAsync(() => getBadges(), [])
 
   /**
    * A local copy of the rails, so shelving a book updates its card straight
@@ -75,9 +88,11 @@ export function HomePage() {
   }
 
   const user = session?.user
-  const firstName = user?.displayName.split(' ')[0] ?? 'there'
-  const streak = user?.stats.readingStreakDays ?? 0
-  const minutes = user?.stats.minutesReadThisWeek ?? 0
+  // Nullable on the account endpoint: a Google signup has no display name
+  // until they set one, and a password signup only has the handle.
+  const firstName = (user?.displayName || user?.username)?.split(' ')[0] ?? 'there'
+  const streak = user?.readingStreak ?? 0
+  const readerLevel = progress.data?.levels.reader ?? null
 
   const inProgress = shelved.data?.items ?? []
   /**
@@ -146,23 +161,50 @@ export function HomePage() {
             </span>
           </p>
           <p className="streak__detail">
-            {formatMinutes(minutes)} read this week ·{' '}
-            {formatCount(user?.stats.chaptersRead ?? 0)} chapters all-time
+            {readerLevel ? (
+              `${formatCount(readerLevel.value)} chapters read all-time`
+            ) : progress.status === 'error' ? (
+              /*
+                No retry and no panel: the streak beside it is already right,
+                it came from the session. A failed count is one clause missing
+                from a greeting, and an error box at the top of the home page
+                would be louder than what it is reporting.
+              */
+              'Chapters read is unavailable right now.'
+            ) : (
+              <Skeleton width="11rem" />
+            )}
           </p>
         </div>
-        <div className="streak__goal">
-          <div className="streak__goal-head">
-            <span>Weekly goal</span>
-            <strong>
-              {formatMinutes(minutes)} / {formatMinutes(WEEKLY_GOAL_MINUTES)}
-            </strong>
+        {/*
+          The meter is a reader level rather than a weekly goal. Chapters read
+          is counted; minutes read is not recorded anywhere, so the old
+          "284 / 400 minutes" was the mock's number shown to everybody. Hidden
+          rather than skeletoned while it loads: the tile reads as complete
+          without it, and a placeholder bar that fills in a moment later draws
+          more attention than the number deserves.
+        */}
+        {readerLevel ? (
+          <div className="streak__goal">
+            <div className="streak__goal-head">
+              <span>Reader level {readerLevel.level}</span>
+              <strong>
+                {readerLevel.next === null
+                  ? 'Top level'
+                  : `${formatCount(readerLevel.value)} / ${formatCount(readerLevel.next)} chapters`}
+              </strong>
+            </div>
+            <ProgressBar
+              value={readerLevel.progress}
+              size="md"
+              label={
+                readerLevel.next === null
+                  ? 'Reader level: top of the ladder'
+                  : `Progress toward reader level ${readerLevel.level + 1}`
+              }
+            />
           </div>
-          <ProgressBar
-            value={minutes / WEEKLY_GOAL_MINUTES}
-            size="md"
-            label="Progress toward your weekly reading goal"
-          />
-        </div>
+        ) : null}
       </section>
 
       {/* Pick up where you left off -------------------------------------- */}
@@ -290,11 +332,26 @@ export function HomePage() {
         )}
       </section>
 
-      {/* Clubs and challenges ------------------------------------------- */}
+      {/* Clubs and challenges -------------------------------------------
+        Both of these read their status before their data. Under the mock they
+        could not: a request that always resolved meant an empty list only ever
+        meant "there are none", so `length === 0` was a safe test. Against the
+        API it is also what a failed request and an in-flight one look like,
+        and both were telling the reader there are no clubs and no challenges
+        running — the second of which they would have had no reason to doubt.
+      */}
       <div className="two-col">
         <section className="page-section">
           <SectionHead title="Your book clubs" to="/clubs" linkLabel="All clubs" />
-          {myClubs.length === 0 && suggestedClubs.length === 0 ? (
+          {clubs.status === 'error' ? (
+            <ErrorState message={clubs.error} onRetry={clubs.reload} />
+          ) : clubs.status === 'loading' ? (
+            <div className="row-list">
+              {Array.from({ length: 2 }, (_, index) => (
+                <Skeleton key={index} height="5.5rem" radius="var(--radius-lg)" />
+              ))}
+            </div>
+          ) : myClubs.length === 0 && suggestedClubs.length === 0 ? (
             <EmptyState icon="users" size="sm" title="No clubs yet" />
           ) : (
             <div className="row-list">
@@ -307,7 +364,15 @@ export function HomePage() {
 
         <section className="page-section">
           <SectionHead title="Writing challenges" to="/challenges" linkLabel="All challenges" />
-          {activeChallenges.length === 0 ? (
+          {challenges.status === 'error' ? (
+            <ErrorState message={challenges.error} onRetry={challenges.reload} />
+          ) : challenges.status === 'loading' ? (
+            <div className="row-list">
+              {Array.from({ length: 2 }, (_, index) => (
+                <Skeleton key={index} height="5.5rem" radius="var(--radius-lg)" />
+              ))}
+            </div>
+          ) : activeChallenges.length === 0 ? (
             <EmptyState icon="trophy" size="sm" title="Nothing running right now" />
           ) : (
             <div className="row-list">

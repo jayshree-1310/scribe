@@ -2,9 +2,9 @@
  * Books + Library types.
  *
  * These mirror the API responses in `apps/api/src/services/{books,library}.ts`
- * exactly. They are separate from `domain.ts` — which describes the mock data
- * layer the rest of the app still runs on — because this feature reads from the
- * real backend and its shapes are the backend's to define.
+ * exactly. This was the first file written this way, against the real backend
+ * while everything else still read a mock; it is now how every file in this
+ * directory is written, one per service, and there is no other kind left.
  */
 
 export interface BookAuthor {

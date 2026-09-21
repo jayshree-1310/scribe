@@ -1,17 +1,45 @@
 /* ==========================================================================
    Immersive reader
 
-   Reading themes are independent of the app theme: someone can read in Sepia
-   while the rest of Scribe is dark. Each theme sets its own surface and ink.
+   Reading themes *can* be independent of the app theme — someone may read in
+   Sepia while the rest of Scribe is dark — but by default they are not: the
+   reader's `auto` preference resolves against the app theme before it reaches
+   `data-reading-theme` here, so a dark app gets a dark story unless the reader
+   asked for something else. See `resolveReadingTheme` in `lib/reader-prefs.ts`.
+
+   Each surface below sets its own page, ink and accent, and nothing in here
+   reads an app-theme token directly: that independence is the whole point, and
+   it is what makes a standing choice of Sepia survive a theme toggle.
    ========================================================================== */
 
 .reader {
+  /*
+   * Fallbacks only. `data-reading-theme` is always one of the three surfaces
+   * below, so these apply to nothing in practice; they exist so a future
+   * surface that forgets a token degrades to something legible rather than to
+   * transparent-on-transparent.
+   */
   --read-bg: var(--surface);
   --read-ink: #22201c;
   --read-ink-soft: #5d574d;
   --read-rule: rgba(34, 32, 28, 0.14);
   --read-measure: 38rem;
   --read-size: 1.1875rem;
+
+  /*
+   * The reader's own accent, independent of the app theme for the reason the
+   * surface and the ink are: a reading theme is chosen separately, so somebody
+   * reading on Paper while the rest of Scribe is in Night mode would otherwise
+   * get the dark theme's pale orange on white — a heart nobody can see. Each
+   * theme below picks the pair that is legible against its own page.
+   */
+  --read-brand: #a2431b;
+  /* What sits *on* the accent, for a filled button. Not derivable from the
+     accent, and getting it from the app theme is what left "Next chapter" as
+     dark brown on dark orange. */
+  --read-brand-fg: #ffffff;
+  --read-brand-soft: rgba(162, 67, 27, 0.1);
+  --read-brand-border: rgba(162, 67, 27, 0.35);
 
   min-height: 100dvh;
   background-color: var(--read-bg);
@@ -30,6 +58,10 @@
   --read-ink: #3a2f21;
   --read-ink-soft: #6b5b45;
   --read-rule: rgba(58, 47, 33, 0.16);
+  /* Warmer, so the accent sits in the page rather than on top of it. */
+  --read-brand: #9a4415;
+  --read-brand-soft: rgba(154, 68, 21, 0.09);
+  --read-brand-border: rgba(154, 68, 21, 0.32);
 }
 
 .reader[data-reading-theme='dark'] {
@@ -37,6 +69,12 @@
   --read-ink: #e6e2da;
   --read-ink-soft: #a49d92;
   --read-rule: rgba(230, 226, 218, 0.14);
+  --read-brand: #ef9558;
+  /* The one theme whose accent is lighter than its page, so the label on a
+     filled button goes dark rather than white. */
+  --read-brand-fg: #2b1305;
+  --read-brand-soft: rgba(239, 149, 88, 0.14);
+  --read-brand-border: rgba(239, 149, 88, 0.38);
 }
 
 .reader[data-font-size='sm'] { --read-size: 1.0625rem; }
@@ -61,7 +99,7 @@
 .reader__progress > span {
   display: block;
   height: 100%;
-  background-color: var(--brand);
+  background-color: var(--read-brand);
   transform-origin: left center;
   transition: transform 90ms linear;
 }
@@ -107,7 +145,7 @@
 }
 
 .reader__back:hover {
-  color: var(--brand);
+  color: var(--read-brand);
 }
 
 .reader__back-text {
@@ -133,7 +171,7 @@
 }
 
 .reader__bookmark.is-on {
-  color: var(--brand) !important;
+  color: var(--read-brand) !important;
 }
 
 /* Article ---------------------------------------------------------------- */
@@ -224,8 +262,10 @@
 .reader__prose blockquote {
   margin: 1.6em 0;
   padding-left: 1em;
-  border-left: 3px solid var(--brand-border);
-  color: var(--text-secondary);
+  /* Against the reading theme, not the app's: a quote in a Paper-themed
+     chapter should not be ruled in the dark theme's orange. */
+  border-left: 3px solid var(--read-brand-border);
+  color: var(--read-ink-soft);
   font-style: italic;
 }
 
@@ -241,19 +281,103 @@
 
 /* Footer and pager ------------------------------------------------------- */
 
+/*
+ * Everything below the prose is shared UI — buttons, a select, a textarea —
+ * drawn from the global tokens in `index.css`. Those tokens follow the *app*
+ * theme, which is chosen separately from the reading theme, so a reader on
+ * Sepia with Scribe in Night mode used to get a row of near-black controls
+ * sitting on cream paper: correct components, wrong page.
+ *
+ * Rather than restyle each primitive, the tokens they read are redefined here
+ * against the reading theme. Anything dropped into the footer or the comment
+ * panel from now on inherits the fix, including components that did not exist
+ * when this was written — which is the whole reason it is done at the tokens
+ * and not at `.btn`.
+ */
+.reader__footer,
+.reader__comments {
+  --bg: var(--read-bg);
+  --bg-tint: color-mix(in srgb, var(--read-ink) 10%, var(--read-bg));
+  --surface: var(--read-bg);
+  --surface-2: color-mix(in srgb, var(--read-ink) 3%, var(--read-bg));
+  --surface-3: color-mix(in srgb, var(--read-ink) 7%, var(--read-bg));
+  --surface-hover: color-mix(in srgb, var(--read-ink) 6%, var(--read-bg));
+  --border: var(--read-rule);
+  --border-subtle: var(--read-rule);
+  --border-strong: color-mix(in srgb, var(--read-ink) 24%, var(--read-bg));
+
+  --text: var(--read-ink);
+  --text-secondary: var(--read-ink-soft);
+  --text-muted: color-mix(in srgb, var(--read-ink-soft) 82%, var(--read-bg));
+
+  --brand: var(--read-brand);
+  --brand-fg: var(--read-brand-fg);
+  --brand-hover: color-mix(in srgb, var(--read-brand) 88%, var(--read-ink));
+  --brand-soft: var(--read-brand-soft);
+  --brand-border: var(--read-brand-border);
+  --brand-ring: var(--read-brand-soft);
+
+  /* Paper has no drop shadows; the rules and the ink do the separating. */
+  --shadow-sm: none;
+  --shadow-md: none;
+
+  font-family: var(--font-sans);
+}
+
 .reader__footer {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-6);
   margin-top: var(--space-12);
   padding-top: var(--space-6);
   border-top: 1px solid var(--read-rule);
-  font-family: var(--font-sans);
 }
 
 .reader__reactions {
   display: flex;
-  gap: var(--space-3);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/*
+ * The comment toggle, deliberately the same pill as `.like--pill` in
+ * `components/engagement/engagement.css`: the two sit side by side and read as
+ * one pair of reactions, so the shape is repeated here rather than the like
+ * button being given a reader-only variant nothing else could use.
+ */
+.reader__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: none;
+  color: var(--read-ink-soft);
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease),
+    color var(--dur-fast) var(--ease),
+    transform var(--dur-fast) var(--ease);
+}
+
+.reader__toggle:hover {
+  border-color: var(--read-brand);
+  background-color: var(--read-brand-soft);
+  color: var(--read-brand);
+  transform: translateY(-1px);
+}
+
+/* Open is a state worth seeing from the pager below, which is where the eye
+   goes next after pressing it. */
+.reader__toggle.is-open {
+  border-color: var(--read-brand-border);
+  background-color: var(--read-brand-soft);
+  color: var(--read-brand);
 }
 
 .reader__pager {
@@ -272,27 +396,51 @@
   font-size: var(--text-sm);
 }
 
+/* Comments --------------------------------------------------------------- */
+
 .reader__comments {
-  margin-top: var(--space-10);
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--read-rule);
-  font-family: var(--font-sans);
-}
-
-.reader__comments h2 {
-  font-size: var(--text-xl);
-}
-
-.reader__comments ul {
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
-  margin: var(--space-5) 0;
+  margin-top: var(--space-10);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--read-rule);
 }
 
-.reader__comments li {
+.reader__comments-head h2 {
+  font-size: var(--text-xl);
+}
+
+.reader__comments-head p {
+  margin-top: var(--space-1);
+  color: var(--read-ink-soft);
+  font-size: var(--text-sm);
+}
+
+.reader__comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/*
+ * One comment per row, ruled rather than carded. A card on paper is a box on a
+ * page; a rule between rows is what a printed letters column looks like, and
+ * it keeps the reading measure unbroken.
+ */
+.reader__comment-list > li {
   display: flex;
   gap: var(--space-3);
+  padding: var(--space-4) 0;
+}
+
+.reader__comment-list > li + li {
+  border-top: 1px solid var(--read-rule);
+}
+
+.reader__comment-body {
+  min-width: 0;
+  flex: 1;
 }
 
 .reader__comment-head {
@@ -300,6 +448,7 @@
   align-items: baseline;
   gap: var(--space-2);
   margin-bottom: var(--space-1);
+  font-size: var(--text-md);
 }
 
 .reader__comment-head span {
@@ -307,19 +456,50 @@
   font-size: var(--text-xs);
 }
 
+.reader__comment-text {
+  color: var(--read-ink);
+  line-height: var(--leading-normal);
+  /* A comment is somebody typing, not the author's prose: breaking a pasted
+     URL is better than pushing the column sideways. */
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.reader__comment-actions-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.reader__comment-replies {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--read-ink-soft);
+  font-size: var(--text-xs);
+}
+
 .reader__comment-form {
-  margin: var(--space-5) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
 }
 
 .reader__comment-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: var(--space-3);
 }
 
 .reader__no-comments {
-  margin: var(--space-5) 0;
   color: var(--read-ink-soft);
+}
+
+/* Pushed to the left edge of the measure, as a footnote rather than a button
+   competing with Post comment above it. */
+.reader__comments > .btn {
+  align-self: flex-start;
+  padding-left: 0;
 }
 
 .reader__error {

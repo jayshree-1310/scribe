@@ -1,5 +1,5 @@
 /**
- * Comments and ratings on stories.
+ * Comments, likes and ratings on stories.
  *
  * Comments follow the thread shape `services/clubs.ts` established and
  * `services/channels.ts` followed, deliberately rather than inventing a third:
@@ -24,6 +24,14 @@
  * orders in SQL over the story table, so a stale column silently mis-sorts the
  * catalogue.
  *
+ * Likes are the third thing here, and the simplest: a row per reader per
+ * subject, keyed on the pair, with no counter column behind it. Two subjects
+ * have one -- a chapter and a comment -- and both go through `setLike` below,
+ * so "liking is idempotent and unliking is silent" is written once rather than
+ * twice. The count is always read from the rows, for the reason the contract
+ * gives: nothing sorts or ranks on it, so a denormalised column would be a
+ * second copy of a number with nothing keeping it honest.
+ *
  * Every function takes the caller's id explicitly -- the routes resolve it
  * once through `middleware/current-user.ts` -- so nothing here reaches for
  * ambient request state.
@@ -35,7 +43,7 @@ import { HttpError } from "../lib/http-error.js";
 import { evaluateBadges } from "./gamification.js";
 import { notify } from "./notifications.js";
 import { assertNotSuspended } from "./roles.js";
-import { findVisibleStoryId, toIso } from "./stories.js";
+import { findVisibleChapter, findVisibleStoryId, toIso } from "./stories.js";
 
 /**
  * The transaction context, derived from `db.transaction` rather than imported
@@ -68,6 +76,9 @@ export interface Comment {
   updatedAt: string;
   /** Always 0 for a reply: replies are one level deep. */
   replyCount: number;
+  likeCount: number;
+  /** False when anonymous, rather than a null the UI would have to branch on. */
+  likedByMe: boolean;
   user: CommentUser;
 }
 
@@ -90,6 +101,12 @@ export interface RatingSummary {
   breakdown: RatingBreakdown;
   /** The caller's own score, or null when anonymous or not yet rated. */
   mine: number | null;
+}
+
+/** What a like write answers with: the subject's new count, and the caller's own state. */
+export interface LikeSummary {
+  count: number;
+  liked: boolean;
 }
 
 export const MAX_PAGE_SIZE = 100;
@@ -226,13 +243,62 @@ function commentsBase(client: Orm = db) {
   ).where((row) => row.hiddenAt.isNull());
 }
 
+/**
+ * How many likes each of these comments has, and which of them the caller has
+ * liked.
+ *
+ * Two queries for the whole page rather than two per comment, the shape the
+ * reply count above uses and for the same reason: a page of twenty comments is
+ * twenty-one round trips the moment either of these moves inside the loop.
+ * The second query is skipped entirely for an anonymous reader, who cannot
+ * have liked anything.
+ */
+async function likesFor(
+  commentIds: string[],
+  viewerId: string | null,
+): Promise<{ counts: Map<string, number>; mine: Set<string> }> {
+  const counts = new Map<string, number>();
+  const mine = new Set<string>();
+
+  if (commentIds.length === 0) return { counts, mine };
+
+  /**
+   * Grouped in SQL rather than by counting rows here: a comment somebody
+   * linked to can collect thousands of likes, and the only thing this needs is
+   * the number per id.
+   */
+  const grouped = await db.orm.engagement.CommentLike.where((like) =>
+    like.commentId.in(commentIds),
+  )
+    .groupBy("commentId")
+    .aggregate((aggregate) => ({ total: aggregate.count() }));
+
+  for (const group of grouped) counts.set(group.commentId, group.total);
+
+  if (viewerId !== null) {
+    const ownRows = await db.orm.engagement.CommentLike.select("commentId")
+      .where((like) => like.commentId.in(commentIds))
+      .where((like) => like.userId.eq(viewerId))
+      .all();
+
+    for (const row of ownRows) mine.add(row.commentId);
+  }
+
+  return { counts, mine };
+}
+
 async function hydrateComments(
   rows: CommentRow[],
   withReplyCounts: boolean,
+  viewerId: string | null,
 ): Promise<Comment[]> {
   if (rows.length === 0) return [];
 
   const users = await usersByIds(rows.map((row) => row.userId));
+  const likes = await likesFor(
+    rows.map((row) => row.id),
+    viewerId,
+  );
 
   const replyCounts = new Map<string, number>();
   if (withReplyCounts) {
@@ -269,6 +335,8 @@ async function hydrateComments(
         createdAt: isoOf(row.createdAt),
         updatedAt: isoOf(row.updatedAt),
         replyCount: replyCounts.get(row.id) ?? 0,
+        likeCount: likes.counts.get(row.id) ?? 0,
+        likedByMe: likes.mine.has(row.id),
         user,
       };
     })
@@ -333,7 +401,7 @@ export async function listComments(
     .limit(query.limit)
     .all();
 
-  const items = await hydrateComments(rows as CommentRow[], threads);
+  const items = await hydrateComments(rows as CommentRow[], threads, viewerId);
   const total = totals.total;
 
   return {
@@ -433,7 +501,7 @@ export async function createComment(
 
   if (!row) throw HttpError.notFound(COMMENT_NOT_FOUND);
 
-  const [comment] = await hydrateComments([row as CommentRow], true);
+  const [comment] = await hydrateComments([row as CommentRow], true, userId);
   if (!comment) throw HttpError.notFound(COMMENT_NOT_FOUND);
 
   // Comments posted is a badge metric. Here rather than in the route so the
@@ -472,6 +540,28 @@ export async function deleteComment(
       throw HttpError.forbidden("That comment is not yours to delete.");
     }
 
+    /**
+     * Likes before the rows they point at, and the replies' likes before the
+     * thread's: `commentLike_commentId_fkey` would otherwise refuse the
+     * delete, and it would refuse it only for a comment somebody had liked --
+     * the kind of failure that never shows up until the feature is used.
+     */
+    const replies = await tx.orm.engagement.Comment.select("id")
+      .where((item) => item.parentId.eq(row.id))
+      .all();
+
+    for (const reply of replies) {
+      await deleteAllIn(() =>
+        tx.orm.engagement.CommentLike.where((like) =>
+          like.commentId.eq(reply.id),
+        ),
+      );
+    }
+
+    await deleteAllIn(() =>
+      tx.orm.engagement.CommentLike.where((like) => like.commentId.eq(row.id)),
+    );
+
     // Replies first, so deleting a thread does not breach the self-referencing
     // foreign key. Deleting a reply matches nothing here, which is fine.
     await deleteAllIn(() =>
@@ -499,6 +589,217 @@ async function deleteAllIn(
   }
 
   throw new Error("deleteAllIn removed 10000 rows without exhausting the match");
+}
+
+/* Likes ------------------------------------------------------------------ */
+
+/** Which of the two things is being liked. */
+type LikeSubject = "chapter" | "comment";
+
+/**
+ * The write for each subject, spelled out per table.
+ *
+ * Both tables take the same two statements with one identifier different, and
+ * that identifier is the one thing a bound parameter cannot carry -- every
+ * `${}` in `db.raw.sql` is a parameter, never a name. So the table name is
+ * written literally in four short statements rather than interpolated from a
+ * string, which is also what makes it impossible for a caller to reach a
+ * table nobody listed here. Everything around them -- the choice, the count,
+ * the answer -- is shared by `setLike` below.
+ */
+const LIKE_STATEMENTS = {
+  chapter: {
+    insert: (userId: string, chapterId: string) =>
+      db.raw
+        .sql`
+          INSERT INTO "engagement"."chapterLike"
+            ("userId", "chapterId", "createdAt")
+          VALUES (${userId}, ${chapterId}, now())
+          ON CONFLICT DO NOTHING
+        `
+        .affectedCount()
+        .build(),
+    remove: (userId: string, chapterId: string) =>
+      db.raw
+        .sql`
+          DELETE FROM "engagement"."chapterLike"
+           WHERE "userId" = ${userId}
+             AND "chapterId" = ${chapterId}
+        `
+        .affectedCount()
+        .build(),
+  },
+  comment: {
+    insert: (userId: string, commentId: string) =>
+      db.raw
+        .sql`
+          INSERT INTO "engagement"."commentLike"
+            ("userId", "commentId", "createdAt")
+          VALUES (${userId}, ${commentId}, now())
+          ON CONFLICT DO NOTHING
+        `
+        .affectedCount()
+        .build(),
+    remove: (userId: string, commentId: string) =>
+      db.raw
+        .sql`
+          DELETE FROM "engagement"."commentLike"
+           WHERE "userId" = ${userId}
+             AND "commentId" = ${commentId}
+        `
+        .affectedCount()
+        .build(),
+  },
+} satisfies Record<LikeSubject, LikeStatements>;
+
+/**
+ * `unknown` for the plans, deliberately: this is a shape guard that every
+ * subject carries both statements, not an attempt to name the query-plan type
+ * -- which the runtime does not export and which `setLike` gets by inference
+ * anyway.
+ */
+interface LikeStatements {
+  insert: (userId: string, subjectId: string) => unknown;
+  remove: (userId: string, subjectId: string) => unknown;
+}
+
+/**
+ * Adds or removes one like, and answers the state that followed.
+ *
+ * **One statement, no read first.** `INSERT ... ON CONFLICT DO NOTHING`
+ * against the pair's primary key is what makes liking idempotent: a double
+ * click, two tabs or a retried request all write the same row once, with no
+ * window between a read and an insert for the second one to land in. The
+ * delete is silent for the same reason -- unliking something you never liked
+ * is the state the caller asked for, not an error to report.
+ *
+ * That is deliberately *unlike* `upsertRating` below, which reads first
+ * because it has a value to replace. A like has nothing to replace: the row's
+ * existence is the whole of its content.
+ *
+ * The count is read after the write rather than inferred from it, so two
+ * readers liking at once each see a number that was true rather than their own
+ * increment applied to a stale one.
+ */
+async function setLike(
+  subject: LikeSubject,
+  userId: string,
+  subjectId: string,
+  liked: boolean,
+): Promise<LikeSummary> {
+  const statements = LIKE_STATEMENTS[subject];
+  const plan = liked
+    ? statements.insert(userId, subjectId)
+    : statements.remove(userId, subjectId);
+
+  await db.runtime().query(plan);
+
+  return { count: await countLikes(subject, subjectId), liked };
+}
+
+async function countLikes(
+  subject: LikeSubject,
+  subjectId: string,
+): Promise<number> {
+  const totals =
+    subject === "chapter"
+      ? await db.orm.engagement.ChapterLike.where((like) =>
+          like.chapterId.eq(subjectId),
+        ).aggregate((aggregate) => ({ total: aggregate.count() }))
+      : await db.orm.engagement.CommentLike.where((like) =>
+          like.commentId.eq(subjectId),
+        ).aggregate((aggregate) => ({ total: aggregate.count() }));
+
+  return totals.total;
+}
+
+/**
+ * Likes a chapter, or leaves it liked.
+ *
+ * Gated on the chapter being one the caller may *read*, through the same
+ * helper `services/stories.ts` gates the chapter body on: a like on an
+ * unpublished chapter would otherwise be a way to confirm that a draft exists
+ * -- the side channel the comment list is careful not to be.
+ *
+ * A suspension stops this the way it stops a comment. It is a write on
+ * somebody else's work, which is the whole of what a suspension is for; see
+ * the header of `services/moderation.ts`.
+ */
+export async function likeChapter(
+  userId: string,
+  chapterId: string,
+): Promise<LikeSummary> {
+  await assertNotSuspended(userId);
+  await visibleChapterId(chapterId, userId);
+
+  return setLike("chapter", userId, chapterId, true);
+}
+
+/** Removes the caller's like. Silent when they had not liked it. */
+export async function unlikeChapter(
+  userId: string,
+  chapterId: string,
+): Promise<LikeSummary> {
+  await visibleChapterId(chapterId, userId);
+
+  return setLike("chapter", userId, chapterId, false);
+}
+
+async function visibleChapterId(
+  chapterId: string,
+  viewerId: string,
+): Promise<string> {
+  const chapter = await findVisibleChapter(chapterId, viewerId);
+  if (chapter === null) {
+    throw HttpError.notFound("That chapter could not be found.");
+  }
+
+  return chapter.id;
+}
+
+/**
+ * Likes a comment, or leaves it liked.
+ *
+ * A hidden comment 404s rather than accepting a like, the same way replying to
+ * one does: as far as anybody but a moderator is concerned it is gone, and a
+ * like that landed on it would be invisible with no way to undo it. The
+ * story's visibility is checked through the comment's own `storyId`, so a
+ * comment under a draft is exactly as reachable as the draft.
+ */
+export async function likeComment(
+  userId: string,
+  commentId: string,
+): Promise<LikeSummary> {
+  await assertNotSuspended(userId);
+  await visibleCommentId(commentId, userId);
+
+  return setLike("comment", userId, commentId, true);
+}
+
+/** Removes the caller's like. Silent when they had not liked it. */
+export async function unlikeComment(
+  userId: string,
+  commentId: string,
+): Promise<LikeSummary> {
+  await visibleCommentId(commentId, userId);
+
+  return setLike("comment", userId, commentId, false);
+}
+
+async function visibleCommentId(
+  commentId: string,
+  viewerId: string,
+): Promise<string> {
+  const row = await commentsBase()
+    .where((comment) => comment.id.eq(commentId))
+    .first();
+
+  if (!row) throw HttpError.notFound(COMMENT_NOT_FOUND);
+
+  // Throws a 404 of its own when the story is one this caller cannot see.
+  await visibleStoryId(row.storyId, viewerId);
+
+  return row.id;
 }
 
 /* Ratings ---------------------------------------------------------------- */
