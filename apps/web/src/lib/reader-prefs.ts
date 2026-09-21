@@ -8,6 +8,18 @@ import { createContext, useContext } from 'react'
 export const READER_STORAGE_KEY = 'scribe:reader'
 
 /**
+ * The shape version of what is in `localStorage`.
+ *
+ * Bumped when a *default* changes in a way a stored value would hide. Version
+ * 1 had no marker at all and defaulted `theme` to `'sepia'`, so every reader
+ * who ever touched the font size has a frozen `'sepia'` that predates `auto`
+ * existing — and Sepia looks the same whichever way the app theme goes, which
+ * is precisely the bug `auto` was added to fix. Without a migration the new
+ * default would only ever reach a browser that had never opened the reader.
+ */
+export const READER_PREFS_VERSION = 2
+
+/**
  * What a reader can choose, which is not the same as what gets drawn.
  *
  * `auto` is a *preference*, not a surface: it means "whatever Scribe is
@@ -40,6 +52,36 @@ export interface ReaderPreferences {
   fontSize: FontSize
   width: ReadingWidth
   autoplayMultimedia: boolean
+}
+
+/** What is actually written to storage: the preferences plus their version. */
+export interface StoredReaderPreferences extends ReaderPreferences {
+  version?: number
+}
+
+/**
+ * Brings a stored blob up to the current version.
+ *
+ * **Only `'sepia'` is rewritten, and only once.** The pre-`auto` default was
+ * exactly `'sepia'`, so that is the one value that cannot be told apart from a
+ * choice nobody made; `'light'` and `'dark'` were never defaults, so a stored
+ * one of those is a deliberate standing choice and is left alone. A reader who
+ * genuinely wants Sepia picks it again — and because the version is stamped on
+ * the way out, that second choice is never revisited.
+ *
+ * Returns the unchanged object when there is nothing to do, so the caller can
+ * tell a migration happened by identity and only write when it did.
+ */
+export function migrateStoredPreferences(
+  stored: StoredReaderPreferences,
+): StoredReaderPreferences {
+  if (stored.version === READER_PREFS_VERSION) return stored
+
+  return {
+    ...stored,
+    theme: stored.theme === 'sepia' ? 'auto' : stored.theme,
+    version: READER_PREFS_VERSION,
+  }
 }
 
 export const DEFAULT_READER_PREFERENCES: ReaderPreferences = {

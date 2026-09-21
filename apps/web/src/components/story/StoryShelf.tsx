@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { Children, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
@@ -15,6 +15,13 @@ interface StoryShelfProps {
  */
 export function StoryShelf({ children, label }: StoryShelfProps) {
   const trackRef = useRef<HTMLUListElement>(null)
+
+  /*
+   * Nothing to scroll: the track would collapse to no height while the
+   * controls, which hang above it, stayed behind over the section heading.
+   * A caller with an empty list wants its own empty state, not bare arrows.
+   */
+  if (Children.count(children) === 0) return null
 
   function scrollBy(direction: 1 | -1) {
     const track = trackRef.current

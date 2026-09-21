@@ -327,6 +327,23 @@ export function HomePage() {
         />
         {discover.status === 'error' ? (
           <ErrorState message={discover.error} onRetry={discover.reload} />
+        ) : rails !== null && rails.trending.length === 0 ? (
+          /*
+            An empty rail is not nothing: the shelf collapses to no height and
+            leaves its scroll arrows stranded against the heading. Say there is
+            nothing to show instead.
+          */
+          <EmptyState
+            icon="compass"
+            size="sm"
+            title="No trending books yet"
+            description="Nothing has been read widely enough this week. Browse the full catalogue instead."
+            action={
+              <ButtonLink variant="secondary" to="/discover">
+                Browse books
+              </ButtonLink>
+            }
+          />
         ) : (
           rail('Trending books', rails?.trending)
         )}

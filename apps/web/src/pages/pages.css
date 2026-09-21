@@ -42,10 +42,23 @@
   margin-bottom: var(--space-8);
 }
 
+/*
+ * A row of sections rather than a section itself, so it carries the page
+ * rhythm above it and its columns do not carry any of their own: the grid gap
+ * is the spacing between them, in both the two-column and the wrapped layout.
+ * The columns have to be reset because `.page-section:first-of-type` counts by
+ * element type — it zeroed only the first column, leaving the second one a
+ * whole `--space-10` lower so the two headings never lined up.
+ */
 .two-col {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
   gap: var(--space-8);
+  margin-top: var(--space-10);
+}
+
+.two-col > .page-section {
+  margin-top: 0;
 }
 
 .card-link {
