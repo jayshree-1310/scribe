@@ -8,6 +8,7 @@ let reader: string;
 let otherReader: string;
 let bookId: string;
 let secondBookId: string;
+let scribeStoryId: string;
 
 /** Puts `bookId` on `reader`'s shelf and returns the created entry. */
 async function addBook(status?: string, book = bookId, as = reader) {
@@ -41,6 +42,13 @@ beforeAll(async () => {
     authorId,
     genreIds: [genreId],
   });
+  scribeStoryId = (
+    await api.createStory({
+      title: "Not A Catalogue Edition",
+      authorId,
+      genreIds: [genreId],
+    })
+  ).id;
 }, 30_000);
 
 afterAll(async () => {
@@ -144,6 +152,24 @@ describe.skipIf(!available)("POST /api/library", () => {
 
     expect(status).toBe(404);
     expect(body.error.code).toBe("not_found");
+  });
+
+  it("refuses a Scribe story, and writes nothing when it does", async () => {
+    // The shelf hydrates through the catalogue, so a story it cannot render
+    // must not get a row either. The failure used to happen on the way out,
+    // after the write: the caller was told 404 and the entry was there.
+    const { status, body } = await api.request("/api/library", {
+      method: "POST",
+      as: reader,
+      body: { bookId: scribeStoryId },
+    });
+
+    expect(status).toBe(400);
+    expect(body.error.code).toBe("validation_error");
+
+    const list = await api.request("/api/library", { as: reader });
+    expect(list.body.items).toHaveLength(0);
+    expect(list.body.counts.ALL).toBe(0);
   });
 
   it("400s on an unknown status", async () => {

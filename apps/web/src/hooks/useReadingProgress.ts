@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useDebouncedValue } from './useDebouncedValue'
 import { ApiError } from '../lib/api-client'
+import { useAuth } from '../lib/auth'
 import * as reading from '../data/reading-api'
 import type { Chapter, ReadingProgress } from '../types/stories'
 
@@ -12,6 +13,23 @@ import type { Chapter, ReadingProgress } from '../types/stories'
  * stopping still keeps the place.
  */
 const SAVE_DELAY_MS = 1500
+
+/**
+ * How long after a restore the page is still allowed to grow under the reader.
+ *
+ * Chapter media reports its intrinsic size after the first paint, so the page
+ * the restore measured is shorter than the one the reader ends up with. Long
+ * enough to cover that; short enough that a late-loading image never yanks
+ * somebody who has settled in to read.
+ */
+const RESTORE_SETTLE_MS = 3000
+
+/**
+ * How far the page may be from where the restore put it before we conclude the
+ * reader moved it themselves. Sub-pixel scroll positions make an exact
+ * comparison useless.
+ */
+const SETTLE_TOLERANCE_PX = 4
 
 interface ReadingProgressInput {
   /** Absent until the story has loaded. */
@@ -42,7 +60,7 @@ interface SavedFor {
  * a position that cannot be restored just starts the chapter at the top, and
  * one that cannot be saved is lost. A signed-out reader is the common case of
  * that second branch, and gets one rejected request rather than one per
- * debounce — see `blockedRef`.
+ * debounce — see `blockedForRef`.
  */
 export function useReadingProgress({
   storyId,
@@ -58,8 +76,24 @@ export function useReadingProgress({
    */
   const [restoredChapterId, setRestoredChapterId] = useState<string | null>(null)
 
-  /** Set once the API says this reader may not save at all. */
-  const blockedRef = useRef(false)
+  const { session } = useAuth()
+  /**
+   * Who the reader is, as far as saving is concerned. `null` is a signed-out
+   * one, which is a perfectly good identity to refuse — and to stop refusing
+   * the moment it changes.
+   */
+  const readerId = session?.user.id ?? null
+
+  /**
+   * The reader the API last refused a save for, or `undefined` while it has
+   * refused none.
+   *
+   * Keyed on the reader rather than on the mount: a 401 says *this* reader may
+   * not save, not that this page may not. Signing in with the reader open used
+   * to save nothing until the next navigation, because the block outlived the
+   * only thing that justified it.
+   */
+  const blockedForRef = useRef<string | null | undefined>(undefined)
 
   /**
    * The offset the current chapter was restored to, and whether the reader has
@@ -109,15 +143,62 @@ export function useReadingProgress({
       restoreOffset / Math.max(1, chapter.content.length),
     )
 
+    /** Where the restore last put the page, so we can tell it has been moved. */
+    let appliedTop = 0
+    let observer: ResizeObserver | null = null
+    let settle: ReturnType<typeof setTimeout> | undefined
+
+    const apply = (): void => {
+      const scrollable = document.body.scrollHeight - window.innerHeight
+      if (scrollable <= 0) return
+
+      const top = target * scrollable
+      // The page has not grown enough to have moved the reader's paragraph.
+      if (Math.abs(top - appliedTop) < 1) return
+
+      window.scrollTo({ top })
+      appliedTop = top
+    }
+
+    const stopWatching = (): void => {
+      observer?.disconnect()
+      observer = null
+      clearTimeout(settle)
+    }
+
     /**
      * After paint. The chapter's paragraphs and any attachments have to be in
      * the document before `scrollHeight` means anything — measured during this
      * render it is still the previous chapter's height, or none at all.
      */
     const frame = requestAnimationFrame(() => {
-      const scrollable = document.body.scrollHeight - window.innerHeight
-      if (target > 0 && scrollable > 0) {
-        window.scrollTo({ top: target * scrollable })
+      if (target > 0) {
+        apply()
+
+        /**
+         * One frame is not the end of the layout. A chapter carrying an image
+         * or a video is laid out twice — once at whatever height the browser
+         * assumes, and again when the file reports its own — and the second
+         * pass lands after this callback. The page measured above is therefore
+         * shorter than the one the reader ends up with, and a proportional
+         * restore against it lands short. So keep re-applying while the page
+         * grows, and stop the moment the reader disagrees with where we put
+         * them or `RESTORE_SETTLE_MS` says the layout has settled.
+         */
+        if (typeof ResizeObserver !== 'undefined') {
+          observer = new ResizeObserver(() => {
+            if (Math.abs(window.scrollY - appliedTop) > SETTLE_TOLERANCE_PX) {
+              // The reader has scrolled. Their position beats the saved one.
+              stopWatching()
+              return
+            }
+
+            apply()
+          })
+
+          observer.observe(document.body)
+          settle = setTimeout(stopWatching, RESTORE_SETTLE_MS)
+        }
       }
 
       restoredOffsetRef.current = restoreOffset
@@ -125,7 +206,10 @@ export function useReadingProgress({
       setRestoredChapterId(chapter.id)
     })
 
-    return () => cancelAnimationFrame(frame)
+    return () => {
+      cancelAnimationFrame(frame)
+      stopWatching()
+    }
   }, [chapter, saved, storyId, restoredChapterId])
 
   /**
@@ -139,7 +223,9 @@ export function useReadingProgress({
   /* Save. */
   useEffect(() => {
     if (storyId === undefined || chapter === null) return
-    if (blockedRef.current) return
+    // Refused for *this* reader. A different one — including the one who just
+    // signed in — has not been refused anything yet.
+    if (blockedForRef.current === readerId) return
     /**
      * Not until this chapter's restore has been applied. Otherwise the first
      * tick writes the top of the page over the position the reader is about to
@@ -174,18 +260,19 @@ export function useReadingProgress({
       .catch((cause: unknown) => {
         if (!active) return
 
-        // A reader who is not signed in cannot save at all, so stop asking.
-        // Anything else may be transient and gets another chance next tick.
+        // A reader who is not signed in cannot save at all, so stop asking —
+        // until they are somebody else. Anything else may be transient and
+        // gets another chance next tick.
         if (
           cause instanceof ApiError &&
           (cause.status === 401 || cause.status === 403)
         ) {
-          blockedRef.current = true
+          blockedForRef.current = readerId
         }
       })
 
     return () => {
       active = false
     }
-  }, [storyId, chapter, debouncedOffset, restoredChapterId])
+  }, [storyId, chapter, debouncedOffset, restoredChapterId, readerId])
 }

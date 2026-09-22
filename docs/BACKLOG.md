@@ -5,13 +5,17 @@ frontend surface (`apps/web/src/pages`) and the API (`apps/api/src/routes`).
 **That gap is closed.** Task 17 deleted `data/api.ts`, `data/mock-db.ts` and
 `types/domain.ts`, so there is no mock data in the repository and every screen
 reads an endpoint. What remains in this document is the record of why things
-are the way they are, and the open questions below.
+are the way they are, and **What is left** below — the open questions sorted
+into the ones somebody has to build, the ones somebody has to open a browser
+to confirm, and the ones already decided.
 
 **Landed tasks are not kept here.** Each one's decisions live in the header of
 the service that owns them — that is the file somebody changing the behaviour
 has open, and a second copy in this document could only go stale. What *is*
 kept is the list below, so a task can name its dependencies, and the open
-questions at the end, which are outstanding rather than done.
+questions at the end, which are outstanding rather than done. A question is
+outstanding until the section it lives in is rewritten or it is struck through
+in place — closing one by deleting it loses the reason it was ever open.
 
 GenAI features are tracked separately in `AI-BACKLOG.md`, which notes which of
 the tasks below it depends on.
@@ -73,13 +77,165 @@ Paste this block at the top of any task prompt below.
 
 ### What is left
 
-Nothing. Every task in this document has landed, and the last one could only be
-last: nothing could be removed from the mock layer until everything that read
-it had somewhere else to read from.
+No *task* is left: every numbered task above has landed, and the last one could
+only be last, because nothing could be removed from the mock layer until
+everything that read it had somewhere else to read from.
+
+What is left is the open questions below — 77 of them, and they are not one
+kind of thing. Some are a bug somebody has to fix, some are a browser somebody
+has to open, and some are a decision already made that only needs to stay made.
+Reading them as one undifferentiated list is what made "nothing is left" look
+true. This is the same set sorted by what it asks of you, each line pointing at
+the section that explains it. Audited 2026-09-22.
+
+#### Bugs — fixed
+
+All three are closed. Kept here, struck through, because the next person to
+touch these three places is better off knowing what they used to do.
+
+- [x] **~~`POST /api/library` writes the row and then answers 404.~~**
+      `requireBook` filtered on nothing but the id, so a `SCRIBE` story passed
+      it and the row was created; the response then hydrated through `getBook`,
+      which is `catalogueOnly`, and the caller was told it had failed while the
+      row sat there. The rule now runs before the write, through
+      `catalogueIdsAmong` in `services/books.ts` — one place that says what the
+      shelf can hold, asked by the guard and by the counters both. A real story
+      id now gets a 400 saying so rather than a 404 denying it exists.
+      `countsFor` was the same bug's other half: it counted every row while
+      `listLibrary` rendered only catalogue ones, so a legacy row still put a
+      number on a tab that showed nothing.
+- [x] **~~`useReadingProgress` stops saving for the rest of the page load~~** on
+      the first 401/403. `blockedRef` was keyed on the mount; it is
+      `blockedForRef` now and keyed on the reader, because a 401 says *this*
+      reader may not save rather than that this page may not. Signing in with
+      the reader open resumes saving on the next tick.
+- [x] **~~A late-growing chapter restores short.~~** The restore still measures
+      one frame after paint, but it now keeps a `ResizeObserver` on the body for
+      `RESTORE_SETTLE_MS` and re-applies the proportion as the page grows,
+      standing down the moment the reader scrolls themselves
+      (`SETTLE_TOLERANCE_PX`). **Still wants a browser**: the numbers are
+      reasoned, not tuned, and no test drives a chapter whose media arrives
+      late. Moved to the check list below rather than called done.
+
+#### Surfaces that were never built — implement
+
+Each is a route and a component; none is blocked on API work that does not
+already exist.
+
+- [ ] **A notifications page.** The dropdown holds the newest twelve with no
+      "see all", so a week of ignoring the bell loses the tail.
+      `GET /api/notifications` is already paginated. § Notifications
+- [ ] **A moderator UI.** The queue has never been read by a person; the only
+      way to make an administrator is `pnpm --filter api admin:grant`.
+      § Moderation and reporting
+- [ ] **A challenge host UI.** Create and edit are reachable with a token and
+      have never been exercised by a person. § Writing challenges
+- [ ] **Tell an author their content was hidden.** Today it simply vanishes and
+      an edit of it 404s. Needs a sixth `NotificationType` and a decision about
+      how much of the reason to reveal. § Moderation and reporting
+- [ ] **Tell a reporter what happened to their report.** Filed into a void,
+      whichever way it went. § Moderation and reporting
+- [ ] **`POST /api/moderation/users/:id/reinstate`.** A suspension can only be
+      lifted through the report that imposed it, so a deleted report strands it.
+      § Moderation and reporting
+- [ ] **An endpoint for somebody else's clubs and shelves.** Those profile tabs
+      are gated on the profile being your own because nothing answers them for
+      anyone else. § Public profiles and follows
+
+#### Columns the behaviour is waiting on — implement
+
+Each of these is a migration rather than a rule change, and each closes a gap
+that cannot be closed without it.
+
+- [ ] **`longestStreak` on `auth.User`.** `streakDays` is the current run, so
+      "read 30 days in a row" is only earnable while the run is still alive.
+      § Badges and levels
+- [ ] **A last-announced level on `auth.User`.** A level is derived on every
+      evaluation rather than awarded, so there is no moment to hang a
+      notification on and crossing a step is silent. § Badges and levels
+- [ ] **The furthest onboarding step reached.** Saving per step is what makes a
+      refresh resume, but a reader who quits at the author step is put back at
+      step one. § Preferences and recommendations
+
+#### Invariants only a comment enforces — implement
+
+These are already correct everywhere today. What is missing is anything that
+keeps the next writer from getting them wrong.
+
+- [ ] **`flushBadges()` must settle before `flushNotifications()`.** Draining
+      the two in parallel loses the badge notification about one time in ten.
+      § Notifications
+- [ ] **A fifth write seam must call `assertNotSuspended`.** The list of four is
+      enforced by somebody reading the header of `services/moderation.ts`.
+      § Moderation and reporting
+- [ ] **A skeleton must gate on `status`, never on `data`.** Six surfaces had it
+      wrong and were fixed; the list was found by reading rather than by a test,
+      so neither its completeness nor its durability is proved. § Retiring the
+      mock layer
+
+#### Check in a browser — may need no work at all
+
+Nothing here is known to be broken. Each is a state the test suite cannot reach,
+so the honest status is unknown rather than done.
+
+- [ ] **The ten "unseen in a browser" sets**, one at the end of each section
+      below — mostly phone-width layout, plus a few sequences the suite cannot
+      drive.
+- [ ] **The re-applied restore, against real media.** `RESTORE_SETTLE_MS` and
+      `SETTLE_TOLERANCE_PX` were chosen by argument. What wants watching is a
+      chapter whose video reports its size late — that the reader lands on the
+      right paragraph, and that nobody who has started reading gets moved.
+      § Reading progress
+- [ ] **The streak across a real midnight.** `advanceStreak` is unit tested
+      against a controlled clock for every branch, but the wiring has only met a
+      backdated anchor, never the database's own `now()` rolling over a UTC day.
+      § Reading progress
+- [ ] **The optimistic failure paths.** The Follow button's roll-back and the
+      notification mark-read roll-back have only ever run on the happy path;
+      both want a throttled or offline browser. § Public profiles and follows,
+      § Notifications
+- [ ] **The dev-identity gap, once the dev header goes.** With no session the
+      API answers for whoever `readerHeaders()` names, which crosses clubs,
+      channels, comments, profiles, challenges, notifications and reading saves,
+      and also hides Delete on your own posts. Expected to disappear wholesale
+      rather than seam by seam — worth confirming that it does. § Clubs and
+      channels
+
+#### Right at today's row counts, wrong later — not now
+
+Deliberately not scheduled. Each names the shape that replaces it, so none of
+them is a surprise when it arrives.
+
+- **Nothing prunes anything.** The analytics event tables, the notification rows
+  and resolved reports all only grow. Read notifications past some horizon are
+  the obvious first thing to drop.
+- **Nothing records a click on a recommendation**, so the `WEIGHTS` cannot be
+  tuned against behaviour — that event is the prerequisite for touching a single
+  number. The ranking itself is a full scan of every listed Scribe story.
+- **Club notification fan-out is a row per member per thread**, which a club of
+  ten thousand makes untenable; the fix is fan-out-on-read, a different table.
+- **`members` and `subscribers` sorts hydrate the whole filtered set** and slice
+  it in JS, because the ORM cannot order by an aggregate. `db.sql` with a join.
+- **Followers and the leaderboard are offset-paged**, so a row can cross a page
+  boundary mid-scroll. Keyset cursors if either list ever gets long.
+- **The web response types are hand-copied** from the services they mirror. Doing
+  it properly is a third workspace package and fourteen files; declined rather
+  than half-done, and each file names its source of truth instead.
+
+#### Settled — no action, do not reopen
+
+Recorded so that finding them again does not start an investigation: the
+notification rows predating Task 15 that carry a null `sourceType` and can never
+be swept; the duplicate-report race, which no index can express because none can
+say "unique only while open"; the replies of a hidden thread, which are neither
+hidden nor visible; catalogue editions recording no reading position; the two
+clock-skew windows (challenge open/close and the visitor digest's day); the
+seeded `viewCount` that flatters both analytics and *Popular Writer*; a mute not
+being retroactive; and the four things Task 17 removed rather than replaced —
+the weekly reading goal, `hiatus`, `AuthorCard` and `GenreCard`.
 
 New work goes in `AI-BACKLOG.md`, or in a new task here written to the house
-rules above. The open questions below are the honest list of what the tests
-cannot reach.
+rules above.
 
 ### One shared shape, settled
 
@@ -178,14 +334,16 @@ folding into whichever task next touches that surface.
 
 ### Reading progress (Task 2)
 
-- **A late-growing chapter restores short.** The restore measures
-  `document.body.scrollHeight` in one `requestAnimationFrame` after the chapter
-  paints (`hooks/useReadingProgress.ts`). A chapter carrying an image or video
-  whose intrinsic size arrives after that frame grows the page *after* it was
-  measured, so the reader lands earlier than where they stopped. Text-only
-  chapters are unaffected. The fix is to re-apply the restore when the article
-  resizes (a `ResizeObserver`, or a second pass on media `load`) — deliberately
-  not done, because it wants a browser to tune against.
+- **~~A late-growing chapter restores short.~~** Fixed: the first measurement
+  is still one `requestAnimationFrame` after paint, but a `ResizeObserver` on
+  the body re-applies the proportion for `RESTORE_SETTLE_MS` afterwards, which
+  is the window a chapter's media has to report its intrinsic size in. It
+  stands down as soon as the page is more than `SETTLE_TOLERANCE_PX` from where
+  the restore put it, because that means the reader is scrolling and their
+  position beats the saved one. What is left of the gap is that both constants
+  are reasoned rather than tuned, and that no test drives late media — it still
+  wants the browser the original note asked for, now to confirm rather than to
+  design.
 - **The offset↔scroll mapping assumes even text density.** A character offset is
   converted to a scroll position by simple proportion, which is exact for prose
   and drifts in proportion to how much vertical space a chapter's attachments
@@ -200,10 +358,12 @@ folding into whichever task next touches that surface.
   Reading shelf and the "Pick up where you left off" rail can legitimately
   disagree about what is in progress. Intended for now; revisit if the reader
   ever opens a catalogue edition.
-- **`useReadingProgress` stops saving for the rest of the page load** once the
-  API answers 401/403, so a reader who signs in while the reader page is open
-  saves nothing until they navigate. Cheap to fix by keying the block on the
-  session rather than the mount.
+- **~~`useReadingProgress` stops saving for the rest of the page load~~** once
+  the API answers 401/403. Fixed as the note suggested: the block is keyed on
+  the reader (`blockedForRef`, read from `useAuth`) rather than on the mount, so
+  a 401 silences saves for the person it refused and nobody else. Signing in
+  with the reader page open resumes on the next debounce, and signing *out*
+  costs one rejected request before the new identity is refused in its turn.
 - **Unseen in a browser:** the "Pick up where you left off" rail — `ContinueCard`
   inside `card-grid--wide` — at phone width, and the restore/save cycle while
   flicking quickly between chapters.
@@ -362,13 +522,25 @@ folding into whichever task next touches that surface.
   reader whose library is entirely imported books gets recommendations that
   share their genres and none of their format. Whether that is right is a
   product question nobody has asked yet.
-- **`POST /api/library` cannot shelve a Scribe story.** Not this task's code,
-  but this task is where it showed up: `addToLibrary` accepts any `Story` id,
-  writes the row, and then 404s hydrating the response through `getBook`, which
-  is catalogue-only. The caller is told it failed and the row is there. So the
-  "already finished" exclusion reaches a *story* through reading history and a
-  *book* through the shelf, and `routes/recommendations.test.ts` says so where
-  it tests both.
+- **~~`POST /api/library` cannot shelve a Scribe story~~ — it now says so
+  before writing anything.** Not this task's code, but this task is where it
+  showed up: `addToLibrary` accepted any `Story` id, wrote the row, and then
+  404ed hydrating the response through `getBook`, which is catalogue-only — the
+  caller was told it failed and the row was there. `requireBook` asks
+  `catalogueIdsAmong` now, so the refusal happens before the write and reads as
+  a 400 explaining the rule rather than a 404 denying the story exists.
+  `countsFor` counts from the same set the shelf renders, so a row written
+  before this no longer inflates a tab that shows nothing. The *rule* is
+  unchanged and still the point: the "already finished" exclusion reaches a
+  *story* through reading history and a *book* through the shelf, and
+  `routes/recommendations.test.ts` says so where it tests both.
+
+  Two things this deliberately did not do. Shelving Scribe stories is a
+  feature, not a bug fix — the shelf has been catalogue-only since Task 1, and
+  making it otherwise means a `getBook` that answers for both sources. And
+  legacy rows pointing at Scribe stories are left in place: they are invisible
+  and inert, and `DELETE /api/library/:id` still removes them, but deleting
+  somebody's rows in a migration is not a call to make on their behalf.
 - **Author suggestions rank by matching stories, not by matching well.** An
   author with one story in a preferred genre outranks one with nine, because
   the ordering is `matches DESC` and a tie falls to follower count. Worth a

@@ -453,6 +453,25 @@ export async function getBook(id: string): Promise<Book> {
 }
 
 /**
+ * Which of these ids name catalogue editions.
+ *
+ * The shelf is catalogue-only — `getBook` and `getBooksByIds` both narrow on
+ * `source`, so a Scribe story reaches neither. Callers that need to *decide*
+ * that before writing a row ask here rather than re-spelling the filter, which
+ * is how `addToLibrary` came to accept ids it could not then hydrate.
+ */
+export async function catalogueIdsAmong(ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+
+  const rows = await db.orm.content.Story.select("id")
+    .where((story) => story.source.eq("CATALOGUE"))
+    .where((story) => story.id.in([...new Set(ids)]))
+    .all();
+
+  return new Set(rows.map((row) => row.id));
+}
+
+/**
  * Several books at once, keyed by id, in one round trip.
  *
  * The shelf reads a whole page of books this way rather than calling `getBook`

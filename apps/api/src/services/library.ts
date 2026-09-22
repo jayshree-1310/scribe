@@ -9,7 +9,12 @@
 import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
-import { getBook, getBooksByIds, type Book } from "./books.js";
+import {
+  catalogueIdsAmong,
+  getBook,
+  getBooksByIds,
+  type Book,
+} from "./books.js";
 
 export const READING_STATUSES = [
   "WANT_TO_READ",
@@ -56,19 +61,31 @@ function nowInstant(): Temporal.Instant {
 /* Reads ------------------------------------------------------------------ */
 
 async function countsFor(userId: string): Promise<LibraryCounts> {
-  const rows = await db.orm.library.LibraryEntry.select("status")
+  const rows = await db.orm.library.LibraryEntry.select("storyId", "status")
     .where((entry) => entry.userId.eq(userId))
     .all();
+
+  /**
+   * Counted from the same set `listLibrary` renders, not from every row.
+   *
+   * `addToLibrary` used to accept any story id, so a database may still hold
+   * rows pointing at Scribe stories — which the shelf drops when it hydrates.
+   * Counting them here would put a number on a tab that shows nothing.
+   */
+  const shelvable = await catalogueIdsAmong(rows.map((row) => row.storyId));
 
   const counts: LibraryCounts = {
     WANT_TO_READ: 0,
     READING: 0,
     FINISHED: 0,
-    ALL: rows.length,
+    ALL: 0,
   };
 
   for (const row of rows) {
+    if (!shelvable.has(row.storyId)) continue;
+
     counts[row.status as ReadingStatus] += 1;
+    counts.ALL += 1;
   }
 
   return counts;
@@ -159,12 +176,30 @@ async function findEntry(userId: string, bookId: string) {
     .first();
 }
 
+/**
+ * That the id names something this shelf can actually hold.
+ *
+ * Checking only that the row exists was not enough: every shelf read hydrates
+ * through `getBook`, which answers for catalogue editions alone, so a Scribe
+ * story passed this guard, got a `LibraryEntry` written for it, and then 404ed
+ * on the way out — telling the caller it had failed while the row sat there.
+ * The rule belongs here, before the write, where saying no costs nothing.
+ */
 async function requireBook(bookId: string): Promise<void> {
-  const book = await db.orm.content.Story.select("id")
+  if ((await catalogueIdsAmong([bookId])).has(bookId)) return;
+
+  // Only reached on the way to an error, so the second query is free in the
+  // case that matters. A caller holding a real story id is better told what is
+  // wrong with it than told it does not exist.
+  const story = await db.orm.content.Story.select("id")
     .where((story) => story.id.eq(bookId))
     .first();
 
-  if (!book) throw HttpError.notFound("That book could not be found.");
+  throw story
+    ? HttpError.badRequest(
+        "Only catalogue books can be added to your library. Scribe stories are kept through your reading history.",
+      )
+    : HttpError.notFound("That book could not be found.");
 }
 
 export async function addToLibrary(
