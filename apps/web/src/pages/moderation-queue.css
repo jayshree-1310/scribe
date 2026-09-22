@@ -1,0 +1,188 @@
+/* `ModerationQueuePage`. The reason radios are shared with the report dialog
+   and live in `components/moderation/moderation.css`; what is here is the
+   queue around them. */
+
+.queue__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.queue__title {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.queue__sub {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.queue__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.report-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface);
+}
+
+/* A resolved row is history rather than work, so it recedes without hiding. */
+.report-row.is-resolved {
+  background-color: var(--surface-2);
+  opacity: 0.85;
+}
+
+.report-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.report-row__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.report-row__badge {
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+  background-color: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.report-row__badge--reason {
+  background-color: var(--brand-soft, var(--surface-2));
+  color: var(--brand);
+}
+
+.report-row__badge--hidden {
+  background-color: var(--danger-soft, var(--surface-2));
+  color: var(--danger, var(--text-muted));
+}
+
+.report-row__when {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.report-row__target {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-2);
+}
+
+.report-row__target-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  /* Without this a long unbroken excerpt widens the whole card. */
+  min-width: 0;
+}
+
+.report-row__author {
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.report-row__author:hover {
+  text-decoration: underline;
+}
+
+.report-row__excerpt {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+/* The report outlives its content, so this is a state rather than an error. */
+.report-row__gone {
+  margin: 0;
+  padding: var(--space-3);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.report-row__details {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.report-row__label {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.report-row__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.report-row__by {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.queue__pages {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.queue__page-of {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 40rem) {
+  .queue__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* The action drops below the byline rather than squeezing beside it. */
+  .report-row__foot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+}

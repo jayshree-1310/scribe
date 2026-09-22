@@ -10,7 +10,7 @@ import { ApiError } from '../lib/api-client'
 import * as challengesApi from '../data/challenges-api'
 import * as storiesApi from '../data/stories-api'
 import type { ChallengeDetail } from '../types/challenges'
-import { AppShell } from '../components/layout/AppShell'
+import { ChallengeHostDialog } from '../components/challenges/ChallengeHostDialog'
 import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
 import { Card, SectionHead, StatTile } from '../components/ui/Card'
@@ -64,6 +64,7 @@ export function ChallengeDetailPage() {
   const authorId = initialising ? undefined : session?.user.id
 
   const challenge = useAsync(() => challengesApi.getChallenge(slug), [slug])
+  const [editing, setEditing] = useState(false)
   const leaderboard = useAsync(() => challengesApi.getLeaderboard(slug), [slug])
   // The entry picker needs the caller's own stories, drafts included.
   const myStories = useAsync(
@@ -84,21 +85,21 @@ export function ChallengeDetailPage() {
 
   if (challenge.status === 'loading') {
     return (
-      <AppShell>
+      <>
         <Skeleton height="12rem" radius="var(--radius-lg)" />
-      </AppShell>
+      </>
     )
   }
 
   if (challenge.status === 'error' || !challenge.data) {
     return (
-      <AppShell>
+      <>
         <ErrorState
           title="We couldn't open that challenge"
           message={challenge.error}
           onRetry={challenge.reload}
         />
-      </AppShell>
+      </>
     )
   }
 
@@ -180,7 +181,7 @@ export function ChallengeDetailPage() {
   const rows = leaderboard.data?.items ?? []
 
   return (
-    <AppShell>
+    <>
       <header
         className="challenge-hero"
         style={{ '--challenge-hue': hueFor(data.slug) } as CSSProperties}
@@ -240,6 +241,18 @@ export function ChallengeDetailPage() {
               Entries closed
             </Button>
           )}
+
+          {/*
+            Editing is an administrator action, offered beside the entry
+            actions rather than in a separate host view: there is one
+            challenge on this page and one thing a host does to it. `PATCH
+            /api/challenges/:id` checks for itself.
+          */}
+          {session?.user.isAdmin ? (
+            <Button size="lg" onClick={() => setEditing(true)} startIcon={<Icon name="pencil" />}>
+              Edit
+            </Button>
+          ) : null}
         </div>
 
         {entryStatus(data) ? (
@@ -248,6 +261,19 @@ export function ChallengeDetailPage() {
           </p>
         ) : null}
       </header>
+
+      {editing ? (
+        <ChallengeHostDialog
+          challenge={data}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false)
+            // The window may have moved, and the state is derived from it, so
+            // the page is re-read rather than patched.
+            challenge.reload()
+          }}
+        />
+      ) : null}
 
       <div className="stat-row">
         <StatTile
@@ -405,6 +431,6 @@ export function ChallengeDetailPage() {
           />
         </div>
       </Dialog>
-    </AppShell>
+    </>
   )
 }

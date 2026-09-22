@@ -75,7 +75,7 @@ export function TopBar({ onOpenNav, title }: TopBarProps) {
           />
         </Tooltip>
 
-        <NotificationBell enabled={Boolean(user)} />
+        <NotificationBell />
 
         {user ? (
           <DropdownMenu

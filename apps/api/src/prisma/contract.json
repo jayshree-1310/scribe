@@ -262,6 +262,20 @@
           },
           "User": {
             "fields": {
+              "announcedAuthorLevel": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "announcedReaderLevel": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "authorLevel": {
                 "nullable": false,
                 "type": {
@@ -336,6 +350,13 @@
                 "nullable": false,
                 "type": {
                   "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "longestStreak": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
                   "kind": "scalar"
                 }
               },
@@ -753,6 +774,12 @@
             },
             "storage": {
               "fields": {
+                "announcedAuthorLevel": {
+                  "column": "announcedAuthorLevel"
+                },
+                "announcedReaderLevel": {
+                  "column": "announcedReaderLevel"
+                },
                 "authorLevel": {
                   "column": "authorLevel"
                 },
@@ -785,6 +812,9 @@
                 },
                 "isAuthor": {
                   "column": "isAuthor"
+                },
+                "longestStreak": {
+                  "column": "longestStreak"
                 },
                 "passwordHash": {
                   "column": "passwordHash"
@@ -841,6 +871,13 @@
                   "kind": "scalar"
                 }
               },
+              "onboardingStep": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "updatedAt": {
                 "nullable": false,
                 "type": {
@@ -883,6 +920,9 @@
                 },
                 "onboardingCompletedAt": {
                   "column": "onboardingCompletedAt"
+                },
+                "onboardingStep": {
+                  "column": "onboardingStep"
                 },
                 "updatedAt": {
                   "column": "updatedAt"
@@ -4248,6 +4288,18 @@
               {
                 "name": "BADGE_EARNED",
                 "value": "BADGE_EARNED"
+              },
+              {
+                "name": "LEVEL_UP",
+                "value": "LEVEL_UP"
+              },
+              {
+                "name": "CONTENT_HIDDEN",
+                "value": "CONTENT_HIDDEN"
+              },
+              {
+                "name": "REPORT_RESOLVED",
+                "value": "REPORT_RESOLVED"
               }
             ]
           },
@@ -4443,8 +4495,8 @@
             "notificationMute": {
               "checks": [
                 {
-                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED')",
-                  "name": "notificationMute_type_check_1efec2b5",
+                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED')",
+                  "name": "notificationMute_type_check_3a77c5c7",
                   "prefix": "notificationMute_type_check"
                 }
               ],
@@ -4513,6 +4565,24 @@
             },
             "user": {
               "columns": {
+                "announcedAuthorLevel": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 1
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "announcedReaderLevel": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 1
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
                 "authorLevel": {
                   "codecId": "pg/int4@1",
                   "default": {
@@ -4586,6 +4656,15 @@
                     "value": false
                   },
                   "nativeType": "bool",
+                  "nullable": false
+                },
+                "longestStreak": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
                   "nullable": false
                 },
                 "passwordHash": {
@@ -4698,6 +4777,15 @@
                   "codecId": "pg/timestamptz-temporal@1",
                   "nativeType": "timestamptz",
                   "nullable": true
+                },
+                "onboardingStep": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
                 },
                 "updatedAt": {
                   "codecId": "pg/timestamptz-temporal@1",
@@ -7597,8 +7685,8 @@
                   "prefix": "notification_sourceType_check"
                 },
                 {
-                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED')",
-                  "name": "notification_type_check_1efec2b5",
+                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED')",
+                  "name": "notification_type_check_3a77c5c7",
                   "prefix": "notification_type_check"
                 }
               ],
@@ -7811,7 +7899,10 @@
                 "STORY_COMMENT",
                 "CLUB_DISCUSSION",
                 "NEW_STORY",
-                "BADGE_EARNED"
+                "BADGE_EARNED",
+                "LEVEL_UP",
+                "CONTENT_HIDDEN",
+                "REPORT_RESOLVED"
               ]
             },
             "ReadingStatus": {
@@ -7863,7 +7954,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "1b3e732f5fadb90ce91f88ac4c78b31a8e93ee5caf19e916bc7590aa922f4235"
+    "storageHash": "e89d7b557c0039c370910c43fa29a533e5c244fdf78e295611d70ee1189c46a3"
   },
   "execution": {
     "executionHash": "58bcd8791f1bf956db3e0406a1dba3023721b98f79d32347cf51690ea1fce423",

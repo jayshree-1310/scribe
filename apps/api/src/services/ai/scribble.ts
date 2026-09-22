@@ -17,7 +17,6 @@
  */
 
 import { z } from "zod";
-import { HttpError } from "../../lib/http-error.js";
 import { listBooks, listGenres, type GenreSummary } from "../books.js";
 import { listStories } from "../stories.js";
 import { createNarrationScanner } from "./json-stream.js";
@@ -27,6 +26,7 @@ import {
   intentSystemPrompt,
 } from "./prompts/scribble.js";
 import { aiProvider } from "./provider.js";
+import { extractJson } from "./structured.js";
 import type {
   Candidate,
   Recommendation,
@@ -104,25 +104,6 @@ const narrationSchema = z.object({
     .catch([]),
 });
 
-/**
- * Small models wrap JSON in prose or a markdown fence however firmly the
- * prompt asks them not to. Taking the outermost brace-delimited span recovers
- * the common cases without pretending to be a parser.
- */
-function extractJson(text: string): unknown {
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  if (start === -1 || end <= start) {
-    throw HttpError.upstream("The assistant's reply could not be understood.");
-  }
-
-  try {
-    return JSON.parse(text.slice(start, end + 1));
-  } catch {
-    throw HttpError.upstream("The assistant's reply could not be understood.");
-  }
-}
-
 /* Stage 1: intent -------------------------------------------------------- */
 
 export interface Intent {
@@ -156,7 +137,15 @@ export async function interpret(
 ): Promise<Intent> {
   const genres = await listGenres();
 
-  const completion = await aiProvider().complete({
+  /**
+   * Structured, because this stage is the one where a malformed reply is
+   * fatal: the narration stage degrades to showing the rows without their
+   * sentences, but a filter object that will not parse means no query ran at
+   * all. The schema on the wire is derived from `intentSchema` itself, so the
+   * shape the model is constrained to and the shape validated here cannot
+   * drift apart.
+   */
+  const { value: parsed } = await aiProvider().completeStructured(intentSchema, {
     feature: "scribble.intent",
     system: intentSystemPrompt(genres, context),
     messages: [{ role: "user", content: message }],
@@ -169,8 +158,6 @@ export async function interpret(
     maxTokens: 600,
     ...(signal ? { signal } : {}),
   });
-
-  const parsed = intentSchema.parse(extractJson(completion.text));
 
   const matched = parsed.genre
     ? genres.find(

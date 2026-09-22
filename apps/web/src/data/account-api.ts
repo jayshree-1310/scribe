@@ -19,6 +19,13 @@ export interface AccountProfile {
   avatarUrl: string | null
   bio: string | null
   isAuthor: boolean
+  /**
+   * Platform administrator. Decides whether the moderation queue and the
+   * challenge host form are *offered*; every privileged endpoint calls
+   * `assertAdmin` for itself, so this is navigation rather than access
+   * control.
+   */
+  isAdmin: boolean
   readingStreak: number
   readerLevel: number
   authorLevel: number

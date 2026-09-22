@@ -365,17 +365,27 @@ export function ReaderPage() {
                   Previous
                 </Button>
 
-                <Select
-                  label="Jump to chapter"
-                  hideLabel
-                  size="sm"
-                  value={String(chapterNumber)}
-                  options={(chapters.data ?? []).map((item) => ({
-                    value: String(item.number),
-                    label: `${item.number}. ${item.title}`,
-                  }))}
-                  onChange={(value) => goToChapter(Number(value))}
-                />
+                {/*
+                  Only once the list has actually arrived. An empty `options`
+                  is indistinguishable from "this story has one chapter", so a
+                  failed or in-flight request used to leave a picker that
+                  silently offered nowhere to go. Previous and Next come from
+                  the chapter itself and keep working either way, so omitting
+                  this is a degradation rather than a dead end.
+                */}
+                {chapters.status === 'ready' && (chapters.data?.length ?? 0) > 1 ? (
+                  <Select
+                    label="Jump to chapter"
+                    hideLabel
+                    size="sm"
+                    value={String(chapterNumber)}
+                    options={(chapters.data ?? []).map((item) => ({
+                      value: String(item.number),
+                      label: `${item.number}. ${item.title}`,
+                    }))}
+                    onChange={(value) => goToChapter(Number(value))}
+                  />
+                ) : null}
 
                 <Button
                   variant="primary"

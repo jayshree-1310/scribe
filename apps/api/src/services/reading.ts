@@ -354,7 +354,11 @@ async function upsertProgress(input: {
  * advances correctly.
  */
 async function recordStreak(userId: string): Promise<number> {
-  const user = await db.orm.auth.User.select("readingStreak", "streakLastReadAt")
+  const user = await db.orm.auth.User.select(
+    "readingStreak",
+    "streakLastReadAt",
+    "longestStreak",
+  )
     .where((row) => row.id.eq(userId))
     .first();
 
@@ -374,6 +378,23 @@ async function recordStreak(userId: string): Promise<number> {
       )
   ).update({
     readingStreak: outcome.streak,
+    /**
+     * The high-water mark, advanced in the same guarded write as the streak so
+     * the two can never disagree.
+     *
+     * The run being *replaced* is in the max as well as the new one, and that
+     * is the whole subtlety: this write is the only moment the old run is
+     * still known. A reset takes `outcome.streak` to 1, so a max over the new
+     * value alone would throw away the eleven days that just ended -- and for
+     * every account that predates `longestStreak` the stored column is 0,
+     * which means the first missed day would have erased their whole history
+     * rather than recording it.
+     */
+    longestStreak: Math.max(
+      user.longestStreak,
+      user.readingStreak,
+      outcome.streak,
+    ),
     streakLastReadAt: Temporal.Now.instant(),
     updatedAt: Temporal.Now.instant(),
   });

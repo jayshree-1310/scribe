@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
+import { useAuth } from '../lib/auth'
+import { useToast } from '../lib/toast'
 import * as challengesApi from '../data/challenges-api'
 import type { ChallengeState } from '../types/challenges'
-import { AppShell } from '../components/layout/AppShell'
+import { Button } from '../components/ui/Button'
+import { Icon } from '../components/ui/Icon'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Tabs, TabPanel } from '../components/ui/Tabs'
 import { EmptyState, ErrorState } from '../components/ui/States'
 import { ChallengeCard } from '../components/story/Cards'
+import { ChallengeHostDialog } from '../components/challenges/ChallengeHostDialog'
 import './pages.css'
 
 const TABS = [
@@ -28,13 +32,19 @@ export function ChallengesPage() {
    * rather than by a stored status, and answers all three at once because the
    * tabs below show a count for each.
    */
-  const challenges = useAsync(() => challengesApi.getChallenges(), [])
+  const { session } = useAuth()
+  const { showToast } = useToast()
+
+  /** Bumped after hosting one, to re-read the three groups it belongs to. */
+  const [revision, setRevision] = useState(0)
+  const challenges = useAsync(() => challengesApi.getChallenges(), [revision])
   const [tab, setTab] = useState<ChallengeState>('active')
+  const [hosting, setHosting] = useState(false)
 
   const shown = challenges.data?.[tab] ?? []
 
   return (
-    <AppShell>
+    <>
       <header className="page-head">
         <div>
           <h1 className="page-head__title">Writing challenges</h1>
@@ -44,13 +54,34 @@ export function ChallengesPage() {
           </p>
         </div>
         {/*
-          No "Host a challenge" button. Creating one is an administrator
-          action — `POST /api/challenges`, gated on `auth.User.isAdmin` — and
-          there is no admin surface in the reader-facing app to put it behind,
-          so the button did nothing but promise something. Hosting is done
-          through the API today; see the README.
+          Offered only to administrators, which is what `POST /api/challenges`
+          has always required. The button used not to exist at all because
+          nothing in the app knew who was one; `AccountProfile.isAdmin` is what
+          changed. The endpoint still checks for itself.
         */}
+        {session?.user.isAdmin ? (
+          <Button
+            variant="primary"
+            onClick={() => setHosting(true)}
+            startIcon={<Icon name="plus" />}
+          >
+            Host a challenge
+          </Button>
+        ) : null}
       </header>
+
+      {hosting ? (
+        <ChallengeHostDialog
+          onClose={() => setHosting(false)}
+          onSaved={(challenge) => {
+            setHosting(false)
+            showToast({ tone: 'success', message: `"${challenge.title}" is live.` })
+            // Which group it lands in depends on its window against the clock,
+            // so the board is re-read rather than guessed at.
+            setRevision((current) => current + 1)
+          }}
+        />
+      ) : null}
 
       <div className="page-tabs">
         <Tabs
@@ -93,6 +124,6 @@ export function ChallengesPage() {
           </div>
         )}
       </TabPanel>
-    </AppShell>
+    </>
   )
 }

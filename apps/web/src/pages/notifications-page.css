@@ -1,0 +1,75 @@
+/* `NotificationsPage`. The rows themselves are
+   `components/notifications/notifications.css`, shared with the bell; what is
+   here is the page around them. */
+
+.notifs__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.notifs__title {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.notifs__sub {
+  margin: var(--space-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* Wraps rather than shrinks: two ghost buttons beside a heading are the first
+   thing with nowhere to go on a narrow screen. */
+.notifs__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.notifs__filter {
+  margin-bottom: var(--space-4);
+}
+
+.notifs__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Unlike the dropdown's, a row on the page sits on the surface rather than in
+   a panel, so it needs its own edge to read as a row. */
+.notifs__list .notification {
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+}
+
+.notifs__list .notification.is-unread {
+  border-color: var(--brand-border);
+}
+
+.notifs__more {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-4);
+}
+
+@media (max-width: 40rem) {
+  /* The actions drop under the heading rather than squeezing beside it. */
+  .notifs__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .notifs__actions {
+    justify-content: flex-start;
+  }
+}

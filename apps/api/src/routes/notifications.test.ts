@@ -1,8 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { drainDeferredWrites } from "../services/deferred.js";
 import { TestApi, databaseAvailable } from "../test/harness.js";
-import { flushBadges } from "../services/gamification.js";
 import {
-  flushNotifications,
   pruneExpired,
   resetPruneThrottle,
 } from "../services/notifications.js";
@@ -22,8 +21,7 @@ const available = await databaseAvailable();
  * badge has handed one over. The same order every other drain site uses.
  */
 async function settle(): Promise<void> {
-  await flushBadges();
-  await flushNotifications();
+  await drainDeferredWrites();
 }
 
 /** One person's list, read the way the bell reads it. */
@@ -356,6 +354,40 @@ describe.skipIf(!available)("badges", () => {
     expect(earned[0]?.href).toBe("/badges");
     // The one type nobody else caused, and so the one with no face beside it.
     expect(earned[0]?.actor).toBeNull();
+  });
+
+  it("announces a level once, and not again on the next evaluation", async () => {
+    /**
+     * The second evaluation is the real assertion. A badge is awarded, so the
+     * insert itself says "this is new"; a level is *derived* on every
+     * evaluation from a metric and a ladder, so without a record of what the
+     * reader has been told it would look new every single time. Rewinding the
+     * announced level is how an account that just crossed a threshold looks.
+     */
+    const climber = await api.createUser("nlevel");
+    // Only the reader ladder is rewound, so the author ladder standing still
+    // is the other half of the assertion: one row, not one per ladder.
+    await api.setAnnouncedLevels(climber, { reader: 0, author: 1 });
+
+    await api.request("/api/badges", { as: climber });
+    await settle();
+
+    const first = (await inbox(climber)).items.filter(
+      (item) => item.type === "LEVEL_UP",
+    );
+    expect(first).toHaveLength(1);
+    expect(first[0]?.title).toBe("Reader level 1");
+    expect(first[0]?.href).toBe("/badges");
+    // Derived, not done to them, so there is no face beside it either.
+    expect(first[0]?.actor).toBeNull();
+
+    await api.request("/api/badges", { as: climber });
+    await settle();
+
+    const again = (await inbox(climber)).items.filter(
+      (item) => item.type === "LEVEL_UP",
+    );
+    expect(again).toHaveLength(1);
   });
 });
 

@@ -9,7 +9,6 @@ import { getBadges } from '../data/gamification-api'
 import * as reading from '../data/reading-api'
 import * as recommendationsApi from '../data/recommendations-api'
 import type { Book, Discover } from '../types/books'
-import { AppShell } from '../components/layout/AppShell'
 import { ButtonLink } from '../components/ui/Button'
 import { SectionHead } from '../components/ui/Card'
 import { Icon } from '../components/ui/Icon'
@@ -133,7 +132,7 @@ export function HomePage() {
   }
 
   return (
-    <AppShell>
+    <>
       {/* Greeting + streak ---------------------------------------------- */}
       <header className="page-head">
         <div>
@@ -400,6 +399,6 @@ export function HomePage() {
           )}
         </section>
       </div>
-    </AppShell>
+    </>
   )
 }

@@ -13,6 +13,7 @@
 
 import { request } from '../lib/api-client'
 import { readerHeaders } from './stories-api'
+import type { ClubPage } from '../types/clubs'
 import type { StoryPage } from '../types/stories'
 import type { FollowPage, FollowState, PublicProfile } from '../types/users'
 
@@ -45,6 +46,26 @@ export async function listUserStories(
       },
     },
   )
+}
+
+/**
+ * The clubs somebody belongs to.
+ *
+ * Public, unlike `clubsApi.listClubs({ mine: true })`, which can only ever
+ * answer about the caller. That asymmetry is why the profile's Clubs tab was
+ * shown only on your own page; this is the endpoint that removed the reason.
+ */
+export async function listUserClubs(
+  username: string,
+  options: { page?: number; limit?: number } = {},
+): Promise<ClubPage> {
+  return request<ClubPage>(`/users/${encodeURIComponent(username)}/clubs`, {
+    headers: readerHeaders(),
+    query: {
+      page: options.page === undefined ? undefined : String(options.page),
+      limit: options.limit === undefined ? undefined : String(options.limit),
+    },
+  })
 }
 
 export async function listFollowers(

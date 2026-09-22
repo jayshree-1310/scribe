@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
-    "lint": "eslint .",
+    "lint": "node scripts/check-async-gating.mjs && eslint .",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -6,7 +6,6 @@ import { ApiError } from '../../lib/api-client'
 import { formatCount, formatRating, formatRelative } from '../../lib/format'
 import * as authoringApi from '../../data/authoring-api'
 import { STORY_STATUS_LABELS, type Story } from '../../types/stories'
-import { AppShell } from '../../components/layout/AppShell'
 import { Button, ButtonLink } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { StatusBadge } from '../../components/ui/Chip'
@@ -62,7 +61,7 @@ export function AuthorStoriesPage() {
   }
 
   return (
-    <AppShell variant="author">
+    <>
       <header className="page-head">
         <div>
           <h1 className="page-head__title">My stories</h1>
@@ -202,6 +201,6 @@ export function AuthorStoriesPage() {
           if (!deleting) setPendingDelete(null)
         }}
       />
-    </AppShell>
+    </>
   )
 }

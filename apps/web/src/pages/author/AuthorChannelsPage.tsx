@@ -5,7 +5,6 @@ import { useToast } from '../../lib/toast'
 import { formatCount, formatRelative } from '../../lib/format'
 import * as channelsApi from '../../data/channels-api'
 import type { ChannelPost } from '../../types/channels'
-import { AppShell } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
 import { Card, SectionHead, StatTile } from '../../components/ui/Card'
 import { ConfirmDialog, Dialog } from '../../components/ui/Dialog'
@@ -163,7 +162,7 @@ export function AuthorChannelsPage() {
   }
 
   return (
-    <AppShell variant="author">
+    <>
       <header className="page-head">
         <div>
           <h1 className="page-head__title">Broadcast channels</h1>
@@ -429,6 +428,6 @@ export function AuthorChannelsPage() {
         onConfirm={() => confirmDelete && onDeletePost(confirmDelete)}
         onCancel={() => setConfirmDelete(null)}
       />
-    </AppShell>
+    </>
   )
 }

@@ -6,7 +6,6 @@ import { formatCount, formatDate, formatRelative } from '../lib/format'
 import * as channelsApi from '../data/channels-api'
 import { channelAuthorName, type ChannelPost } from '../types/channels'
 import { paragraphsOf } from '../types/stories'
-import { AppShell } from '../components/layout/AppShell'
 import { ReportMenu } from '../components/moderation/ReportMenu'
 import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
@@ -90,21 +89,21 @@ export function ChannelDetailPage() {
 
   if (channel.status === 'loading') {
     return (
-      <AppShell width="narrow">
+      <>
         <Skeleton height="10rem" radius="var(--radius-lg)" />
-      </AppShell>
+      </>
     )
   }
 
   if (channel.status === 'error' || !channel.data) {
     return (
-      <AppShell width="narrow">
+      <>
         <ErrorState
           title="We couldn't open that channel"
           message={channel.error}
           onRetry={channel.reload}
         />
-      </AppShell>
+      </>
     )
   }
 
@@ -140,7 +139,7 @@ export function ChannelDetailPage() {
   }
 
   return (
-    <AppShell width="narrow">
+    <>
       <header className="channel-hero">
         <div className="channel-hero__head">
           <Avatar user={data.author} size="xl" />
@@ -269,6 +268,6 @@ export function ChannelDetailPage() {
           ) : null}
         </>
       )}
-    </AppShell>
+    </>
   )
 }

@@ -13,7 +13,6 @@ import {
   type LibraryView,
   type ReadingStatus,
 } from '../types/books'
-import { AppShell } from '../components/layout/AppShell'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
 import { TextField } from '../components/ui/TextField'
@@ -129,7 +128,7 @@ export function MyLibraryPage() {
   }))
 
   return (
-    <AppShell>
+    <>
       <header className="page-head">
         <div>
           <h1 className="page-head__title">My library</h1>
@@ -205,6 +204,6 @@ export function MyLibraryPage() {
           ))}
         </div>
       )}
-    </AppShell>
+    </>
   )
 }

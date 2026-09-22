@@ -30,6 +30,7 @@ import {
   REPORT_TARGETS,
   createReport,
   listReports,
+  reinstateUser,
   resolveReport,
 } from "../services/moderation.js";
 
@@ -75,6 +76,10 @@ const queueQuerySchema = z.object({
   reason: z.enum(REPORT_REASONS).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(20),
+});
+
+const userIdParamSchema = z.object({
+  id: z.uuid("That account could not be found."),
 });
 
 const reportIdParamSchema = z.object({
@@ -156,6 +161,23 @@ router.post("/moderation/reports/:id/resolve", async (req, res, next) => {
         note: body.note,
       }),
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Lifting a suspension, without a report to hang it on.
+ *
+ * A `POST` rather than a `DELETE` on some suspension resource: there is no
+ * suspension row to delete -- it is a column on the account -- and the verb
+ * that matches what a moderator is doing is the one in the path.
+ */
+router.post("/moderation/users/:id/reinstate", async (req, res, next) => {
+  try {
+    const { id } = parseOrThrow(userIdParamSchema, req.params);
+
+    res.json({ user: await reinstateUser(requireUserId(res), id) });
   } catch (error) {
     next(error);
   }

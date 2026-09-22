@@ -13,12 +13,8 @@ import type { Server } from "node:http";
 import app from "../app.js";
 import { db } from "../prisma/db.js";
 import { deleteAll } from "../prisma/delete-all.js";
-import { flushAnalytics } from "../services/analytics.js";
-import { flushBadges } from "../services/gamification.js";
-import {
-  flushNotifications,
-  type NotificationType,
-} from "../services/notifications.js";
+import { drainDeferredWrites } from "../services/deferred.js";
+import { type NotificationType } from "../services/notifications.js";
 import { deletePreferencesFor } from "../services/preferences.js";
 import { DEV_USER_HEADER } from "../middleware/current-user.js";
 import { slugify } from "../lib/slug.js";
@@ -144,12 +140,10 @@ export class TestApi {
    * breach a foreign key against, which is what account deletion is -- has to
    * wait for them, and `cleanup` already drains the same three at teardown.
    *
-   * Badges before notifications, never alongside: an award issues a
-   * notification as it lands. See `flushNotifications`.
+   * The order the three settle in is `drainDeferredWrites`'s business.
    */
   async settleBackgroundWrites(): Promise<void> {
-    await Promise.all([flushBadges(), flushAnalytics()]);
-    await flushNotifications();
+    await drainDeferredWrites();
   }
 
   /**
@@ -862,13 +856,40 @@ export class TestApi {
     });
   }
 
+  /**
+   * Rewinds what a reader has been *told* their levels are.
+   *
+   * The cheap way to provoke a level-up: climbing a ladder for real costs ten
+   * distinct chapter reads or a thousand written words, and neither of those
+   * is what a test of "announced once" is about. Setting the announced level
+   * below the derived one puts the account in exactly the state a reader who
+   * just crossed a threshold is in.
+   */
+  async setAnnouncedLevels(
+    userId: string,
+    input: { reader: number; author: number },
+  ): Promise<void> {
+    await db.orm.auth.User.where((user) => user.id.eq(userId)).update({
+      announcedReaderLevel: input.reader,
+      announcedAuthorLevel: input.author,
+    });
+  }
+
+  /** Backdates a high-water mark, for asserting it is never lowered. */
+  async setLongestStreak(userId: string, longest: number): Promise<void> {
+    await db.orm.auth.User.where((user) => user.id.eq(userId)).update({
+      longestStreak: longest,
+    });
+  }
+
   /** A reader's streak as stored, for asserting what a write did. */
   async readStreak(
     userId: string,
-  ): Promise<{ streak: number; lastReadAt: Date | null }> {
+  ): Promise<{ streak: number; longest: number; lastReadAt: Date | null }> {
     const user = await db.orm.auth.User.select(
       "readingStreak",
       "streakLastReadAt",
+      "longestStreak",
     )
       .where((row) => row.id.eq(userId))
       .first();
@@ -877,6 +898,7 @@ export class TestApi {
 
     return {
       streak: user.readingStreak,
+      longest: user.longestStreak,
       lastReadAt:
         user.streakLastReadAt === null || user.streakLastReadAt === undefined
           ? null
@@ -927,10 +949,7 @@ export class TestApi {
      * `storyView_userId_fkey`, and of a notification fan-out and
      * `notification_userId_fkey`.
      */
-    await Promise.all([flushBadges(), flushAnalytics()]);
-    // After the badges, never alongside: an award issues a notification as it
-    // lands. See `flushNotifications`.
-    await flushNotifications();
+    await drainDeferredWrites();
 
     /**
      * Rows a suite created *through the API* -- an authored story, its

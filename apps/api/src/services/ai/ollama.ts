@@ -130,6 +130,11 @@ function bodyFor(
       ...request.messages,
     ],
     stream,
+    // Ollama takes a JSON schema directly and compiles it to a grammar, so a
+    // constrained reply is genuinely constrained rather than requested. Only
+    // sent when a caller asked for a shape: an unconditional `format` would
+    // make every prose completion produce JSON.
+    ...(request.format ? { format: request.format.schema } : {}),
     options: { num_predict: request.maxTokens ?? config.maxTokens },
   });
 }

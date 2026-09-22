@@ -35,18 +35,17 @@
  *   migration's header.
  *
  * - **Suspension stops writing, not reading.** `auth.User.suspendedAt`, read
- *   only through `assertNotSuspended` in `services/roles.ts`. The write seams
- *   that call it are exactly these four:
+ *   only through `assertNotSuspended` in `services/roles.ts`. Which seams call
+ *   it is no longer written here: this list said "exactly these four" while
+ *   there were six, because two like endpoints were added and the prose was
+ *   not, which is exactly what a list maintained by hand does.
  *
- *       services/engagement.ts  createComment
- *       services/clubs.ts       createDiscussion
- *       services/channels.ts    createPost
- *       services/moderation.ts  createReport
- *
- *   A fifth surface that accepts user-written text joins that list. Nothing
- *   enforces that it does, which is the honest state of it: the alternative
- *   was an async check in `requireUser`, paid for by every request in the app
- *   to answer a question four of them ask.
+ *   `routes/suspension.test.ts` holds it now, beside a test that fails when a
+ *   write route is added without a decision recorded against it. The guard is
+ *   still per service function rather than in `requireUser` -- a check there
+ *   would cost every request in the app a query to answer a question a handful
+ *   of them ask -- so what that test enforces is that nobody adds the seventh
+ *   seam without saying which kind it is.
  *
  * **Every public read path that had to learn about `hiddenAt`**, audited when
  * this landed, and the place to add to when a new one appears:
@@ -72,6 +71,7 @@
 import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
+import { notify } from "./notifications.js";
 import { assertAdmin, assertNotSuspended } from "./roles.js";
 import { toIso } from "./stories.js";
 
@@ -104,6 +104,36 @@ export type ReportStatus = (typeof REPORT_STATUSES)[number];
 export const REPORT_ACTIONS = ["DISMISS", "HIDE", "SUSPEND"] as const;
 
 export type ReportAction = (typeof REPORT_ACTIONS)[number];
+
+/**
+ * What a reason is called when it is said back to the person it was used
+ * against.
+ *
+ * **The category, never the report.** A reporter's `details` are their words
+ * about somebody, written in confidence and unreviewed; handing them to the
+ * person they are about would turn the queue into a channel for exactly the
+ * harassment it exists to stop, and would identify the reporter by content
+ * where the row does not identify them by name. The moderator's `note` is
+ * internal for the same reason -- it is written to another moderator. So what
+ * is revealed is the enum a human chose from a fixed list, which is enough to
+ * know what rule was applied and carries nobody else's voice.
+ */
+const REASON_WORDS: Record<ReportReason, string> = {
+  SPAM: "spam or advertising",
+  HARASSMENT: "harassment",
+  HATE: "hate speech",
+  SEXUAL: "sexual content",
+  VIOLENCE: "violence",
+  SPOILER: "unmarked spoilers",
+  OTHER: "a breach of the community rules",
+};
+
+/** What each kind of target is called in a sentence. */
+const TARGET_WORDS: Record<ReportTarget, string> = {
+  COMMENT: "comment",
+  CLUB_DISCUSSION: "club post",
+  CHANNEL_POST: "channel post",
+};
 
 /** The same four fields every other author summary in the app carries. */
 export interface ModerationUser {
@@ -817,6 +847,10 @@ export async function resolveReport(
    * One statement for the report itself and every other open report on the
    * same target. `OR` rather than two updates, so a moderator cannot see a
    * half-resolved queue between them.
+   *
+   * `RETURNING "reporterId"` is what makes the reporters tellable: the sweep
+   * already knows every person who asked about this target, and a second
+   * query to find them again could only disagree with it.
    */
   const plan = db.raw.sql`
     UPDATE "moderation"."report"
@@ -830,16 +864,155 @@ export async function resolveReport(
         OR ("targetType" = ${report.targetType}
             AND "targetId" = ${report.targetId}
             AND "status" = 'OPEN')
+    RETURNING "reporterId"
   `
-    .affectedCount()
+    .returnsRow({ reporterId: "pg/text@1" })
     .build();
 
-  await db.runtime().query(plan);
+  const swept = (await db.runtime().query(plan)) as { reporterId: string }[];
 
   const resolved = await findReport(reportId);
   if (!resolved) throw HttpError.notFound(REPORT_NOT_FOUND);
 
+  announceOutcome({
+    action: input.action,
+    reason: report.reason as ReportReason,
+    targetType,
+    target,
+    callerId,
+    reporterIds: swept.map((row) => row.reporterId),
+  });
+
   return resolved;
+}
+
+/**
+ * Tells the people a resolution is about: the author it was applied to, and
+ * everybody who reported it.
+ *
+ * **Issued after the writes, never inside them.** `notify` is fire-and-forget
+ * by design, and a notification about a resolution that then failed to commit
+ * would be the one kind of moderation message that cannot be taken back.
+ *
+ * Two audiences and two types, rather than one type with two meanings. The
+ * author is being told a rule was applied to them and needs to know which; a
+ * reporter is being told their report was read and needs to know nothing about
+ * the author at all. Folding them together would mean one row whose wording
+ * had to be safe for both, which is how a moderation notice ends up saying
+ * nothing.
+ */
+function announceOutcome(input: {
+  action: ReportAction;
+  reason: ReportReason;
+  targetType: ReportTarget;
+  target: TargetRow | null;
+  callerId: string;
+  reporterIds: string[];
+}): void {
+  const { action, reason, targetType, target } = input;
+  const thing = TARGET_WORDS[targetType];
+
+  /**
+   * The author, but only when something was actually done to them. A
+   * `DISMISS` means the report was not upheld, so there is nothing to tell
+   * them about -- and telling somebody "you were reported and we decided you
+   * were fine" hands them a grievance they did not have.
+   */
+  if (target && (action === "HIDE" || action === "SUSPEND")) {
+    notify({
+      event: "content-hidden",
+      userId: target.authorId,
+      title:
+        action === "SUSPEND"
+          ? `Your ${thing} was hidden and your account suspended`
+          : `Your ${thing} was hidden`,
+      reason: `A moderator hid it for ${REASON_WORDS[reason]}.`,
+      /**
+       * The link goes where the content was, which for a hidden row is a page
+       * that no longer shows it. That is the honest destination: there is no
+       * "your hidden content" surface, and inventing a link to one here would
+       * be inventing the surface.
+       */
+      href: target.href,
+    });
+  }
+
+  const outcome =
+    action === "DISMISS"
+      ? "We looked at it and took no action."
+      : action === "SUSPEND"
+        ? "The content was hidden and the account suspended."
+        : "The content was hidden.";
+
+  for (const reporterId of new Set(input.reporterIds)) {
+    // A moderator resolving their own report has just been told by doing it.
+    if (reporterId === input.callerId) continue;
+
+    notify({
+      event: "report-resolved",
+      userId: reporterId,
+      title: `Your report on a ${thing} was reviewed`,
+      description: outcome,
+    });
+  }
+}
+
+/**
+ * Lifts a suspension, on its own.
+ *
+ * **The gap this closes.** A suspension could only be undone through the
+ * report that imposed it -- `DISMISS` on that row clears the column -- which
+ * made the undo depend on a row that can legitimately disappear. Delete the
+ * reporter's account and the report goes with it, and the suspension outlives
+ * the only thing that could lift it: the account is then locked out until
+ * somebody writes SQL. This is that statement, with an administrator and an
+ * audit trail in front of it.
+ *
+ * It deliberately does *not* touch the reports. A suspension and the report
+ * that prompted it are different facts -- the queue records what a moderator
+ * decided at the time, and reopening a resolved report to say "and then we
+ * changed our minds" would lose the first decision rather than add to it.
+ * Nothing re-hides content either: reinstating somebody says they may write
+ * again, not that what they wrote was fine.
+ *
+ * Idempotent in effect but not in answer: reinstating an account in good
+ * standing is a 409 rather than a silent success, because a moderator who
+ * clicked it expected somebody to be suspended and should be told they were
+ * not.
+ */
+export async function reinstateUser(
+  callerId: string,
+  userId: string,
+): Promise<ModerationUser> {
+  await assertAdmin(callerId);
+
+  const user = await db.orm.auth.User.select(
+    "id",
+    "username",
+    "displayName",
+    "avatarUrl",
+    "suspendedAt",
+  )
+    .where((row) => row.id.eq(userId))
+    .first();
+
+  if (!user) throw HttpError.notFound("That account could not be found.");
+
+  if (user.suspendedAt === null || user.suspendedAt === undefined) {
+    throw HttpError.conflict("That account is not suspended.");
+  }
+
+  await db.orm.auth.User.where((row) => row.id.eq(userId)).update({
+    suspendedAt: null,
+    updatedAt: now(),
+  });
+
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName ?? null,
+    avatarUrl: user.avatarUrl ?? null,
+  };
 }
 
 /**

@@ -161,15 +161,20 @@ router.get("/", async (req, res, next) => {
   try {
     const query = parseOrThrow(listQuerySchema, req.query);
 
+    const viewerId = getUserId(req);
+
     const page = await listClubs(
       {
         search: query.search,
-        mine: query.mine,
+        // `?mine=true` is this caller's membership. An anonymous caller
+        // belongs to nothing, so the filter is dropped rather than answered
+        // with an empty page.
+        memberId: query.mine && viewerId !== null ? viewerId : undefined,
         sort: query.sort,
         page: query.page,
         limit: query.limit,
       },
-      getUserId(req),
+      viewerId,
     );
 
     res.json(page);

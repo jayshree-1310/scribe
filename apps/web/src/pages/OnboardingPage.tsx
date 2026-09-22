@@ -91,6 +91,17 @@ export function OnboardingPage() {
     if (adopted || saved.status !== 'ready' || !saved.data) return
     setGenreIds(saved.data.genreIds)
     setLength(saved.data.contentLength)
+    /**
+     * And where they had got to. Saving per step was always what made a
+     * refresh resume, but the row could not say *where*: a reader who quit at
+     * the author step had their genres back and was still put on step one, to
+     * walk forward through answers they had already given.
+     *
+     * Clamped, so a step stored by a build with more steps than this one --
+     * or a hand-written value inside the API's ceiling -- cannot land the
+     * reader past the end of the flow.
+     */
+    setStep(Math.min(saved.data.onboardingStep, STEPS.length - 1))
     setAdopted(true)
   }, [adopted, saved.status, saved.data])
 
@@ -148,8 +159,22 @@ export function OnboardingPage() {
       if (!ok) return
     }
 
+    const reached = Math.min(step + 1, STEPS.length - 1)
+
+    /**
+     * Recorded as the reader arrives, and not awaited: the step they are on is
+     * worth remembering but never worth making them wait for, and the two
+     * steps that save real answers have already been awaited above. A failure
+     * costs the resume point and nothing else, so it is swallowed rather than
+     * shown -- an error about bookkeeping on a screen the reader just left
+     * would be about us, not them.
+     */
+    void preferencesApi
+      .savePreferences({ onboardingStep: reached })
+      .catch(() => {})
+
     setError(null)
-    setStep((current) => Math.min(current + 1, STEPS.length - 1))
+    setStep(reached)
   }
 
   /**

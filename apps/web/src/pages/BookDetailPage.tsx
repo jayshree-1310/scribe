@@ -11,7 +11,6 @@ import {
   type Book,
   type ReadingStatus,
 } from '../types/books'
-import { AppShell } from '../components/layout/AppShell'
 import { ButtonLink } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
 import { Stars } from '../components/ui/Rating'
@@ -107,9 +106,9 @@ export function BookDetailPage() {
 
   if (book.status === 'loading') {
     return (
-      <AppShell>
+      <>
         <DetailSkeleton />
-      </AppShell>
+      </>
     )
   }
 
@@ -124,7 +123,7 @@ export function BookDetailPage() {
         book.error.includes("couldn't find"))
 
     return (
-      <AppShell>
+      <>
         {missing ? (
           <EmptyState
             icon="book"
@@ -135,14 +134,14 @@ export function BookDetailPage() {
         ) : (
           <ErrorState message={book.error} onRetry={book.reload} />
         )}
-      </AppShell>
+      </>
     )
   }
 
   const current: Book = book.data
 
   return (
-    <AppShell>
+    <>
       <nav className="crumbs" aria-label="Breadcrumb">
         <Link to="/discover">Books</Link>
         <Icon name="chevron-right" size="0.85em" />
@@ -296,6 +295,6 @@ export function BookDetailPage() {
           />
         )}
       </section>
-    </AppShell>
+    </>
   )
 }

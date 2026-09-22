@@ -12,7 +12,6 @@ import {
   type StoryPerformance,
 } from '../../types/analytics'
 import { STORY_STATUS_LABELS, readingMinutes } from '../../types/stories'
-import { AppShell } from '../../components/layout/AppShell'
 import { LineChart } from '../../components/charts/LineChart'
 import { Card, SectionHead, StatTile } from '../../components/ui/Card'
 import { StatusBadge } from '../../components/ui/Chip'
@@ -122,7 +121,7 @@ export function AuthorAnalyticsPage() {
   const windowLabel = ANALYTICS_RANGE_LABELS[range].toLowerCase()
 
   return (
-    <AppShell variant="author">
+    <>
       <header className="page-head">
         <div>
           <h1 className="page-head__title">Analytics</h1>
@@ -317,6 +316,6 @@ export function AuthorAnalyticsPage() {
           </section>
         </>
       )}
-    </AppShell>
+    </>
   )
 }

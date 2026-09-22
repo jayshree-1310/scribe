@@ -1,0 +1,153 @@
+/**
+ * The writing assistant panel, between the toolbar and the prose.
+ *
+ * Two columns so the author's own text and the suggestion can be read against
+ * each other — that comparison is the point, and it is why the panel is not a
+ * modal over the editor. Below 52rem they stack, original first.
+ */
+
+.assist {
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2, var(--surface));
+}
+
+.assist__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.assist__mark {
+  color: var(--brand);
+}
+
+.assist__title {
+  margin: 0;
+  font-size: var(--text-base);
+}
+
+/** Says what this is wherever it is read. Never styled as the author's words. */
+.assist__badge {
+  margin-right: auto;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.assist__tone {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.assist__tone > :first-child {
+  flex: 1;
+}
+
+.assist__columns {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 1fr 1fr;
+}
+
+@media (max-width: 52rem) {
+  .assist__columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.assist__column {
+  display: grid;
+  gap: var(--space-1);
+  align-content: start;
+  min-width: 0;
+}
+
+.assist__column--suggestion {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--brand);
+}
+
+@media (max-width: 52rem) {
+  .assist__column--suggestion {
+    padding-left: 0;
+    padding-top: var(--space-3);
+    border-left: none;
+    border-top: 2px solid var(--brand);
+  }
+}
+
+.assist__column-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.assist__text {
+  margin: 0;
+  max-height: 18rem;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.assist__pulse {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--brand);
+  animation: assist-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes assist-pulse {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .assist__pulse {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+.assist__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.assist__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.assist__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}

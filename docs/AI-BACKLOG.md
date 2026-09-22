@@ -484,6 +484,25 @@ is the natural follow-up.
 
 ## Task AI 3 — Writing assistant
 
+**Status: built.** `services/ai/assist.ts`, `services/ai/prompts/assist/`, two
+routes on `routes/ai.ts`, `components/ai/AssistPanel.tsx` wired into
+`pages/author/StoryEditorPage.tsx`, tests in `services/ai/assist.test.ts` (pure)
+and `routes/ai-assist.test.ts` (end to end).
+
+Three things to know before extending it. The service **has no write path**, so
+"a failed request leaves the draft untouched" is structural rather than
+promised. The prose travels in the **request body**, not by chapter id, because
+the editor's buffer is the truth while someone is typing — which is why the
+contract has no `chapterId`. And the editor **re-checks the range** before
+applying an accepted suggestion, since an author can keep typing while one
+streams.
+
+Task AI 2's server side landed with it: `writeEvent` / `reportStreamFailure` in
+`routes/ai.ts` and `streamRequest` in `apps/web/src/data/ai-api.ts` are now
+shared by both streaming features. What remains of AI 1 and AI 2 is the
+`/api/ai/chat` endpoint and the `/ai-lab` workbench page, which nothing depends
+on.
+
 The first feature an author would actually use. **Depends on `BACKLOG.md` Task 6
 (authoring CRUD)** — without a save path, "Accept" has nowhere to put the text.
 
@@ -525,6 +544,23 @@ The first feature an author would actually use. **Depends on `BACKLOG.md` Task 6
 
 ## Task AI 4 — Structured outputs
 
+**Status: built.** `services/ai/json-schema.ts` (zod → the wire schema),
+`services/ai/structured.ts` (`completeStructured`: constrain, validate, repair
+once, then fail), `services/ai/schemas.ts` (the three shapes), the `format`
+field on `AiRequest` mapped by both providers, tests in
+`services/ai/structured.test.ts`. Scribble's intent stage runs through it;
+narration does not, because it degrades gracefully and is streamed — see
+`docs/ai-architecture.md` § *Structured output*. Verified against
+`llama3.2:3b`: a story idea, schema-valid on the first attempt, 35s on CPU.
+
+Two notes for whoever picks up Task AI 5. The schemas are written and tested
+but nothing calls them yet — the endpoints are that task. And the wire schema
+carries structure only (`type`, `enum`, `properties`, `required`, `items`,
+`anyOf`, `description`): bounds like `max(120)` are enforced by zod on the way
+back, because some providers' strict mode rejects those keywords outright.
+`AI_STRUCTURED_OUTPUT=off` is the escape hatch for a provider that rejects
+`response_format` entirely.
+
 **Prompt:**
 
 > Stop parsing prose. Move the generative features onto schema-constrained
@@ -557,6 +593,20 @@ The first feature an author would actually use. **Depends on `BACKLOG.md` Task 6
 ---
 
 ## Task AI 5 — Story generation tools
+
+**Status: built.** `services/ai/generate.ts`, `services/ai/prompts/generate.ts`,
+four routes on `routes/ai.ts`, `getStoryContext` in `services/authoring.ts` (the
+ownership guard reused rather than rewritten), `pages/author/IdeaStudioPage.tsx`
+at `/author/ideas`, tests in `routes/ai-generate.test.ts`. Verified against
+`llama3.2:3b`: a chapter outline, schema-valid on the first attempt, 64s on CPU.
+
+Three decisions worth knowing before extending it. Alternatives are generated
+**sequentially**, each told what the previous ones were — concurrent calls on a
+local model are not faster, and alternatives that cannot see each other are
+rewordings. The refinement conversation lives in **Redis under a key containing
+the caller's id**, so a client never sends back the object being revised.
+Chapter **titles** reach the prompt, never bodies; Task AI 13 is where the
+assistant learns what is inside them.
 
 **Prompt:**
 

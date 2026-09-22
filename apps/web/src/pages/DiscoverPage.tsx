@@ -14,7 +14,6 @@ import {
   type BookSort,
 } from '../types/books'
 import type { Story } from '../types/stories'
-import { AppShell } from '../components/layout/AppShell'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { SelectableChip } from '../components/ui/Chip'
 import { Icon } from '../components/ui/Icon'
@@ -385,7 +384,7 @@ export function DiscoverPage() {
   }
 
   return (
-    <AppShell>
+    <>
       <header className="page-head">
         <div>
           <h1 className="page-head__title">Discover</h1>
@@ -575,6 +574,6 @@ export function DiscoverPage() {
           )}
         </section>
       )}
-    </AppShell>
+    </>
   )
 }

@@ -96,6 +96,9 @@ export const NOTIFICATION_TYPES = [
   "CLUB_DISCUSSION",
   "NEW_STORY",
   "BADGE_EARNED",
+  "LEVEL_UP",
+  "CONTENT_HIDDEN",
+  "REPORT_RESOLVED",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -182,6 +185,32 @@ export type NotificationEvent =
       userId: string;
       name: string;
       description: string;
+    }
+  /**
+   * A level crossed. Carries the words rather than the number for the same
+   * reason `badge-earned` carries the badge's name: the ladders live in
+   * `services/gamification.ts`, and taking the rendered title as an argument
+   * is what keeps this module from importing the one that imports it.
+   */
+  | { event: "level-up"; userId: string; title: string; description: string }
+  /**
+   * Somebody's own content was hidden by a moderator, and the reason. The one
+   * event that is bad news, and the only one whose recipient is the person the
+   * write was performed *against* rather than an audience for it.
+   *
+   * Deliberately carries no `sourceType` / `sourceId`. Those exist so
+   * `hideContent` can delete notifications that *quote* hidden content, and
+   * this one does not quote it -- it is a notice about the hiding. Recording
+   * the source would put the notice in the path of the next sweep of the same
+   * row, which would delete the author's only explanation.
+   */
+  | { event: "content-hidden"; userId: string; title: string; reason: string; href: string }
+  /** A report the recipient filed reached an outcome, either way. */
+  | {
+      event: "report-resolved";
+      userId: string;
+      title: string;
+      description: string;
     };
 
 /* Fan-out ---------------------------------------------------------------- */
@@ -246,6 +275,30 @@ async function fanOut(event: NotificationEvent): Promise<void> {
       return notifyFollowers(event.storyId);
     case "badge-earned":
       return notifyEarner(event.userId, event.name, event.description);
+    case "level-up":
+      return notifyPlain(
+        event.userId,
+        "LEVEL_UP",
+        event.title,
+        event.description,
+        "/badges",
+      );
+    case "content-hidden":
+      return notifyPlain(
+        event.userId,
+        "CONTENT_HIDDEN",
+        event.title,
+        event.reason,
+        event.href,
+      );
+    case "report-resolved":
+      return notifyPlain(
+        event.userId,
+        "REPORT_RESOLVED",
+        event.title,
+        event.description,
+        "/notifications",
+      );
   }
 }
 
@@ -541,6 +594,59 @@ async function notifyEarner(
              SELECT 1 FROM "auth"."notificationMute" AS mute
               WHERE mute."userId" = ${userId}
                 AND mute."type" = 'BADGE_EARNED'
+           )
+  `.affectedCount().build();
+
+  await db.runtime().query(plan);
+}
+
+/**
+ * One row, to one person, about something nobody else did.
+ *
+ * `LEVEL_UP`, `CONTENT_HIDDEN` and `REPORT_RESOLVED` share a shape that the
+ * five older resolvers do not: there is no audience to select and no actor to
+ * record, so the whole of the fan-out is a single insert of values the caller
+ * already computed. `notifyEarner` predates it and is left alone rather than
+ * folded in -- it is the same statement, but rewriting a working resolver to
+ * save nine lines is how a working resolver stops working.
+ *
+ * The mute check is the same `NOT EXISTS` every other resolver carries, and
+ * carrying it is not optional: it is the clause that makes a muted type a type
+ * that is never *written*, rather than one that is written and hidden. See the
+ * module header.
+ *
+ * `source` is passed only where the notification quotes something that can
+ * later be hidden, which is what lets `hideContent` sweep the copies.
+ */
+async function notifyPlain(
+  userId: string,
+  type: NotificationType,
+  title: string,
+  excerpt: string,
+  href: string,
+  source?: { sourceType: string; sourceId: string },
+): Promise<void> {
+  const plan = db.raw.sql`
+    INSERT INTO "notifications"."notification"
+      ("id", "userId", "type", "actorId", "title", "excerpt", "href",
+       "sourceType", "sourceId", "createdAt")
+    SELECT gen_random_uuid()::text,
+           ${userId},
+           ${type},
+           NULL,
+           ${title},
+           left(${excerpt}::text, ${EXCERPT_LENGTH}),
+           ${href},
+           -- NULLIF rather than a null parameter: the raw-SQL lane takes no
+           -- nulls, and two statements differing only in two columns would be
+           -- two places to change the next time this row grows a field.
+           NULLIF(${source?.sourceType ?? ""}::text, ''),
+           NULLIF(${source?.sourceId ?? ""}::text, ''),
+           now()
+     WHERE NOT EXISTS (
+             SELECT 1 FROM "auth"."notificationMute" AS mute
+              WHERE mute."userId" = ${userId}
+                AND mute."type" = ${type}
            )
   `.affectedCount().build();
 

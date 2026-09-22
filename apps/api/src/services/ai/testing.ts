@@ -21,6 +21,7 @@ import { HttpError } from "../../lib/http-error.js";
 import type {
   AiProvider,
   AiRequest,
+  AiResponseFormat,
   AiStreamEvent,
   AiUsage,
 } from "./types.js";
@@ -31,6 +32,8 @@ export interface RecordedCall {
   messages: AiRequest["messages"];
   model: string | undefined;
   maxTokens: number | undefined;
+  /** The schema the caller asked the provider to constrain output to, if any. */
+  format: AiResponseFormat | undefined;
   /** Whether the caller's signal was aborted by the time the call ended. */
   aborted: boolean;
   streamed: boolean;
@@ -75,6 +78,7 @@ export function fakeAiProvider(replies: string[] = ["ok"]): FakeAiProvider {
       messages: request.messages,
       model: request.model,
       maxTokens: request.maxTokens,
+      format: request.format,
       aborted: request.signal?.aborted === true,
       streamed,
     });

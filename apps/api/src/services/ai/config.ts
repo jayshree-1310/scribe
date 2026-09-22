@@ -43,6 +43,16 @@ export interface AiConfig {
   timeoutMs: number;
   /** Attempts *after* the first, for transient failures only. */
   maxRetries: number;
+  /**
+   * Whether a structured call sends its JSON schema to the provider.
+   *
+   * On by default, because a constrained reply is worth far more than a
+   * well-worded request for one. Off is the escape hatch for a provider that
+   * rejects `response_format` outright: the prompts still ask for JSON and zod
+   * still validates, so the feature degrades rather than breaking, and nobody
+   * needs a deploy to find that out.
+   */
+  structuredOutput: boolean;
   /** Per-user daily ceiling, enforced by the routes. 0 disables the check. */
   dailyTokenBudget: number;
 }
@@ -56,6 +66,7 @@ const DEFAULTS = {
   maxTokens: 1024,
   timeoutMs: 120_000,
   maxRetries: 1,
+  structuredOutput: true,
   dailyTokenBudget: 200_000,
 };
 
@@ -83,6 +94,13 @@ function readInt(name: string, fallback: number): number {
   return Number.isFinite(parsed) && parsed >= 0 ? Math.trunc(parsed) : fallback;
 }
 
+/** Opt *out* only: anything but an explicit denial leaves the default on. */
+function readFlag(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (raw === undefined || raw === "") return fallback;
+  return !(raw === "off" || raw === "false" || raw === "0" || raw === "no");
+}
+
 function readProvider(): AiProviderName {
   const raw = process.env["AI_PROVIDER"]?.trim().toLowerCase();
   return AI_PROVIDERS.find((name) => name === raw) ?? DEFAULTS.provider;
@@ -107,6 +125,10 @@ export function loadAiConfig(): AiConfig {
     maxTokens: readInt("AI_MAX_TOKENS", DEFAULTS.maxTokens),
     timeoutMs: readInt("AI_TIMEOUT_MS", DEFAULTS.timeoutMs),
     maxRetries: readInt("AI_MAX_RETRIES", DEFAULTS.maxRetries),
+    structuredOutput: readFlag(
+      "AI_STRUCTURED_OUTPUT",
+      DEFAULTS.structuredOutput,
+    ),
     dailyTokenBudget: readInt(
       "AI_DAILY_TOKEN_BUDGET",
       DEFAULTS.dailyTokenBudget,

@@ -14,6 +14,7 @@
 import { request } from '../lib/api-client'
 import { readerHeaders } from './stories-api'
 import type {
+  Challenge,
   ChallengeBoard,
   ChallengeDetail,
   ChallengeEntry,
@@ -96,4 +97,52 @@ export async function withdrawEntry(entryId: string): Promise<void> {
     method: 'DELETE',
     headers: readerHeaders(),
   })
+}
+
+/* Hosting ---------------------------------------------------------------- */
+
+/**
+ * What a host supplies. `startsAt` / `endsAt` are ISO strings with an offset,
+ * which is what the API's schema demands and what a `datetime-local` input
+ * does *not* produce -- the form converts.
+ */
+export interface ChallengeDraft {
+  title: string
+  prompt: string
+  description?: string | null
+  wordTarget?: number | null
+  startsAt: string
+  endsAt: string
+}
+
+/**
+ * Creates a challenge. Administrators only; anybody else gets a 403 from the
+ * server whatever the browser believes about itself.
+ */
+export async function createChallenge(
+  draft: ChallengeDraft,
+): Promise<Challenge> {
+  const { challenge } = await request<{ challenge: Challenge }>('/challenges', {
+    method: 'POST',
+    headers: readerHeaders(),
+    body: draft,
+  })
+
+  return challenge
+}
+
+/**
+ * Edits one. Partial: every field is optional and an empty body is refused,
+ * so the form sends only what changed.
+ */
+export async function updateChallenge(
+  id: string,
+  changes: Partial<ChallengeDraft>,
+): Promise<Challenge> {
+  const { challenge } = await request<{ challenge: Challenge }>(
+    `/challenges/${encodeURIComponent(id)}`,
+    { method: 'PATCH', headers: readerHeaders(), body: changes },
+  )
+
+  return challenge
 }

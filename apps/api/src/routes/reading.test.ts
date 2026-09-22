@@ -438,4 +438,38 @@ describe.skipIf(!available)("reading streak", () => {
 
     await clearAll();
   });
+
+  it("keeps the longest run when the current one resets", async () => {
+    // The whole point of the second column: a reset used to lose the fact
+    // that eleven days had happened at all, which is what made the 30-day
+    // badge earnable only while a run was still alive.
+    await api.setStreak(reader, {
+      streak: 11,
+      lastReadAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+    });
+
+    await save({ storyId, chapterId: chapterOne, offset: 10 });
+
+    const after = await api.readStreak(reader);
+    expect(after.streak).toBe(1);
+    expect(after.longest).toBe(11);
+
+    await clearAll();
+  });
+
+  it("does not let the longest run go backwards", async () => {
+    await api.setStreak(reader, {
+      streak: 4,
+      lastReadAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    });
+    await api.setLongestStreak(reader, 40);
+
+    await save({ storyId, chapterId: chapterOne, offset: 10 });
+
+    const after = await api.readStreak(reader);
+    expect(after.streak).toBe(5);
+    expect(after.longest).toBe(40);
+
+    await clearAll();
+  });
 });

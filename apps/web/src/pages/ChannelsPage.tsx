@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useAsync } from '../hooks/useAsync'
 import { useToast } from '../lib/toast'
 import * as channelsApi from '../data/channels-api'
-import { AppShell } from '../components/layout/AppShell'
 import { Button } from '../components/ui/Button'
 import { SectionHead } from '../components/ui/Card'
 import { Dialog } from '../components/ui/Dialog'
@@ -87,7 +86,7 @@ export function ChannelsPage() {
   const loading = all.status === 'loading' || subscribed.status === 'loading'
 
   return (
-    <AppShell>
+    <>
       <header className="page-head">
         <div>
           <h1 className="page-head__title">Broadcast channels</h1>
@@ -211,6 +210,6 @@ export function ChannelsPage() {
           />
         </div>
       </Dialog>
-    </AppShell>
+    </>
   )
 }

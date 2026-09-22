@@ -14,7 +14,6 @@ import {
   type Discussion,
 } from '../types/clubs'
 import { storyAuthorName } from '../types/stories'
-import { AppShell } from '../components/layout/AppShell'
 import { ReportMenu } from '../components/moderation/ReportMenu'
 import { Avatar } from '../components/ui/Avatar'
 import { Button, ButtonLink } from '../components/ui/Button'
@@ -81,21 +80,21 @@ export function ClubDetailPage() {
 
   if (club.status === 'loading') {
     return (
-      <AppShell>
+      <>
         <Skeleton height="12rem" radius="var(--radius-lg)" />
-      </AppShell>
+      </>
     )
   }
 
   if (club.status === 'error' || !club.data) {
     return (
-      <AppShell>
+      <>
         <ErrorState
           title="We couldn't open that club"
           message={club.error}
           onRetry={club.reload}
         />
-      </AppShell>
+      </>
     )
   }
 
@@ -234,7 +233,7 @@ export function ClubDetailPage() {
   }
 
   return (
-    <AppShell>
+    <>
       {/*
         `clubs.BookClub` has no hue column — the mock's was invented — so the
         banner colour is derived from the slug. Deterministic, so the club keeps
@@ -651,6 +650,6 @@ export function ClubDetailPage() {
         onConfirm={() => setMembership(false)}
         onCancel={() => setConfirmLeave(false)}
       />
-    </AppShell>
+    </>
   )
 }

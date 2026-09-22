@@ -28,6 +28,7 @@ import {
   getPublicProfile,
   listFollowers,
   listFollowing,
+  listUserClubs,
   listUserStories,
   unfollowUser,
 } from "../services/users.js";
@@ -86,6 +87,24 @@ router.get("/:username/stories", async (req, res, next) => {
     const query = parseOrThrow(pageQuerySchema, req.query);
 
     res.json(await listUserStories(username, query, getUserId(req)));
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * The clubs this person is in.
+ *
+ * Public, like the profile it sits on -- see `listUserClubs` for the reasoning
+ * and for what it changes. Paginated like the other profile lists rather than
+ * capped: somebody in forty clubs has forty clubs.
+ */
+router.get("/:username/clubs", async (req, res, next) => {
+  try {
+    const { username } = parseOrThrow(usernameParamSchema, req.params);
+    const query = parseOrThrow(pageQuerySchema, req.query);
+
+    res.json(await listUserClubs(username, query, getUserId(req)));
   } catch (error) {
     next(error);
   }

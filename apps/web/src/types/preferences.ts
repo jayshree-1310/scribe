@@ -43,6 +43,8 @@ export interface Preferences {
    */
   onboardingComplete: boolean
   onboardingCompletedAt: string | null
+  /** The furthest step of onboarding reached, zero-based. */
+  onboardingStep: number
   /** Null for a reader who has never saved anything. */
   updatedAt: string | null
 }
@@ -57,4 +59,6 @@ export interface PreferenceUpdate {
   contentLength?: ContentLength
   mutedNotificationTypes?: NotificationType[]
   onboardingComplete?: boolean
+  /** Only ever moves forward, server-side; sending a lower one is a no-op. */
+  onboardingStep?: number
 }

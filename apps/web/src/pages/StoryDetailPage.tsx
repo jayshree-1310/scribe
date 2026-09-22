@@ -23,7 +23,6 @@ import {
   type Comment,
 } from '../types/engagement'
 import { useAuth } from '../lib/auth'
-import { AppShell } from '../components/layout/AppShell'
 import { LikeButton } from '../components/engagement/LikeButton'
 import { ReportMenu } from '../components/moderation/ReportMenu'
 import { Avatar } from '../components/ui/Avatar'
@@ -122,7 +121,7 @@ export function StoryDetailPage() {
 
   if (story.status === 'loading') {
     return (
-      <AppShell>
+      <>
         <div className="detail__loading">
           <Skeleton width="9rem" height="13.5rem" radius="var(--radius-sm)" />
           <div className="stack" style={{ gap: 'var(--space-3)', flex: 1 }}>
@@ -132,19 +131,19 @@ export function StoryDetailPage() {
             <Skeleton width="80%" height="0.85rem" />
           </div>
         </div>
-      </AppShell>
+      </>
     )
   }
 
   if (story.status === 'error' || !story.data) {
     return (
-      <AppShell>
+      <>
         <ErrorState
           title="We couldn't open that story"
           message={story.error}
           onRetry={story.reload}
         />
-      </AppShell>
+      </>
     )
   }
 
@@ -313,7 +312,7 @@ export function StoryDetailPage() {
   }
 
   return (
-    <AppShell>
+    <>
       {/* Header --------------------------------------------------------- */}
       <header className="detail">
         <div className="detail__wash" style={{ background: coverWash(hue) }} aria-hidden="true" />
@@ -848,6 +847,6 @@ export function StoryDetailPage() {
           </p>
         </div>
       </Dialog>
-    </AppShell>
+    </>
   )
 }

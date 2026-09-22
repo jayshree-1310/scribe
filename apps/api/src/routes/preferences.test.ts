@@ -159,6 +159,32 @@ describe.skipIf(!available)("writing preferences", () => {
     await write(reader, { onboardingComplete: true });
   });
 
+  it("remembers the furthest onboarding step, and never a lower one", async () => {
+    const stepper = await api.createUser("pstep");
+
+    const forward = await write(stepper, { onboardingStep: 2 });
+    expect(forward.preferences.onboardingStep).toBe(2);
+
+    // Stepping back to change an answer and saving is not losing ground.
+    const back = await write(stepper, { onboardingStep: 1 });
+    expect(back.preferences.onboardingStep).toBe(2);
+
+    const on = await write(stepper, { onboardingStep: 3 });
+    expect(on.preferences.onboardingStep).toBe(3);
+  });
+
+  it("starts a reader who has answered nothing at step zero", async () => {
+    const fresh = await api.createUser("pfresh");
+
+    expect((await read(fresh)).onboardingStep).toBe(0);
+  });
+
+  it("refuses a step beyond the end of any flow", async () => {
+    const { status } = await write(reader, { onboardingStep: 900 });
+
+    expect(status).toBe(400);
+  });
+
   it("refuses a genre that does not exist", async () => {
     const { status } = await write(reader, {
       genreIds: ["00000000-0000-4000-8000-0000000000ff"],

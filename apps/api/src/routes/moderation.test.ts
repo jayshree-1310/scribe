@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { drainDeferredWrites } from "../services/deferred.js";
 import { TestApi, databaseAvailable } from "../test/harness.js";
-import { flushBadges } from "../services/gamification.js";
-import { flushNotifications } from "../services/notifications.js";
 import type { Page, Report } from "../services/moderation.js";
 
 const api = new TestApi();
@@ -15,8 +14,7 @@ const available = await databaseAvailable();
  * parallel, the order every other drain site uses.
  */
 async function settle(): Promise<void> {
-  await flushBadges();
-  await flushNotifications();
+  await drainDeferredWrites();
 }
 
 async function fileReport(
@@ -541,5 +539,171 @@ describe.skipIf(!available)("resolving", () => {
     expect(await api.readSuspended(moderator)).toBe(false);
     // Nothing was hidden either: the guard runs before any write.
     expect(await visibleComments(story.slug)).toContain(commentId);
+  });
+});
+
+describe.skipIf(!available)("telling people what happened", () => {
+  /** The notification types sitting in an account's bell. */
+  async function inboxTypes(as: string): Promise<string[]> {
+    const response = await api.request<{ items: { type: string }[] }>(
+      "/api/notifications",
+      { as },
+    );
+
+    expect(response.status).toBe(200);
+    return response.body.items.map((item) => item.type);
+  }
+
+  async function inboxOf(as: string, type: string) {
+    const response = await api.request<{
+      items: { type: string; title: string; excerpt: string | null }[];
+    }>("/api/notifications", { as });
+
+    expect(response.status).toBe(200);
+    return response.body.items.filter((item) => item.type === type);
+  }
+
+  it("tells an author their comment was hidden, and why", async () => {
+    const author = await api.createUser("mhidden");
+    const commentId = await api.createComment({
+      storyId: story.id,
+      userId: author,
+      content: "Buy my thing.",
+    });
+
+    const filed = await fileReport(reporter, {
+      targetType: "COMMENT",
+      targetId: commentId,
+      reason: "SPAM",
+      details: "This person is a menace and here is my opinion of them.",
+    });
+    expect(filed.status).toBe(201);
+
+    expect((await resolve(moderator, filed.body.report.id, "HIDE")).status).toBe(
+      200,
+    );
+    await settle();
+
+    const told = await inboxOf(author, "CONTENT_HIDDEN");
+    expect(told).toHaveLength(1);
+    expect(told[0]?.title).toBe("Your comment was hidden");
+    // The category, not the reporter's words about them.
+    expect(told[0]?.excerpt).toBe("A moderator hid it for spam or advertising.");
+    expect(told[0]?.excerpt).not.toContain("menace");
+  });
+
+  it("tells the reporter the outcome, without naming the author", async () => {
+    const author = await api.createUser("mreported");
+    // Its own reporter: the shared fixture has filed reports all over this
+    // file, and "exactly one" is the assertion that matters here.
+    const asker = await api.createUser("masker");
+    const commentId = await api.createComment({
+      storyId: story.id,
+      userId: author,
+      content: "Something reportable.",
+    });
+
+    const filed = await fileReport(asker, {
+      targetType: "COMMENT",
+      targetId: commentId,
+    });
+    expect(filed.status).toBe(201);
+
+    expect((await resolve(moderator, filed.body.report.id, "HIDE")).status).toBe(
+      200,
+    );
+    await settle();
+
+    const told = await inboxOf(asker, "REPORT_RESOLVED");
+    expect(told).toHaveLength(1);
+    expect(told[0]?.title).toBe("Your report on a comment was reviewed");
+    expect(told[0]?.excerpt).toBe("The content was hidden.");
+    expect(told[0]?.title).not.toContain(author);
+  });
+
+  it("says nothing to an author whose report was dismissed", async () => {
+    const author = await api.createUser("mkept");
+    const commentId = await api.createComment({
+      storyId: story.id,
+      userId: author,
+      content: "Perfectly fine, actually.",
+    });
+
+    const asker = await api.createUser("mdismissed");
+    const filed = await fileReport(asker, {
+      targetType: "COMMENT",
+      targetId: commentId,
+    });
+    expect(filed.status).toBe(201);
+
+    expect(
+      (await resolve(moderator, filed.body.report.id, "DISMISS")).status,
+    ).toBe(200);
+    await settle();
+
+    // Nothing was done to them, so there is nothing to tell them -- and a
+    // grievance they did not have is not worth handing over.
+    expect(await inboxTypes(author)).not.toContain("CONTENT_HIDDEN");
+    // The reporter still hears, because they asked.
+    const told = await inboxOf(asker, "REPORT_RESOLVED");
+    expect(told).toHaveLength(1);
+    expect(told[0]?.excerpt).toBe("We looked at it and took no action.");
+  });
+});
+
+describe.skipIf(!available)("reinstating an account", () => {
+  async function reinstate(as: string, userId: string) {
+    return api.request<{ user: { id: string } }>(
+      `/api/moderation/users/${userId}/reinstate`,
+      { method: "POST", as },
+    );
+  }
+
+  it("lifts a suspension without the report that imposed it", async () => {
+    const offender = await api.createUser("mstranded");
+    const commentId = await api.createComment({
+      storyId: story.id,
+      userId: offender,
+      content: "Worth a suspension.",
+    });
+
+    const filed = await fileReport(reporter, {
+      targetType: "COMMENT",
+      targetId: commentId,
+    });
+    expect(
+      (await resolve(moderator, filed.body.report.id, "SUSPEND")).status,
+    ).toBe(200);
+    expect(await api.readSuspended(offender)).toBe(true);
+
+    const lifted = await reinstate(moderator, offender);
+    expect(lifted.status).toBe(200);
+    expect(lifted.body.user.id).toBe(offender);
+    expect(await api.readSuspended(offender)).toBe(false);
+  });
+
+  it("409s for an account in good standing", async () => {
+    const fine = await api.createUser("mfine");
+
+    const { status } = await reinstate(moderator, fine);
+
+    expect(status).toBe(409);
+  });
+
+  it("404s for an account that does not exist", async () => {
+    const { status } = await reinstate(
+      moderator,
+      "00000000-0000-4000-8000-0000000000ff",
+    );
+
+    expect(status).toBe(404);
+  });
+
+  it("is administrators only", async () => {
+    const offender = await api.createUser("mstill");
+
+    const { status } = await reinstate(reporter, offender);
+
+    expect(status).toBe(403);
   });
 });

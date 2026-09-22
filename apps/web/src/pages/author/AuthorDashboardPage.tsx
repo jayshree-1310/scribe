@@ -5,7 +5,6 @@ import * as analyticsApi from '../../data/analytics-api'
 import * as channelsApi from '../../data/channels-api'
 import { STORY_STATUS_LABELS } from '../../types/stories'
 import type { StoryPerformance } from '../../types/analytics'
-import { AppShell } from '../../components/layout/AppShell'
 import { LineChart } from '../../components/charts/LineChart'
 import { ButtonLink } from '../../components/ui/Button'
 import { Card, SectionHead, StatTile } from '../../components/ui/Card'
@@ -77,7 +76,7 @@ export function AuthorDashboardPage() {
     .slice(0, 4)
 
   return (
-    <AppShell variant="author">
+    <>
       <header className="page-head">
         <div>
           <h1 className="page-head__title">Author studio</h1>
@@ -261,6 +260,6 @@ export function AuthorDashboardPage() {
           </section>
         </>
       ) : null}
-    </AppShell>
+    </>
   )
 }

@@ -38,7 +38,6 @@ import {
   useReaderPrefs,
 } from '../lib/reader-prefs'
 import { PASSWORD_MIN, isValidEmail, isValidUsername, passwordStrength } from '../lib/auth'
-import { AppShell } from '../components/layout/AppShell'
 import { AvatarField, type PendingAvatar } from '../components/settings/AvatarField'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -654,7 +653,7 @@ export function SettingsPage() {
   }
 
   return (
-    <AppShell width="narrow">
+    <>
       <header className="page-head">
         <div>
           <h1 className="page-head__title">Settings</h1>
@@ -1262,6 +1261,6 @@ export function SettingsPage() {
           ) : null}
         </div>
       </Dialog>
-    </AppShell>
+    </>
   )
 }

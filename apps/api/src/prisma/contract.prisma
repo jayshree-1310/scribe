@@ -65,6 +65,20 @@ enum NotificationType {
   NEW_STORY
   // A badge the recipient earned. The one type with no actor.
   BADGE_EARNED
+  /// A reader or author level the recipient crossed. Like `BADGE_EARNED` it
+  /// has no actor -- nobody did it to them -- and unlike it, it is derived
+  /// rather than awarded, so `auth.User.announcedReaderLevel` is what keeps it
+  /// from firing on every evaluation. See `announceLevels`.
+  LEVEL_UP
+  /// The recipient's own comment, club thread or channel post was hidden by a
+  /// moderator. The one type that is bad news, and the reason moderation stops
+  /// being silent: until this existed a hidden post simply vanished and an
+  /// edit of it 404ed with no explanation offered anywhere.
+  CONTENT_HIDDEN
+  /// A report the recipient filed was acted on or dismissed. Addressed to the
+  /// reporter rather than to the author, which is what makes it a different
+  /// type from `CONTENT_HIDDEN` and not a second recipient of it.
+  REPORT_RESOLVED
 }
 
 /// Which of the three kinds of user-written text a row is about.
@@ -219,8 +233,33 @@ namespace auth {
     /// and a different row.
     streakLastReadAt DateTime?
 
+    /// The longest run `readingStreak` has ever reached.
+    ///
+    /// `readingStreak` is the *current* run and resets to 1 on a missed day,
+    /// which made "read 30 days in a row" earnable only while the run was
+    /// still alive: a reader who managed forty days last year and is on three
+    /// today could not hold the badge they had plainly earned. The metric the
+    /// badges read is this one. Advanced in the same compare-and-set that
+    /// advances the streak, so it can never lag behind it.
+    longestStreak Int @default(0)
+
     authorLevel   Int     @default(1)
     readerLevel   Int     @default(1)
+
+    /// The levels the reader has actually been *told* about.
+    ///
+    /// Levels are derived on every evaluation rather than awarded, so unlike a
+    /// badge there is no inserted row to hang a notification on -- nothing
+    /// anywhere knew that a level had just changed as opposed to merely being
+    /// high. These two columns are that knowledge: when a derived level is
+    /// above the announced one, the difference is the announcement owed, and
+    /// writing it back is what stops it being made twice.
+    ///
+    /// Defaulted to 1, the level everybody starts at, so an existing account
+    /// is not told it reached a level it has held for months. See
+    /// `announceLevels` in `services/gamification.ts`.
+    announcedReaderLevel Int @default(1)
+    announcedAuthorLevel Int @default(1)
 
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now())
@@ -291,6 +330,16 @@ namespace auth {
     /// than on local state, so a refresh halfway through resumes instead of
     /// skipping to the feed.
     onboardingCompletedAt DateTime?
+
+    /// The furthest step of onboarding the reader has reached, zero-based.
+    ///
+    /// Saving per step is what makes a refresh resume, but the row alone could
+    /// not say *where* to resume: a reader who quit at the author step had
+    /// genres saved and was still put back at step one, to walk forward
+    /// through answers they had already given. This is the number that stops
+    /// that. It only ever moves forward -- going back a step to change an
+    /// answer is not losing progress -- so the write is a `GREATEST`.
+    onboardingStep Int @default(0)
 
     createdAt DateTime @default(now())
     updatedAt DateTime @default(now())

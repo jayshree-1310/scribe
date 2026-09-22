@@ -6,11 +6,9 @@ import { useToast } from '../lib/toast'
 import { formatCount, formatDate, formatRelative } from '../lib/format'
 import * as books from '../data/books-api'
 import * as gamification from '../data/gamification-api'
-import * as clubsApi from '../data/clubs-api'
 import * as usersApi from '../data/users-api'
 import { READING_STATUS_LABELS } from '../types/books'
 import type { FollowPage, FollowState } from '../types/users'
-import { AppShell } from '../components/layout/AppShell'
 import { Avatar } from '../components/ui/Avatar'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Card, SectionHead, StatTile } from '../components/ui/Card'
@@ -52,11 +50,16 @@ function messageOf(cause: unknown): string {
  * story list, which returns the caller's own drafts to them and nobody else's
  * to anybody.
  *
- * Three sections are the *caller's own* data and so are hidden on somebody
- * else's profile: currently-reading, reading activity and clubs. They read the
- * signed-in reader's library and `listClubs({ mine: true })`, neither of which
- * can be asked about another person; a public "clubs this person is in" would
- * be a new endpoint on the clubs service rather than a UI change.
+ * Two sections are the *caller's own* data and so are hidden on somebody
+ * else's profile: currently-reading and reading activity. Both read the
+ * signed-in reader's library, which cannot be asked about another person --
+ * making a reading list public is a decision about what this product discloses
+ * rather than a missing endpoint, and nobody has made it.
+ *
+ * Clubs used to be the third. `GET /api/users/:username/clubs` answers for
+ * anybody now, so the tab is public: every club in this app is open and its
+ * member list already readable, so the tab saves a stranger looking rather
+ * than telling them anything new.
  *
  * Badges used to be the fourth. They are public now — the badge engine landed
  * `GET /api/users/:username/badges`, which answers for anybody with the badges
@@ -177,13 +180,18 @@ export function ProfilePage() {
     [handle, initialising],
   )
 
-  // The caller's own data, so there is nothing to load on somebody else's page.
+  /**
+   * Public now, so this asks about whoever the page is showing rather than
+   * about the caller. `handle` is absent on `/profile`, where the answer is
+   * the signed-in reader -- and `data.username` is who that turned out to be.
+   */
+  const clubsOf = handle ?? data?.username
   const clubs = useAsync(
     () =>
-      isMe
-        ? clubsApi.listClubs({ mine: true, limit: 24 }).then((page) => page.items)
+      clubsOf
+        ? usersApi.listUserClubs(clubsOf, { limit: 24 }).then((page) => page.items)
         : Promise.resolve([]),
-    [isMe],
+    [clubsOf],
   )
   const reading = useAsync(
     () =>
@@ -232,7 +240,7 @@ export function ProfilePage() {
 
   if (!data) {
     return (
-      <AppShell>
+      <>
         {profile.status === 'error' ? (
           <ErrorState
             title="We couldn't find that profile"
@@ -242,7 +250,7 @@ export function ProfilePage() {
         ) : (
           <Skeleton height="12rem" radius="var(--radius-lg)" />
         )}
-      </AppShell>
+      </>
     )
   }
 
@@ -273,16 +281,13 @@ export function ProfilePage() {
     { id: 'followers' as const, label: 'Followers', count: followerCount },
     { id: 'following' as const, label: 'Following', count: data.followingCount },
     { id: 'badges' as const, label: 'Badges', count: earnedBadges.length },
-    ...(isMe
-      ? [
-          { id: 'activity' as const, label: 'Reading activity' },
-          { id: 'clubs' as const, label: 'Clubs', count: myClubs.length },
-        ]
-      : []),
+    // Clubs are public; the reading shelves are still the caller's own.
+    { id: 'clubs' as const, label: 'Clubs', count: myClubs.length },
+    ...(isMe ? [{ id: 'activity' as const, label: 'Reading activity' }] : []),
   ]
 
   return (
-    <AppShell>
+    <>
       {/* Header --------------------------------------------------------- */}
       <header className="profile">
         <div className="profile__identity">
@@ -645,11 +650,26 @@ export function ProfilePage() {
 
       {tab === 'clubs' ? (
         <TabPanel id="clubs">
-          {myClubs.length === 0 ? (
+          {/* Status first: an empty list, a list still loading and a list that
+              failed are three different things, and this tab said "not in any
+              clubs" to all three. */}
+          {clubs.status === 'loading' ? (
+            <div className="card-grid card-grid--wide" aria-busy="true">
+              {[0, 1, 2].map((slot) => (
+                <Skeleton key={slot} height="9rem" radius="var(--radius-lg)" />
+              ))}
+            </div>
+          ) : clubs.status === 'error' ? (
+            <ErrorState
+              title="We couldn't load those clubs"
+              message={clubs.error}
+              onRetry={clubs.reload}
+            />
+          ) : myClubs.length === 0 ? (
             <EmptyState
               icon="users"
-              title="Not in any clubs"
-              action={<ButtonLink to="/clubs">Browse clubs</ButtonLink>}
+              title={isMe ? 'Not in any clubs' : `${displayName} isn't in any clubs`}
+              action={isMe ? <ButtonLink to="/clubs">Browse clubs</ButtonLink> : undefined}
             />
           ) : (
             <div className="card-grid card-grid--wide">
@@ -678,7 +698,7 @@ export function ProfilePage() {
           ) : null}
         </Lightbox>
       ) : null}
-    </AppShell>
+    </>
   )
 }
 

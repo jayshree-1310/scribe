@@ -27,6 +27,7 @@
 import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
+import { listClubs, type Club } from "./clubs.js";
 import { evaluateBadges } from "./gamification.js";
 import {
   countVisibleStoriesBy,
@@ -278,6 +279,35 @@ export async function getPublicProfile(
  * draft rule, so an author asking for their own profile gets their drafts and
  * everybody else asking for the same page does not.
  */
+/**
+ * The clubs somebody belongs to.
+ *
+ * **This is a deliberate widening of what a profile tells strangers.** Club
+ * membership was previously answerable only about yourself, not because it was
+ * considered private but because `?mine=true` was the only way to ask -- the
+ * profile's Clubs tab was gated on being your own for want of an endpoint
+ * rather than for want of a decision. Making it public is the decision that
+ * was missing: a book club is a place people join to be seen reading together,
+ * every club in this app is open, and its member list is already readable by
+ * anybody who opens it. Nothing here reveals a club a stranger could not
+ * already have found; it only saves them looking.
+ *
+ * Delegated to `listClubs` with a `memberId` rather than reimplemented, so a
+ * profile's Clubs tab and the clubs page cannot disagree about what a club is.
+ */
+export async function listUserClubs(
+  username: string,
+  query: { page: number; limit: number },
+  viewerId: string | null,
+): Promise<Page<Club>> {
+  const row = await findByUsername(username);
+
+  return listClubs(
+    { memberId: row.id, sort: "newest", page: query.page, limit: query.limit },
+    viewerId,
+  );
+}
+
 export async function listUserStories(
   username: string,
   query: { page: number; limit: number },

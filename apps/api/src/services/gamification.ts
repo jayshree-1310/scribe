@@ -76,7 +76,15 @@ export const BADGE_METRICS = [
   "clubPosts",
   /** People following this account. */
   "followers",
-  /** The reader's *current* streak, not their longest -- see `levelsFor`. */
+  /**
+   * The reader's *longest* run, not the one they are on.
+   *
+   * It was the current streak, which made "read 30 days in a row" earnable
+   * only while the run was still alive -- somebody who managed forty days last
+   * year and is on three today could not hold a badge they had plainly earned.
+   * `auth.User.longestStreak` is the column that fixed it. Still not what
+   * drives a level; see `levelsFor`.
+   */
   "streakDays",
   /** Listed stories this author has written. */
   "storiesPublished",
@@ -371,10 +379,11 @@ export interface Levels {
 /**
  * Both levels for a set of metrics.
  *
- * Deliberately *not* driven by `streakDays`, which is the reader's current
- * streak: a level that fell back to 1 the day somebody missed a day would be
- * punishing a reader for a holiday. A streak earns badges, which are a record
- * of having done it once; a level is cumulative and only ever goes up.
+ * Deliberately *not* driven by `streakDays`. That metric is monotonic now that
+ * it reads the longest run rather than the current one, so it would no longer
+ * fall back -- but a level is a measure of how much somebody has read, and a
+ * streak measures when. A streak earns badges, which are a record of having
+ * done it once; a level is cumulative and only ever goes up.
  */
 export function levelsFor(metrics: Metrics): Levels {
   return {
@@ -428,7 +437,12 @@ export async function metricsFor(userId: string): Promise<Metrics> {
       (SELECT COUNT(*)
          FROM "engagement"."follow" AS f
         WHERE f."followingId" = ${userId})::int                  AS "followers",
-      (SELECT COALESCE(MAX(u."readingStreak"), 0)
+      -- The longest run the reader has ever had, not the one they are on.
+      -- GREATEST rather than the stored column alone because longestStreak
+      -- starts at 0 for every account that predates it and only catches up on
+      -- the next read: the current streak is a lower bound on the longest that
+      -- is always true and costs nothing to include. See the migration.
+      (SELECT COALESCE(MAX(GREATEST(u."longestStreak", u."readingStreak")), 0)
          FROM "auth"."user" AS u
         WHERE u."id" = ${userId})::int                           AS "streakDays",
       (SELECT COUNT(*)
@@ -604,7 +618,9 @@ async function evaluate(userId: string): Promise<Evaluation> {
     });
   }
 
-  await writeLevels(userId, levelsFor(metrics));
+  const levels = levelsFor(metrics);
+  await writeLevels(userId, levels);
+  await announceLevels(userId, levels);
 
   return { metrics, earnedAt, newlyEarned };
 }
@@ -633,6 +649,9 @@ async function insertBadge(
   return row ? toIso(row.earnedAt) : null;
 }
 
+/** What each ladder is called where a reader sees it. */
+const LADDER_NAMES = { reader: "Reader", author: "Author" } as const;
+
 /**
  * Stores the derived levels, and only when one of them moved.
  *
@@ -657,6 +676,79 @@ async function writeLevels(userId: string, levels: Levels): Promise<void> {
       readerLevel: levels.reader.level,
       authorLevel: levels.author.level,
     });
+}
+
+/**
+ * Tells the reader about a level they have crossed, once.
+ *
+ * **Why this needs two more columns rather than reusing `readerLevel`.** A
+ * badge is *awarded*: `insertBadge` returns a row exactly when the award is
+ * new, so "it just happened" is something the database can answer. A level is
+ * *derived* on every evaluation -- it is a function of a metric and a ladder --
+ * so nothing anywhere knew the difference between a level that had just
+ * changed and one that had merely been high for months. `announcedReaderLevel`
+ * and `announcedAuthorLevel` are that missing knowledge: the gap between
+ * derived and announced is the announcement owed.
+ *
+ * The write is the guard, as in `writeLevels` above, and it returns the values
+ * it *replaced*. That is the whole trick: after the update both ladders read
+ * equal to their derived level whether or not they moved, so the post-update
+ * row cannot say which announcement was owed. `prev` captures the row before
+ * the write -- under `FOR UPDATE`, so a second evaluation racing this one
+ * blocks rather than reading the same "before" -- and a ladder is announced
+ * exactly when the value it replaced was lower.
+ *
+ * Only ever upward. A level cannot fall today, but if a metric were ever
+ * recounted downward the reader should not be told they have *lost* a level by
+ * a notification designed to congratulate them, and the announced column
+ * should not follow it down and re-announce the recovery.
+ */
+async function announceLevels(userId: string, levels: Levels): Promise<void> {
+  const plan = db.raw.sql`
+    UPDATE "auth"."user" AS u
+       SET "announcedReaderLevel" = GREATEST(u."announcedReaderLevel", ${levels.reader.level}),
+           "announcedAuthorLevel" = GREATEST(u."announcedAuthorLevel", ${levels.author.level})
+      FROM (SELECT "id",
+                   "announcedReaderLevel" AS "wasReader",
+                   "announcedAuthorLevel" AS "wasAuthor"
+              FROM "auth"."user"
+             WHERE "id" = ${userId}
+               FOR UPDATE) AS prev
+     WHERE u."id" = prev."id"
+       AND (prev."wasReader" < ${levels.reader.level}
+         OR prev."wasAuthor" < ${levels.author.level})
+    RETURNING prev."wasReader", prev."wasAuthor"
+  `.returnsRow({
+    wasReader: "pg/int4@1",
+    wasAuthor: "pg/int4@1",
+  }).build();
+
+  const rows = (await db.runtime().query(plan)) as {
+    wasReader: number;
+    wasAuthor: number;
+  }[];
+
+  // No row means somebody else got there first, or nothing moved.
+  const previous = rows[0];
+  if (!previous) return;
+
+  for (const ladder of ["reader", "author"] as const) {
+    const progress = levels[ladder];
+    const was = ladder === "reader" ? previous.wasReader : previous.wasAuthor;
+
+    // This ladder is only the reason for the row if it is the one that moved.
+    if (was >= progress.level) continue;
+
+    notify({
+      event: "level-up",
+      userId,
+      title: `${LADDER_NAMES[ladder]} level ${progress.level}`,
+      description:
+        ladder === "reader"
+          ? `You have read ${progress.value.toLocaleString("en")} chapters.`
+          : `You have written ${progress.value.toLocaleString("en")} words.`,
+    });
+  }
 }
 
 /* Reading ---------------------------------------------------------------- */

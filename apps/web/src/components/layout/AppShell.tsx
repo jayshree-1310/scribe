@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../lib/auth'
@@ -9,7 +9,7 @@ import { MobileNav } from './MobileNav'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { VerifyEmailBanner } from './VerifyEmailBanner'
-import { AUTHOR_NAV, READER_NAV } from './nav-config'
+import { ADMIN_NAV, AUTHOR_NAV, READER_NAV } from './nav-config'
 import './layout.css'
 
 interface AppShellProps {
@@ -23,9 +23,12 @@ interface AppShellProps {
 export function AppShell({ children, variant = 'reader', width = 'default' }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { session } = useAuth()
-  const location = useLocation()
 
-  const sections = variant === 'author' ? AUTHOR_NAV : READER_NAV
+  const base = variant === 'author' ? AUTHOR_NAV : READER_NAV
+  // The one section that depends on who is looking. See `ADMIN_NAV`.
+  const sections = session?.user.isAdmin
+    ? [...base, ADMIN_NAV]
+    : base
 
   // Esc closes the drawer; route changes close it via each link's onClick.
   useEffect(() => {
@@ -87,10 +90,11 @@ export function AppShell({ children, variant = 'reader', width = 'default' }: Ap
 
       <div className="shell__main">
         <TopBar onOpenNav={() => setDrawerOpen(true)} />
-        {/* Above <main>, which is keyed on the path and remounts on every
-            navigation — the banner should not flicker as pages change. */}
         <VerifyEmailBanner />
-        <main className={cn('shell__content', `shell__content--${width}`)} id="main" key={location.pathname}>
+        {/* Deliberately not keyed on the path. This element persists across
+            navigations — see `ShellLayout` — which is what keeps `page-in` a
+            first-load animation rather than a flash on every link. */}
+        <main className={cn('shell__content', `shell__content--${width}`)} id="main">
           {children}
         </main>
       </div>
@@ -99,8 +103,9 @@ export function AppShell({ children, variant = 'reader', width = 'default' }: Ap
 
       {/* Signed in only: `/api/ai/scribble` is behind `requireUser`, so the
           launcher would only ever produce a 401 for a signed-out reader.
-          Mounted here rather than per page so the conversation survives
-          navigation — `<main>` remounts on every route, this does not. */}
+          Mounted on the shell rather than per page so the conversation
+          survives navigation, which it does now that the shell itself is a
+          layout route rather than something each page renders. */}
       {session ? <ScribbleWidget /> : null}
     </div>
   )

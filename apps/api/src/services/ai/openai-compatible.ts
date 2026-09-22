@@ -135,6 +135,25 @@ function bodyFor(
     ...(config.reasoningEffort
       ? { reasoning_effort: config.reasoningEffort }
       : {}),
+    /**
+     * `strict` is what turns the schema from a hint into a guarantee on the
+     * providers that implement it, and the schema is pruned to the keyword
+     * subset they all accept before it gets here (`json-schema.ts`). A server
+     * that does not know `response_format` at all rejects the request, which
+     * is what `AI_STRUCTURED_OUTPUT=off` exists for.
+     */
+    ...(request.format
+      ? {
+          response_format: {
+            type: "json_schema",
+            json_schema: {
+              name: request.format.name,
+              schema: request.format.schema,
+              strict: true,
+            },
+          },
+        }
+      : {}),
     stream,
     ...(stream ? { stream_options: { include_usage: true } } : {}),
   });

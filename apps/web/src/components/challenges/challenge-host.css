@@ -1,0 +1,15 @@
+/* `ChallengeHostDialog`. Everything else it draws is `ui.css`'s. */
+
+/* The two halves of the window, side by side where there is room: a start
+   without an end beside it is the field people forget. */
+.host-dialog__window {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+@media (max-width: 30rem) {
+  .host-dialog__window {
+    grid-template-columns: 1fr;
+  }
+}

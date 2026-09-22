@@ -62,6 +62,16 @@ export type ContentLength = (typeof CONTENT_LENGTHS)[number];
  */
 export const MAX_PREFERRED_GENRES = 20;
 
+/**
+ * The highest step number the flow can put somebody on.
+ *
+ * The web app owns how many steps there are and what they ask; this is only a
+ * ceiling, so a client cannot store a step nothing can render and strand the
+ * reader outside the flow. Raising it is safe; the steps themselves are in
+ * `OnboardingPage`.
+ */
+export const MAX_ONBOARDING_STEP = 9;
+
 export interface Preferences {
   /** The genres the reader named, in the order the catalogue lists them. */
   genreIds: string[];
@@ -70,6 +80,14 @@ export interface Preferences {
   /** Derived from the timestamp below; the two cannot disagree. */
   onboardingComplete: boolean;
   onboardingCompletedAt: string | null;
+  /**
+   * The furthest step of the flow the reader has reached, zero-based.
+   *
+   * Meaningless once `onboardingComplete` is true, and deliberately not
+   * cleared then: it costs nothing to keep and reopening the flow for somebody
+   * should not silently decide where they resume.
+   */
+  onboardingStep: number;
   /** Null for a reader who has never answered anything. */
   updatedAt: string | null;
 }
@@ -87,6 +105,7 @@ const DEFAULTS: Preferences = {
   mutedNotificationTypes: [],
   onboardingComplete: false,
   onboardingCompletedAt: null,
+  onboardingStep: 0,
   updatedAt: null,
 };
 
@@ -94,6 +113,12 @@ export interface PreferenceUpdate {
   genreIds?: string[] | undefined;
   contentLength?: ContentLength | undefined;
   mutedNotificationTypes?: NotificationType[] | undefined;
+  /**
+   * How far through onboarding the reader has got. Only ever moves forward --
+   * see the write below -- so a client that steps back to change an answer
+   * and saves does not lose the ground it covered.
+   */
+  onboardingStep?: number | undefined;
   /**
    * `true` finishes onboarding, `false` reopens it. Finishing twice keeps the
    * first timestamp: the column records when the reader got through the flow,
@@ -126,6 +151,7 @@ export async function getPreferences(userId: string): Promise<Preferences> {
     db.orm.auth.UserPreference.select(
       "contentLength",
       "onboardingCompletedAt",
+      "onboardingStep",
       "updatedAt",
     )
       .where((preference) => preference.userId.eq(userId))
@@ -160,6 +186,7 @@ export async function getPreferences(userId: string): Promise<Preferences> {
       .sort(),
     onboardingComplete: completedAt !== null,
     onboardingCompletedAt: completedAt,
+    onboardingStep: row?.onboardingStep ?? DEFAULTS.onboardingStep,
     updatedAt: row ? toIso(row.updatedAt) : null,
   };
 }
@@ -237,6 +264,17 @@ export async function updatePreferences(
         ? (current.onboardingCompletedAt ?? new Date().toISOString())
         : null;
 
+  /**
+   * Forward only, and decided here rather than in the statement so the value
+   * returned to the caller matches what was written. `GREATEST` in SQL would
+   * do the same thing, but the response is assembled from `getPreferences`
+   * below, which reads the row back -- this is only the number offered to it.
+   */
+  const onboardingStep = Math.max(
+    current.onboardingStep,
+    update.onboardingStep ?? 0,
+  );
+
   await db.transaction(async (tx) => {
     /**
      * One statement rather than a read and a branch: two tabs of the settings
@@ -247,12 +285,18 @@ export async function updatePreferences(
      */
     const plan = db.raw.sql`
       INSERT INTO "auth"."userPreference"
-        ("userId", "contentLength", "onboardingCompletedAt", "createdAt", "updatedAt")
+        ("userId", "contentLength", "onboardingCompletedAt", "onboardingStep",
+         "createdAt", "updatedAt")
       VALUES (${userId}, ${contentLength},
-              NULLIF(${completedAt ?? ""}::text, '')::timestamptz, now(), now())
+              NULLIF(${completedAt ?? ""}::text, '')::timestamptz,
+              ${onboardingStep}, now(), now())
       ON CONFLICT ("userId") DO UPDATE SET
         "contentLength"         = EXCLUDED."contentLength",
         "onboardingCompletedAt" = EXCLUDED."onboardingCompletedAt",
+        -- GREATEST rather than EXCLUDED: two tabs saving at once must not let
+        -- the one further back decide where the reader resumes.
+        "onboardingStep"        = GREATEST("userPreference"."onboardingStep",
+                                           EXCLUDED."onboardingStep"),
         "updatedAt"             = now()
     `.affectedCount().build();
 

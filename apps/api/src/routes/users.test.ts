@@ -464,3 +464,44 @@ describe.skipIf(!available)("the follow graph", () => {
     );
   });
 });
+
+describe.skipIf(!available)("a profile's clubs", () => {
+  it("answers for somebody else, not only for the caller", async () => {
+    const joiner = await api.createUser("uclubber");
+    const handle = api.usernameOf(joiner);
+    const club = await api.createClub({
+      name: "Readers Of Note",
+      creatorId: joiner,
+    });
+
+    // Signed out: the whole point is that this is not gated on being them.
+    const { status, body } = await api.request<{
+      items: { id: string }[];
+      total: number;
+    }>(`/api/users/${handle}/clubs`);
+
+    expect(status).toBe(200);
+    expect(body.total).toBe(1);
+    expect(body.items.map((item) => item.id)).toContain(club.id);
+  });
+
+  it("leaves out clubs the person is not in", async () => {
+    const outsider = await api.createUser("uoutsider");
+    const other = await api.createUser("uowner");
+    await api.createClub({ name: "Somebody Else's", creatorId: other });
+
+    const { body } = await api.request<{ total: number }>(
+      `/api/users/${api.usernameOf(outsider)}/clubs`,
+    );
+
+    expect(body.total).toBe(0);
+  });
+
+  it("404s for a handle nobody holds", async () => {
+    const { status } = await api.request(
+      `/api/users/${api.runId}-nobody/clubs`,
+    );
+
+    expect(status).toBe(404);
+  });
+});

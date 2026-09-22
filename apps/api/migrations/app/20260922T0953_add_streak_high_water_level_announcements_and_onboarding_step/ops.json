@@ -1,0 +1,338 @@
+[
+  {
+    "id": "dropCheckConstraint.notificationMute.notificationMute_type_check_1efec2b5",
+    "label": "Drop check constraint \"notificationMute_type_check_1efec2b5\" on \"notificationMute\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "checkConstraint",
+        "name": "notificationMute_type_check_1efec2b5",
+        "table": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notificationMute_type_check_1efec2b5\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_1efec2b5",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"notificationMute_type_check_1efec2b5\"",
+        "sql": "ALTER TABLE \"auth\".\"notificationMute\" DROP CONSTRAINT \"notificationMute_type_check_1efec2b5\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notificationMute_type_check_1efec2b5\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_1efec2b5",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropCheckConstraint.notification.notification_type_check_1efec2b5",
+    "label": "Drop check constraint \"notification_type_check_1efec2b5\" on \"notification\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_type_check_1efec2b5",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_type_check_1efec2b5\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_1efec2b5",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"notification_type_check_1efec2b5\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" DROP CONSTRAINT \"notification_type_check_1efec2b5\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_type_check_1efec2b5\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_1efec2b5",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.auth.user.announcedAuthorLevel",
+    "label": "Add column \"announcedAuthorLevel\" to \"user\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "column",
+        "name": "announcedAuthorLevel",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"announcedAuthorLevel\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "user",
+          "announcedAuthorLevel"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"announcedAuthorLevel\"",
+        "sql": "ALTER TABLE \"auth\".\"user\" ADD COLUMN \"announcedAuthorLevel\" int4 DEFAULT 1 NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"announcedAuthorLevel\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "user",
+          "announcedAuthorLevel"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.auth.user.announcedReaderLevel",
+    "label": "Add column \"announcedReaderLevel\" to \"user\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "column",
+        "name": "announcedReaderLevel",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"announcedReaderLevel\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "user",
+          "announcedReaderLevel"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"announcedReaderLevel\"",
+        "sql": "ALTER TABLE \"auth\".\"user\" ADD COLUMN \"announcedReaderLevel\" int4 DEFAULT 1 NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"announcedReaderLevel\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "user",
+          "announcedReaderLevel"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.auth.user.longestStreak",
+    "label": "Add column \"longestStreak\" to \"user\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "column",
+        "name": "longestStreak",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"longestStreak\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "user",
+          "longestStreak"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"longestStreak\"",
+        "sql": "ALTER TABLE \"auth\".\"user\" ADD COLUMN \"longestStreak\" int4 DEFAULT 0 NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"longestStreak\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "user",
+          "longestStreak"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.auth.userPreference.onboardingStep",
+    "label": "Add column \"onboardingStep\" to \"userPreference\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "column",
+        "name": "onboardingStep",
+        "table": "userPreference"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"onboardingStep\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "userPreference",
+          "onboardingStep"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"onboardingStep\"",
+        "sql": "ALTER TABLE \"auth\".\"userPreference\" ADD COLUMN \"onboardingStep\" int4 DEFAULT 0 NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"onboardingStep\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "auth",
+          "userPreference",
+          "onboardingStep"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notificationMute.notificationMute_type_check_3a77c5c7",
+    "label": "Add check constraint \"notificationMute_type_check_3a77c5c7\" on \"notificationMute\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "checkConstraint",
+        "name": "notificationMute_type_check_3a77c5c7",
+        "table": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notificationMute_type_check_3a77c5c7\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_3a77c5c7",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notificationMute_type_check_3a77c5c7\"",
+        "sql": "ALTER TABLE \"auth\".\"notificationMute\" ADD CONSTRAINT \"notificationMute_type_check_3a77c5c7\" CHECK (\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notificationMute_type_check_3a77c5c7\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_3a77c5c7",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notification.notification_type_check_3a77c5c7",
+    "label": "Add check constraint \"notification_type_check_3a77c5c7\" on \"notification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_type_check_3a77c5c7",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_type_check_3a77c5c7\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_3a77c5c7",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notification_type_check_3a77c5c7\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" ADD CONSTRAINT \"notification_type_check_3a77c5c7\" CHECK (\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_type_check_3a77c5c7\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_3a77c5c7",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  }
+]

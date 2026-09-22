@@ -14,6 +14,22 @@ export interface NavSection {
   items: NavItem[]
 }
 
+/**
+ * The administrator's section, appended rather than built into `READER_NAV`.
+ *
+ * Kept separate because it is the only part of the navigation that depends on
+ * who is looking: everything else is the same for everybody signed in, and
+ * threading a session through the nav config so one section could read it
+ * would make every other section pay for this one. `AppShell` appends it when
+ * the session says `isAdmin` -- and the queue checks again on the server, so
+ * this is what is *offered* rather than what is allowed.
+ */
+export const ADMIN_NAV: NavSection = {
+  id: 'admin',
+  label: 'Administration',
+  items: [{ to: '/moderation', label: 'Moderation', icon: 'shield' }],
+}
+
 export const READER_NAV: NavSection[] = [
   {
     id: 'read',
@@ -42,6 +58,7 @@ export const AUTHOR_NAV: NavSection[] = [
     items: [
       { to: '/author', label: 'Dashboard', icon: 'home', primary: true },
       { to: '/author/stories', label: 'My Stories', icon: 'book', primary: true },
+      { to: '/author/ideas', label: 'Idea Studio', icon: 'sparkle' },
       { to: '/author/analytics', label: 'Analytics', icon: 'trend', primary: true },
     ],
   },

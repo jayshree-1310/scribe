@@ -723,6 +723,68 @@ async function loadChapter(chapterId: string): Promise<AuthoredChapter> {
 }
 
 /**
+ * A compact description of one of the caller's own stories, for prompting.
+ *
+ * Lives here rather than in an AI module because of the first line: the
+ * ownership guard is `ownedStory`, and the alternative was a second check
+ * written somewhere with less reason to be careful. Generating material "for
+ * my story" must not be a way to read somebody else's draft.
+ *
+ * Chapter *titles* only, never bodies. A novel does not fit in a context
+ * window, and placing a new chapter in the sequence is all this is for; Task
+ * AI 13 is where the assistant learns what is inside the chapters.
+ */
+export interface StoryContext {
+  id: string;
+  title: string;
+  description: string | null;
+  kidsAppropriate: boolean;
+  genres: string[];
+  chapters: { number: number; title: string }[];
+}
+
+/**
+ * Asserts the caller owns a story, and nothing else.
+ *
+ * The writing assistant needs the guard without the story: the prose it works
+ * on travels in the request body, because the editor's buffer is the truth
+ * while somebody is typing and this module's copy is a save behind.
+ */
+export async function assertStoryOwned(
+  userId: string,
+  storyId: string,
+): Promise<void> {
+  await ownedStory(db, storyId, userId);
+}
+
+export async function getStoryContext(
+  userId: string,
+  storyId: string,
+): Promise<StoryContext> {
+  await ownedStory(db, storyId, userId);
+
+  const [story, chapters] = await Promise.all([
+    getStory(storyId, userId),
+    db.orm.content.Chapter.select("chapterNumber", "title")
+      .where((chapter) => chapter.storyId.eq(storyId))
+      .orderBy((chapter) => chapter.chapterNumber.asc())
+      .all(),
+  ]);
+
+  return {
+    id: story.id,
+    title: story.title,
+    description: story.description,
+    kidsAppropriate: story.kidsAppropriate,
+    genres: story.genres.map((genre) => genre.name),
+    chapters: chapters.map((chapter) => ({
+      number: chapter.chapterNumber,
+      title: chapter.title,
+    })),
+  };
+}
+
+/**
  * Every chapter of one of the caller's stories, bodies included.
  *
  * The public chapter list returns summaries so a reader's chapter list costs

@@ -14,8 +14,7 @@ import { HttpError } from "../lib/http-error.js";
 import { sniffImage } from "../lib/image.js";
 import { revokeAllSessions } from "../lib/sessions.js";
 import { storage } from "../lib/storage.js";
-import { flushBadges } from "./gamification.js";
-import { flushNotifications } from "./notifications.js";
+import { drainDeferredWrites } from "./deferred.js";
 import { deletePreferencesFor, hasCompletedOnboarding } from "./preferences.js";
 
 /** The profile shape the account endpoints return. Written out field by field
@@ -30,6 +29,20 @@ export interface AccountProfile {
   avatarUrl: string | null;
   bio: string | null;
   isAuthor: boolean;
+  /**
+   * Platform administrator.
+   *
+   * Read-only here and set only by `scripts/grant-admin.ts` -- no endpoint
+   * writes it, so no request can escalate itself, and `PATCH /api/account/me`
+   * ignores it like any field it does not name.
+   *
+   * On the profile because the web app has to know whether to *offer* the
+   * moderation queue and the challenge host form at all. That is a
+   * convenience, not a control: every privileged endpoint calls `assertAdmin`
+   * for itself, so a browser that lied about this would get a 403 from the
+   * first request it made.
+   */
+  isAdmin: boolean;
   readingStreak: number;
   readerLevel: number;
   authorLevel: number;
@@ -93,6 +106,7 @@ const PROFILE_COLUMNS = [
   "avatarUrl",
   "bio",
   "isAuthor",
+  "isAdmin",
   "readingStreak",
   "readerLevel",
   "authorLevel",
@@ -112,6 +126,7 @@ function toProfile(
     avatarUrl: string | null;
     bio: string | null;
     isAuthor: boolean;
+    isAdmin: boolean;
     readingStreak: number;
     readerLevel: number;
     authorLevel: number;
@@ -129,6 +144,7 @@ function toProfile(
     avatarUrl: row.avatarUrl,
     bio: row.bio,
     isAuthor: row.isAuthor,
+    isAdmin: row.isAdmin,
     readingStreak: row.readingStreak,
     readerLevel: row.readerLevel,
     authorLevel: row.authorLevel,
@@ -421,11 +437,7 @@ export async function deleteAccount(
    * `notification_actorId_fkey` instead. The sweep below therefore clears both
    * columns, and this drain is what stops one arriving after it.
    */
-  await flushBadges();
-  // After the badges, never alongside: an award issues a notification as it
-  // lands, so a parallel drain can return before that row exists. See
-  // `flushNotifications`.
-  await flushNotifications();
+  await drainDeferredWrites();
 
   await db.transaction(async (tx) => {
     const stories = await tx.orm.content.Story.select("id")

@@ -1,0 +1,120 @@
+/**
+ * The idea studio.
+ *
+ * Two layout jobs: a brief form that stays compact, and a result grid that
+ * puts alternatives beside each other so they can actually be compared — the
+ * whole reason for generating more than one. Below 60rem they stack, because
+ * two columns of dense prose on a phone is neither.
+ */
+
+.idea-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.idea-form form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.idea-form__grid {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+}
+
+.idea-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.idea-form__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.idea-form__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+/* Results ---------------------------------------------------------------- */
+
+.generated {
+  margin-top: var(--space-6);
+}
+
+/**
+ * Says what this is, next to the heading rather than once at the top of the
+ * page: a card can be read on its own, and the label has to travel with it.
+ */
+.generated__notice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.generated__grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  align-items: start;
+}
+
+.generated__card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.generated__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: 1.25;
+}
+
+.generated__body {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.generated__detail dt {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.generated__detail dd {
+  margin: var(--space-1) 0 0;
+  line-height: 1.55;
+}
+
+.generated__list {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: grid;
+  gap: var(--space-1);
+}
+
+.generated__actions {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.generated__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

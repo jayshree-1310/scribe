@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useAsync } from '../hooks/useAsync'
 import { getBadges } from '../data/gamification-api'
 import type { BadgeCategory, LevelProgress } from '../types/gamification'
-import { AppShell } from '../components/layout/AppShell'
 import { SectionHead, StatTile } from '../components/ui/Card'
 import { ProgressBar } from '../components/ui/Progress'
 import { Skeleton } from '../components/ui/Skeleton'
@@ -73,7 +72,7 @@ export function BadgesPage() {
   const levels = collection.data?.levels
 
   return (
-    <AppShell>
+    <>
       <header className="page-head">
         <div>
           <h1 className="page-head__title">Badges</h1>
@@ -175,6 +174,6 @@ export function BadgesPage() {
           </>
         )}
       </TabPanel>
-    </AppShell>
+    </>
   )
 }

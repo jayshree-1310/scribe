@@ -1,0 +1,80 @@
+/* The notification row, shared by the bell's dropdown and `NotificationsPage`.
+   These moved out of `components/layout/layout.css` with the markup when the
+   page arrived: the panel around the rows is still the top bar's business, and
+   lives there, but a row is not. */
+
+.notification {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.notification:hover {
+  background-color: var(--surface-2);
+}
+
+.notification__face {
+  flex-shrink: 0;
+}
+
+/* Stands in for the avatar on the one type with no actor. */
+.notification__icon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-full);
+  background-color: var(--surface-2);
+  color: var(--brand);
+}
+
+.notification__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  /* Without this a long title refuses to wrap and widens the whole panel. */
+  min-width: 0;
+}
+
+.notification__line {
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+
+.is-unread .notification__line {
+  font-weight: 600;
+}
+
+.notification__excerpt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+}
+
+.notification__when {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.notification__dot {
+  flex-shrink: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  margin-top: 0.4rem;
+  border-radius: var(--radius-full);
+  background-color: var(--brand);
+}

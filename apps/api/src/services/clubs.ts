@@ -119,8 +119,16 @@ export const MAX_PAGE_SIZE = 48;
 
 export interface ClubQuery {
   search?: string | undefined;
-  /** Only clubs the caller belongs to. Ignored for an anonymous caller. */
-  mine?: boolean | undefined;
+  /**
+   * Only clubs this account belongs to.
+   *
+   * An account id rather than a `mine` flag, because "the clubs somebody is
+   * in" turned out to be a question two surfaces ask: the caller asks it about
+   * themselves on the clubs page, and a profile asks it about whoever it is
+   * showing. One filter answers both; a second flag would have been a second
+   * membership query that could drift from this one.
+   */
+  memberId?: string | undefined;
   sort: ClubSort;
   page: number;
   limit: number;
@@ -332,14 +340,15 @@ export async function listClubs(
   }
 
   /**
-   * "My clubs" is a membership predicate rather than a second query, so it
-   * composes with search and paginates like every other filter. An anonymous
-   * caller belongs to nothing, so the flag is dropped rather than answered
-   * with an empty page -- there is no caller to have clubs.
+   * Membership is a predicate rather than a second query, so it composes with
+   * search and paginates like every other filter. The route drops it for an
+   * anonymous caller asking about themselves -- there is no caller to have
+   * clubs -- rather than answering an empty page for a question nobody asked.
    */
-  if (query.mine && viewerId !== null) {
+  if (query.memberId !== undefined) {
+    const memberId = query.memberId;
     const memberOf = await db.orm.clubs.ClubMembership.select("clubId")
-      .where((entry) => entry.userId.eq(viewerId))
+      .where((entry) => entry.userId.eq(memberId))
       .all();
 
     const ids = memberOf.map((entry) => entry.clubId);

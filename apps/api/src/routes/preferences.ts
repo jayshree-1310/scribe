@@ -18,6 +18,7 @@ import { requireUser, requireUserId } from "../middleware/current-user.js";
 import { NOTIFICATION_TYPES } from "../services/notifications.js";
 import {
   CONTENT_LENGTHS,
+  MAX_ONBOARDING_STEP,
   MAX_PREFERRED_GENRES,
   getPreferences,
   updatePreferences,
@@ -46,6 +47,18 @@ const updateSchema = z
     contentLength: z.enum(CONTENT_LENGTHS).optional(),
     mutedNotificationTypes: z.array(z.enum(NOTIFICATION_TYPES)).optional(),
     onboardingComplete: z.boolean().optional(),
+    /**
+     * Bounded rather than any integer: the flow is a fixed handful of steps,
+     * and a client that sent 900 would strand the reader on a step that does
+     * not exist. The service only ever moves it forward, so the ceiling is the
+     * one thing this has to protect.
+     */
+    onboardingStep: z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(MAX_ONBOARDING_STEP)
+      .optional(),
   })
   // An empty body is a no-op the caller almost certainly did not mean, and
   // answering 200 to it hides a broken form. The same rule `PATCH

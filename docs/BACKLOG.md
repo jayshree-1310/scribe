@@ -117,60 +117,130 @@ touch these three places is better off knowing what they used to do.
       reasoned, not tuned, and no test drives a chapter whose media arrives
       late. Moved to the check list below rather than called done.
 
-#### Surfaces that were never built — implement
+#### Surfaces that were never built — built
 
-Each is a route and a component; none is blocked on API work that does not
-already exist.
+All but one, and the exception is a decision rather than a task. Each was
+"a route and a component" as predicted; two of them also needed the app to
+learn something it did not know, which is recorded against them.
 
-- [ ] **A notifications page.** The dropdown holds the newest twelve with no
-      "see all", so a week of ignoring the bell loses the tail.
-      `GET /api/notifications` is already paginated. § Notifications
-- [ ] **A moderator UI.** The queue has never been read by a person; the only
-      way to make an administrator is `pnpm --filter api admin:grant`.
+- [x] **~~A notifications page.~~** `/notifications`, behind `RequireAuth`,
+      accumulating across "Load older" the way the channel feed does, with an
+      All/Unread filter and the bell's two sweeping actions. No API work, as
+      the note predicted — but it did need one structural change: the bell and
+      the page are on screen together, so the notification state moved into
+      `NotificationsProvider` and there is now exactly one poll and one unread
+      count. The page owns its paginated list and delegates every write to the
+      shared actions, which is why those now resolve to whether the write
+      stuck. **Not seen signed in** — see the check list. § Notifications
+- [x] **~~A moderator UI.~~** `/moderation`, offered in a new Administration
+      nav section when the session says `isAdmin`. Filters by status, draws the
+      target excerpt or the "content no longer exists" state, and resolves
+      through a dialog that offers only Dismiss when there is nothing left to
+      hide. `AccountProfile.isAdmin` is the field that made it possible — the
+      app previously had no way to know who was an administrator — and it is
+      navigation, not access: every endpoint still calls `assertAdmin`.
+      Granting the flag is still `pnpm --filter api admin:grant`.
       § Moderation and reporting
-- [ ] **A challenge host UI.** Create and edit are reachable with a token and
-      have never been exercised by a person. § Writing challenges
-- [ ] **Tell an author their content was hidden.** Today it simply vanishes and
-      an edit of it 404s. Needs a sixth `NotificationType` and a decision about
-      how much of the reason to reveal. § Moderation and reporting
-- [ ] **Tell a reporter what happened to their report.** Filed into a void,
-      whichever way it went. § Moderation and reporting
-- [ ] **`POST /api/moderation/users/:id/reinstate`.** A suspension can only be
-      lifted through the report that imposed it, so a deleted report strands it.
+- [x] **~~A challenge host UI.~~** One `ChallengeHostDialog` for both create
+      and edit — they differ in a verb and a starting value — reached from a
+      "Host a challenge" button on the challenges page and an Edit button on
+      the detail hero, both `isAdmin`-only. The fiddly part is documented in
+      the component: `datetime-local` has no zone and the API wants an offset.
+      § Writing challenges
+- [x] **~~Tell an author their content was hidden.~~** `CONTENT_HIDDEN`, with
+      the reason revealed as the *category* a moderator chose and nothing more:
+      the reporter's `details` are their unreviewed words about somebody, and
+      handing those to the person they are about would make the queue a channel
+      for the harassment it exists to stop. The moderator's note is internal
+      for the same reason. A dismissal tells the author nothing at all — being
+      told "you were reported and we decided you were fine" hands somebody a
+      grievance they did not have. § Moderation and reporting
+- [x] **~~Tell a reporter what happened to their report.~~**
+      `REPORT_RESOLVED`, to everybody whose report the sweep closed — the
+      resolving statement `RETURNING "reporterId"` rather than a second query
+      that could disagree with it. Says what happened and nothing about the
+      author. A moderator resolving their own report is skipped; they were
+      there. § Moderation and reporting
+- [x] **~~`POST /api/moderation/users/:id/reinstate`.~~** Built. It
+      deliberately does not touch the reports: a suspension and the report that
+      prompted it are different facts, and reopening a resolved row to say "we
+      changed our minds" would lose the first decision rather than add to it.
+      409 for an account in good standing, because a moderator who clicked it
+      expected somebody to be suspended. § Moderation and reporting
+- [x] **~~An endpoint for somebody else's clubs~~ — the shelves half is
+      deliberately not built.** `GET /api/users/:username/clubs` is public and
+      the profile's Clubs tab no longer requires the profile to be your own;
+      `ClubQuery.mine` became `memberId`, so one filter answers both "my clubs"
+      and "theirs" rather than two membership queries that could drift. Every
+      club is open and its member list already readable, so this saves a
+      stranger looking rather than telling them anything new.
+      **The reading shelves were left alone on purpose.** Making every reader's
+      library publicly readable is a decision about what this product discloses
+      about its users, not a missing endpoint, and it is not mine to make
+      quietly. Say the word and it is the same shape as the clubs one.
+      § Public profiles and follows
+
+#### Columns the behaviour is waiting on — landed
+
+All three, in one migration
+(`20260922T0953_add_streak_high_water_level_announcements_and_onboarding_step`)
+together with the three notification types the work above needed. Entirely
+additive, no data transform, and the migration's header says why none was
+honest to write.
+
+- [x] **~~`longestStreak` on `auth.User`.~~** Advanced in the same
+      compare-and-set that advances the streak, and the max includes the run
+      being *replaced* — that write is the only moment the old run is still
+      known, so a reset that took only the new value would throw away the
+      eleven days that just ended. No backfill: the metric reads
+      `GREATEST(longestStreak, readingStreak)`, which is true from the first
+      day and needed no invented history. § Badges and levels
+- [x] **~~A last-announced level on `auth.User`.~~** Two columns, one per
+      ladder, and a `LEVEL_UP` notification. The subtlety is that the claiming
+      write has to return what it *replaced*: after the update both ladders
+      read equal to their derived level whether or not they moved, so the
+      post-update row cannot say which announcement was owed. Defaulted to 1
+      so an existing account is told once, late but true, rather than marked
+      as already told and never hearing about the next one. § Badges and levels
+- [x] **~~The furthest onboarding step reached.~~** `onboardingStep`, forward
+      only — stepping back to change an answer is not losing ground — with a
+      `GREATEST` in the upsert so two tabs cannot let the one further back
+      decide where the reader resumes. Written as the reader arrives at a step
+      and never awaited: the resume point is worth remembering and never worth
+      making somebody wait for. § Preferences and recommendations
+
+#### Invariants only a comment enforces — enforced
+
+All three now fail something rather than relying on being read. Two of them
+found a real defect on their first run, which is the argument for the whole
+category: a comment that has drifted looks exactly like one that has not.
+
+- [x] **~~`flushBadges()` must settle before `flushNotifications()`.~~** There
+      is no order left to get wrong: `services/deferred.ts` owns it and every
+      caller — the shutdown, `deleteAccount`, the test harness — calls
+      `drainDeferredWrites()`. The individual flushes stay exported because
+      each one's *seam* belongs to its own service; nothing outside that file
+      calls more than one of them. § Notifications
+- [x] **~~A fifth write seam must call `assertNotSuspended`.~~**
+      `routes/suspension.test.ts` fails when a write route appears with no
+      decision recorded against it, and again when a decision outlives the
+      route it was for. It cannot decide whether a route *should* be guarded —
+      no test can — it only refuses to let one be added without somebody
+      saying which it is and why. The old prose list was already wrong when
+      this started: it said four seams when there were six. **One thing it
+      surfaced rather than fixed:** publishing a story is not suspension-gated
+      today, which is arguable and is recorded as such rather than changed.
       § Moderation and reporting
-- [ ] **An endpoint for somebody else's clubs and shelves.** Those profile tabs
-      are gated on the profile being your own because nothing answers them for
-      anyone else. § Public profiles and follows
-
-#### Columns the behaviour is waiting on — implement
-
-Each of these is a migration rather than a rule change, and each closes a gap
-that cannot be closed without it.
-
-- [ ] **`longestStreak` on `auth.User`.** `streakDays` is the current run, so
-      "read 30 days in a row" is only earnable while the run is still alive.
-      § Badges and levels
-- [ ] **A last-announced level on `auth.User`.** A level is derived on every
-      evaluation rather than awarded, so there is no moment to hang a
-      notification on and crossing a step is silent. § Badges and levels
-- [ ] **The furthest onboarding step reached.** Saving per step is what makes a
-      refresh resume, but a reader who quits at the author step is put back at
-      step one. § Preferences and recommendations
-
-#### Invariants only a comment enforces — implement
-
-These are already correct everywhere today. What is missing is anything that
-keeps the next writer from getting them wrong.
-
-- [ ] **`flushBadges()` must settle before `flushNotifications()`.** Draining
-      the two in parallel loses the badge notification about one time in ten.
-      § Notifications
-- [ ] **A fifth write seam must call `assertNotSuspended`.** The list of four is
-      enforced by somebody reading the header of `services/moderation.ts`.
-      § Moderation and reporting
-- [ ] **A skeleton must gate on `status`, never on `data`.** Six surfaces had it
-      wrong and were fixed; the list was found by reading rather than by a test,
-      so neither its completeness nor its durability is proved. § Retiring the
+- [x] **~~A skeleton must gate on `status`, never on `data`.~~**
+      `apps/web/scripts/check-async-gating.mjs`, run by `pnpm --filter web
+      lint`: a `useAsync` result whose `status` is never mentioned in its own
+      file cannot be telling the three cases apart, whatever it does with
+      `data`. Coarse on purpose — it says nothing about whether the branches
+      are *right*, only that somebody looked.
+      It found four the reading audit had missed on its first run, which is the
+      point. Two were real (the reader's chapter picker, fixed; the Idea Studio
+      story picker, parked because that file belongs to in-flight GenAI work),
+      and two are genuinely fine and now say why in `ALLOWED`. § Retiring the
       mock layer
 
 #### Check in a browser — may need no work at all
@@ -181,6 +251,33 @@ so the honest status is unknown rather than done.
 - [ ] **The ten "unseen in a browser" sets**, one at the end of each section
       below — mostly phone-width layout, plus a few sequences the suite cannot
       drive.
+- [ ] **Navigation, now that the shell persists.** Every signed-in page used to
+      render its own `<AppShell>`, so following a link rebuilt the sidebar, top
+      bar, bell and Scribble widget, and `<main>` was keyed on the path to
+      replay a 280ms fade-from-nothing on top of that. The shell is a layout
+      route now (`components/layout/ShellLayout.tsx`), `page-in` is a first-load
+      animation because the element it is on no longer remounts, and
+      `ScrollRestoration` puts new pages at the top instead of wherever the last
+      one was scrolled to. Typechecks, lints, builds, and every route still
+      resolves and still gates — but how it *feels* is the whole point of the
+      change and is the one thing none of that measures.
+- [ ] **The moderator queue, against a real report.** Every filter, the target
+      excerpt, the "content no longer exists" case and the three actions have
+      now been exercised by tests and by a page, but never by a person: making
+      an administrator is still `pnpm --filter api admin:grant`, so seeing this
+      means granting yourself the flag first. Worth provoking a suspension and
+      reinstating it, which is the path that had no in-app existence at all
+      until now. § Moderation and reporting
+- [ ] **Hosting a challenge, in a real timezone.** The `datetime-local`
+      conversion is the part to distrust: type a window, save it, reopen the
+      edit dialog, and check the clock reads back the same. A host east of UTC
+      is the case that would expose a sign error. § Writing challenges
+- [ ] **The notifications page, signed in.** Typechecks, lints and builds, and
+      `/notifications` redirects to sign-in as it should — but the list, the
+      filter, the sweeps and the empty states have never been drawn for a real
+      reader, because this repo has no frontend test harness and no signed-in
+      headless one either. Worth an account with more than twenty notifications
+      so "Load older" accumulates more than once. § Notifications
 - [ ] **The re-applied restore, against real media.** `RESTORE_SETTLE_MS` and
       `SETTLE_TOLERANCE_PX` were chosen by argument. What wants watching is a
       chapter whose video reports its size late — that the reader lands on the
@@ -218,6 +315,14 @@ them is a surprise when it arrives.
   it in JS, because the ORM cannot order by an aggregate. `db.sql` with a join.
 - **Followers and the leaderboard are offset-paged**, so a row can cross a page
   boundary mid-scroll. Keyset cursors if either list ever gets long.
+- **Nothing caches a page's data, so every visit re-fetches and re-skeletons.**
+  The shell no longer flickers between pages, but returning to a list you left
+  ten seconds ago still empties it and loads it again, which is the remaining
+  half of why navigation does not feel instant. The fix is a client cache with
+  stale-while-revalidate — show the last data, refresh underneath — which is a
+  change to `useAsync` and its callers rather than to any one page. The shelf
+  tabs already do this by hand: `.shelf-list.is-stale` holds the previous shelf
+  on screen, dimmed, while the next loads.
 - **The web response types are hand-copied** from the services they mirror. Doing
   it properly is a third workspace package and fourteen files; declined rather
   than half-done, and each file names its source of truth instead.
@@ -442,10 +547,18 @@ folding into whichever task next touches that surface.
   transport is rewriting that function; the reconciling around it already
   assumes rows can arrive at any moment. What has not been proved is the
   reconnect behaviour a push transport needs and a poll does not have.
-- **There is no notifications *page*.** The dropdown holds the newest twelve
-  and there is no "see all", so a reader who ignores the bell for a week loses
-  the tail of it. `GET /api/notifications` is already paginated, so this is a
-  route and a list component and no API work at all.
+- **~~There is no notifications *page*.~~** Built: `/notifications`, reachable
+  from the "See all notifications" link the dropdown now ends with. It was a
+  route and a list component and no API work at all, as this note said — but
+  not *only* that. Two lists of the same rows on screen at once meant two polls
+  and two unread counts, so `useNotifications` split into a source that
+  `NotificationsProvider` runs once and a consumer hook everything else reads.
+  The page keeps its own paginated list, because that genuinely is its own, and
+  delegates every write to the shared actions; those return `Promise<boolean>`
+  now so a second list can undo its mirror when the first rolls back. The row
+  itself is `components/notifications/NotificationRow.tsx`, shared, because the
+  wording of "so-and-so replied to you in" is exactly the thing that goes out
+  of step when it is written twice.
 - **~~There is no way to turn any of it off.~~** Closed by Task 16, which
   built `auth.NotificationMute` beside the genre preferences rather than a
   second settings model, and put the filter in the fan-out: a muted type is

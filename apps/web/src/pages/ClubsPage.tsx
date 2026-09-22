@@ -5,7 +5,6 @@ import { useToast } from '../lib/toast'
 import { formatCount, formatRelative } from '../lib/format'
 import * as clubsApi from '../data/clubs-api'
 import { clubUserName, type Club } from '../types/clubs'
-import { AppShell } from '../components/layout/AppShell'
 import { Avatar } from '../components/ui/Avatar'
 import { Button } from '../components/ui/Button'
 import { Card, SectionHead } from '../components/ui/Card'
@@ -171,7 +170,7 @@ export function ClubsPage() {
   }
 
   return (
-    <AppShell>
+    <>
       <header className="page-head">
         <div>
           <h1 className="page-head__title">Book clubs</h1>
@@ -335,6 +334,6 @@ export function ClubsPage() {
           />
         </div>
       </Dialog>
-    </AppShell>
+    </>
   )
 }

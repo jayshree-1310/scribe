@@ -17,9 +17,28 @@
  * When that day comes: `POLL_INTERVAL_MS` and the interval go, `subscribe`
  * opens the stream, and each pushed message calls `refresh()`. The reconciling
  * below already assumes rows can arrive at any moment.
+ *
+ * **One instance, two readers.** `useNotificationsSource` is run once, by
+ * `NotificationsProvider`, and everything else reads it through
+ * `useNotifications()`. That is not tidiness: the bell and `NotificationsPage`
+ * are on screen together, and two instances would mean two polls and two
+ * unread counts, so marking a page of notifications read would leave the bell
+ * claiming a number that nothing on screen agreed with for up to a minute.
+ * The page keeps its own paginated list -- that is genuinely its own -- but
+ * delegates every *write* here, so the count and the requests have one home
+ * and the page only ever mirrors the result onto its own rows. That is what
+ * the booleans the three actions resolve to are for: a mirror has to know when
+ * the thing it mirrors rolled back.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import {
   clearReadNotifications,
   getNotifications,
@@ -63,10 +82,15 @@ export interface NotificationsState {
   error: string | null
   /** Re-reads now. Called on open, and by `subscribe` on its interval. */
   refresh: () => void
-  markRead: (id: string) => void
-  markAllRead: () => void
+  /**
+   * Each resolves to whether the write survived the server, so a second list
+   * showing the same rows can roll its own copy back. Never rejects: a failed
+   * notification write is not an error anybody needs thrown at them.
+   */
+  markRead: (id: string) => Promise<boolean>
+  markAllRead: () => Promise<boolean>
   /** Deletes the read ones. Unread rows are left alone; see the API service. */
-  clearRead: () => void
+  clearRead: () => Promise<boolean>
   /** True when there is something for `clearRead` to remove. */
   hasRead: boolean
 }
@@ -78,8 +102,11 @@ export interface NotificationsState {
  * `enabled` rather than a null return so the hook's shape does not change with
  * the session -- the bell renders either way, and a component that had to
  * branch on "is there a hook result" would be branching in render.
+ *
+ * Called once, by `NotificationsProvider`. Components want `useNotifications`
+ * below; see the module header for why there is only ever one of these.
  */
-export function useNotifications(enabled: boolean): NotificationsState {
+export function useNotificationsSource(enabled: boolean): NotificationsState {
   const [items, setItems] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -162,7 +189,7 @@ export function useNotifications(enabled: boolean): NotificationsState {
    * reader who waited for the round trip would watch the row stay bold as the
    * page changed under it.
    */
-  const markRead = useCallback((id: string) => {
+  const markRead = useCallback((id: string): Promise<boolean> => {
     let rolledBack = false
 
     setItems((current) =>
@@ -174,12 +201,13 @@ export function useNotifications(enabled: boolean): NotificationsState {
     )
     setUnreadCount((count) => Math.max(0, count - 1))
 
-    markNotificationRead(id)
+    return markNotificationRead(id)
       // The server's count, not ours: it knows about rows this browser has
       // never seen, and a poll arriving mid-click would otherwise leave the
       // two disagreeing until the next one.
       .then((count) => {
         if (!rolledBack) setUnreadCount(count)
+        return true
       })
       .catch(() => {
         rolledBack = true
@@ -189,10 +217,11 @@ export function useNotifications(enabled: boolean): NotificationsState {
           ),
         )
         setUnreadCount((count) => count + 1)
+        return false
       })
   }, [])
 
-  const markAllRead = useCallback(() => {
+  const markAllRead = useCallback((): Promise<boolean> => {
     const previous = items
 
     setItems((current) =>
@@ -204,13 +233,17 @@ export function useNotifications(enabled: boolean): NotificationsState {
     )
     setUnreadCount(0)
 
-    markAllNotificationsRead()
-      .then((count) => setUnreadCount(count))
+    return markAllNotificationsRead()
+      .then((count) => {
+        setUnreadCount(count)
+        return true
+      })
       .catch(() => {
         setItems(previous)
         // Re-read rather than restoring a remembered number: the rollback is
         // the one moment this browser knows least about what the server holds.
         refresh()
+        return false
       })
   }, [items, refresh])
 
@@ -222,12 +255,18 @@ export function useNotifications(enabled: boolean): NotificationsState {
    * so the browser's copy of the list is the one thing that definitely is not
    * the truth. `markAllRead` rolls back the same way and for the same reason.
    */
-  const clearRead = useCallback(() => {
+  const clearRead = useCallback((): Promise<boolean> => {
     setItems((current) => current.filter((item) => item.readAt === null))
 
-    clearReadNotifications()
-      .then((count) => setUnreadCount(count))
-      .catch(() => refresh())
+    return clearReadNotifications()
+      .then((count) => {
+        setUnreadCount(count)
+        return true
+      })
+      .catch(() => {
+        refresh()
+        return false
+      })
   }, [refresh])
 
   return {
@@ -241,4 +280,23 @@ export function useNotifications(enabled: boolean): NotificationsState {
     clearRead,
     hasRead: items.some((item) => item.readAt !== null),
   }
+}
+
+/**
+ * The shared state, provided by `NotificationsProvider`.
+ *
+ * Null rather than a default value so that reading it outside the provider is
+ * a thrown error rather than a bell that silently never fills -- the same
+ * bargain `useAuth` makes.
+ */
+export const NotificationsContext = createContext<NotificationsState | null>(null)
+
+/** The bell's state, for anything rendering notifications. */
+export function useNotifications(): NotificationsState {
+  const context = useContext(NotificationsContext)
+  if (!context) {
+    throw new Error('useNotifications must be used inside <NotificationsProvider>.')
+  }
+
+  return context
 }

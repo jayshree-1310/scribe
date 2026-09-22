@@ -737,6 +737,32 @@ describe.skipIf(!available)("POST /api/ai/scribble", () => {
     expect(system).toContain(`genre: ${fantasyName}`);
   });
 
+  it("constrains the intent call to the filter schema", async () => {
+    const provider = scripted([
+      intent({}),
+      narration([{ id: ids["kidsBook"] as string, reason: "A fit." }]),
+    ]);
+
+    await api.request("/api/ai/scribble", {
+      method: "POST",
+      as: readerId,
+      body: { message: "fantasy for kids" },
+    });
+
+    // Stage 1 is the one where a malformed reply is fatal -- no filters means
+    // no query ran at all -- so it asks the provider for a shape rather than
+    // for prose that looks like one. Stage 3 is left unconstrained on purpose;
+    // `docs/ai-architecture.md` says why.
+    const format = provider.calls[0]?.format;
+    expect(format?.name).toBe("scribble_intent");
+    expect(format?.schema).toMatchObject({
+      type: "object",
+      additionalProperties: false,
+      properties: { genre: {}, kidsAppropriate: {}, limit: {} },
+    });
+    expect(provider.calls[1]?.format).toBeUndefined();
+  });
+
   it("surfaces a provider outage as a 503", async () => {
     const provider = scripted([intent({}), narration([])]);
     provider.failNext(HttpError.unavailable("The model server is not reachable."));

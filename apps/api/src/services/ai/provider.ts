@@ -6,16 +6,18 @@
  * is what keeps "swap the model" a one-file change and keeps a provider's types
  * out of feature code.
  *
- * The provider returned here is wrapped twice: once to retry transient
- * failures, once to record usage. Both belong here rather than in each
- * implementation, because they are policy and not protocol.
+ * The provider returned here is wrapped: once to retry transient failures and
+ * record usage, once more to add the structured-output path. All of it belongs
+ * here rather than in each implementation, because it is policy and not
+ * protocol -- an implementation only ever writes `complete` and `stream`.
  */
 
 import { HttpError } from "../../lib/http-error.js";
 import { isAiConfigured, loadAiConfig, type AiConfig } from "./config.js";
 import { createOllamaProvider } from "./ollama.js";
 import { createOpenAiCompatibleProvider } from "./openai-compatible.js";
-import type { AiProvider, AiRequest } from "./types.js";
+import { withStructured } from "./structured.js";
+import type { AiClient, AiProvider, AiRequest } from "./types.js";
 import { logAiUsage } from "./usage.js";
 
 /* Construction ----------------------------------------------------------- */
@@ -144,9 +146,23 @@ function wrap(inner: AiProvider, config: AiConfig): AiProvider {
   };
 }
 
+/**
+ * Retry and usage first, structured output on top.
+ *
+ * The order is the point: `completeStructured` may make two calls, and each
+ * one gets its own retries and its own usage record. Wrapped the other way
+ * round, a repaired reply would cost two calls and log one, which is exactly
+ * the number you would want when asking why the bill moved.
+ */
+function client(inner: AiProvider, config: AiConfig): AiClient {
+  return withStructured(wrap(inner, config), {
+    structuredOutput: config.structuredOutput,
+  });
+}
+
 /* Access ----------------------------------------------------------------- */
 
-let cached: { config: AiConfig; provider: AiProvider } | null = null;
+let cached: { config: AiConfig; provider: AiClient } | null = null;
 
 /**
  * The configured provider, or a 503 when AI is not set up.
@@ -155,7 +171,7 @@ let cached: { config: AiConfig; provider: AiProvider } | null = null;
  * forgets to check still fails correctly, with a message a person can act on,
  * instead of dereferencing undefined.
  */
-export function aiProvider(): AiProvider {
+export function aiProvider(): AiClient {
   if (cached) return cached.provider;
 
   const config = loadAiConfig();
@@ -166,16 +182,32 @@ export function aiProvider(): AiProvider {
     );
   }
 
-  cached = { config, provider: wrap(build(config), config) };
+  cached = { config, provider: client(build(config), config) };
   return cached.provider;
 }
 
-/** Test seam: install a fake, then `resetAiProvider()` in teardown. */
+/**
+ * Test seam: install a fake, then `resetAiProvider()` in teardown.
+ *
+ * The fake is given `completeStructured` but **not** retries or usage logging:
+ * a test that scripts one failure expects one failure, and a test that asserts
+ * on `fake.calls` is counting the calls its feature made. The structured path
+ * is different -- it is the behaviour under test in `structured.test.ts`, and
+ * it is written once rather than duplicated into the fake.
+ */
 export function setAiProvider(provider: AiProvider | null): void {
-  cached =
-    provider === null
-      ? null
-      : { config: loadAiConfig(), provider };
+  if (provider === null) {
+    cached = null;
+    return;
+  }
+
+  const config = loadAiConfig();
+  cached = {
+    config,
+    provider: withStructured(provider, {
+      structuredOutput: config.structuredOutput,
+    }),
+  };
 }
 
 /** Drops the cache so the next call re-reads the environment. */

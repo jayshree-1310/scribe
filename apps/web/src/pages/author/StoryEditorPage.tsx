@@ -21,7 +21,6 @@ import {
   MAX_MEDIA_BYTES,
   uploadMedia,
 } from '../../data/uploads-api'
-import { AppShell } from '../../components/layout/AppShell'
 import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { SelectableChip, StatusBadge } from '../../components/ui/Chip'
@@ -39,6 +38,12 @@ import { InlineNotice } from '../../components/ui/States'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { ErrorState } from '../../components/ui/States'
 import { CoverField } from '../../components/story/CoverField'
+import {
+  ASSIST_MENU,
+  AssistPanel,
+  type AssistRequest,
+} from '../../components/ai/AssistPanel'
+import type { AssistAction } from '../../data/ai-api'
 import { countWords, renderChapter } from '../../lib/chapter-markdown'
 import '../pages.css'
 import './author.css'
@@ -206,6 +211,15 @@ export function StoryEditorPage() {
   const [detaching, setDetaching] = useState<string | null>(null)
   const [dropping, setDropping] = useState(false)
   const [confirmPublish, setConfirmPublish] = useState(false)
+
+  /**
+   * The suggestion on screen, if any, plus where it would go. Null whenever
+   * the assistant is closed — and nothing in the draft depends on it, because
+   * a suggestion is not applied until `acceptAssist`.
+   */
+  const [assisting, setAssisting] = useState<
+    (AssistRequest & { start: number; end: number; replaced: string }) | null
+  >(null)
 
   const bodyRef = useRef<HTMLTextAreaElement>(null)
   const mediaInputRef = useRef<HTMLInputElement>(null)
@@ -457,6 +471,104 @@ export function StoryEditorPage() {
     requestAnimationFrame(() => {
       field.focus()
       field.setSelectionRange(caret, caret)
+    })
+  }
+
+  /* The writing assistant ---------------------------------------------- */
+
+  /**
+   * How much prose either side of the passage travels with it. The server
+   * trims further to its own budget; this only keeps the request small.
+   */
+  const ASSIST_CONTEXT = 2000
+  /** What `continue` reads back from the caret to pick up the thread. */
+  const CONTINUE_LOOKBACK = 1500
+
+  /**
+   * Opens the assistant on the current selection.
+   *
+   * `replaced` is stored separately from `original`: for `continue` the two
+   * differ, because the model is shown the prose leading up to the caret while
+   * the range being written to is the empty one at it.
+   */
+  function startAssist(action: AssistAction) {
+    const field = bodyRef.current
+    if (!field) {
+      showToast({ message: 'Switch to Write to use the assistant.' })
+      return
+    }
+
+    const { selectionStart, selectionEnd, value } = field
+    const continuing = action === 'continue'
+
+    if (!continuing && selectionEnd <= selectionStart) {
+      showToast({ message: 'Select the text you want help with first.' })
+      return
+    }
+
+    const start = continuing ? selectionEnd : selectionStart
+    const end = selectionEnd
+    const original = continuing
+      ? value.slice(Math.max(0, end - CONTINUE_LOOKBACK), end)
+      : value.slice(start, end)
+
+    if (original.trim().length === 0) {
+      showToast({ message: 'There is nothing there for the assistant to read.' })
+      return
+    }
+
+    setAssisting({
+      action,
+      original,
+      // For `continue` the lookback is the passage, so the context before it
+      // starts where the lookback does, not at the caret.
+      before: value.slice(Math.max(0, start - original.length - ASSIST_CONTEXT), continuing ? end - original.length : start),
+      after: value.slice(end, end + ASSIST_CONTEXT),
+      storyId,
+      start,
+      end,
+      replaced: value.slice(start, end),
+    })
+  }
+
+  /**
+   * Applies an accepted suggestion through `patchChapter` — the same path the
+   * toolbar uses, so this is one more edit of the draft rather than a second
+   * way of writing to it.
+   *
+   * The range is re-checked first. The author can keep typing while a
+   * suggestion streams, and replacing an offset that has since moved would
+   * corrupt the very paragraph they were working on.
+   */
+  function acceptAssist(text: string) {
+    if (!assisting) return
+
+    const value = active.body
+    if (value.slice(assisting.start, assisting.end) !== assisting.replaced) {
+      showToast({
+        tone: 'error',
+        message: 'That part of the chapter changed while the assistant was working, so nothing was replaced.',
+      })
+      setAssisting(null)
+      return
+    }
+
+    // A continuation is an insertion, and needs a space when the prose it
+    // follows does not already end in one.
+    const insertion =
+      assisting.action === 'continue' && !/\s$/.test(value.slice(0, assisting.start))
+        ? ` ${text}`
+        : text
+
+    const next = value.slice(0, assisting.start) + insertion + value.slice(assisting.end)
+    const caret = assisting.start + insertion.length
+
+    patchChapter(active.key, { body: next })
+    setAssisting(null)
+
+    requestAnimationFrame(() => {
+      bodyRef.current?.focus()
+      bodyRef.current?.setSelectionRange(caret, caret)
     })
   }
 
@@ -845,22 +957,22 @@ export function StoryEditorPage() {
 
   if (loaded.status === 'error') {
     return (
-      <AppShell variant="author">
+      <>
         <ErrorState message={loaded.error} onRetry={loaded.reload} />
-      </AppShell>
+      </>
     )
   }
 
   if (!isNew && loaded.status === 'loading') {
     return (
-      <AppShell variant="author">
+      <>
         <Skeleton height="28rem" radius="var(--radius-lg)" />
-      </AppShell>
+      </>
     )
   }
 
   return (
-    <AppShell variant="author">
+    <>
       {/* Studio header --------------------------------------------------- */}
       <header className="editor__head">
         <div className="editor__head-main">
@@ -954,6 +1066,31 @@ export function StoryEditorPage() {
 
               <span className="editor__toolbar-divider" role="separator" />
 
+              <DropdownMenu
+                label="Writing assistant"
+                trigger={(props) => (
+                  <Button
+                    {...props}
+                    variant="ghost"
+                    size="sm"
+                    startIcon={<Icon name="sparkle" size="1rem" />}
+                  >
+                    Assist
+                  </Button>
+                )}
+              >
+                {ASSIST_MENU.map((entry) => (
+                  <MenuItem
+                    key={entry.action}
+                    onSelect={() => startAssist(entry.action)}
+                  >
+                    {entry.label}
+                  </MenuItem>
+                ))}
+              </DropdownMenu>
+
+              <span className="editor__toolbar-divider" role="separator" />
+
               {MEDIA_KINDS.map((media) => (
                 <Button
                   key={media.kind}
@@ -973,6 +1110,19 @@ export function StoryEditorPage() {
                 </Button>
               ))}
             </div>
+
+            {/*
+              Between the toolbar and the prose rather than over it: the point
+              of the panel is reading the suggestion against the original, and
+              a modal would hide the chapter it came from.
+            */}
+            {assisting ? (
+              <AssistPanel
+                request={assisting}
+                onAccept={acceptAssist}
+                onClose={() => setAssisting(null)}
+              />
+            ) : null}
 
             {mode === 'write' ? (
               <>
@@ -1472,6 +1622,6 @@ export function StoryEditorPage() {
           leave now.
         </p>
       </Dialog>
-    </AppShell>
+    </>
   )
 }
