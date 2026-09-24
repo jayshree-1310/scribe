@@ -305,6 +305,20 @@ getting right before the first feature.
 
 ## Task AI 1 — First endpoint
 
+**Status: built.** `services/ai/chat.ts`, `services/ai/prompts/chat.ts`,
+`services/ai/budget.ts`, two routes on `routes/ai.ts`, the chat pair in
+`apps/web/src/data/ai-api.ts`, `pages/AiLabPage.tsx` at `/ai-lab`, tests in
+`routes/ai-chat.test.ts`. Verified end to end against `gpt-oss-120b` on Groq:
+365 tokens in about a second, and the prompt's no-catalogue-facts rule holds —
+asked for three fantasy titles from the library it declines and points at
+Discover, which is the only honest answer a feature with no retrieval can give.
+
+Two things to know before extending it. `AI_DAILY_TOKEN_BUDGET` is now
+**enforced**, but only here: `budget.ts` checks it before a call and charges it
+after one, and extending that to every feature (plus persisting the counts) is
+still Task AI 18. And `/ai-lab` is mounted only when `import.meta.env.DEV` — it
+is a workbench, so a production build drops the route rather than shipping it.
+
 **Prompt:**
 
 > `POST /api/ai/chat` behind `requireUser`: a validated prompt in, a model reply
@@ -346,7 +360,8 @@ the retrieval result before the model has written anything.
 
 Still open: no conversation memory, so a follow-up ("something shorter?")
 does not resolve against the previous answer — that is Task AI 10. The daily
-token budget is read but unenforced (Task AI 18).
+token budget is enforced on `/api/ai/chat` only (Task AI 1); extending it here
+and everywhere else is Task AI 18.
 
 The first task a user can see the point of, and deliberately placed before the
 embedding work: it needs no vectors, no pgvector, no chunking. Everything it
@@ -446,6 +461,21 @@ is the natural follow-up.
 
 ## Task AI 2 — Streaming
 
+**Status: built.** Its server side landed early, with Task AI 3 — `writeEvent`
+and `reportStreamFailure` in `routes/ai.ts`, `streamRequest` in
+`apps/web/src/data/ai-api.ts` — and this task finished the endpoint it was
+written for: `POST /api/ai/chat/stream`, `streamChat`, and progressive
+rendering with a stop button on `/ai-lab`.
+
+The three failure modes are tested rather than hoped about, in
+`routes/ai-chat.test.ts`: a client that disconnects aborts the provider call
+(the test asserts the signal the provider was handed actually fired), a failure
+after the first delta arrives as an `error` frame with no terminal `done`, and
+a failure *before* the first byte is still an ordinary 503 — because
+`writeEvent` does not commit to `200 text/event-stream` until there is
+something to write. Nothing retries a stream that has already emitted text;
+see `provider.ts`.
+
 **Prompt:**
 
 > Make `/api/ai/chat` stream, because a 20-second wait with no output is the
@@ -499,9 +529,8 @@ streams.
 
 Task AI 2's server side landed with it: `writeEvent` / `reportStreamFailure` in
 `routes/ai.ts` and `streamRequest` in `apps/web/src/data/ai-api.ts` are now
-shared by both streaming features. What remains of AI 1 and AI 2 is the
-`/api/ai/chat` endpoint and the `/ai-lab` workbench page, which nothing depends
-on.
+shared by all three streaming features — the third being `/api/ai/chat/stream`,
+which closed out Tasks AI 1 and AI 2.
 
 The first feature an author would actually use. **Depends on `BACKLOG.md` Task 6
 (authoring CRUD)** — without a save path, "Accept" has nowhere to put the text.

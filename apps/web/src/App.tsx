@@ -42,6 +42,7 @@ import { ChannelDetailPage } from './pages/ChannelDetailPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { AiLabPage } from './pages/AiLabPage'
 import { AuthorDashboardPage } from './pages/author/AuthorDashboardPage'
 import { AuthorStoriesPage } from './pages/author/AuthorStoriesPage'
 import { IdeaStudioPage } from './pages/author/IdeaStudioPage'
@@ -162,6 +163,22 @@ const router = createBrowserRouter(
             arrives by typing the URL, and every request it makes is checked
             again by `assertAdmin`. */}
         <Route path="/moderation" element={<ModerationQueuePage />} />
+
+        {/*
+          A workbench for building AI features, not a feature: mounted in
+          development only, and linked from nowhere. `import.meta.env.DEV` is
+          a compile-time constant, so a production build drops this branch and
+          tree-shakes the page with it — only its stylesheet rides along, which
+          is a kilobyte of rules nothing renders. `createRoutesFromElements`
+          skips a null child, which is what makes the conditional legal here.
+
+          This is a convenience, not the security boundary. `/api/ai/chat`
+          requires a session and is rate-limited whether or not a page exists
+          to call it — a route hidden in the client would protect nothing.
+        */}
+        {import.meta.env.DEV ? (
+          <Route path="/ai-lab" element={<AiLabPage />} />
+        ) : null}
       </Route>
 
       {/* Author studio: the same shell, the other navigation. ------------- */}

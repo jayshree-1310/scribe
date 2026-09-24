@@ -16,6 +16,11 @@ import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
 import { parseOrThrow } from "../lib/validate.js";
 import { requireUser, requireUserId } from "../middleware/current-user.js";
 import {
+  assertWithinDailyBudget,
+  recordTokenUsage,
+} from "../services/ai/budget.js";
+import { PROMPT_LIMIT, chat, chatStream } from "../services/ai/chat.js";
+import {
   GENERATION_KINDS,
   MAX_VARIANTS,
   generate,
@@ -128,6 +133,135 @@ function reportStreamFailure(
   res.end();
   return true;
 }
+
+/* Chat ------------------------------------------------------------------- */
+
+/**
+ * One model call per request, and the only feature here with no product
+ * around it -- which makes it the easiest of the four to point a script at.
+ * The window matches the others so the limits read as one policy rather than
+ * four opinions.
+ */
+const CHAT_LIMIT = 30;
+const CHAT_WINDOW_SECONDS = 60 * 10;
+
+const chatSchema = z.object({
+  prompt: z
+    .string()
+    .trim()
+    .min(1, "Type something to send.")
+    .max(
+      PROMPT_LIMIT,
+      // Says the number, because "too long" leaves a caller guessing at a
+      // limit that exists to keep the prompt well inside the context window.
+      `Keep it under ${PROMPT_LIMIT} characters — this endpoint sends one prompt, not a document.`,
+    ),
+});
+
+/**
+ * Both tolls, before a single token is generated.
+ *
+ * The request limit is checked first because it is the cheaper read, and
+ * neither refusal counts as an attempt: a caller who was turned away did not
+ * get to ask, and charging them for it would extend their own lockout.
+ */
+async function chargeChat(userId: string): Promise<void> {
+  const key = `ai:chat:${userId}`;
+
+  const status = await isRateLimited(key, CHAT_LIMIT);
+  if (status.limited) {
+    throw HttpError.tooManyRequests(
+      "You have sent a lot of prompts in a short time. Try again shortly.",
+      status.retryAfter,
+    );
+  }
+
+  await assertWithinDailyBudget(userId);
+  await recordAttempt(key, CHAT_WINDOW_SECONDS);
+}
+
+/**
+ * The smallest end-to-end AI path in the app: validate, charge, call, answer.
+ *
+ * It returns its token counts to the caller, which no other route here does.
+ * `/ai-lab` is a workbench for whatever feature is being built next, and one
+ * whose whole job is to show what a request costs cannot keep the number to
+ * itself.
+ */
+router.post("/chat", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const { prompt } = parseOrThrow(chatSchema, req.body);
+
+    await chargeChat(userId);
+
+    const reply = await chat(prompt, abortOnDisconnect(res).signal);
+    // After the fact, necessarily: what a completion costs is not known until
+    // it exists. See `services/ai/budget.ts` on why that is a budget rather
+    // than a hard stop.
+    await recordTokenUsage(userId, reply.usage.totalTokens);
+
+    res.json(reply);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * The same answer, streamed, because a local model can take half a minute over
+ * a paragraph and a blank screen for half a minute reads as a broken app.
+ *
+ * Three failures this has to handle rather than hope about, all exercised by
+ * `ai-chat.test.ts`:
+ *
+ * - **The client goes away.** `abortOnDisconnect` cancels the provider call,
+ *   or we keep generating tokens nobody will read.
+ * - **The provider fails mid-stream.** Headers are already out, so a 500 is no
+ *   longer available: the failure goes in-band as an `error` frame and the
+ *   stream ends.
+ * - **A failure before the first byte** is still an ordinary JSON status,
+ *   because `writeEvent` does not commit to `200 text/event-stream` until
+ *   there is something to write.
+ */
+router.post("/chat/stream", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const { prompt } = parseOrThrow(chatSchema, req.body);
+
+    await chargeChat(userId);
+
+    const disconnect = abortOnDisconnect(res);
+
+    for await (const event of chatStream(prompt, disconnect.signal)) {
+      if (event.type === "done") {
+        // The terminal event is the only place usage exists, so a stream the
+        // reader abandoned goes uncharged. That is tolerable rather than
+        // ideal: the disconnect aborted the provider call with it, so there is
+        // little left to have charged for, and the request limit above still
+        // caps how often somebody can do it on purpose.
+        await recordTokenUsage(userId, event.usage.totalTokens);
+      }
+      if (!writeEvent(res, event)) break;
+    }
+
+    res.end();
+  } catch (error) {
+    if (
+      reportStreamFailure(
+        res,
+        error,
+        "The reply stopped unexpectedly.",
+        "chat stream failed after headers",
+      )
+    ) {
+      return;
+    }
+
+    next(error);
+  }
+});
+
+/* Scribble --------------------------------------------------------------- */
 
 /**
  * The previous turn's filters, so a follow-up can narrow them.

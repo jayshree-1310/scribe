@@ -1,11 +1,13 @@
 /**
  * AI data access, following `books-api.ts`.
  *
- * Two features live here. Scribble returns books: everything about them —
+ * The features differ in how much of what they return a model wrote, and the
+ * UI has to differ with them. Scribble returns books: everything about them —
  * title, author, description, link — came out of the database, and only
- * `reason` and `intro` were generated. Generation returns material that is
- * *entirely* model-written, which is why nothing it produces is saved until an
- * author acts on it, and why the UI labels all of it.
+ * `reason` and `intro` were generated. Generation and the writing assistant
+ * return material that is *entirely* model-written, which is why nothing they
+ * produce is saved until an author acts on it, and why the UI labels all of
+ * it. Chat is the bare path underneath all three, for `/ai-lab`.
  */
 
 import {
@@ -379,4 +381,56 @@ export function streamAssist(
   signal?: AbortSignal,
 ): AsyncGenerator<AssistEvent> {
   return streamRequest<AssistEvent>('/ai/assist/stream', payload, signal)
+}
+
+/* Chat ------------------------------------------------------------------- */
+
+/**
+ * The plain prompt-in, reply-out path, plus what it cost.
+ *
+ * Only `/ai-lab` uses it. It is kept because it is the one AI call with
+ * nothing around it — no retrieval, no schema, no window — so it is where a
+ * provider swap, a model change or a timeout gets diagnosed before the blame
+ * lands on a feature.
+ */
+export interface ChatUsage {
+  model: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  /** Measured at the provider, so it excludes this app's own overhead. */
+  durationMs: number
+}
+
+export interface ChatReply {
+  text: string
+  usage: ChatUsage
+}
+
+export type ChatEvent =
+  | { type: 'text'; text: string }
+  /** Exactly one, last. A stream that ends without it failed. */
+  | { type: 'done'; usage: ChatUsage }
+  | { type: 'error'; code: string; message: string }
+
+export async function chat(
+  prompt: string,
+  signal?: AbortSignal,
+): Promise<ChatReply> {
+  return request<ChatReply>('/ai/chat', {
+    method: 'POST',
+    headers: readerHeaders(),
+    body: { prompt },
+    // A local CPU model takes tens of seconds; the shared 15s default would
+    // abort every call.
+    timeoutMs: AI_REQUEST_TIMEOUT_MS,
+    ...(signal ? { signal } : {}),
+  })
+}
+
+export function streamChat(
+  prompt: string,
+  signal?: AbortSignal,
+): AsyncGenerator<ChatEvent> {
+  return streamRequest<ChatEvent>('/ai/chat/stream', { prompt }, signal)
 }

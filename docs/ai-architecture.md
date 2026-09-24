@@ -1,11 +1,12 @@
 # AI architecture
 
 How an AI request flows through Scribe, what each layer is responsible for, and
-what a new AI feature has to add. Written for the state after Tasks AI 0, AI 1.5,
-AI 3, AI 4 and AI 5 of `AI-BACKLOG.md`: the module and the provider seam exist, a
-model can be asked for a shape rather than for prose that looks like one, and
-three features are built on that — Scribble for readers, the idea studio and the
-writing assistant for authors.
+what a new AI feature has to add. Written for the state after Tasks AI 0 through
+AI 5 of `AI-BACKLOG.md`: the module and the provider seam exist, a model can be
+asked for a shape rather than for prose that looks like one, every long answer
+streams, and three features are built on that — Scribble for readers, the idea
+studio and the writing assistant for authors — plus `/api/ai/chat`, which is the
+bare path underneath them and the one the `/ai-lab` workbench drives.
 
 ## The path
 
@@ -45,6 +46,9 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/ollama.ts` | The default implementation: plain HTTP to a local Ollama server, no SDK, no key. Maps transport and protocol failures onto `HttpError`. |
 | `services/ai/provider.ts` | Constructs the provider (once), wraps it with retry and usage policy, and hands it out via `aiProvider()`. The only place a client is built. |
 | `services/ai/usage.ts` | Where usage records go. Logs today; Task AI 18 swaps the sink for one that also persists. |
+| `services/ai/budget.ts` | The per-user token ceiling `config.ts` reads. Checked before a call, charged after one. Not a second limiter: the read side *is* `isRateLimited`. |
+| `services/ai/chat.ts` | Task AI 1's feature: a prompt in, a reply out, streamed or not. The only AI call with nothing around it, which is what makes it the thing to test a provider with. |
+| `services/ai/prompts/chat.ts` | The one prompt that says what Scribe is. Its load-bearing rule is the one forbidding catalogue facts: chat has no retrieval to be right from. |
 | `services/ai/json-schema.ts` | Derives the JSON schema sent to a provider from a zod schema, pruned to the keyword subset every provider accepts. |
 | `services/ai/structured.ts` | `completeStructured`: constrain, validate, repair once, then fail. Written over whichever provider is configured, so no implementation implements it. |
 | `services/ai/schemas.ts` | The shapes generative features ask for — story idea, character profile, chapter outline. Zod only; the wire schema is derived. |
@@ -196,10 +200,30 @@ were, so three options are three different options rather than three rewordings.
 The count is capped at three in the route schema *and* in the service: it is the
 one field whose value multiplies the bill.
 
+### Two limits, not one
+
+Every AI route is rate-limited per user, and `/api/ai/chat` is additionally
+charged against a token budget. They answer different questions, which is why
+both exist: twenty requests is twenty requests whether each one was a sentence
+or a chapter, so `lib/rate-limit.ts` caps how *often* somebody can ask and
+`services/ai/budget.ts` caps how much they can spend doing it.
+
+The budget is checked before the call and charged after it, because what a
+completion costs is not known until it has been generated — so it is a budget
+rather than a hard stop, and a caller just under the ceiling can cross it by one
+request's worth. Neither refusal counts as an attempt: a caller who was turned
+away did not get to ask, and charging them for it would extend their own
+lockout. A stream is charged even when the reader has already closed the tab,
+because the tokens were generated either way.
+
+`AI_DAILY_TOKEN_BUDGET=0` disables it. Persisted usage, spend by feature, an
+admin view and the same check on every other feature are Task AI 18; this is
+what makes the setting mean something in the meantime.
+
 ### Streaming, in one place
 
-Two routes stream — Scribble and the assistant — through `writeEvent` and
-`reportStreamFailure` in `routes/ai.ts`. Headers are written on the *first*
+Three routes stream — chat, Scribble and the assistant — through `writeEvent`
+and `reportStreamFailure` in `routes/ai.ts`. Headers are written on the *first*
 event, never up front: every service does its authorisation and its first
 provider call before yielding anything, so a 403 or a 503 still reaches
 `errorHandler` as ordinary JSON. Committing to `200 text/event-stream` earlier
@@ -208,8 +232,7 @@ byte `errorHandler` can no longer answer, so a mid-stream failure is reported
 in-band as an `error` frame, and a stream that ends without its terminal event
 is a failure the client must treat as one.
 
-The browser side is `streamRequest` in `data/ai-api.ts`, shared by both
-features: `request()` always ends in `response.json()`, so streaming cannot go
+The browser side is `streamRequest` in `data/ai-api.ts`, shared by all three: `request()` always ends in `response.json()`, so streaming cannot go
 through it, and the chunk-boundary handling is the part that is wrong
 *intermittently* when it is wrong — which is the worst way to be wrong twice.
 
@@ -240,11 +263,12 @@ delivery varies by provider and cannot be verified here without a key.
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The remaining features.** Tasks AI 1 onward.
-- **Persisted usage and budgets.** The sink exists; the table is Task AI 18. So
-  is enforcement: `config.ts` reads `AI_DAILY_TOKEN_BUDGET` and nothing honours
-  it yet. `routes/ai.ts` rate-limits *requests* per user, which caps the blast
-  radius but not the spend.
+- **The remaining features.** Tasks AI 6 onward: summaries, embeddings,
+  retrieval, and everything built on them.
+- **Persisted usage, and budgets everywhere else.** The sink still only logs,
+  and the table is Task AI 18. `services/ai/budget.ts` enforces
+  `AI_DAILY_TOKEN_BUDGET` on `/api/ai/chat`; the other features are
+  rate-limited by *request*, which caps the blast radius but not the spend.
 - **Embeddings.** `AiProvider` has no `embed` yet; Task AI 7 adds it along with
   the model and dimension decision.
 

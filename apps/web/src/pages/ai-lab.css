@@ -1,0 +1,128 @@
+/**
+ * The AI workbench.
+ *
+ * Deliberately plain: it is a development tool, and every rule here earns its
+ * place by making something legible that a bare page would not. The reply is
+ * monospaced and whitespace-preserving because what is being inspected is the
+ * model's *literal* output — a stray markdown fence or a doubled newline is a
+ * prompt bug, and a proportional font that swallows it hides the bug.
+ */
+
+.ai-lab__form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.ai-lab__form form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.ai-lab__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.ai-lab__note {
+  margin: 0;
+  flex: 1 1 16rem;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.ai-lab__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.ai-lab__result {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+}
+
+.ai-lab__notice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.ai-lab__reply {
+  min-height: 6rem;
+}
+
+.ai-lab__text {
+  margin: 0;
+  /* The reply is shown exactly as it arrived, blank lines and all. */
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.ai-lab__waiting {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* A cursor while tokens are still arriving, so a pause reads as a pause
+   rather than as a finished answer that stopped mid-sentence. */
+.ai-lab__caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  margin-left: 0.1em;
+  vertical-align: text-bottom;
+  background: var(--text-muted);
+  animation: ai-lab-blink 1s steps(2, start) infinite;
+}
+
+@keyframes ai-lab-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-lab__caret {
+    animation: none;
+  }
+}
+
+.ai-lab__stats {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  margin: 0;
+}
+
+.ai-lab__stat {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.ai-lab__stat dt {
+  color: var(--text-muted);
+  font-size: var(--text-2xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.ai-lab__stat dd {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}

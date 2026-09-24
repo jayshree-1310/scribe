@@ -149,6 +149,8 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
 
     // Generation for the caller alone; nothing it returns is published by it.
     ...[
+      "ai.ts POST /chat",
+      "ai.ts POST /chat/stream",
       "ai.ts POST /scribble",
       "ai.ts POST /scribble/stream",
       "ai.ts POST /assist",
