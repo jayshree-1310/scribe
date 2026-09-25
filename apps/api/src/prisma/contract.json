@@ -36,6 +36,10 @@
       "model": "ChapterRead",
       "namespace": "engagement"
     },
+    "chapterSummary": {
+      "model": "ChapterSummary",
+      "namespace": "ai"
+    },
     "clubDiscussion": {
       "model": "ClubDiscussion",
       "namespace": "clubs"
@@ -123,6 +127,117 @@
   },
   "domain": {
     "namespaces": {
+      "ai": {
+        "models": {
+          "ChapterSummary": {
+            "fields": {
+              "chapterId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "contentHash": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "promptVersion": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "text": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "chapter": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "chapterId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Chapter",
+                  "namespace": "content"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "chapterId": {
+                  "column": "chapterId"
+                },
+                "contentHash": {
+                  "column": "contentHash"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "promptVersion": {
+                  "column": "promptVersion"
+                },
+                "text": {
+                  "column": "text"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "ai",
+              "table": "chapterSummary"
+            }
+          }
+        }
+      },
       "auth": {
         "models": {
           "GenrePreference": {
@@ -2093,6 +2208,21 @@
                 "to": {
                   "model": "Story",
                   "namespace": "content"
+                }
+              },
+              "summary": {
+                "cardinality": "1:1",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "chapterId"
+                  ]
+                },
+                "to": {
+                  "model": "ChapterSummary",
+                  "namespace": "ai"
                 }
               }
             },
@@ -4407,6 +4537,97 @@
   },
   "storage": {
     "namespaces": {
+      "ai": {
+        "entries": {
+          "table": {
+            "chapterSummary": {
+              "columns": {
+                "chapterId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "contentHash": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "promptVersion": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "text": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "source": {
+                    "columns": [
+                      "chapterId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "chapterSummary"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "chapter"
+                  }
+                }
+              ],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "chapterId"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "id": "ai",
+        "kind": "postgres-schema"
+      },
       "auth": {
         "entries": {
           "table": {
@@ -7954,10 +8175,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "e89d7b557c0039c370910c43fa29a533e5c244fdf78e295611d70ee1189c46a3"
+    "storageHash": "d6fc7e415642368b7f80b2c9510bd90d28c385360fbde9a7bf7962f0dd15981c"
   },
   "execution": {
-    "executionHash": "58bcd8791f1bf956db3e0406a1dba3023721b98f79d32347cf51690ea1fce423",
+    "executionHash": "27bfeefcc8d868893066dd961591862c0e87de77c8fbd31cd8d5babafd125024",
     "mutations": {
       "defaults": [
         {
@@ -8035,6 +8256,17 @@
             "column": "id",
             "namespace": "engagement",
             "table": "chapterRead"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "ai",
+            "table": "chapterSummary"
           }
         },
         {

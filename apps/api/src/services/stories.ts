@@ -869,6 +869,101 @@ export async function findVisibleChapter(
 }
 
 /**
+ * The chapter before `chapterNumber` that this caller may actually read, with
+ * its text.
+ *
+ * **Not `chapterNumber - 1`.** An unpublished chapter in the middle of a story
+ * is invisible to everybody but its author, and numbering can be uneven after
+ * a deletion -- so the chapter preceding twelve is nine for one reader and
+ * eleven for another. The reader's own prev/next links already work this way
+ * (see `getChapter`); anything reading "the previous chapter" has to agree
+ * with them or it will describe a chapter the reader cannot open.
+ *
+ * Written for the AI recap, which summarises this chapter for a reader
+ * returning to a serial after a fortnight. It lives here rather than in
+ * `services/ai/` because it is a visibility question, and every answer to a
+ * visibility question in this codebase is in this file. A copy over there
+ * would be the copy that eventually recaps a draft to a stranger.
+ *
+ * Returns null when there is no previous visible chapter, which is an ordinary
+ * answer -- the first chapter of a story has none. A story the caller may not
+ * see is a 404, because that is a different question with a different answer.
+ */
+export async function findPreviousVisibleChapter(
+  slugOrId: string,
+  chapterNumber: number,
+  viewerId: string | null,
+): Promise<{
+  id: string;
+  number: number;
+  title: string;
+  content: string;
+} | null> {
+  const story = await findStoryRow(slugOrId, viewerId);
+  if (!story) throw HttpError.notFound(NOT_FOUND);
+
+  const row = await chaptersVisibleTo(story, viewerId)
+    .select("id", "chapterNumber", "title", "content")
+    .where((chapter) => chapter.chapterNumber.lt(chapterNumber))
+    .orderBy((chapter) => chapter.chapterNumber.desc())
+    .first();
+
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    number: row.chapterNumber,
+    title: row.title,
+    content: row.content,
+  };
+}
+
+/**
+ * One visible chapter's prose, by id.
+ *
+ * `findVisibleChapter` above answers "may this caller see this chapter?" and
+ * deliberately returns no text, because its callers only needed to authorise a
+ * like. This answers the same question and returns the body, for the AI
+ * explain feature -- which is handed a chapter id and a pair of offsets, and
+ * has to read the passage out of the stored chapter itself rather than trust
+ * prose sent in a request body.
+ *
+ * That indirection is the point of the function. A reader-facing endpoint that
+ * accepts arbitrary text and forwards it to a model is a general-purpose model
+ * proxy wearing a costume; one that accepts offsets into a chapter it looks up
+ * can only ever explain published fiction.
+ */
+export async function findVisibleChapterText(
+  chapterId: string,
+  viewerId: string | null,
+): Promise<{
+  id: string;
+  storyId: string;
+  number: number;
+  title: string;
+  content: string;
+} | null> {
+  // The visibility decision itself is not repeated here -- it is the function
+  // above, so the draft rule has exactly one implementation.
+  const visible = await findVisibleChapter(chapterId, viewerId);
+  if (!visible) return null;
+
+  const row = await db.orm.content.Chapter.select("title", "content")
+    .where((chapter) => chapter.id.eq(chapterId))
+    .first();
+
+  if (!row) return null;
+
+  return {
+    id: visible.id,
+    storyId: visible.storyId,
+    number: visible.number,
+    title: row.title,
+    content: row.content,
+  };
+}
+
+/**
  * Stories sharing a genre with this one, most engaged first. Returns nothing
  * rather than falling back to unrelated stories: an empty "related" rail reads
  * better than a misleading one.

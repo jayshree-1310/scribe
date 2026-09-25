@@ -526,6 +526,12 @@ export async function deleteStory(
           like.chapterId.eq(chapterId),
         ),
       );
+      // The generated recap, which has a foreign key onto the chapter and so
+      // would block its deletion. Nothing regrets losing it: it is derived
+      // from a chapter that is about to stop existing.
+      await deleteAll(() =>
+        tx.orm.ai.ChapterSummary.where((row) => row.chapterId.eq(chapterId)),
+      );
     }
 
     /**
@@ -898,6 +904,11 @@ export async function deleteChapter(
       tx.orm.engagement.ChapterLike.where((like) =>
         like.chapterId.eq(chapterId),
       ),
+    );
+    // See the same pass in `deleteStory`: the recap holds a foreign key onto
+    // the chapter, so it goes first or the delete below fails.
+    await deleteAll(() =>
+      tx.orm.ai.ChapterSummary.where((row) => row.chapterId.eq(chapterId)),
     );
 
     // Likes on this chapter's comments, before the comments go. See the same

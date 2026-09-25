@@ -1,12 +1,14 @@
 # AI architecture
 
 How an AI request flows through Scribe, what each layer is responsible for, and
-what a new AI feature has to add. Written for the state after Tasks AI 0 through
-AI 5 of `AI-BACKLOG.md`: the module and the provider seam exist, a model can be
-asked for a shape rather than for prose that looks like one, every long answer
-streams, and three features are built on that — Scribble for readers, the idea
-studio and the writing assistant for authors — plus `/api/ai/chat`, which is the
-bare path underneath them and the one the `/ai-lab` workbench drives.
+what a new AI feature has to add. Written for the state after Tasks AI 0
+through AI 5 of `AI-BACKLOG.md`, plus the reader half of Task AI 6: the module
+and the provider seam exist, a model can be asked for a shape rather than for
+prose that looks like one, every long answer streams, and five features are
+built on that — Scribble, the chapter recap and passage explanations for
+readers; the idea studio and the writing assistant for authors — plus
+`/api/ai/chat`, which is the bare path underneath them and the one the
+`/ai-lab` workbench drives.
 
 ## The path
 
@@ -63,6 +65,10 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/scribble-types.ts` | The shapes Scribble's stages pass between them, split out so `prompts/` can render a candidate without an import cycle. |
 | `services/ai/json-stream.ts` | Reads the narration call's JSON object incrementally, so a `pick` can be sent the moment it closes. A byte-wise scanner, because a delta can split mid-uuid or mid-escape. |
 | `services/ai/prompts/scribble.ts` | Both of Scribble's prompts. Built from server-derived values only — no caller text is ever concatenated into system text. |
+| `services/ai/recap.ts` | The reader's "previously in this story": a summary of the *previous* chapter, cached on a hash of that chapter's body. The only AI feature that stores what it generates. |
+| `services/ai/prompts/recap.ts` | The recap prompt, and `RECAP_PROMPT_VERSION` — the first prompt version that is actually written onto a stored row. |
+| `services/ai/explain.ts` | "What does this mean?": a reader's highlighted passage explained. Guarded by *visibility* rather than ownership, and takes offsets rather than prose. |
+| `services/ai/prompts/explain.ts` | Three modes — explain, simplify, define — over one system prompt whose load-bearing rule forbids guessing at what the reader has not reached. |
 
 ## Rules that the code enforces
 
@@ -177,6 +183,51 @@ The editor re-checks the range before applying an accepted suggestion: an author
 can keep typing while one streams, and replacing an offset that has since moved
 would corrupt the paragraph they were working on.
 
+### A reader's guard is visibility; an author's is ownership
+
+The two are easy to confuse and the confusion is expensive in both directions.
+`services/ai/assist.ts` asserts the caller **owns** the story, because it edits
+an author's draft. `services/ai/explain.ts` and `services/ai/recap.ts` assert
+only that the caller may **see** the chapter, because a reader owns nothing
+they read — copying the assistant's guard there would have locked every reader
+out of a feature built for them, and omitting a guard would have exposed
+unpublished writing to anybody who could guess a chapter id.
+
+Neither reader feature implements the rule. `findVisibleChapterText` and
+`findPreviousVisibleChapter` in `services/stories.ts` answer it, beside
+`visibleTo` and `chaptersVisibleTo`, which are where every other read path in
+the app answers it. That is deliberate: a draft is hidden in exactly one place,
+and a second copy of that rule in `services/ai/` is how a draft would
+eventually be recapped to a stranger. A missing chapter and a forbidden one
+both give 404, because a distinguishable 403 confirms the draft exists.
+
+"The previous chapter" is also a visibility question rather than arithmetic. It
+is not `number - 1`: an unpublished chapter in the middle of a story is
+invisible to everybody but its author, so the chapter before twelve is eleven
+for one reader and nine for another, and a recap that got this wrong would
+describe a chapter its reader cannot open.
+
+### A reader-facing endpoint takes offsets, not prose
+
+`/api/ai/assist` accepts the passage in the request body, because the author's
+unsaved editor buffer is the truth and the saved copy is a debounce behind.
+`/api/ai/explain` accepts a chapter id and a `[start, end)` pair instead, and
+reads the text out of the stored chapter itself.
+
+The reason is not symmetry. An endpoint that forwards arbitrary request-body
+text to a model is a general-purpose model proxy behind the site's own key, and
+this one is reachable by every signed-in reader. Taking offsets means the only
+thing that can ever be explained is fiction somebody published on Scribe. The
+offsets are validated against the real body — past the end is a 409 telling the
+reader the chapter changed under them, not a slice of whatever now sits there.
+
+The cost is paid on the client: `lib/chapter-markdown.tsx` renders `**cold**`
+as `cold`, so a DOM offset is not a source offset. `lib/chapter-selection.ts`
+bridges the two by searching the source for what the reader highlighted, loosely
+enough to survive collapsed newlines and emphasis markers, and returns null
+rather than a guess when it cannot place the selection — in which case the UI
+offers no button at all.
+
 ### Generated state lives on the server
 
 `POST /api/ai/generate/{idea,character,outline}` returns variants plus a
@@ -220,10 +271,47 @@ because the tokens were generated either way.
 admin view and the same check on every other feature are Task AI 18; this is
 what makes the setting mean something in the meantime.
 
+The two reader features are charged against it as well, and they are the reason
+it stopped being enough to charge `/api/ai/chat` alone. Everything else here is
+reachable by an *author*, working on their own story — a bounded population
+doing bounded work. `/api/ai/explain` is reachable by every signed-in reader on
+every published chapter, which makes it the widest-open AI surface in the app
+and the first one where request-rate alone would not describe the spend.
+
+### Generated content is cached by what it was generated from
+
+The chapter recap is the first thing here that is *stored* rather than returned
+and forgotten, and the rule it establishes is that the cache key is a hash of
+the input, never a timestamp. `ai.ChapterSummary` holds the SHA-256 of the
+chapter body the recap was written from; a request whose chapter still hashes
+to the same value is answered from the table without a model call, and one
+whose chapter has changed regenerates.
+
+A timestamp would have been wrong in both directions. `Chapter.updatedAt` moves
+when an author fixes a typo or saves without changing a word, so half the
+regenerations would buy an identical paragraph — and it would not move at all
+if a body were ever changed by a path that forgot to touch it, leaving a recap
+of prose nobody can read any more.
+
+The property worth keeping is that **invalidation needs no cooperation**.
+`services/authoring.ts` does not import this feature and has no idea it exists;
+an edit made through the ORM in a test invalidates the recap exactly as an edit
+through the editor does. Anything else here that starts storing generated
+content — summaries, extractions, embeddings — should key the same way.
+
+What the hash covers is the text actually sent to the model, not the whole
+body: a chapter longer than `CHAPTER_LIMIT` is summarised from its opening, so
+hashing the truncated text means changing that limit re-summarises everything
+rather than leaving long chapters with a recap of their first two-thirds.
+
+Every stored row also carries the model and `RECAP_PROMPT_VERSION`, so a recap
+that reads badly is traceable to the prompt that wrote it, and a fixed prompt
+can select the rows that need regenerating.
+
 ### Streaming, in one place
 
-Three routes stream — chat, Scribble and the assistant — through `writeEvent`
-and `reportStreamFailure` in `routes/ai.ts`. Headers are written on the *first*
+Four routes stream — chat, Scribble, the assistant and explain — through
+`writeEvent` and `reportStreamFailure` in `routes/ai.ts`. Headers are written on the *first*
 event, never up front: every service does its authorisation and its first
 provider call before yielding anything, so a 403 or a 503 still reaches
 `errorHandler` as ordinary JSON. Committing to `200 text/event-stream` earlier
@@ -232,7 +320,7 @@ byte `errorHandler` can no longer answer, so a mid-stream failure is reported
 in-band as an `error` frame, and a stream that ends without its terminal event
 is a failure the client must treat as one.
 
-The browser side is `streamRequest` in `data/ai-api.ts`, shared by all three: `request()` always ends in `response.json()`, so streaming cannot go
+The browser side is `streamRequest` in `data/ai-api.ts`, shared by all four: `request()` always ends in `response.json()`, so streaming cannot go
 through it, and the chunk-boundary handling is the part that is wrong
 *intermittently* when it is wrong — which is the worst way to be wrong twice.
 
@@ -263,12 +351,17 @@ delivery varies by provider and cannot be verified here without a key.
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The remaining features.** Tasks AI 6 onward: summaries, embeddings,
-  retrieval, and everything built on them.
+- **The remaining features.** Embeddings, retrieval, and everything built on
+  them — Tasks AI 7 onward. Of Task AI 6 only the chapter recap was built; the
+  story-level summary, the spoiler-free summary and the map-reduce that a
+  multi-chapter summary needs are not here.
 - **Persisted usage, and budgets everywhere else.** The sink still only logs,
   and the table is Task AI 18. `services/ai/budget.ts` enforces
-  `AI_DAILY_TOKEN_BUDGET` on `/api/ai/chat`; the other features are
-  rate-limited by *request*, which caps the blast radius but not the spend.
+  `AI_DAILY_TOKEN_BUDGET` on `/api/ai/chat` and on both reader features
+  (`/api/ai/recap` and `/api/ai/explain`, where every signed-in reader can
+  reach it rather than only authors); Scribble, the assistant and generation
+  are still rate-limited by *request* only, which caps the blast radius but
+  not the spend.
 - **Embeddings.** `AiProvider` has no `embed` yet; Task AI 7 adds it along with
   the model and dimension decision.
 

@@ -1,0 +1,142 @@
+[
+  {
+    "id": "schema.ai",
+    "label": "Create schema \"ai\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"ai\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"ai\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "table.chapterSummary",
+    "label": "Create table \"chapterSummary\"",
+    "summary": "Creates table \"chapterSummary\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "chapterSummary"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"chapterSummary\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterSummary\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"chapterSummary\"",
+        "sql": "CREATE TABLE \"ai\".\"chapterSummary\" (\n  \"chapterId\" text NOT NULL,\n  \"contentHash\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"model\" text NOT NULL,\n  \"promptVersion\" int4 NOT NULL,\n  \"text\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"chapterSummary\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterSummary\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.chapterSummary.chapterSummary_chapterId_key",
+    "label": "Add unique constraint on \"chapterSummary\" (chapterId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "unique",
+        "name": "chapterSummary_chapterId_key",
+        "table": "chapterSummary"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"chapterSummary_chapterId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterSummary_chapterId_key",
+          "ai",
+          "\"ai\".\"chapterSummary\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"chapterSummary_chapterId_key\"",
+        "sql": "ALTER TABLE \"ai\".\"chapterSummary\" ADD CONSTRAINT \"chapterSummary_chapterId_key\" UNIQUE (\"chapterId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"chapterSummary_chapterId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterSummary_chapterId_key",
+          "ai",
+          "\"ai\".\"chapterSummary\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chapterSummary.chapterSummary_chapterId_fkey",
+    "label": "Add foreign key \"chapterSummary_chapterId_fkey\" on \"chapterSummary\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "chapterSummary_chapterId_fkey",
+        "table": "chapterSummary"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chapterSummary_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterSummary_chapterId_fkey",
+          "ai",
+          "\"ai\".\"chapterSummary\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chapterSummary_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"chapterSummary\"\nADD CONSTRAINT \"chapterSummary_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chapterSummary_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterSummary_chapterId_fkey",
+          "ai",
+          "\"ai\".\"chapterSummary\""
+        ]
+      }
+    ]
+  }
+]

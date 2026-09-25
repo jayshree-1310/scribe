@@ -383,6 +383,104 @@ export function streamAssist(
   return streamRequest<AssistEvent>('/ai/assist/stream', payload, signal)
 }
 
+/* Reader: recap ---------------------------------------------------------- */
+
+export interface ChapterRecap {
+  /** The chapter recapped — the one *before* the one being read. */
+  chapterNumber: number
+  chapterTitle: string
+  /** Generated. Always labelled as such in the UI. */
+  text: string
+  generatedAt: string | null
+  /** The chapter was long enough to be cut before summarising. */
+  truncated: boolean
+}
+
+export interface RecapStatus {
+  /**
+   * False when there is no previous chapter this reader can open — the first
+   * chapter of a story, or the first one visible to them. The card is not
+   * rendered at all, rather than rendered empty.
+   */
+  available: boolean
+  /** Null until somebody has generated it. */
+  recap: ChapterRecap | null
+}
+
+/**
+ * What to show above a chapter. Never calls a model, so it is safe to request
+ * on every chapter open.
+ */
+export async function getRecap(
+  slugOrId: string,
+  chapterNumber: number,
+  signal?: AbortSignal,
+): Promise<RecapStatus> {
+  return request<RecapStatus>(
+    `/ai/recap/${encodeURIComponent(slugOrId)}/${chapterNumber}`,
+    {
+      headers: readerHeaders(),
+      ...(signal ? { signal } : {}),
+    },
+  )
+}
+
+/**
+ * Writes the recap, or returns the one somebody already generated.
+ *
+ * Behind a button rather than automatic: this is the call that can occupy a
+ * CPU core for half a minute, and a reader working straight through a serial
+ * has not forgotten anything and should not pay for it.
+ */
+export async function generateRecap(
+  slugOrId: string,
+  chapterNumber: number,
+  signal?: AbortSignal,
+): Promise<RecapStatus> {
+  return request<RecapStatus>(
+    `/ai/recap/${encodeURIComponent(slugOrId)}/${chapterNumber}`,
+    {
+      method: 'POST',
+      headers: readerHeaders(),
+      // A whole chapter through a local CPU model; the shared 15s default
+      // would abort every one of them.
+      timeoutMs: AI_REQUEST_TIMEOUT_MS,
+      ...(signal ? { signal } : {}),
+    },
+  )
+}
+
+/* Reader: explain -------------------------------------------------------- */
+
+export type ExplainMode = 'explain' | 'simplify' | 'define'
+
+/**
+ * Offsets into the stored chapter, never the text itself.
+ *
+ * The server slices the passage out of the chapter it looks up, which is what
+ * stops this endpoint being a general-purpose model proxy — and means the
+ * client has to send offsets that match the published body, not whatever the
+ * DOM happened to hold.
+ */
+export interface ExplainPayload {
+  chapterId: string
+  start: number
+  end: number
+  mode: ExplainMode
+}
+
+export type ExplainEvent =
+  | { type: 'text'; text: string }
+  | { type: 'done'; tokensUsed: number }
+  | { type: 'error'; code: string; message: string }
+
+export function streamExplain(
+  payload: ExplainPayload,
+  signal?: AbortSignal,
+): AsyncGenerator<ExplainEvent> {
+  return streamRequest<ExplainEvent>('/ai/explain/stream', payload, signal)
+}
+
 /* Chat ------------------------------------------------------------------- */
 
 /**

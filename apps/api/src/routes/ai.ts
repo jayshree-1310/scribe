@@ -40,6 +40,17 @@ import {
   askStream,
   type ScribbleContext,
 } from "../services/ai/scribble.js";
+import {
+  EXPLAIN_MODES,
+  SELECTION_LIMIT as EXPLAIN_SELECTION_LIMIT,
+  explain,
+  explainStream,
+  type ExplainInput,
+} from "../services/ai/explain.js";
+import {
+  generateChapterRecap,
+  getChapterRecap,
+} from "../services/ai/recap.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -74,7 +85,7 @@ function abortOnDisconnect(res: Response): AbortController {
 }
 
 /**
- * Server-sent events, once, for the two routes that stream.
+ * Server-sent events, once, for every route here that streams.
  *
  * Headers are written on the *first* event rather than up front, which is what
  * keeps a pre-stream failure an ordinary HTTP status: every service here does
@@ -634,6 +645,232 @@ router.post("/generate/refine", requireUser, async (req, res, next) => {
       ),
     );
   } catch (error) {
+    next(error);
+  }
+});
+
+/* Reader: recap ---------------------------------------------------------- */
+
+/**
+ * Generous, because the read path is free and the write path is idempotent.
+ *
+ * A reader opening chapter after chapter triggers one `GET` each, and those
+ * never reach a model. Only the first reader of a cold chapter pays for a
+ * generation, and a second press of the button is answered from the table --
+ * so what this limit actually caps is somebody walking a story's chapters to
+ * make the machine generate thirty recaps in a row.
+ */
+const RECAP_LIMIT = 20;
+const RECAP_WINDOW_SECONDS = 60 * 10;
+
+/**
+ * A story is addressed by slug or id, exactly as `/api/stories/:slugOrId` is,
+ * so the reader page can ask with whatever it already has in hand.
+ */
+const recapParams = z.object({
+  slugOrId: z.string().trim().min(1).max(200),
+  chapterNumber: z.coerce
+    .number()
+    .int()
+    .min(1, "Chapters are numbered from 1.")
+    .max(100000),
+});
+
+/**
+ * What to show above a chapter, without generating anything.
+ *
+ * Behind `requireUser` like every other AI route, although it calls no model:
+ * the answer it gives is derived from a model's output, it is requested on
+ * every chapter open, and an anonymous read path here would be the one place
+ * somebody could enumerate which chapters have been summarised. The house rule
+ * has no exception for "this one is only a read".
+ */
+router.get(
+  "/recap/:slugOrId/:chapterNumber",
+  requireUser,
+  async (req, res, next) => {
+    try {
+      const userId = requireUserId(res);
+      const { slugOrId, chapterNumber } = parseOrThrow(recapParams, req.params);
+
+      // No rate limit and no budget check: this is a single indexed lookup
+      // that can never reach a provider. Charging for it would make a reader
+      // who simply turns pages run out of AI allowance.
+      res.json(await getChapterRecap(slugOrId, chapterNumber, userId));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/**
+ * Writes the recap for the chapter before this one, or returns the stored one.
+ *
+ * `POST` rather than `GET` because it can spend tens of seconds of CPU and
+ * create a row. It is nonetheless idempotent in effect -- the second caller
+ * gets the first caller's text -- which is what makes a double-clicked button
+ * harmless.
+ */
+router.post(
+  "/recap/:slugOrId/:chapterNumber",
+  requireUser,
+  async (req, res, next) => {
+    try {
+      const userId = requireUserId(res);
+      const { slugOrId, chapterNumber } = parseOrThrow(recapParams, req.params);
+
+      const key = `ai:recap:${userId}`;
+      const status = await isRateLimited(key, RECAP_LIMIT);
+      if (status.limited) {
+        throw HttpError.tooManyRequests(
+          "You have asked for a lot of recaps in a short time. Try again shortly.",
+          status.retryAfter,
+        );
+      }
+      await assertWithinDailyBudget(userId);
+      await recordAttempt(key, RECAP_WINDOW_SECONDS);
+
+      const result = await generateChapterRecap(
+        slugOrId,
+        chapterNumber,
+        userId,
+        abortOnDisconnect(res).signal,
+      );
+
+      // Zero on a cache hit, so a reader served from the table is charged
+      // nothing -- see `RecapGeneration`.
+      await recordTokenUsage(userId, result.tokensUsed);
+
+      res.json({ available: result.available, recap: result.recap });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/* Reader: explain -------------------------------------------------------- */
+
+/**
+ * The widest-open AI surface in the app: every signed-in reader, on every
+ * published chapter, rather than only authors on their own drafts. So the
+ * limit is tighter than the assistant's and the daily token budget is enforced
+ * as well -- a reader stopping to ask about a paragraph does it a few times a
+ * chapter, not thirty times a minute.
+ */
+const EXPLAIN_LIMIT = 20;
+const EXPLAIN_WINDOW_SECONDS = 60 * 10;
+
+/**
+ * Offsets, never prose.
+ *
+ * The body cannot carry the passage: the server reads it out of the stored
+ * chapter at these offsets, which is what stops this endpoint being a
+ * general-purpose model proxy behind the site's key. See the header of
+ * `services/ai/explain.ts`. The bounds below are a cheap first pass; the real
+ * check is against the chapter's actual length, in the service.
+ */
+const explainSchema = z
+  .object({
+    chapterId: z.uuid("That chapter could not be found."),
+    start: z.coerce.number().int().min(0),
+    end: z.coerce.number().int().min(1),
+    mode: z.enum(EXPLAIN_MODES).default("explain"),
+  })
+  .refine((value) => value.end > value.start, {
+    message: "Select some text first.",
+    path: ["end"],
+  })
+  .refine((value) => value.end - value.start <= EXPLAIN_SELECTION_LIMIT, {
+    message: `That selection is too long — highlight a sentence or a paragraph at a time (up to ${EXPLAIN_SELECTION_LIMIT} characters).`,
+    path: ["end"],
+  });
+
+function toExplainInput(
+  parsed: z.infer<typeof explainSchema>,
+): ExplainInput {
+  return {
+    chapterId: parsed.chapterId,
+    start: parsed.start,
+    end: parsed.end,
+    mode: parsed.mode,
+  };
+}
+
+async function chargeExplain(userId: string): Promise<void> {
+  const key = `ai:explain:${userId}`;
+  const status = await isRateLimited(key, EXPLAIN_LIMIT);
+  if (status.limited) {
+    throw HttpError.tooManyRequests(
+      "You have asked about a lot of passages in a short time. Try again shortly.",
+      status.retryAfter,
+    );
+  }
+  await assertWithinDailyBudget(userId);
+  await recordAttempt(key, EXPLAIN_WINDOW_SECONDS);
+}
+
+router.post("/explain", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const input = toExplainInput(parseOrThrow(explainSchema, req.body));
+
+    await chargeExplain(userId);
+
+    const result = await explain(
+      userId,
+      input,
+      abortOnDisconnect(res).signal,
+    );
+    await recordTokenUsage(userId, result.tokensUsed);
+
+    res.json({
+      mode: result.mode,
+      passage: result.passage,
+      text: result.text,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** The same, streamed, because a reader is waiting mid-sentence. */
+router.post("/explain/stream", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const input = toExplainInput(parseOrThrow(explainSchema, req.body));
+
+    await chargeExplain(userId);
+
+    const disconnect = abortOnDisconnect(res);
+
+    for await (const event of explainStream(
+      userId,
+      input,
+      disconnect.signal,
+    )) {
+      if (event.type === "done") {
+        // The terminal event is the only place usage exists, so a reader who
+        // navigated away goes uncharged -- the disconnect aborted the call
+        // with them, and the request limit above still caps deliberate abuse.
+        // Same trade as `/chat/stream`.
+        await recordTokenUsage(userId, event.tokensUsed);
+      }
+      if (!writeEvent(res, event)) break;
+    }
+
+    res.end();
+  } catch (error) {
+    if (
+      reportStreamFailure(
+        res,
+        error,
+        "The explanation stopped unexpectedly.",
+        "explain stream failed after headers",
+      )
+    ) {
+      return;
+    }
+
     next(error);
   }
 });

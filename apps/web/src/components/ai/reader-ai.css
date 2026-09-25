@@ -1,0 +1,308 @@
+/* ==========================================================================
+   Reader-side AI: the chapter recap and the explain sheet
+
+   Both live inside `.reader`, so both are painted in the *reading* theme's
+   tokens (`--read-*`) rather than the app theme's. That is not a stylistic
+   preference: a reader on Sepia while the app is in Night mode would otherwise
+   get a dark panel on a cream page. See the header of `reader.css`.
+
+   Both are deliberately quiet, and that is the main thing to preserve when
+   editing them. They sit beside somebody's fiction. A generated paraphrase
+   that competes with the prose for attention — a filled panel, a heavy accent,
+   a block of colour above the title — is a worse neighbour than one that waits
+   to be looked at.
+   ========================================================================== */
+
+/* Recap ------------------------------------------------------------------ */
+
+/*
+ * An editorial aside, not a card.
+ *
+ * `.reader__article` is a flex column whose children stretch to the reading
+ * measure. **Do not put `margin-inline: auto` or a `max-width` here**: an auto
+ * inline margin overrides `align-items: stretch`, which sizes this to its own
+ * content and leaves it narrower than — and centred against — the prose it
+ * belongs to. That was the first version's most visible fault. Let it stretch.
+ */
+.recap {
+  margin-block-end: var(--space-5);
+  padding-inline-start: var(--space-4);
+  border-inline-start: 2px solid var(--read-brand-border);
+  font-family: var(--font-sans);
+}
+
+.recap__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.recap__mark {
+  color: var(--read-brand);
+  flex: none;
+  align-self: center;
+}
+
+.recap__label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--read-brand);
+}
+
+/*
+ * The chapter's own title, and deliberately *not* its number beside it.
+ * Authors number their titles themselves and often disagree with the
+ * sequence — "chapter 2, Chapter 1: The Ordinary Girl" reads as a bug even
+ * when both halves are right. The title alone is what a reader recognises.
+ */
+.recap__chapter {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--read-ink-soft);
+}
+
+.recap__toggle {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--read-brand);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.recap__toggle:hover {
+  text-decoration-thickness: 2px;
+}
+
+.recap__pending,
+.recap__error {
+  margin-block: var(--space-2) 0;
+  font-size: var(--text-sm);
+  color: var(--read-ink-soft);
+}
+
+.recap__error {
+  color: var(--read-brand);
+}
+
+/* The recap itself, in the reading face — it is prose about prose. */
+.recap__text {
+  margin-block: var(--space-3) 0;
+  font-family: var(--font-reading);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--read-ink);
+}
+
+/*
+ * The label. Small, but never behind a tooltip or an icon: a reader deciding
+ * how much to trust this should not have to hover to learn a machine wrote it.
+ */
+.recap__note {
+  margin-block: var(--space-2) 0;
+  font-size: var(--text-xs);
+  color: var(--read-ink-soft);
+}
+
+/* Explain ---------------------------------------------------------------- */
+
+/*
+ * A sheet docked to the bottom of the viewport.
+ *
+ * It replaced a popover anchored beside the selection, for two reasons that
+ * are worth not rediscovering: a floating panel covers the sentence it is
+ * explaining, and staying small enough not to cover more left long answers
+ * wrapping at seven words a line.
+ */
+.explain-sheet {
+  position: fixed;
+  inset-inline: 0;
+  inset-block-end: 0;
+  z-index: 45;
+
+  display: flex;
+  flex-direction: column;
+  /* Modest on purpose: a sheet taller than this starts being the page. */
+  max-height: min(45vh, 24rem);
+
+  background-color: var(--read-bg);
+  border-block-start: 1px solid var(--read-rule);
+  box-shadow: 0 -0.5rem 2rem rgb(0 0 0 / 22%);
+  font-family: var(--font-sans);
+  color: var(--read-ink);
+
+  animation: explain-rise var(--dur) var(--ease);
+}
+
+@keyframes explain-rise {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .explain-sheet {
+    animation: none;
+  }
+}
+
+/* The sheet spans the window; its contents align with the prose column. */
+.explain-sheet__inner {
+  display: flex;
+  flex-direction: column;
+  /* `min-height: 0` is what lets the body below actually scroll. */
+  min-height: 0;
+  width: 100%;
+  max-width: var(--read-measure);
+  margin-inline: auto;
+  padding: var(--space-3) var(--space-5) var(--space-4);
+}
+
+.explain-sheet__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: none;
+}
+
+.explain-sheet__mark {
+  color: var(--read-brand);
+  flex: none;
+}
+
+.explain-sheet__tabs {
+  display: flex;
+  gap: var(--space-4);
+  flex: 1;
+}
+
+/* Text tabs rather than boxed buttons: three filled controls competed with
+   the answer, which is the only thing here worth looking at. */
+.explain-sheet__tab {
+  padding: var(--space-2) 0;
+  border: 0;
+  border-block-end: 2px solid transparent;
+  background: none;
+  color: var(--read-ink-soft);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.explain-sheet__tab:hover:not(:disabled) {
+  color: var(--read-ink);
+}
+
+.explain-sheet__tab.is-on {
+  color: var(--read-brand);
+  border-block-end-color: var(--read-brand);
+  font-weight: 600;
+}
+
+.explain-sheet__tab:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/*
+ * **The one scroll region in this component.**
+ *
+ * The first version capped the quote at 6em and the answer at 16em, which put
+ * two scrollbars inside a panel inside a scrolling page. If something here
+ * needs to be shorter, clamp it — do not give it its own overflow.
+ */
+.explain-sheet__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/*
+ * The reader's own highlight, clamped to two lines.
+ *
+ * An orientation aid, not something to read: they wrote it, and the full text
+ * is on the page behind the sheet. Hence an ellipsis rather than a scrollbar.
+ */
+.explain-sheet__passage {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+
+  margin-block: var(--space-2) var(--space-3);
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--read-brand-border);
+  font-family: var(--font-reading);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--read-ink-soft);
+}
+
+.explain-sheet__hint,
+.explain-sheet__error {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--read-ink-soft);
+}
+
+.explain-sheet__error {
+  color: var(--read-brand);
+}
+
+.explain-sheet__answer {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  white-space: pre-wrap;
+}
+
+.explain-sheet__note {
+  flex: none;
+  margin-block: var(--space-3) 0;
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--read-rule);
+  font-size: var(--text-xs);
+  color: var(--read-ink-soft);
+}
+
+/* The floating "ask about this" button that opens the sheet. */
+.explain-trigger {
+  position: absolute;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--read-brand-border);
+  border-radius: var(--radius-full);
+  background-color: var(--read-bg);
+  box-shadow: var(--shadow-md);
+  color: var(--read-brand);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.explain-trigger:hover {
+  background-color: var(--read-brand-soft);
+}
+
+/* Neither is useful in print, and the trigger is meaningless on paper. */
+@media print {
+  .recap,
+  .explain-sheet,
+  .explain-trigger {
+    display: none;
+  }
+}

@@ -475,6 +475,9 @@ namespace content {
     likes          engagement.ChapterLike[]
     readingHistory engagement.ReadingHistory[]
     reads          engagement.ChapterRead[]
+    /// The generated recap of this chapter, if one has ever been asked for.
+    /// Optional because it is derived and lazy: most chapters never have one.
+    summary        ai.ChapterSummary?
 
     @@unique([storyId, chapterNumber])
   }
@@ -1204,5 +1207,52 @@ namespace moderation {
     /// A reporter's own history, which is what a moderator checks before
     /// trusting the tenth report from the same account in an hour.
     @@index([reporterId])
+  }
+}
+
+/// Generated artefacts, kept apart from the content they describe.
+///
+/// Its own namespace for the reason every other one here has its own: a
+/// summary is not a property of a chapter, it is a derived thing with its own
+/// lifecycle, its own staleness and its own reasons to be thrown away. Folding
+/// it onto `content.Chapter` would put a model's output in the same row as the
+/// author's words, and the first time a regeneration went wrong that would be
+/// a chapter edit rather than a cache miss.
+namespace ai {
+  /// A short "previously in this story" recap of one chapter.
+  ///
+  /// **`contentHash` is the whole design.** Generating one of these costs tens
+  /// of seconds on a local model, and the text it describes usually has not
+  /// changed since the last time somebody asked. So the hash of the chapter
+  /// body that produced this row is stored beside it, and a request whose
+  /// chapter still hashes to the same value is answered from here without a
+  /// model call. An author's edit changes the hash, which is what makes the
+  /// stale recap regenerate itself rather than having to be invalidated by
+  /// whatever code did the editing.
+  ///
+  /// **One row per chapter**, hence the unique index rather than a history.
+  /// Keeping every recap a chapter ever had would be a table that grows with
+  /// edits and is read for exactly one row, and the superseded text has no
+  /// reader: nobody wants last week's summary of a paragraph that changed.
+  ///
+  /// `model` and `promptVersion` are recorded because a recap that reads badly
+  /// is evidence about a prompt or a model, and neither is answerable months
+  /// later from the text alone. They are also what a future regeneration sweep
+  /// would select on -- "every recap written by the prompt we just fixed".
+  model ChapterSummary {
+    id            String   @id @default(uuid())
+    chapterId     String   @unique
+    /// The recap itself. Always labelled as generated where it is shown.
+    text          String
+    /// SHA-256 of the chapter body this was written from; see above.
+    contentHash   String
+    /// The model that wrote it, as the provider named it.
+    model         String
+    /// `RECAP_PROMPT_VERSION` at the time of writing.
+    promptVersion Int
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @default(now())
+
+    chapter content.Chapter @relation(fields: [chapterId], references: [id])
   }
 }

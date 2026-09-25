@@ -1220,6 +1220,12 @@ export class TestApi {
             like.chapterId.eq(chapter.id),
           ),
         );
+        // A generated recap holds a foreign key onto the chapter, so it goes
+        // before the chapter does. Any suite that exercised `/api/ai/recap`
+        // leaves one behind whether or not it tracked it.
+        await deleteAll(() =>
+          db.orm.ai.ChapterSummary.where((row) => row.chapterId.eq(chapter.id)),
+        );
       }
 
       // Likes on this story's comments, before the comments they point at.

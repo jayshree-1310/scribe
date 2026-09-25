@@ -458,6 +458,17 @@ export async function deleteAccount(
             like.chapterId.eq(chapterId),
           ),
         );
+        /**
+         * Generated recaps of this account's chapters. They hold a foreign key
+         * onto the chapter, so they would block the delete below -- but they
+         * would have to go regardless: a recap is written from a member's own
+         * unpublished prose, and erasing the prose while keeping a model's
+         * paraphrase of it is not a deletion. See the retention note in the
+         * header.
+         */
+        await deleteAll(() =>
+          tx.orm.ai.ChapterSummary.where((row) => row.chapterId.eq(chapterId)),
+        );
       }
 
       /**

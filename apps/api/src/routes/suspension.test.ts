@@ -156,7 +156,21 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
       "ai.ts POST /assist",
       "ai.ts POST /assist/stream",
       "ai.ts POST /generate/refine",
+      "ai.ts POST /explain",
+      "ai.ts POST /explain/stream",
     ].map((route) => [route, "answers the caller and writes nothing public"]),
+
+    /**
+     * The one AI route that does write a row, and still exempt.
+     *
+     * What it stores is a model's recap of a chapter that was already
+     * published by somebody else -- none of the caller's own words reach it,
+     * so a suspended account cannot use it to put text in front of readers.
+     * Suspension exists to stop someone publishing; this publishes nothing of
+     * theirs. It is also idempotent per chapter, so the row a suspended caller
+     * triggers is the row the next reader would have triggered anyway.
+     */
+    ["ai.ts POST /recap/:slugOrId/:chapterNumber", "stores a model's recap of somebody else's published chapter; none of the caller's text reaches it"],
   ] as [string, string][],
 );
 

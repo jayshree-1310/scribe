@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { useReadingProgress } from '../hooks/useReadingProgress'
@@ -25,6 +25,9 @@ import {
   commentUserName,
 } from '../types/engagement'
 import { LikeButton } from '../components/engagement/LikeButton'
+import { RecapCard } from '../components/ai/RecapCard'
+import { ExplainSheet } from '../components/ai/ExplainSheet'
+import { readSelection, type ChapterSelection } from '../lib/chapter-selection'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
 import { Avatar } from '../components/ui/Avatar'
@@ -162,6 +165,60 @@ export function ReaderPage() {
     [navigate, slug],
   )
 
+  /* Ask about a passage ------------------------------------------------ */
+
+  /**
+   * The prose element, so a selection can be checked for being *inside* it.
+   * A highlight that began in the chapter and ended in the comment box is not
+   * a passage, and neither is one made in the footer.
+   */
+  const proseRef = useRef<HTMLDivElement | null>(null)
+
+  const [selection, setSelection] = useState<ChapterSelection | null>(null)
+  const [anchorPoint, setAnchorPoint] = useState({ top: 0, left: 0 })
+  const [explaining, setExplaining] = useState(false)
+
+  /**
+   * Offers the trigger when the reader has highlighted something explicable.
+   *
+   * `readSelection` returns null for anything unusable — collapsed, outside
+   * the prose, or not locatable in the chapter source because the highlight
+   * crossed formatting the renderer had removed. All of those produce no
+   * button at all: offering an action that would fail is worse than offering
+   * none, and the reader gets no explanation of a limitation they did not know
+   * existed.
+   */
+  const onSelect = useCallback(() => {
+    // `chapter.data` rather than the `current` alias below, which is declared
+    // after the hooks.
+    const chapterData = chapter.data
+    if (!chapterData) return
+
+    const found = readSelection(proseRef.current, chapterData.content)
+    if (!found) {
+      setSelection(null)
+      setExplaining(false)
+      return
+    }
+
+    const range = window.getSelection()?.getRangeAt(0)
+    const rect = range?.getBoundingClientRect()
+    if (rect) {
+      setAnchorPoint({
+        top: rect.bottom + window.scrollY + 8,
+        // Clamped so a selection near the right edge does not open a panel
+        // half off the screen.
+        left: Math.max(
+          12,
+          Math.min(rect.left + window.scrollX, window.innerWidth - 360),
+        ),
+      })
+    }
+
+    setSelection(found)
+    setExplaining(false)
+  }, [chapter.data])
+
   // Scroll-linked reading progress.
   useEffect(() => {
     let frame = 0
@@ -293,6 +350,13 @@ export function ReaderPage() {
           </div>
         ) : (
           <article className="reader__article">
+            {/*
+              The returning reader's catch-up, above chapter two and later.
+              Renders nothing when there is no previous chapter they can open,
+              and never calls a model until they ask it to.
+            */}
+            <RecapCard storyKey={slug} chapterNumber={current.number} />
+
             <p className="reader__eyebrow">
               Chapter {current.number}
               {total > 0 ? ` of ${total}` : ''} ·{' '}
@@ -314,9 +378,47 @@ export function ReaderPage() {
               headings and emphasis an author formats with are the ones their
               readers get. See `lib/chapter-markdown.tsx`.
             */}
-            <div className="reader__prose">
+            <div
+              className="reader__prose"
+              ref={proseRef}
+              onMouseUp={onSelect}
+              onTouchEnd={onSelect}
+            >
               {renderChapter(current.content, current.multimedia, hue)}
             </div>
+
+            {/*
+              The offer, then the panel. Two steps rather than one because a
+              reader selects text for all sorts of reasons — to copy it, to
+              keep their place, by accident — and opening a panel on every
+              highlight would be a model call nobody asked for.
+            */}
+            {selection && !explaining ? (
+              <button
+                type="button"
+                className="explain-trigger"
+                style={{
+                  top: `${anchorPoint.top}px`,
+                  left: `${anchorPoint.left}px`,
+                }}
+                onClick={() => setExplaining(true)}
+              >
+                <Icon name="sparkle" size="0.9em" />
+                Ask about this
+              </button>
+            ) : null}
+
+            {selection && explaining ? (
+              <ExplainSheet
+                chapterId={current.id}
+                selection={selection}
+                selectionBottom={anchorPoint.top}
+                onClose={() => {
+                  setExplaining(false)
+                  setSelection(null)
+                }}
+              />
+            ) : null}
 
             {/* Chapter footer ------------------------------------------- */}
             <footer className="reader__footer">

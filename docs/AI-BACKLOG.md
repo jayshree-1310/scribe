@@ -4,11 +4,13 @@ Companion to `BACKLOG.md`, derived from `scribe-genai-roadmap.md`. Same format:
 each task is a self-contained prompt you can hand to an implementer, grounded in
 what this repo actually has rather than in the abstract.
 
-The roadmap's 20 phases collapse into 22 tasks here (AI 0 – AI 20, plus AI 1.5),
-in the order the roadmap recommends. Every task states what already exists, because most of them build on
-code that is already in the tree. AI 1.5 is not from the roadmap: it is the first
-user-visible feature, and it sits early precisely because it needs none of the
-retrieval infrastructure the roadmap front-loads.
+The roadmap's 20 phases collapse into 23 tasks here (AI 0 – AI 20, plus AI 1.5
+and AI 6.5), in the order the roadmap recommends. Every task states what already
+exists, because most of them build on code that is already in the tree. AI 1.5
+and AI 6.5 are not from the roadmap: they are user-visible features that sit
+early precisely because they need none of the retrieval infrastructure the
+roadmap front-loads — AI 1.5 routes a sentence into SQL, and AI 6.5 windows a
+passage the reader already highlighted.
 
 **Learning is the point.** Each task carries a `Learn:` line naming the concepts
 it exists to teach — that is why the tasks are sequenced the way they are rather
@@ -214,6 +216,7 @@ Task AI 0 interface; nothing else changes.
 | AI 4 Structured outputs | **Free** — Ollama takes a JSON schema |
 | AI 5 Story generation | **Free** |
 | AI 6 Summarization | **Free** — smaller context makes map-reduce mandatory |
+| AI 6.5 Explain this passage | **Free** — one short call over a windowed selection |
 | AI 7 Embeddings | **Free** — `nomic-embed-text` or transformers.js, plus pgvector |
 | AI 8 Semantic + hybrid search | **Free** — embeddings and SQL only |
 | AI 9 Ask This Book (RAG) | **Free** — the whole flagship feature |
@@ -667,6 +670,44 @@ assistant learns what is inside them.
 
 ## Task AI 6 — Summarization
 
+**Status: the chapter recap is built; the rest is not.** `services/ai/recap.ts`,
+`services/ai/prompts/recap.ts`, the `ai` namespace in `contract.prisma` with
+`ai.ChapterSummary` plus its migration, `GET`/`POST /api/ai/recap/:slugOrId/:chapterNumber`,
+`components/ai/RecapCard.tsx` on `ReaderPage`, tests in `routes/ai-reader.test.ts`.
+Verified end to end against `gpt-oss-120b` on Groq: a recap in about a second,
+and the second request served from the table in 14ms for zero tokens.
+
+**This was deliberately scoped down to one of the four summary kinds**, and the
+one chosen is the one a serial fiction site actually needs: a reader returning
+to chapter twelve a fortnight after chapter eleven, who has forgotten who
+knocked on the last page. It recaps the *previous chapter only*. What that
+avoids is the part of this task that is genuinely hard — a "story so far"
+covering chapters 1–11 does not fit in a local context window, so it needs
+map-reduce over chapter summaries *and* a cache key spanning a range, where
+editing chapter three invalidates every card from four onward.
+
+What is still open, and none of it is started:
+
+- **The story summary** on `StoryDetailPage`, and the map-reduce it requires.
+- **Spoiler-free summaries** and the public `GET` for them.
+- **An author's regenerate action.** Regeneration happens today only by editing
+  the chapter, which changes the hash.
+- **Long chapters are truncated, not map-reduced.** A chapter over
+  `CHAPTER_LIMIT` (24k characters) is summarised from its opening, and the
+  result carries a `truncated` flag saying so rather than hiding it.
+
+The per-chapter summary table is the input a cumulative recap would reduce
+over, so none of the above is a rewrite of what landed.
+
+Two things worth knowing before extending it. Generation is **lazy and behind a
+button** — there is no job runner (Task AI 20), so the first reader who asks
+pays for it and everybody after them gets a cache hit; a reader working
+straight through a serial never triggers a model call at all. And the daily
+token budget is now enforced **here and on `/api/ai/explain`** as well as on
+`/api/ai/chat`, because a feature every reader can reach is the first one where
+request-rate alone stops describing the spend. Extending that to Scribble, the
+assistant and generation is still Task AI 18.
+
 **Prompt:**
 
 > Generate and store chapter and story summaries.
@@ -703,6 +744,69 @@ assistant learns what is inside them.
 > caching generated content by input hash.
 
 ---
+
+## Task AI 6.5 — Explain this passage
+
+**Status: built.** `services/ai/explain.ts`, `services/ai/prompts/explain.ts`,
+`POST /api/ai/explain` and `/explain/stream`, `lib/chapter-selection.ts`,
+`components/ai/ExplainSheet.tsx` on `ReaderPage`, tests in
+`routes/ai-reader.test.ts`. Verified against `gpt-oss-120b` on Groq: all three
+modes under a second.
+
+Not from the roadmap, and here for the same reason Task AI 1.5 is: it is a
+feature a user can see the point of that needs **no retrieval infrastructure**
+— a selection and a bounded window around it, which is the assistant's
+machinery pointed the other way. A reader stuck on a sentence highlights it and
+asks; three modes (`explain`, `simplify`, `define`), streamed.
+
+**The three inversions from Task AI 3 are the whole design**, and each is a way
+the obvious implementation would have been wrong:
+
+> - **The guard is visibility, not ownership.** `assist.ts` asserts the caller
+>   owns the story. A reader owns nothing they read, so this asserts only that
+>   they may see the chapter — through `findVisibleChapterText` in
+>   `services/stories.ts`, never a second copy of the rule. Copying the
+>   assistant's guard locks out every reader; omitting one leaks drafts to
+>   anybody who can guess a chapter id. A missing chapter and a forbidden one
+>   both answer 404.
+> - **The passage travels as offsets, not as text.** The assistant takes prose
+>   in the body because the author's editor buffer is the truth. Here the
+>   published chapter is the truth, and a body carrying arbitrary text would
+>   make this a general-purpose model proxy behind the site's key — reachable,
+>   unlike every other AI route, by *every signed-in reader on every published
+>   chapter*. The server slices the passage out of the chapter it looks up, and
+>   offsets past the end are a 409 rather than a slice of whatever is there.
+> - **The window leans backwards.** Text after the selection is text the reader
+>   has not reached, so the forward half of the window is a fraction of the
+>   backward half, and the prompt's load-bearing rule forbids guessing at how
+>   anything resolves.
+>
+> The client pays for the offset decision: the markdown renderer turns
+> `**cold**` into `cold`, so a DOM offset is not a source offset.
+> `lib/chapter-selection.ts` searches the source for the highlighted text,
+> loosely enough to survive collapsed newlines and emphasis markers, picks the
+> occurrence nearest the reader's position when a phrase repeats, and returns
+> null rather than a guess — in which case no button is offered at all.
+
+**The panel is a bottom sheet, and that is a reversal worth not undoing.** The
+first version was a popover anchored beside the selection, which failed in
+exactly the two ways the shape guarantees: it covered the sentence it was
+explaining, and staying narrow enough not to cover more left the answer
+wrapping at seven words a line with a scrollbar inside a scrollbar. The sheet
+docks to the bottom at the full reading measure, has **one** scroll region, and
+clamps the quoted passage rather than scrolling it. It also scrolls the
+highlight clear of itself when the selection sits low in the viewport, which is
+the one case where a bottom sheet would still cover the thing being asked
+about.
+
+Still open: selections spanning emphasis *inside* a word (`un**bel**ievable`)
+are not locatable and silently offer no button. Threading source offsets
+through `lib/chapter-markdown.tsx` would fix it properly and is the right move
+if the renderer grows.
+
+Learn: the same primitive serving two audiences, authorisation as the thing
+that changes rather than the prompt, and why an endpoint's *input shape* is a
+security decision.
 
 ## Task AI 7 — Embeddings
 
