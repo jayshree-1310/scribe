@@ -185,3 +185,97 @@ export function isAiConfigured(config: AiConfig = loadAiConfig()): boolean {
   // Self-hosted: no credential, and the base URL always has a default.
   return config.baseUrl.length > 0;
 }
+
+/* Embeddings ------------------------------------------------------------- */
+
+/**
+ * Embeddings are configured **separately from chat**, and that is the point.
+ *
+ * `AI_PROVIDER` selects who writes prose; this selects who turns a passage
+ * into a vector, and there is no reason for them to be the same service. The
+ * setup this repo is developed against is exactly the split case: chat goes to
+ * a hosted OpenAI-compatible endpoint that serves no embedding model at all,
+ * while embeddings go to the Ollama container on this machine. Folding the two
+ * into one provider would have made retrieval impossible to run here without
+ * paying somebody.
+ *
+ * So the defaults below describe the local embedder regardless of what the
+ * chat provider is set to, and a deployment that wants both from one service
+ * sets `AI_EMBED_*` to match.
+ */
+export interface AiEmbedConfig {
+  provider: AiProviderName;
+  baseUrl: string;
+  apiKey: string | undefined;
+  model: string;
+  /**
+   * The width of the vectors this model returns.
+   *
+   * **This number is in the database.** The chunk column is `vector(N)`, so
+   * changing the model to one of a different width is a migration plus a
+   * re-embedding of the entire corpus -- not a config edit. It is kept here
+   * rather than discovered at runtime so that a mismatch is caught on the
+   * first reply (see `embeddings.ts`) instead of becoming a column-width error
+   * halfway through a backfill.
+   */
+  dimensions: number;
+  /**
+   * How many passages go in one request.
+   *
+   * Both provider APIs take an array. Batching matters more locally than
+   * hosted: each request to Ollama re-enters the model, so sixteen texts in
+   * one call is markedly faster than sixteen calls, and small enough that a
+   * failure costs little to retry.
+   */
+  batchSize: number;
+  timeoutMs: number;
+  maxRetries: number;
+}
+
+const EMBED_DEFAULTS = {
+  provider: "ollama" as AiProviderName,
+  baseUrl: "http://localhost:11434",
+  /** 768 dimensions, 137M parameters, fast on CPU. See `AI-BACKLOG.md`. */
+  model: "nomic-embed-text",
+  dimensions: 768,
+  batchSize: 16,
+};
+
+function readEmbedProvider(): AiProviderName {
+  const raw = process.env["AI_EMBED_PROVIDER"]?.trim().toLowerCase();
+  return AI_PROVIDERS.find((name) => name === raw) ?? EMBED_DEFAULTS.provider;
+}
+
+export function loadAiEmbedConfig(): AiEmbedConfig {
+  const chat = loadAiConfig();
+
+  return {
+    provider: readEmbedProvider(),
+    baseUrl: (
+      process.env["AI_EMBED_BASE_URL"]?.trim() || EMBED_DEFAULTS.baseUrl
+    ).replace(/\/$/, ""),
+    // Falls back to the chat key so that a deployment serving both from one
+    // hosted provider needs one credential, not two spellings of it.
+    apiKey: process.env["AI_EMBED_API_KEY"]?.trim() || chat.apiKey,
+    model: process.env["AI_EMBED_MODEL"]?.trim() || EMBED_DEFAULTS.model,
+    dimensions: readInt("AI_EMBED_DIMENSIONS", EMBED_DEFAULTS.dimensions),
+    batchSize: Math.max(
+      1,
+      readInt("AI_EMBED_BATCH_SIZE", EMBED_DEFAULTS.batchSize),
+    ),
+    // Shared with chat: a timeout and a retry count describe this machine, not
+    // this feature, and a second pair of knobs would only ever be set wrong.
+    timeoutMs: chat.timeoutMs,
+    maxRetries: chat.maxRetries,
+  };
+}
+
+/** Same rule as `isAiConfigured`: only a missing credential is knowable here. */
+export function isAiEmbedConfigured(
+  config: AiEmbedConfig = loadAiEmbedConfig(),
+): boolean {
+  if (config.provider === "anthropic" || config.provider === "openai") {
+    return config.apiKey !== undefined && config.baseUrl.length > 0;
+  }
+  return config.baseUrl.length > 0;
+}

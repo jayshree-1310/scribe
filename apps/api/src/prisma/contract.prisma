@@ -452,6 +452,8 @@ namespace content {
     challengeEntries challenges.ChallengeEntry[]
     /// Clubs currently reading this story together.
     clubReads        clubs.BookClub[]
+    /// Embedded passages of this story's chapters; see `ai.ChapterChunk`.
+    embeddingChunks  ai.ChapterChunk[]
   }
 
   model Chapter {
@@ -478,6 +480,8 @@ namespace content {
     /// The generated recap of this chapter, if one has ever been asked for.
     /// Optional because it is derived and lazy: most chapters never have one.
     summary        ai.ChapterSummary?
+    /// This chapter's embedded passages; see `ai.ChapterChunk`.
+    embeddingChunks ai.ChapterChunk[]
 
     @@unique([storyId, chapterNumber])
   }
@@ -1254,5 +1258,72 @@ namespace ai {
     updatedAt     DateTime @default(now())
 
     chapter content.Chapter @relation(fields: [chapterId], references: [id])
+  }
+
+  /// One embedded passage of one chapter: the unit retrieval actually returns.
+  ///
+  /// **The vector is not declared here, and cannot be.** The column is
+  /// `vector(768)`, a type contributed by the `pgvector` extension, and the
+  /// Prisma Next extension package that would let a contract name it
+  /// (`pgvector.Vector(length: 768)`) is not published for this release. So
+  /// the migration adds the `embedding` column itself with `typeSql`, and
+  /// every read and write of it goes through the raw-SQL lane in
+  /// `services/ai/embeddings.ts`. Everything a query *filters* on is declared
+  /// below and typed; only the vector is untyped, and it is never filtered on
+  /// -- it is measured against. Swap this for a declared column the day the
+  /// extension package exists; nothing above the service changes.
+  ///
+  /// `db verify --strict` will report the extra column, because the contract
+  /// does not know about it. Plain `db verify` will not: extras in the
+  /// database are allowed by default.
+  ///
+  /// **`contentHash` is what stops the corpus being embedded twice.** It is
+  /// the SHA-256 of `text` -- this chunk's own prose, not the whole chapter --
+  /// so an author fixing a typo in one paragraph re-embeds the one or two
+  /// windows that paragraph falls in and reuses the rest. Embedding is the
+  /// most duplicated cost in the AI backlog, and this column is the whole of
+  /// the defence against it.
+  ///
+  /// `model` and `dimensions` sit on the row rather than in configuration
+  /// because a corpus is embedded over time and a model can change under it.
+  /// Vectors from two models are not comparable, so the row has to say which
+  /// one wrote it -- and that is also what lets a re-embedding sweep select
+  /// exactly the rows a model change invalidated.
+  ///
+  /// `storyId` is denormalised from the chapter so that a search can filter by
+  /// story without joining -- a vector scan that has to join to apply a filter
+  /// is a vector scan that reads far more rows than it returns.
+  ///
+  /// Both foreign keys cascade, unlike `ChapterSummary` above, whose rows
+  /// `services/authoring.ts` deletes by hand before the chapter goes. These
+  /// are derived data with no independent worth, there are many per chapter,
+  /// and a third place that has to remember they exist is a third place to
+  /// forget.
+  model ChapterChunk {
+    id          String   @id @default(uuid())
+    storyId     String
+    chapterId   String
+    /// Position within the chapter, from 0. Windows overlap; see `chunking.ts`.
+    ordinal     Int
+    /// The exact text that was embedded, and what a search result quotes.
+    text        String
+    /// SHA-256 of `text`; see above.
+    contentHash String
+    /// The embedding model, as the provider named it.
+    model       String
+    /// The width of `embedding`. Must match the column and the configuration.
+    dimensions  Int
+    createdAt   DateTime @default(now())
+
+    story   content.Story   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    chapter content.Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+    /// One row per window per chapter: what makes a re-embed a replacement
+    /// rather than an accumulation, and what a concurrent second backfill
+    /// collides with instead of silently doubling the index.
+    @@unique([chapterId, ordinal])
+    /// Retrieval filters by story; the backfill and reuse path looks up by hash.
+    @@index([storyId])
+    @@index([chapterId, contentHash])
   }
 }

@@ -228,6 +228,28 @@ Three things make this safe to run on every boot, cold starts included:
   when adding a check constraint, so an expression some row violates fails the
   migration and the deploy. An *unpaired* check drop is still refused.
 
+### One migration needs an extension
+
+`20260925T1018_add_ai_chapter_chunks` opens with `CREATE EXTENSION IF NOT
+EXISTS "vector"` — the AI chunk table stores embeddings in a `vector(768)`
+column. It is an additive operation and passes the destructive check, but it
+is the first migration in this repo that depends on something the *server*
+provides rather than on the schema it is given:
+
+- **Neon** ships pgvector and lets the database owner create it, so this
+  applies with no console step. A managed Postgres that does not allow it
+  fails the migration and therefore the boot, which is the correct place to
+  find out.
+- **The Compose stacks** now run `pgvector/pgvector:pg17` rather than
+  `postgres:17-alpine`, in both `docker-compose.yml` and
+  `docker-compose.prod.yml`. Switching an existing volume needs no dump: same
+  major, same on-disk format. The image is Debian-based where the alpine one
+  was musl, so run the one-off `REINDEX` noted in `docker-compose.yml` for the
+  collation change.
+
+Nothing else in the app touches the extension: with the table empty, every
+route behaves exactly as it did before.
+
 ### Required environment
 
 | Variable | Why |

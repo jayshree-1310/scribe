@@ -10,8 +10,11 @@
 name: scribe-prod
 
 services:
+  # Matches the development stack: the AI chunk table has a `vector` column,
+  # and the stock image has no such type. See the note in `docker-compose.yml`
+  # about switching an existing volume over.
   postgres:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-scribe}

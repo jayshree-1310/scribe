@@ -16,9 +16,11 @@
  */
 
 import { HttpError } from "../../lib/http-error.js";
-import type { AiConfig } from "./config.js";
+import type { AiConfig, AiEmbedConfig } from "./config.js";
 import type {
   AiCompletion,
+  AiEmbedder,
+  AiEmbeddings,
   AiProvider,
   AiRequest,
   AiStreamEvent,
@@ -58,7 +60,10 @@ function toUsage(
  * fix, not a 500 -- "the model server is not reachable" is actionable, "an
  * unexpected error occurred" is not.
  */
-function transportError(cause: unknown, config: AiConfig): HttpError {
+function transportError(
+  cause: unknown,
+  config: { baseUrl: string },
+): HttpError {
   if (cause instanceof DOMException && cause.name === "TimeoutError") {
     return HttpError.upstreamTimeout(
       "The model took too long to respond. Try a shorter request.",
@@ -95,7 +100,9 @@ async function responseError(
     );
   }
 
-  const error = HttpError.upstream("The model could not complete that request.");
+  const error = HttpError.upstream(
+    "The model could not complete that request.",
+  );
   // Attach for the error handler's log; `toBody` never serialises it.
   Object.defineProperty(error, "upstreamDetail", {
     value: { status: response.status, body: detail.slice(0, 500) },
@@ -108,11 +115,12 @@ async function responseError(
  * Composes the caller's cancellation with the configured timeout, so a client
  * that disconnects and a model that hangs are both bounded.
  */
-function signalFor(request: AiRequest, config: AiConfig): AbortSignal {
+function signalFor(
+  request: { signal?: AbortSignal },
+  config: { timeoutMs: number },
+): AbortSignal {
   const timeout = AbortSignal.timeout(config.timeoutMs);
-  return request.signal
-    ? AbortSignal.any([request.signal, timeout])
-    : timeout;
+  return request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
 }
 
 function bodyFor(
@@ -247,9 +255,84 @@ export function createOllamaProvider(
 
       yield {
         type: "done",
-        usage:
-          usage ?? toUsage({}, request.model ?? config.model, startedAt),
+        usage: usage ?? toUsage({}, request.model ?? config.model, startedAt),
       } satisfies AiStreamEvent;
+    },
+  };
+}
+
+/* Embeddings ------------------------------------------------------------- */
+
+interface OllamaEmbedResponse {
+  embeddings?: number[][];
+  prompt_eval_count?: number;
+  error?: string;
+}
+
+/**
+ * The local embedder: `POST /api/embed`, which takes an array and answers one
+ * vector per entry in the order given.
+ *
+ * `/api/embed` rather than the older `/api/embeddings`, which takes a single
+ * `prompt` and returns a single `embedding`. The batching is the whole reason:
+ * each request re-enters the model, so a chapter's worth of chunks in one call
+ * is several times faster on CPU than a call per chunk, and this runs over the
+ * whole corpus.
+ */
+export function createOllamaEmbedder(
+  config: AiEmbedConfig,
+  fetchImpl: FetchLike = fetch,
+): AiEmbedder {
+  const url = `${config.baseUrl}/api/embed`;
+
+  return {
+    name: "ollama",
+    model: config.model,
+    dimensions: config.dimensions,
+
+    async embed(request) {
+      const startedAt = Date.now();
+      const model = request.model ?? config.model;
+
+      let response: Response;
+      try {
+        response = await fetchImpl(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model, input: request.texts }),
+          signal: signalFor(request, config),
+        });
+      } catch (cause) {
+        if (request.signal?.aborted) throw cause;
+        throw transportError(cause, config);
+      }
+
+      if (!response.ok) throw await responseError(response, model);
+
+      const body = (await response.json()) as OllamaEmbedResponse;
+      if (body.error) {
+        throw HttpError.upstream("The embedding model could not answer.");
+      }
+
+      const vectors = body.embeddings ?? [];
+      // A short reply would otherwise misalign vectors with the chunks they
+      // belong to, which is silent and wrong rather than loud and wrong.
+      if (vectors.length !== request.texts.length) {
+        throw HttpError.upstream(
+          "The embedding model returned the wrong number of vectors.",
+        );
+      }
+
+      return {
+        vectors,
+        usage: {
+          provider: "ollama",
+          model,
+          inputTokens: body.prompt_eval_count ?? 0,
+          outputTokens: 0,
+          durationMs: Date.now() - startedAt,
+        },
+      } satisfies AiEmbeddings;
     },
   };
 }

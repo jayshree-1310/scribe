@@ -9,8 +9,26 @@
 name: scribe
 
 services:
+  # `pgvector/pgvector:pg17`, not `postgres:17-alpine`: Task AI 7 stores
+  # embeddings in a `vector` column, and the stock image has no such type
+  # (`pg_trgm` ships with Postgres; `vector` does not). The migration runs
+  # `CREATE EXTENSION vector`, which needs the extension installed in the
+  # image first.
+  #
+  # Two things to know when switching an existing checkout over:
+  #
+  #   - The data volume survives. Same Postgres major, same on-disk format, so
+  #     `docker compose up -d postgres` recreates the container against the
+  #     data that is already there.
+  #   - The image is Debian-based where the alpine one was musl, which changes
+  #     the C library's collation. Postgres notices and warns. Text indexes
+  #     built under the old collation should be rebuilt once:
+  #
+  #       docker compose exec postgres psql -U scribe -d scribe \
+  #         -c 'REINDEX DATABASE scribe;' \
+  #         -c 'ALTER DATABASE scribe REFRESH COLLATION VERSION;'
   postgres:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     container_name: scribe-postgres
     restart: unless-stopped
     environment:

@@ -1,0 +1,316 @@
+[
+  {
+    "id": "extension.vector",
+    "label": "Create extension \"vector\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create extension \"vector\"",
+        "sql": "CREATE EXTENSION IF NOT EXISTS \"vector\""
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "table.chapterChunk",
+    "label": "Create table \"chapterChunk\"",
+    "summary": "Creates table \"chapterChunk\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "chapterChunk"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"chapterChunk\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterChunk\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"chapterChunk\"",
+        "sql": "CREATE TABLE \"ai\".\"chapterChunk\" (\n  \"chapterId\" text NOT NULL,\n  \"contentHash\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"dimensions\" int4 NOT NULL,\n  \"id\" text NOT NULL,\n  \"model\" text NOT NULL,\n  \"ordinal\" int4 NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"text\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"chapterChunk\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterChunk\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.chapterChunk.embedding",
+    "label": "Add column \"embedding\" vector(768) to \"chapterChunk\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Add column \"embedding\" to \"ai\".\"chapterChunk\"",
+        "sql": "ALTER TABLE \"ai\".\"chapterChunk\" ADD COLUMN \"embedding\" vector(768)"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "unique.chapterChunk.chapterChunk_chapterId_ordinal_key",
+    "label": "Add unique constraint on \"chapterChunk\" (chapterId, ordinal)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "unique",
+        "name": "chapterChunk_chapterId_ordinal_key",
+        "table": "chapterChunk"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"chapterChunk_chapterId_ordinal_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterChunk_chapterId_ordinal_key",
+          "ai",
+          "\"ai\".\"chapterChunk\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"chapterChunk_chapterId_ordinal_key\"",
+        "sql": "ALTER TABLE \"ai\".\"chapterChunk\" ADD CONSTRAINT \"chapterChunk_chapterId_ordinal_key\" UNIQUE (\"chapterId\", \"ordinal\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"chapterChunk_chapterId_ordinal_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterChunk_chapterId_ordinal_key",
+          "ai",
+          "\"ai\".\"chapterChunk\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapterChunk.chapterChunk_chapterId_contentHash_idx_b343f6d1",
+    "label": "Create index \"chapterChunk_chapterId_contentHash_idx_b343f6d1\" on \"chapterChunk\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "chapterChunk_chapterId_contentHash_idx_b343f6d1",
+        "table": "chapterChunk"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapterChunk_chapterId_contentHash_idx_b343f6d1\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterChunk_chapterId_contentHash_idx_b343f6d1\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapterChunk_chapterId_contentHash_idx_b343f6d1\"",
+        "sql": "CREATE INDEX \"chapterChunk_chapterId_contentHash_idx_b343f6d1\" ON \"ai\".\"chapterChunk\" (\"chapterId\", \"contentHash\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapterChunk_chapterId_contentHash_idx_b343f6d1\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterChunk_chapterId_contentHash_idx_b343f6d1\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapterChunk.chapterChunk_chapterId_idx_411dd3d6",
+    "label": "Create index \"chapterChunk_chapterId_idx_411dd3d6\" on \"chapterChunk\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "chapterChunk_chapterId_idx_411dd3d6",
+        "table": "chapterChunk"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapterChunk_chapterId_idx_411dd3d6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterChunk_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapterChunk_chapterId_idx_411dd3d6\"",
+        "sql": "CREATE INDEX \"chapterChunk_chapterId_idx_411dd3d6\" ON \"ai\".\"chapterChunk\" (\"chapterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapterChunk_chapterId_idx_411dd3d6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterChunk_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapterChunk.chapterChunk_storyId_idx_cd452158",
+    "label": "Create index \"chapterChunk_storyId_idx_cd452158\" on \"chapterChunk\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "chapterChunk_storyId_idx_cd452158",
+        "table": "chapterChunk"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapterChunk_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterChunk_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapterChunk_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"chapterChunk_storyId_idx_cd452158\" ON \"ai\".\"chapterChunk\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapterChunk_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterChunk_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chapterChunk.chapterChunk_storyId_fkey",
+    "label": "Add foreign key \"chapterChunk_storyId_fkey\" on \"chapterChunk\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "chapterChunk_storyId_fkey",
+        "table": "chapterChunk"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chapterChunk_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterChunk_storyId_fkey",
+          "ai",
+          "\"ai\".\"chapterChunk\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chapterChunk_storyId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"chapterChunk\"\nADD CONSTRAINT \"chapterChunk_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chapterChunk_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterChunk_storyId_fkey",
+          "ai",
+          "\"ai\".\"chapterChunk\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chapterChunk.chapterChunk_chapterId_fkey",
+    "label": "Add foreign key \"chapterChunk_chapterId_fkey\" on \"chapterChunk\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "chapterChunk_chapterId_fkey",
+        "table": "chapterChunk"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chapterChunk_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterChunk_chapterId_fkey",
+          "ai",
+          "\"ai\".\"chapterChunk\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chapterChunk_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"chapterChunk\"\nADD CONSTRAINT \"chapterChunk_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chapterChunk_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterChunk_chapterId_fkey",
+          "ai",
+          "\"ai\".\"chapterChunk\""
+        ]
+      }
+    ]
+  }
+]

@@ -28,6 +28,10 @@
       "model": "Chapter",
       "namespace": "content"
     },
+    "chapterChunk": {
+      "model": "ChapterChunk",
+      "namespace": "ai"
+    },
     "chapterLike": {
       "model": "ChapterLike",
       "namespace": "engagement"
@@ -129,6 +133,138 @@
     "namespaces": {
       "ai": {
         "models": {
+          "ChapterChunk": {
+            "fields": {
+              "chapterId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "contentHash": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "dimensions": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "ordinal": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "storyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "text": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "chapter": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "chapterId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Chapter",
+                  "namespace": "content"
+                }
+              },
+              "story": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "storyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Story",
+                  "namespace": "content"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "chapterId": {
+                  "column": "chapterId"
+                },
+                "contentHash": {
+                  "column": "contentHash"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "dimensions": {
+                  "column": "dimensions"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "ordinal": {
+                  "column": "ordinal"
+                },
+                "storyId": {
+                  "column": "storyId"
+                },
+                "text": {
+                  "column": "text"
+                }
+              },
+              "namespaceId": "ai",
+              "table": "chapterChunk"
+            }
+          },
           "ChapterSummary": {
             "fields": {
               "chapterId": {
@@ -2135,6 +2271,21 @@
                   "namespace": "engagement"
                 }
               },
+              "embeddingChunks": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "chapterId"
+                  ]
+                },
+                "to": {
+                  "model": "ChapterChunk",
+                  "namespace": "ai"
+                }
+              },
               "likes": {
                 "cardinality": "1:N",
                 "on": {
@@ -2658,6 +2809,21 @@
                 "to": {
                   "model": "Comment",
                   "namespace": "engagement"
+                }
+              },
+              "embeddingChunks": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "storyId"
+                  ]
+                },
+                "to": {
+                  "model": "ChapterChunk",
+                  "namespace": "ai"
                 }
               },
               "genres": {
@@ -4540,6 +4706,135 @@
       "ai": {
         "entries": {
           "table": {
+            "chapterChunk": {
+              "columns": {
+                "chapterId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "contentHash": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "dimensions": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "ordinal": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "storyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "text": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "storyId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "chapterChunk"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "story"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "chapterId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "chapterChunk"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "chapter"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "chapterId",
+                    "contentHash"
+                  ],
+                  "name": "chapterChunk_chapterId_contentHash_idx_b343f6d1",
+                  "prefix": "chapterChunk_chapterId_contentHash_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "chapterId"
+                  ],
+                  "name": "chapterChunk_chapterId_idx_411dd3d6",
+                  "prefix": "chapterChunk_chapterId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "storyId"
+                  ],
+                  "name": "chapterChunk_storyId_idx_cd452158",
+                  "prefix": "chapterChunk_storyId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "chapterId",
+                    "ordinal"
+                  ]
+                }
+              ]
+            },
             "chapterSummary": {
               "columns": {
                 "chapterId": {
@@ -8175,10 +8470,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "d6fc7e415642368b7f80b2c9510bd90d28c385360fbde9a7bf7962f0dd15981c"
+    "storageHash": "2e2d925a6f69cc5591018756d801b51e12b9ad2040b4f99951a8634370365d3f"
   },
   "execution": {
-    "executionHash": "27bfeefcc8d868893066dd961591862c0e87de77c8fbd31cd8d5babafd125024",
+    "executionHash": "6ffef856154cc72abdefc222bd3f765bd864801e4240230d490bafa092b14f39",
     "mutations": {
       "defaults": [
         {
@@ -8245,6 +8540,17 @@
             "column": "id",
             "namespace": "content",
             "table": "chapter"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "ai",
+            "table": "chapterChunk"
           }
         },
         {

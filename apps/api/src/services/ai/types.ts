@@ -76,8 +76,7 @@ export interface AiCompletion {
  * token counts are not available until generation stops.
  */
 export type AiStreamEvent =
-  | { type: "text"; text: string }
-  | { type: "done"; usage: AiUsage };
+  { type: "text"; text: string } | { type: "done"; usage: AiUsage };
 
 export interface AiProvider {
   /** For logs and error messages: `ollama`, `anthropic`, `fake`. */
@@ -139,4 +138,46 @@ export interface AiUsageRecord extends AiUsage {
   outcome: "ok" | "error";
   /** The failure's stable code, never a provider message. */
   errorCode?: string;
+}
+
+/* Embeddings ------------------------------------------------------------- */
+
+export interface AiEmbedRequest {
+  /** Same role as `AiRequest.feature`: what the usage record is keyed by. */
+  feature: string;
+  /** One vector comes back per entry, in the same order. */
+  texts: string[];
+  /** Defaults to the configured embedding model. */
+  model?: string;
+  signal?: AbortSignal;
+}
+
+export interface AiEmbeddings {
+  /** Parallel to `texts`, every vector the same width. */
+  vectors: number[][];
+  /** `outputTokens` is always 0: an embedder generates nothing. */
+  usage: AiUsage;
+}
+
+/**
+ * The embedding seam -- deliberately **not** a method on `AiProvider`.
+ *
+ * Writing prose and turning it into a vector are two services in the general
+ * case and two services in this repo's own setup: chat is answered by a hosted
+ * OpenAI-compatible endpoint that serves no embedding model, and embeddings by
+ * the local Ollama container. A single interface would have forced one object
+ * to implement a method it has no endpoint for, and the honest expression of
+ * "these can be different providers" is two interfaces with two accessors.
+ *
+ * `dimensions` is on the interface rather than inferred from the first reply
+ * because it is a *declared* width that the database column must agree with.
+ * An implementation checks what came back against it and fails loudly on a
+ * mismatch; see `embeddings.ts` for why a quiet one would be so expensive.
+ */
+export interface AiEmbedder {
+  /** For logs and error messages: `ollama`, `openai`, `fake`. */
+  readonly name: string;
+  readonly model: string;
+  readonly dimensions: number;
+  embed(request: AiEmbedRequest): Promise<AiEmbeddings>;
 }

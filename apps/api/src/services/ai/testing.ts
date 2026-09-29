@@ -19,6 +19,7 @@
 
 import { HttpError } from "../../lib/http-error.js";
 import type {
+  AiEmbedder,
   AiProvider,
   AiRequest,
   AiResponseFormat,
@@ -136,6 +137,101 @@ export function fakeAiProvider(replies: string[] = ["ok"]): FakeAiProvider {
         type: "done",
         usage: usageFor(request.model ?? "fake-model", text),
       } satisfies AiStreamEvent;
+    },
+  };
+}
+
+/* Embeddings ------------------------------------------------------------- */
+
+export interface RecordedEmbedCall {
+  feature: string;
+  texts: string[];
+  model: string | undefined;
+}
+
+export interface FakeAiEmbedder extends AiEmbedder {
+  /** Every call, in order. A test asserting "no model call" checks `length`. */
+  readonly calls: RecordedEmbedCall[];
+  /** Make the next call fail, once. */
+  failNext(error: HttpError): void;
+  /** Answer with vectors of this width instead of `dimensions`, once. */
+  returnWidthOnce(width: number): void;
+  reset(): void;
+}
+
+/**
+ * Deterministic pseudo-vectors: the same text always embeds to the same
+ * numbers, and different texts to different ones.
+ *
+ * That is the only property the tests need, and it is the one a real model
+ * also has. Nothing here is a distance metric -- a test asserting that two
+ * passages about grief come out near each other would be testing the model,
+ * which this is not.
+ */
+function vectorFor(text: string, width: number): number[] {
+  let seed = 0;
+  for (const character of text) {
+    seed = (seed * 31 + character.codePointAt(0)!) % 2147483647;
+  }
+
+  return Array.from({ length: width }, (_, index) => {
+    seed = (seed * 48271 + index) % 2147483647;
+    return (seed % 2000) / 1000 - 1;
+  });
+}
+
+export function fakeAiEmbedder(dimensions = 8): FakeAiEmbedder {
+  const calls: RecordedEmbedCall[] = [];
+  let failure: HttpError | null = null;
+  let widthOnce: number | null = null;
+
+  return {
+    name: "fake",
+    model: "fake-embed",
+    dimensions,
+    calls,
+
+    failNext(error) {
+      failure = error;
+    },
+
+    returnWidthOnce(width) {
+      widthOnce = width;
+    },
+
+    reset() {
+      calls.length = 0;
+      failure = null;
+      widthOnce = null;
+    },
+
+    async embed(request) {
+      calls.push({
+        feature: request.feature,
+        texts: request.texts,
+        model: request.model,
+      });
+
+      const error = failure;
+      failure = null;
+      if (error) throw error;
+
+      const width = widthOnce ?? dimensions;
+      widthOnce = null;
+
+      return {
+        vectors: request.texts.map((text) => vectorFor(text, width)),
+        usage: {
+          provider: "fake",
+          model: request.model ?? "fake-embed",
+          inputTokens: request.texts.reduce(
+            (total, text) => total + Math.ceil(text.length / 4),
+            0,
+          ),
+          outputTokens: 0,
+          durationMs: 1,
+        },
+      };
     },
   };
 }

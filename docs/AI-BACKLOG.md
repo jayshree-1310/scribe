@@ -217,7 +217,7 @@ Task AI 0 interface; nothing else changes.
 | AI 5 Story generation | **Free** |
 | AI 6 Summarization | **Free** — smaller context makes map-reduce mandatory |
 | AI 6.5 Explain this passage | **Free** — one short call over a windowed selection |
-| AI 7 Embeddings | **Free** — `nomic-embed-text` or transformers.js, plus pgvector |
+| AI 7 Embeddings | **Free** — built on `nomic-embed-text` plus pgvector |
 | AI 8 Semantic + hybrid search | **Free** — embeddings and SQL only |
 | AI 9 Ask This Book (RAG) | **Free** — the whole flagship feature |
 | AI 10 Conversational assistant | **Free** |
@@ -810,8 +810,53 @@ security decision.
 
 ## Task AI 7 — Embeddings
 
-The first infrastructure task. **Read the whole prompt before touching
-docker-compose.**
+**Status: built.** `services/ai/chunking.ts`, `services/ai/embeddings.ts`,
+`ai.ChapterChunk` in `contract.prisma` plus its migration (which also runs
+`CREATE EXTENSION vector` and adds the `vector(768)` column by hand),
+`AI_EMBED_*` in `config.ts`, `aiEmbedder()` on the provider seam with Ollama
+and OpenAI-compatible implementations, `seed:embeddings`, tests in
+`services/ai/chunking.test.ts` and `services/ai/embeddings.test.ts`. Verified
+end to end against `nomic-embed-text` on the local Ollama container: 244
+windows across 21 chapters in about three minutes on CPU, and the second run
+in two seconds for zero tokens.
+
+The first infrastructure task, and the first one with no route and no UI. Four
+things are worth knowing before building on it.
+
+**The embedder is a second provider, not a third method.** `AiProvider` has no
+`embed`. Chat and embeddings are separately configured (`AI_EMBED_*`) and in
+this repo's own `.env` they are two different services — chat goes to Groq,
+which serves no embedding model, and embeddings stay on the local Ollama
+container. `aiEmbedder()` sits beside `aiProvider()` with the same retry and
+usage-logging policy.
+
+**The vector column is not in the contract, and cannot be.** The Prisma Next
+`pgvector` extension package this task's prompt names is not published for
+`8.0.0-rc.*` — there is no `@prisma/extension-pgvector` on npm — so
+`pgvector.Vector(length: 768)` was not available. The migration adds
+`embedding vector(768)` with explicit SQL instead and `embeddings.ts` reads
+and writes it through the raw-SQL lane; every column a query *filters* on is
+declared and typed, and only the vector is not. `db verify` passes; `db verify
+--strict` will name the extra column. Swap it for a declared column when the
+package exists — nothing above the service changes.
+
+**Paragraphs are split on any newline, not on blank lines.** The prompt says to
+reuse `paragraphsOf` from `apps/web/src/types/stories.ts`, which splits on
+`\n{2,}`. The corpus disagrees with it: chapters written in the editor separate
+paragraphs with a single newline, and measured on the seeded stories that made
+66 of 161 windows fall through to the 2000-character sentence splitter and get
+cut mid-scene. Splitting on `\n+` put every window back on a paragraph
+boundary. (The reader page splitting the other way is why those chapters render
+as one block — a rendering bug, and a different task.)
+
+**The backfill skips drafts unless passed `--all`.** A vector index does not
+know a draft is a draft, and Task AI 8 is where that rule has to be applied to
+results. Until search exists and enforces it, unpublished prose is simply not
+in the index. That is not a substitute for AI 8's filter — a chapter can be
+embedded and then unpublished.
+
+What is deliberately not here: the ANN index and the operator-class decision,
+which Task AI 8's prompt asks for alongside the search that needs them.
 
 **Prompt:**
 

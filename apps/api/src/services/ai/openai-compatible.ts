@@ -23,9 +23,11 @@
  */
 
 import { HttpError } from "../../lib/http-error.js";
-import type { AiConfig } from "./config.js";
+import type { AiConfig, AiEmbedConfig } from "./config.js";
 import type {
   AiCompletion,
+  AiEmbedder,
+  AiEmbeddings,
   AiProvider,
   AiRequest,
   AiStreamEvent,
@@ -58,7 +60,7 @@ function toUsage(
   };
 }
 
-function transportError(cause: unknown, config: AiConfig): HttpError {
+function transportError(cause: unknown): HttpError {
   if (cause instanceof DOMException && cause.name === "TimeoutError") {
     return HttpError.upstreamTimeout(
       "The model took too long to respond. Try a shorter request.",
@@ -103,7 +105,9 @@ async function responseError(
     );
   }
 
-  const error = HttpError.upstream("The model could not complete that request.");
+  const error = HttpError.upstream(
+    "The model could not complete that request.",
+  );
   Object.defineProperty(error, "upstreamDetail", {
     value: { status: response.status, body: detail.slice(0, 500) },
     enumerable: false,
@@ -111,7 +115,10 @@ async function responseError(
   return error;
 }
 
-function signalFor(request: AiRequest, config: AiConfig): AbortSignal {
+function signalFor(
+  request: { signal?: AbortSignal },
+  config: { timeoutMs: number },
+): AbortSignal {
   const timeout = AbortSignal.timeout(config.timeoutMs);
   return request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
 }
@@ -179,7 +186,7 @@ export function createOpenAiCompatibleProvider(
       });
     } catch (cause) {
       if (request.signal?.aborted) throw cause;
-      throw transportError(cause, config);
+      throw transportError(cause);
     }
 
     if (!response.ok) {
@@ -268,6 +275,92 @@ export function createOpenAiCompatibleProvider(
         type: "done",
         usage: usage ?? toUsage({}, request.model ?? config.model, startedAt),
       } satisfies AiStreamEvent;
+    },
+  };
+}
+
+/* Embeddings ------------------------------------------------------------- */
+
+interface EmbeddingsResponse {
+  data?: { embedding?: number[]; index?: number }[];
+  usage?: { prompt_tokens?: number };
+  error?: { message?: string };
+}
+
+/**
+ * `POST /embeddings` on the same wire format, for a deployment whose embedder
+ * is hosted rather than local.
+ *
+ * Not every server behind `AI_BASE_URL` has this endpoint -- Groq, the one
+ * this repo's own `.env` points at, serves chat only -- which is exactly why
+ * `AI_EMBED_*` is configured separately. A provider without it answers 404,
+ * and `responseError` turns that into a 503 naming the model.
+ *
+ * The reply is re-ordered by `index` rather than trusted to arrive in
+ * request order. The spec says it is ordered; the cost of the assumption being
+ * wrong is every chunk in the batch paired with somebody else's vector, which
+ * is not a failure anybody would notice until search returned nonsense.
+ */
+export function createOpenAiCompatibleEmbedder(
+  config: AiEmbedConfig,
+  fetchImpl: FetchLike = fetch,
+): AiEmbedder {
+  const url = `${config.baseUrl}/embeddings`;
+
+  return {
+    name: "openai",
+    model: config.model,
+    dimensions: config.dimensions,
+
+    async embed(request) {
+      const startedAt = Date.now();
+      const model = request.model ?? config.model;
+
+      let response: Response;
+      try {
+        response = await fetchImpl(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.apiKey ?? ""}`,
+          },
+          body: JSON.stringify({ model, input: request.texts }),
+          signal: signalFor(request, config),
+        });
+      } catch (cause) {
+        if (request.signal?.aborted) throw cause;
+        throw transportError(cause);
+      }
+
+      if (!response.ok) throw await responseError(response, model);
+
+      const body = (await response.json()) as EmbeddingsResponse;
+      if (body.error) {
+        throw HttpError.upstream("The embedding model could not answer.");
+      }
+
+      const rows = body.data ?? [];
+      if (rows.length !== request.texts.length) {
+        throw HttpError.upstream(
+          "The embedding model returned the wrong number of vectors.",
+        );
+      }
+
+      const vectors: number[][] = [];
+      rows.forEach((row, position) => {
+        vectors[row.index ?? position] = row.embedding ?? [];
+      });
+
+      return {
+        vectors,
+        usage: {
+          provider: "openai",
+          model,
+          inputTokens: body.usage?.prompt_tokens ?? 0,
+          outputTokens: 0,
+          durationMs: Date.now() - startedAt,
+        },
+      } satisfies AiEmbeddings;
     },
   };
 }

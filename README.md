@@ -688,6 +688,25 @@ docker compose exec api pnpm --filter api seed:stories     # Scribe stories with
 docker compose exec api pnpm --filter api seed:challenges  # writing challenges, past and upcoming
 ```
 
+One more is not sample content but derived from it — it embeds published
+chapters so the AI retrieval features have something to search. It needs the
+Ollama container and the `nomic-embed-text` model (see `docs/AI-BACKLOG.md`
+§ _Running it for free_), takes a few minutes the first time, and costs
+nothing on every run after: it re-embeds only prose that has changed.
+
+```bash
+docker compose --profile ai up -d ollama
+docker compose exec ollama ollama pull nomic-embed-text
+
+pnpm --filter api seed:embeddings          # from the host
+```
+
+From the host rather than inside the `api` container, because the embedder
+defaults to `http://localhost:11434` and inside that container nothing is
+listening there. To run it in the container instead, pass the service name:
+`docker compose exec -e AI_EMBED_BASE_URL=http://ollama:11434 api pnpm --filter
+api seed:embeddings`.
+
 The view and like counts these set are invented starting values, not counted
 events — see the note under
 [Where the project actually stands](#-where-the-project-actually-stands).

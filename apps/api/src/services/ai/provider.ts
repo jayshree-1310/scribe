@@ -10,14 +10,29 @@
  * record usage, once more to add the structured-output path. All of it belongs
  * here rather than in each implementation, because it is policy and not
  * protocol -- an implementation only ever writes `complete` and `stream`.
+ *
+ * `aiEmbedder()` is the same idea for embeddings and a **second** accessor
+ * rather than a third method, because the two are separately configured and in
+ * this repo's own setup are two different services -- see `AiEmbedder` in
+ * `types.ts`.
  */
 
 import { HttpError } from "../../lib/http-error.js";
-import { isAiConfigured, loadAiConfig, type AiConfig } from "./config.js";
-import { createOllamaProvider } from "./ollama.js";
-import { createOpenAiCompatibleProvider } from "./openai-compatible.js";
+import {
+  isAiConfigured,
+  isAiEmbedConfigured,
+  loadAiConfig,
+  loadAiEmbedConfig,
+  type AiConfig,
+  type AiEmbedConfig,
+} from "./config.js";
+import { createOllamaEmbedder, createOllamaProvider } from "./ollama.js";
+import {
+  createOpenAiCompatibleEmbedder,
+  createOpenAiCompatibleProvider,
+} from "./openai-compatible.js";
 import { withStructured } from "./structured.js";
-import type { AiClient, AiProvider, AiRequest } from "./types.js";
+import type { AiClient, AiEmbedder, AiProvider, AiRequest } from "./types.js";
 import { logAiUsage } from "./usage.js";
 
 /* Construction ----------------------------------------------------------- */
@@ -213,6 +228,115 @@ export function setAiProvider(provider: AiProvider | null): void {
 /** Drops the cache so the next call re-reads the environment. */
 export function resetAiProvider(): void {
   cached = null;
+}
+
+/* Embeddings ------------------------------------------------------------- */
+
+function buildEmbedder(config: AiEmbedConfig): AiEmbedder {
+  switch (config.provider) {
+    case "ollama":
+      return createOllamaEmbedder(config);
+    case "openai":
+      return createOpenAiCompatibleEmbedder(config);
+    case "anthropic":
+      // Anthropic publishes no embedding model of its own, so there is nothing
+      // to implement here rather than something not yet implemented. A
+      // deployment wanting hosted embeddings points `AI_EMBED_*` at a provider
+      // that serves them, which speaks the OpenAI wire format above.
+      throw HttpError.unavailable(
+        "Anthropic serves no embedding model. Set AI_EMBED_PROVIDER=ollama or openai.",
+      );
+  }
+}
+
+/**
+ * The same retry and usage policy as `wrap`, over the embedding call.
+ *
+ * Written out rather than shared with `wrap` because the two wrap different
+ * method names over different request shapes, and the version that abstracts
+ * over both is longer than both. Retrying is worth more here than on chat: a
+ * backfill makes hundreds of calls in a row, so one transient failure
+ * otherwise aborts a run that was minutes in.
+ */
+function wrapEmbedder(inner: AiEmbedder, config: AiEmbedConfig): AiEmbedder {
+  return {
+    name: inner.name,
+    model: inner.model,
+    dimensions: inner.dimensions,
+
+    async embed(request) {
+      const startedAt = Date.now();
+
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          const result = await inner.embed(request);
+          logAiUsage({
+            ...result.usage,
+            feature: request.feature,
+            outcome: "ok",
+          });
+          return result;
+        } catch (error) {
+          const retryable =
+            isTransient(error) &&
+            attempt < config.maxRetries &&
+            request.signal?.aborted !== true;
+
+          if (retryable) {
+            await wait(backoffMs(attempt));
+            continue;
+          }
+
+          logAiUsage({
+            provider: inner.name,
+            model: request.model ?? config.model,
+            inputTokens: 0,
+            outputTokens: 0,
+            durationMs: Date.now() - startedAt,
+            feature: request.feature,
+            outcome: "error",
+            errorCode:
+              error instanceof HttpError ? error.code : "internal_error",
+          });
+          throw error;
+        }
+      }
+    },
+  };
+}
+
+let cachedEmbedder: AiEmbedder | null = null;
+
+/**
+ * The configured embedder, or a 503 when embeddings are not set up.
+ *
+ * A separate accessor from `aiProvider()` on purpose: the two can be, and here
+ * usually are, different services. A deployment can have working chat and no
+ * embedder, and the failure a caller gets must say which one is missing.
+ */
+export function aiEmbedder(): AiEmbedder {
+  if (cachedEmbedder) return cachedEmbedder;
+
+  const config = loadAiEmbedConfig();
+
+  if (!isAiEmbedConfigured(config)) {
+    throw HttpError.unavailable(
+      "Embeddings are not configured on this server.",
+    );
+  }
+
+  cachedEmbedder = wrapEmbedder(buildEmbedder(config), config);
+  return cachedEmbedder;
+}
+
+/** Test seam, matching `setAiProvider`. The fake gets no retries either. */
+export function setAiEmbedder(embedder: AiEmbedder | null): void {
+  cachedEmbedder = embedder;
+}
+
+/** Drops the cache so the next call re-reads the environment. */
+export function resetAiEmbedder(): void {
+  cachedEmbedder = null;
 }
 
 /**
