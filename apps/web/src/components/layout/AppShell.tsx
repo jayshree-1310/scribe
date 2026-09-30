@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../lib/auth'
+import { useTour } from '../../lib/tour'
 import { Icon } from '../ui/Icon'
 import { ScribbleWidget } from '../ai/ScribbleWidget'
 import { MobileNav } from './MobileNav'
@@ -23,12 +24,17 @@ interface AppShellProps {
 export function AppShell({ children, variant = 'reader', width = 'default' }: AppShellProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { session } = useAuth()
+  const { registerReveal } = useTour()
 
   const base = variant === 'author' ? AUTHOR_NAV : READER_NAV
   // The one section that depends on who is looking. See `ADMIN_NAV`.
   const sections = session?.user.isAdmin
     ? [...base, ADMIN_NAV]
     : base
+
+  // The product tour slides the drawer open on a tablet, where there is no
+  // sidebar and no tab bar, to point at the link it is talking about.
+  useEffect(() => registerReveal('drawer', setDrawerOpen), [registerReveal])
 
   // Esc closes the drawer; route changes close it via each link's onClick.
   useEffect(() => {
@@ -78,6 +84,7 @@ export function AppShell({ children, variant = 'reader', width = 'default' }: Ap
       <aside
         className="shell__drawer"
         aria-label="Navigation"
+        data-tour-drawer=""
         aria-hidden={!drawerOpen}
         inert={drawerOpen ? undefined : true}
       >
@@ -94,7 +101,11 @@ export function AppShell({ children, variant = 'reader', width = 'default' }: Ap
         {/* Deliberately not keyed on the path. This element persists across
             navigations — see `ShellLayout` — which is what keeps `page-in` a
             first-load animation rather than a flash on every link. */}
-        <main className={cn('shell__content', `shell__content--${width}`)} id="main">
+        <main
+          className={cn('shell__content', `shell__content--${width}`)}
+          id="main"
+          data-tour="app"
+        >
           {children}
         </main>
       </div>

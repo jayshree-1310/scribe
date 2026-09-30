@@ -71,6 +71,7 @@ export function AuthorStoriesPage() {
           variant="primary"
           to="/author/stories/new"
           startIcon={<Icon name="plus" size="1em" />}
+          data-tour="author-studio"
         >
           Create New Story
         </ButtonLink>

@@ -303,7 +303,7 @@ export function ReaderPage() {
           </span>
         </Link>
 
-        <div className="reader__bar-actions">
+        <div className="reader__bar-actions" data-tour="reading-controls">
           <Button
             variant="ghost"
             iconOnly
@@ -458,7 +458,11 @@ export function ReaderPage() {
                 </button>
               </div>
 
-              <nav className="reader__pager" aria-label="Chapter navigation">
+              <nav
+                className="reader__pager"
+                aria-label="Chapter navigation"
+                data-tour="chapter-navigation"
+              >
                 <Button
                   disabled={previousNumber === null}
                   onClick={() => goToChapter(previousNumber)}

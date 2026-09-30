@@ -46,6 +46,25 @@ function visitor(req: Request) {
 }
 
 /**
+ * The header the web client's product tour sends while it is on screen.
+ *
+ * The tour opens a story and one of its chapters to show those pages off.
+ * That is a demonstration, not a reading: recorded, it would count a chapter
+ * the reader never chose toward their reader level and badges, and a view and
+ * a read toward some author's analytics -- all for a brand-new account that
+ * has not read anything yet.
+ *
+ * Trusting a client header is safe here in a way it would not be for anything
+ * that grants: all it can do is withhold a count of the caller's own visit,
+ * which the caller could equally withhold by not making the request.
+ */
+export const TOUR_PREVIEW_HEADER = "x-scribe-tour";
+
+function isTourPreview(req: Request): boolean {
+  return req.get(TOUR_PREVIEW_HEADER) === "1";
+}
+
+/**
  * `req.query` values arrive as strings. Coercion lives in the schema so a bad
  * `page=abc` is a 400 with a field message rather than a silent `NaN`.
  */
@@ -128,7 +147,7 @@ router.get("/:slug", async (req, res, next) => {
      * returns `void` by design, so this line cannot delay the response or
      * turn a counter's failure into a failed read.
      */
-    recordStoryView(story.id, visitor(req));
+    if (!isTourPreview(req)) recordStoryView(story.id, visitor(req));
 
     res.json({ story });
   } catch (error) {
@@ -163,7 +182,9 @@ router.get("/:slug/chapters/:number", async (req, res, next) => {
 
     // The reader endpoint: fetching a chapter's body is the closest thing to
     // "somebody read this" the API can observe. See `engagement.ChapterRead`.
-    recordChapterRead(chapter.id, visitor(req));
+    // Not for the product tour, which is showing the reader off rather than
+    // reading -- see `TOUR_PREVIEW_HEADER`.
+    if (!isTourPreview(req)) recordChapterRead(chapter.id, visitor(req));
 
     res.json({ chapter });
   } catch (error) {

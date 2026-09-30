@@ -78,9 +78,11 @@ export class TestApi {
       as?: string;
       /** Sends bytes verbatim instead of JSON, for the avatar upload route. */
       raw?: { data: Buffer; contentType: string };
+      /** Anything else the request should carry. */
+      headers?: Record<string, string>;
     } = {},
   ): Promise<ApiResponse<T>> {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { ...options.headers };
     if (options.body !== undefined) headers["Content-Type"] = "application/json";
     if (options.raw) headers["Content-Type"] = options.raw.contentType;
     if (options.as) headers[DEV_USER_HEADER] = options.as;

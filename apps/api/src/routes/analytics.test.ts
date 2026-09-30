@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TestApi, databaseAvailable } from "../test/harness.js";
 import { flushAnalytics } from "../services/analytics.js";
+import { TOUR_PREVIEW_HEADER } from "./stories.js";
 
 const api = new TestApi();
 const available = await databaseAvailable();
@@ -57,8 +58,12 @@ afterAll(async () => {
  * nothing about the row having landed. `flushAnalytics` is the seam the
  * service exposes for exactly this.
  */
-async function read(path: string, as?: string): Promise<number> {
-  const response = await api.request(path, as ? { as } : {});
+async function read(
+  path: string,
+  as?: string,
+  headers?: Record<string, string>,
+): Promise<number> {
+  const response = await api.request(path, { ...(as ? { as } : {}), headers });
   await flushAnalytics();
   return response.status;
 }
@@ -96,6 +101,34 @@ describe.skipIf(!available)("recording story views", () => {
     expect(await read(`/api/stories/${story.slug}/chapters/1`, reader)).toBe(200);
 
     expect(await api.countChapterReads(chapterId)).toBe(1);
+  });
+
+  it("records nothing for the product tour's visit to a story", async () => {
+    const toured = await api.createStory({ title: "Toured Story", authorId: watched });
+    const before = await api.readViewCount(toured.id);
+
+    expect(
+      await read(`/api/stories/${toured.slug}`, reader, { [TOUR_PREVIEW_HEADER]: "1" }),
+    ).toBe(200);
+
+    expect(await api.countStoryViews(toured.id)).toBe(0);
+    expect(await api.readViewCount(toured.id)).toBe(before);
+  });
+
+  it("records nothing for the product tour's visit to a chapter", async () => {
+    const toured = await api.createStory({ title: "Toured Chapters", authorId: watched });
+    const opened = await api.createChapter({ storyId: toured.id, number: 1 });
+
+    expect(
+      await read(`/api/stories/${toured.slug}/chapters/1`, reader, {
+        [TOUR_PREVIEW_HEADER]: "1",
+      }),
+    ).toBe(200);
+    expect(await api.countChapterReads(opened)).toBe(0);
+
+    // And the same reader opening it themselves afterwards still counts.
+    expect(await read(`/api/stories/${toured.slug}/chapters/1`, reader)).toBe(200);
+    expect(await api.countChapterReads(opened)).toBe(1);
   });
 
   it("records nothing for a story the caller cannot see", async () => {

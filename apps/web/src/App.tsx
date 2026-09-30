@@ -11,6 +11,7 @@ import { AuthProvider } from './components/providers/AuthProvider'
 import { NotificationsProvider } from './components/providers/NotificationsProvider'
 import { ReaderPrefsProvider } from './components/providers/ReaderPrefsProvider'
 import { ThemeProvider } from './components/providers/ThemeProvider'
+import { TourProvider } from './components/providers/TourProvider'
 import { ToastProvider } from './components/ui/ToastProvider'
 import { RequireAuth } from './components/RequireAuth'
 import { ShellLayout } from './components/layout/ShellLayout'
@@ -67,13 +68,18 @@ import { StoryEditorPage } from './pages/author/StoryEditorPage'
  * arrived halfway down the next page. It restores the remembered position on
  * back and forward, and goes to the top on anything new, which is what a
  * browser would have done.
+ *
+ * The product tour lives here too, above both shells and the reader page,
+ * because it walks across all three and has to survive every navigation it
+ * makes. It needs the router to navigate, which is why it is not up in `App`
+ * with the other providers. See `components/providers/TourProvider.tsx`.
  */
 function RootLayout() {
   return (
-    <>
+    <TourProvider>
       <ScrollRestoration />
       <Outlet />
-    </>
+    </TourProvider>
   )
 }
 
@@ -111,6 +117,7 @@ const router = createBrowserRouter(
       {/* The reader page brings its own chrome, so it too sits outside. */}
       <Route
         path="/read/:slug/:chapter"
+        handle={{ tour: true }}
         element={
           <RequireAuth>
             <ReaderPage />
@@ -123,8 +130,14 @@ const router = createBrowserRouter(
         onto the layout route with it: the gate is the same for every page in
         the group, and twenty copies of it was twenty chances to forget one.
         `handle` carries the only thing a page still says about its own frame.
+
+        `tour: true` on this group, the studio's and the reader's is where the
+        product tour may run. Anywhere else -- the public pages, onboarding --
+        a tour in progress waits, rather than pulling somebody who is reading
+        the terms back into the app. See `TourProvider`.
       */}
       <Route
+        handle={{ tour: true }}
         element={
           <RequireAuth>
             <ShellLayout />
@@ -183,6 +196,7 @@ const router = createBrowserRouter(
 
       {/* Author studio: the same shell, the other navigation. ------------- */}
       <Route
+        handle={{ tour: true }}
         element={
           <RequireAuth>
             <ShellLayout variant="author" />

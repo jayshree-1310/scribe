@@ -66,6 +66,7 @@ export function NotificationBell() {
             iconOnly
             aria-label={label}
             className="topbar__bell"
+            data-tour="notifications"
             /**
              * The count rides inside `startIcon` because `iconOnly` drops a
              * `Button`'s children -- that is what makes it icon-only. The

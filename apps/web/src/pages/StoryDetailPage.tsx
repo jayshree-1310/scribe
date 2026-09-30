@@ -322,7 +322,7 @@ export function StoryDetailPage() {
             <StoryCover story={data} size="xl" />
           </div>
 
-          <div className="detail__body">
+          <div className="detail__body" data-tour="story-page">
             <div className="detail__genres">
               {data.genres.map((genre) => (
                 <GenreChip key={genre.id} genre={genre} asLink />

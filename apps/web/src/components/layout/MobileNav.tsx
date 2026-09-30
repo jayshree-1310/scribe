@@ -22,6 +22,7 @@ export function MobileNav({ sections, onOpenMore }: MobileNavProps) {
           key={item.to}
           to={item.to}
           end={item.to === '/author'}
+          data-tour={item.tour}
           className={({ isActive }) => cn('mobile-nav__link', isActive && 'is-active')}
         >
           <Icon name={item.icon} size="1.3rem" />

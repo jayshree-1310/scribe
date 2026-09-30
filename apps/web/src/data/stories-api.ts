@@ -8,6 +8,7 @@
 
 import { request } from '../lib/api-client'
 import { getAccessToken } from '../lib/access-token'
+import { tourPreviewHeaders } from '../lib/tour-preview'
 import type {
   Chapter,
   ChapterSummary,
@@ -82,10 +83,14 @@ export async function getGenres(): Promise<StoryGenreSummary[]> {
 }
 
 /** `slugOrId` because the API accepts either, and older links carry ids. */
+/**
+ * The two reads the API counts -- a story view, a chapter read -- carry the
+ * product tour's marker while it is on screen. See `lib/tour-preview.ts`.
+ */
 export async function getStory(slugOrId: string): Promise<Story> {
   const { story } = await request<{ story: Story }>(
     `/stories/${encodeURIComponent(slugOrId)}`,
-    { headers: readerHeaders() },
+    { headers: { ...readerHeaders(), ...tourPreviewHeaders() } },
   )
   return story
 }
@@ -106,7 +111,7 @@ export async function getChapter(
 ): Promise<Chapter> {
   const { chapter } = await request<{ chapter: Chapter }>(
     `/stories/${encodeURIComponent(slugOrId)}/chapters/${number}`,
-    { headers: readerHeaders() },
+    { headers: { ...readerHeaders(), ...tourPreviewHeaders() } },
   )
   return chapter
 }

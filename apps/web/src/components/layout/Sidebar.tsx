@@ -30,6 +30,7 @@ export function Sidebar({ sections, footer, onNavigate }: SidebarProps) {
                   <NavLink
                     to={item.to}
                     end={item.to === '/author'}
+                    data-tour={item.tour}
                     onClick={onNavigate}
                     className={({ isActive }) =>
                       cn('sidebar__link', isActive && 'is-active')

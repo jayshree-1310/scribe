@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useDebouncedValue } from './useDebouncedValue'
 import { ApiError } from '../lib/api-client'
 import { useAuth } from '../lib/auth'
+import { useIsTouring } from '../lib/tour'
 import * as reading from '../data/reading-api'
 import type { Chapter, ReadingProgress } from '../types/stories'
 
@@ -83,6 +84,20 @@ export function useReadingProgress({
    * the moment it changes.
    */
   const readerId = session?.user.id ?? null
+
+  /**
+   * The product tour opens a chapter to show the reader off, and scrolls it
+   * to reach the chapter controls. Neither is the reader reading, and a save
+   * would move their place, record a visit and advance their streak -- so
+   * nothing is saved while the tour is open.
+   *
+   * `heldRef` is where the tour left the page. Ending the tour midway through
+   * a chapter saves nothing until the reader scrolls from there themselves:
+   * the position on screen is the tour's, not theirs. Another chapter is the
+   * reader's own choice, and is recorded as usual.
+   */
+  const touring = useIsTouring()
+  const heldRef = useRef<{ chapterId: string; offset: number } | null>(null)
 
   /**
    * The reader the API last refused a save for, or `undefined` while it has
@@ -237,6 +252,16 @@ export function useReadingProgress({
      */
     if (restoredChapterId !== chapter.id) return
 
+    if (touring) {
+      heldRef.current = { chapterId: chapter.id, offset: debouncedOffset }
+      return
+    }
+    const held = heldRef.current
+    if (held !== null) {
+      if (held.chapterId === chapter.id && held.offset === debouncedOffset) return
+      heldRef.current = null
+    }
+
     if (debouncedOffset > 0) movedRef.current = true
 
     /**
@@ -274,5 +299,5 @@ export function useReadingProgress({
     return () => {
       active = false
     }
-  }, [storyId, chapter, debouncedOffset, restoredChapterId, readerId])
+  }, [storyId, chapter, debouncedOffset, restoredChapterId, readerId, touring])
 }

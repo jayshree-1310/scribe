@@ -142,7 +142,13 @@ export function MyLibraryPage() {
         </ButtonLink>
       </header>
 
-      <Tabs items={tabs} active={shelf} onChange={setShelf} label="Reading shelves" />
+      <Tabs
+        items={tabs}
+        active={shelf}
+        onChange={setShelf}
+        label="Reading shelves"
+        data-tour="shelves"
+      />
 
       <div className="filters">
         <div className="filters__row">

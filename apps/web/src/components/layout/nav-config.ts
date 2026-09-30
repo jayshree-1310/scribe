@@ -6,6 +6,11 @@ export interface NavItem {
   icon: IconName
   /** Shown on the mobile bottom bar (max five). */
   primary?: boolean
+  /**
+   * The product tour's anchor for this link, rendered as `data-tour` on every
+   * copy of it -- sidebar, drawer and tab bar alike. See `tour-config.ts`.
+   */
+  tour?: string
 }
 
 export interface NavSection {
@@ -34,16 +39,16 @@ export const READER_NAV: NavSection[] = [
   {
     id: 'read',
     items: [
-      { to: '/home', label: 'Home', icon: 'home', primary: true },
-      { to: '/discover', label: 'Discover', icon: 'compass', primary: true },
-      { to: '/library', label: 'My Library', icon: 'library', primary: true },
+      { to: '/home', label: 'Home', icon: 'home', primary: true, tour: 'home' },
+      { to: '/discover', label: 'Discover', icon: 'compass', primary: true, tour: 'discover' },
+      { to: '/library', label: 'My Library', icon: 'library', primary: true, tour: 'library' },
     ],
   },
   {
     id: 'community',
     label: 'Community',
     items: [
-      { to: '/clubs', label: 'Book Clubs', icon: 'users', primary: true },
+      { to: '/clubs', label: 'Book Clubs', icon: 'users', primary: true, tour: 'book-clubs' },
       { to: '/challenges', label: 'Writing Challenges', icon: 'trophy' },
       { to: '/channels', label: 'Channels', icon: 'megaphone' },
       { to: '/badges', label: 'Badges', icon: 'medal' },

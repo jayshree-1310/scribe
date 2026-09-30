@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../lib/auth'
+import { useTour } from '../lib/tour'
 import { cn } from '../lib/cn'
 import { formatCount } from '../lib/format'
 import * as storiesApi from '../data/stories-api'
@@ -53,7 +54,21 @@ const MIN_GENRES = 3
  */
 export function OnboardingPage() {
   const { completeOnboarding } = useAuth()
+  const tour = useTour()
   const navigate = useNavigate()
+
+  /**
+   * Hands a new reader to the home page, and the product tour with them.
+   *
+   * This is the only place the tour starts unasked: finishing onboarding is
+   * what makes somebody new. Everybody else finds it in the account menu, and
+   * a reader who has already been through it is not shown it again.
+   */
+  function enterScribe(): void {
+    completeOnboarding()
+    navigate('/home', { replace: true })
+    if (!tour.state.completed) tour.startTour()
+  }
 
   // Genres are real rows in `content.Genre`, served with story counts.
   const genres = useAsync(() => storiesApi.getGenres(), [])
@@ -221,8 +236,7 @@ export function OnboardingPage() {
     })
     if (!ok) return
 
-    completeOnboarding()
-    navigate('/home', { replace: true })
+    enterScribe()
   }
 
   async function skip(): Promise<void> {
@@ -231,8 +245,7 @@ export function OnboardingPage() {
     })
     if (!ok) return
 
-    completeOnboarding()
-    navigate('/home', { replace: true })
+    enterScribe()
   }
 
   return (

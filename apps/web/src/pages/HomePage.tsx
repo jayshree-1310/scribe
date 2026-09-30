@@ -148,7 +148,7 @@ export function HomePage() {
         </ButtonLink>
       </header>
 
-      <section className="streak">
+      <section className="streak" data-tour="reading-streak">
         <div className="streak__flame">
           <Icon name="flame" size="1.5rem" />
         </div>
@@ -213,7 +213,7 @@ export function HomePage() {
         and two empty states stacked would say the same thing twice.
       */}
       {resumable.length > 0 || inProgressStories.status === 'loading' ? (
-        <section className="page-section">
+        <section className="page-section" data-tour="continue-reading">
           <SectionHead
             title="Pick up where you left off"
             subtitle="The last thing you were reading, at the page you stopped on."

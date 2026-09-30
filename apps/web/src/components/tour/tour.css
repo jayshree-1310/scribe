@@ -1,0 +1,460 @@
+/* ==========================================================================
+   Product tour — the dimmed page, the lit target and the card beside it
+
+   Everything here is built from the design system's own tokens, so the tour
+   wears whichever theme Scribe is wearing: the card is a `--surface` panel
+   with the brand's orange edge, the headings are Newsreader, the buttons are
+   `Button`. Only the scrim and the glow are the tour's own.
+
+   Layering. The overlay is a modal `<dialog>`, so it sits in the top layer,
+   above anything a z-index can reach. The values below order the tour's own
+   parts inside it, and are what the overlay would need if it ever left the
+   top layer.
+   ========================================================================== */
+
+.tour {
+  --z-tour-overlay: 10000;
+  --z-tour-spotlight: 10001;
+  --z-tour-tooltip: 10002;
+  --z-tour-controls: 10003;
+
+  /* Warm ink over parchment; the black the dark theme asks for below. */
+  --tour-scrim: rgba(28, 24, 21, 0.6);
+  --tour-glow: color-mix(in srgb, var(--brand) 42%, transparent);
+  --tour-glide: 280ms;
+
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-tour-overlay);
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+  animation: tour-in var(--dur-slow) var(--ease-out);
+}
+
+[data-theme='dark'] .tour {
+  --tour-scrim: rgba(0, 0, 0, 0.65);
+  --tour-glow: color-mix(in srgb, var(--brand) 38%, transparent);
+}
+
+/* The spotlight's shadow is the dimming; the platform's backdrop stays clear. */
+.tour::backdrop {
+  background: transparent;
+}
+
+.tour:focus,
+.tour:focus-visible {
+  outline: none;
+}
+
+.tour[data-phase='closing'] {
+  animation: tour-out var(--dur) var(--ease) forwards;
+  pointer-events: none;
+}
+
+@keyframes tour-in {
+  from { opacity: 0; }
+}
+
+@keyframes tour-out {
+  to { opacity: 0; }
+}
+
+/* Spotlight ----------------------------------------------------------------- */
+
+.tour__spot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z-tour-spotlight);
+  pointer-events: none;
+  /* The outline, then the scrim: a spread wide enough to cover any screen. */
+  box-shadow:
+    0 0 0 2px var(--brand),
+    0 0 0 200vmax var(--tour-scrim);
+  transition:
+    transform var(--tour-glide) var(--ease),
+    width var(--tour-glide) var(--ease),
+    height var(--tour-glide) var(--ease),
+    border-radius var(--tour-glide) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+/* The soft glow breathes on its own layer, so the pulse costs an opacity
+   change rather than repainting a screen-sized shadow every frame. */
+.tour__spot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    0 0 0 4px var(--brand-ring),
+    0 0 24px 6px var(--tour-glow);
+  opacity: 0.55;
+  animation: tour-glow 2.4s ease-in-out infinite;
+  transition: opacity var(--dur) var(--ease);
+}
+
+@keyframes tour-glow {
+  50% { opacity: 1; }
+}
+
+/* Nothing lit: the hole closes to a point, and outline and glow go with it. */
+.tour__spot.is-dim {
+  box-shadow:
+    0 0 0 0 transparent,
+    0 0 0 200vmax var(--tour-scrim);
+}
+
+.tour__spot.is-dim::after {
+  opacity: 0;
+  animation: none;
+}
+
+/* Between steps the hole holds for a beat before closing. The next target
+   usually lands inside it, and the spot then glides straight there. */
+.tour__spot.is-waiting {
+  transition-delay: 150ms;
+}
+
+.tour__spot.is-fresh {
+  transition: none;
+}
+
+/* Card -------------------------------------------------------------------- */
+
+.tour__anchor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z-tour-tooltip);
+  width: min(24rem, calc(100vw - 2rem));
+  transition: transform var(--tour-glide) var(--ease);
+}
+
+.tour__anchor.is-fresh {
+  transition: none;
+}
+
+/* Laid out, so it can be measured, and not yet shown. */
+.tour__anchor.is-measuring {
+  visibility: hidden;
+}
+
+.tour__nudge.is-nudging {
+  animation: tour-nudge 260ms var(--ease-out);
+}
+
+@keyframes tour-nudge {
+  30% { transform: translateX(-4px); }
+  65% { transform: translateX(3px); }
+}
+
+.tour__card {
+  position: relative;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface);
+  box-shadow: var(--shadow-lg);
+  animation: tour-card-in var(--dur-slow) var(--ease-out);
+  transition: opacity var(--dur) var(--ease);
+}
+
+/* The card fades only if the next step is slow to arrive; a step on the same
+   page lands before the delay is up and the card simply glides. */
+.tour__card[data-state='waiting'] {
+  opacity: 0;
+  transition-delay: 120ms;
+}
+
+@keyframes tour-card-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+}
+
+/* The notch pointing at the target: a square turned on its corner, carrying
+   the card's surface and two of its borders. */
+.tour__arrow {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 1px solid var(--brand);
+  background-color: var(--surface);
+  transform: rotate(45deg);
+  transition:
+    left var(--tour-glide) var(--ease),
+    top var(--tour-glide) var(--ease);
+}
+
+[data-side='bottom'] .tour__arrow {
+  top: -7px;
+  left: calc(var(--tour-arrow) - 6px);
+  border-right: 0;
+  border-bottom: 0;
+}
+
+[data-side='top'] .tour__arrow {
+  bottom: -7px;
+  left: calc(var(--tour-arrow) - 6px);
+  border-top: 0;
+  border-left: 0;
+}
+
+[data-side='right'] .tour__arrow {
+  top: calc(var(--tour-arrow) - 6px);
+  left: -7px;
+  border-top: 0;
+  border-right: 0;
+}
+
+[data-side='left'] .tour__arrow {
+  top: calc(var(--tour-arrow) - 6px);
+  right: -7px;
+  border-bottom: 0;
+  border-left: 0;
+}
+
+/* Tooltip ----------------------------------------------------------------- */
+
+.tour__tooltip {
+  padding: var(--space-5) var(--space-5) var(--space-4);
+}
+
+.tour__text {
+  animation: tour-text-in var(--dur-slow) var(--ease-out);
+}
+
+.tour__text[data-direction='back'] {
+  animation-name: tour-text-in-back;
+}
+
+@keyframes tour-text-in {
+  from { opacity: 0; transform: translateX(8px); }
+}
+
+@keyframes tour-text-in-back {
+  from { opacity: 0; transform: translateX(-8px); }
+}
+
+.tour__title {
+  font-size: var(--text-xl);
+}
+
+.tour__description {
+  margin-top: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+/* The welcome and the send-off: centred, with a mark above the title. */
+.tour__tooltip[data-hero] {
+  padding: var(--space-6) var(--space-6) var(--space-5);
+  text-align: center;
+}
+
+.tour__tooltip[data-hero] .tour__title {
+  font-size: var(--text-2xl);
+}
+
+.tour__badge {
+  display: grid;
+  place-items: center;
+  margin: 0 auto var(--space-4);
+}
+
+/* The logo mark, as the sidebar draws it. */
+.tour__badge--mark {
+  width: 2.75rem;
+  height: 2.75rem;
+  padding: 0.6rem;
+  border-radius: var(--radius-md);
+  background-color: var(--brand);
+  color: var(--brand-fg);
+  box-shadow: var(--shadow-sm);
+}
+
+.tour__badge--done {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: var(--radius-full);
+  background-color: var(--brand-soft);
+  color: var(--brand);
+}
+
+/* The tick draws itself in, once. */
+.tour__badge--done path {
+  stroke-dasharray: 14;
+  stroke-dashoffset: 14;
+  animation: tour-tick var(--dur-slow) var(--ease-out) 160ms forwards;
+}
+
+@keyframes tour-tick {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Controls ---------------------------------------------------------------- */
+
+.tour__controls {
+  position: relative;
+  z-index: var(--z-tour-controls);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.tour__count {
+  margin-right: auto;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tour__skip {
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease);
+}
+
+.tour__skip:hover {
+  color: var(--text);
+}
+
+.tour__controls--finale {
+  justify-content: center;
+}
+
+.tour__explore {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--brand);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.tour__explore:hover {
+  text-decoration: underline;
+}
+
+/* Waiting on a page ------------------------------------------------------- */
+
+.tour__loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: var(--z-tour-tooltip);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background-color: var(--surface);
+  box-shadow: var(--shadow-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  transform: translate(-50%, -50%);
+  /* Held back, so a page that is already there never flashes a spinner. */
+  animation: tour-in var(--dur) var(--ease-out) 300ms both;
+}
+
+/* Phones: a sheet docked to an edge ---------------------------------------- */
+
+.tour__anchor[data-mode='sheet'] {
+  right: 0;
+  left: 0;
+  width: auto;
+  max-width: 36rem;
+  margin-inline: auto;
+}
+
+.tour__anchor[data-mode='sheet'][data-dock='bottom'] {
+  top: auto;
+  bottom: 0;
+}
+
+.tour__anchor[data-mode='sheet'] .tour__card {
+  border-width: 1px 1px 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  animation-name: tour-sheet-in;
+}
+
+/* A little tighter than the floating card: on a phone every pixel the sheet
+   takes is one the lit target does not get. */
+.tour__anchor[data-mode='sheet'] .tour__tooltip {
+  padding: var(--space-4) var(--space-5) max(var(--space-3), env(safe-area-inset-bottom));
+}
+
+.tour__anchor[data-mode='sheet'] .tour__controls {
+  margin-top: var(--space-4);
+}
+
+/* Docked to the top when the target lives at the bottom -- the tab bar. */
+.tour__anchor[data-mode='sheet'][data-dock='top'] .tour__card {
+  border-width: 0 1px 1px;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  animation-name: tour-sheet-in-top;
+}
+
+.tour__anchor[data-mode='sheet'][data-dock='top'] .tour__tooltip {
+  padding-top: max(var(--space-4), env(safe-area-inset-top));
+  padding-bottom: var(--space-3);
+}
+
+@keyframes tour-sheet-in {
+  from { transform: translateY(24px); opacity: 0; }
+}
+
+@keyframes tour-sheet-in-top {
+  from { transform: translateY(-24px); opacity: 0; }
+}
+
+@media (max-width: 47.99rem) {
+  .tour__controls .btn {
+    min-height: 2.5rem;
+  }
+}
+
+@media (max-width: 22.5rem) {
+  /* The narrowest phones: the counter takes its own line so the buttons keep
+     their labels. */
+  .tour__controls:not(.tour__controls--finale) {
+    flex-wrap: wrap;
+  }
+
+  .tour__count {
+    flex-basis: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes tour-card-in { from { opacity: 0; } }
+  @keyframes tour-text-in { from { opacity: 0; } }
+  @keyframes tour-text-in-back { from { opacity: 0; } }
+  @keyframes tour-sheet-in { from { opacity: 0; } }
+  @keyframes tour-sheet-in-top { from { opacity: 0; } }
+
+  .tour__spot::after {
+    animation: none;
+  }
+}

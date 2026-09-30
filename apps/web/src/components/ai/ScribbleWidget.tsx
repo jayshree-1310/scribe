@@ -14,6 +14,7 @@ import {
   type ScribbleReply,
 } from '../../data/ai-api'
 import { cn } from '../../lib/cn'
+import { useIsTouring, useTour } from '../../lib/tour'
 import { Icon } from '../ui/Icon'
 import { BookCover } from '../books/BookCover'
 import './scribble.css'
@@ -251,6 +252,13 @@ export function ScribbleWidget() {
 
   const busy = turns.some((turn) => turn.streaming)
 
+  // The product tour opens the panel to show it off. While the tour is on
+  // screen the open state is its to decide, so a click on the tour's own
+  // buttons must not read as clicking away.
+  const { registerReveal } = useTour()
+  const touring = useIsTouring()
+  useEffect(() => registerReveal('scribble', setOpen), [registerReveal])
+
   // Esc closes, matching the navigation drawer in `AppShell`.
   useEffect(() => {
     if (!open) return
@@ -267,7 +275,7 @@ export function ScribbleWidget() {
    * answer to copy it — does not count as clicking away.
    */
   useEffect(() => {
-    if (!open) return
+    if (!open || touring) return
     function onPointerDown(event: PointerEvent) {
       const target = event.target as Node
       if (panel.current?.contains(target)) return
@@ -276,7 +284,7 @@ export function ScribbleWidget() {
     }
     document.addEventListener('pointerdown', onPointerDown)
     return () => document.removeEventListener('pointerdown', onPointerDown)
-  }, [open])
+  }, [open, touring])
 
   // Focus the input on open, and hand focus back to the launcher on close —
   // otherwise closing drops the caret at the top of the document.
@@ -407,6 +415,7 @@ export function ScribbleWidget() {
         ref={launcher}
         type="button"
         className={cn('scribble-fab', open && 'is-hidden')}
+        data-tour="scribble"
         onClick={() => setOpen(true)}
         aria-expanded={open}
         aria-controls="scribble-panel"
@@ -424,6 +433,7 @@ export function ScribbleWidget() {
         ref={panel}
         id="scribble-panel"
         className={cn('scribble', open && 'is-open')}
+        data-tour="scribble-panel"
         aria-label="Ask Scribble"
         aria-hidden={!open}
         inert={open ? undefined : true}

@@ -15,6 +15,8 @@ interface TabsProps<T extends string> {
   /** Describes the tab set for assistive tech. */
   label: string
   variant?: 'underline' | 'pill'
+  /** Product tour anchor, for a tab set a tour step points at. */
+  'data-tour'?: string
 }
 
 /**
@@ -27,6 +29,7 @@ export function Tabs<T extends string>({
   onChange,
   label,
   variant = 'underline',
+  'data-tour': tourAnchor,
 }: TabsProps<T>) {
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     const direction = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0
@@ -43,6 +46,7 @@ export function Tabs<T extends string>({
       className={cn('tabs', `tabs--${variant}`)}
       role="tablist"
       aria-label={label}
+      data-tour={tourAnchor}
       onKeyDown={onKeyDown}
     >
       {items.map((item) => {

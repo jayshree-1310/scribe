@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../lib/theme'
+import { useTour } from '../../lib/tour'
 import { Avatar } from '../ui/Avatar'
 import { Button } from '../ui/Button'
 import { DropdownMenu, MenuItem, MenuSeparator } from '../ui/DropdownMenu'
@@ -19,6 +20,7 @@ interface TopBarProps {
 export function TopBar({ onOpenNav, title }: TopBarProps) {
   const { session, signOut } = useAuth()
   const { resolved, toggle } = useTheme()
+  const { startTour } = useTour()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
 
@@ -47,7 +49,7 @@ export function TopBar({ onOpenNav, title }: TopBarProps) {
 
       {title ? <h1 className="topbar__title">{title}</h1> : null}
 
-      <form className="topbar__search" role="search" onSubmit={onSearch}>
+      <form className="topbar__search" role="search" onSubmit={onSearch} data-tour="search">
         <label className="visually-hidden" htmlFor="global-search">
           Search stories, authors and clubs
         </label>
@@ -81,7 +83,7 @@ export function TopBar({ onOpenNav, title }: TopBarProps) {
           <DropdownMenu
             label="Account"
             trigger={(props) => (
-              <button {...props} type="button" className="topbar__avatar-btn">
+              <button {...props} type="button" className="topbar__avatar-btn" data-tour="profile">
                 <Avatar user={user} size="sm" />
                 <span className="visually-hidden">Open account menu</span>
               </button>
@@ -109,6 +111,9 @@ export function TopBar({ onOpenNav, title }: TopBarProps) {
               onSelect={() => navigate('/settings')}
             >
               Settings
+            </MenuItem>
+            <MenuItem icon={<Icon name="compass" size="1rem" />} onSelect={startTour}>
+              Take a tour
             </MenuItem>
             <MenuSeparator />
             <MenuItem
