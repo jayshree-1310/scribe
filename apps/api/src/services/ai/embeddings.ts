@@ -43,12 +43,14 @@
  *
  * ## What this does not do
  *
- * There is no ANN index yet and no search. Both are Task AI 8, which is also
- * where the rule that **retrieval inherits every authorisation rule of the
- * data** has to be enforced: a vector index does not know a draft is a draft.
- * Nothing here queries the table, so nothing here can leak one -- but the
- * backfill still declines to embed unpublished chapters by default, because
- * the cheapest way to not leak a draft is to not have it in the index.
+ * Search. That is `search.ts` (Task AI 8), which is also where the rule that
+ * **retrieval inherits every authorisation rule of the data** is enforced: a
+ * vector index does not know a draft is a draft. The ANN index it runs on is
+ * built here, by `ensureEmbeddingIndex`, for the reason given there. The
+ * backfill still declines to embed unpublished chapters by default -- the
+ * cheapest way to not leak a draft is to not have it in the index -- but that
+ * is a second line, not the first: a chapter can be embedded and then
+ * unpublished.
  */
 
 import { randomUUID } from "node:crypto";
@@ -334,6 +336,53 @@ export async function embedChapter(
     unchanged: false,
     tokensUsed,
   };
+}
+
+/* The ANN index ---------------------------------------------------------- */
+
+/**
+ * Builds the approximate-nearest-neighbour index search runs on, if it is not
+ * there yet.
+ *
+ * **Here, and not in a migration, because no migration can carry it.** The
+ * contract does not declare `embedding` (see the header), so declaring an index
+ * on it is impossible, and a hand-written migration from a contract to the
+ * same contract is refused by the migration tooling unless it carries a *data*
+ * invariant -- which an index is not -- and is in any case never run by plain
+ * `prisma db migrate`, which is what deploys run. The day the column moves into
+ * the contract, this moves into the migration that does it.
+ *
+ * The backfill is the next-best home because the index is only worth anything
+ * where vectors exist, and this is the one command that puts them there. It is
+ * idempotent, so every re-run of the backfill is also a check that the index
+ * exists. Search is correct without it -- Postgres falls back to an exact scan
+ * -- so a database that has never had the backfill run loses nothing but speed.
+ *
+ * - **HNSW rather than IVFFlat.** IVFFlat clusters whatever rows exist when it
+ *   is built and files later rows under those clusters, so an index built over
+ *   a small corpus keeps the wrong centroids until somebody remembers to
+ *   rebuild it. HNSW is a graph that grows row by row and needs no training
+ *   step; it costs more memory and a slower build, both irrelevant at a few
+ *   thousand chunks.
+ * - **`vector_cosine_ops`, queried with `<=>`.** `nomic-embed-text` is trained
+ *   for cosine similarity and its vectors are not unit length, so inner product
+ *   would rank long vectors above close ones, and L2 mixes length into distance
+ *   too. Cosine ignores magnitude. The operator class has to agree with the
+ *   operator the query uses or Postgres silently ignores the index, which is
+ *   why `search.ts` says `<=>` and nothing else.
+ * - **Default build parameters** (`m = 16`, `ef_construction = 64`): pgvector's
+ *   defaults, and nothing here has measured a reason to move them.
+ */
+export async function ensureEmbeddingIndex(): Promise<void> {
+  const plan = db.raw.sql`
+    CREATE INDEX IF NOT EXISTS "chapterChunk_embedding_hnsw_idx"
+        ON "ai"."chapterChunk"
+     USING hnsw ("embedding" vector_cosine_ops)
+  `
+    .affectedCount()
+    .build();
+
+  await db.runtime().query(plan);
 }
 
 /* Inspection ------------------------------------------------------------- */

@@ -51,6 +51,8 @@ import {
   generateChapterRecap,
   getChapterRecap,
 } from "../services/ai/recap.js";
+import { QUERY_LIMIT, SEARCH_MODES, search } from "../services/ai/search.js";
+import { MAX_PAGE_SIZE } from "../services/stories.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -871,6 +873,85 @@ router.post("/explain/stream", requireUser, async (req, res, next) => {
       return;
     }
 
+    next(error);
+  }
+});
+
+/* Search ----------------------------------------------------------------- */
+
+/**
+ * The most generous limit here, because a search box is typed into.
+ *
+ * One request is one embedding of a sentence -- milliseconds on CPU, a
+ * fraction of a cent hosted -- and a repeated query is answered from the
+ * vector cache without reaching a model at all. What this caps is somebody
+ * scripting the endpoint, not a reader refining a query a word at a time,
+ * which the page debounces anyway.
+ */
+const SEARCH_LIMIT = 90;
+const SEARCH_WINDOW_SECONDS = 60 * 10;
+
+/**
+ * `listStories`' own query parameters, plus `q` and `mode`, so a caller moving
+ * from `/api/stories` to here changes a path and a parameter name.
+ *
+ * `q` may be empty -- that is the fallback to the ordinary list -- so it has a
+ * maximum and no minimum.
+ */
+const searchQuerySchema = z.object({
+  q: z
+    .string()
+    .trim()
+    .max(
+      QUERY_LIMIT,
+      `Keep it under ${QUERY_LIMIT} characters — describe the book in a sentence.`,
+    )
+    .default(""),
+  genreId: z.uuid("Not a known genre.").optional(),
+  source: z.enum(["SCRIBE", "CATALOGUE"]).optional(),
+  mode: z.enum(SEARCH_MODES).default("hybrid"),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(12),
+});
+
+/**
+ * Hybrid search over stories: their titles and authors, and the meaning of
+ * their chapters.
+ *
+ * No daily token budget, unlike the generation routes: the budget meters
+ * tokens a model *writes*, and an embedder writes none. Embedding usage is
+ * still logged per call by the provider seam (`feature: "search.query"`).
+ */
+router.get("/search", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const query = parseOrThrow(searchQuerySchema, req.query);
+
+    const key = `ai:search:${userId}`;
+    const status = await isRateLimited(key, SEARCH_LIMIT);
+    if (status.limited) {
+      throw HttpError.tooManyRequests(
+        "You have searched a lot in a short time. Try again shortly.",
+        status.retryAfter,
+      );
+    }
+    await recordAttempt(key, SEARCH_WINDOW_SECONDS);
+
+    res.json(
+      await search(
+        {
+          q: query.q,
+          genreId: query.genreId,
+          source: query.source,
+          mode: query.mode,
+          page: query.page,
+          limit: query.limit,
+        },
+        userId,
+        abortOnDisconnect(res).signal,
+      ),
+    );
+  } catch (error) {
     next(error);
   }
 });

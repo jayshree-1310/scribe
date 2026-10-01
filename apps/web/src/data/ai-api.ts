@@ -18,6 +18,7 @@ import {
   toApiError,
 } from '../lib/api-client'
 import { ensureAccessToken, getAccessToken } from '../lib/access-token'
+import type { Story, StoryPage } from '../types/stories'
 
 const DEV_READER_ID =
   import.meta.env.VITE_DEV_USER_ID ?? '00000000-0000-4000-8000-000000000001'
@@ -531,4 +532,77 @@ export function streamChat(
   signal?: AbortSignal,
 ): AsyncGenerator<ChatEvent> {
   return streamRequest<ChatEvent>('/ai/chat/stream', { prompt }, signal)
+}
+
+/* Search ----------------------------------------------------------------- */
+
+/**
+ * A passage quoted under a search result.
+ *
+ * The author's own words, read out of the stored chapter — nothing here was
+ * generated. What the model contributed is only the *choice* of passage: it is
+ * the one whose meaning sat nearest the query.
+ */
+export interface SearchPassage {
+  chapterId: string
+  chapterNumber: number
+  chapterTitle: string
+  excerpt: string
+  similarity: number
+}
+
+/** Where a result came from; see `SearchMatch` in `services/ai/search.ts`. */
+export interface SearchMatch {
+  keywordRank: number | null
+  semanticRank: number | null
+  score: number
+}
+
+export interface SearchResult extends Story {
+  passages: SearchPassage[]
+  match: SearchMatch | null
+}
+
+/**
+ * What actually ran. `keyword` means meaning search was asked for and the
+ * server could not reach its embedder, so the page should say so rather than
+ * present title matches as the usual results.
+ */
+export type SearchBasis = 'list' | 'hybrid' | 'semantic' | 'keyword'
+
+export interface SearchPage extends StoryPage {
+  items: SearchResult[]
+  basis: SearchBasis
+}
+
+export interface SearchFilters {
+  q: string
+  genreId?: string | null
+  mode?: 'hybrid' | 'semantic'
+  page?: number
+  limit?: number
+}
+
+/**
+ * Hybrid search over Scribe stories: title and author, and what their
+ * chapters are about. Same page shape as `listStories`, so the result renders
+ * with the components that already draw story lists.
+ */
+export async function searchStories(
+  filters: SearchFilters,
+  signal?: AbortSignal,
+): Promise<SearchPage> {
+  return request<SearchPage>('/ai/search', {
+    headers: readerHeaders(),
+    query: {
+      q: filters.q.trim(),
+      genreId: filters.genreId ?? undefined,
+      mode: filters.mode,
+      // Authored stories only: the catalogue grid below has its own search.
+      source: 'SCRIBE',
+      page: filters.page === undefined ? undefined : String(filters.page),
+      limit: filters.limit === undefined ? undefined : String(filters.limit),
+    },
+    ...(signal ? { signal } : {}),
+  })
 }

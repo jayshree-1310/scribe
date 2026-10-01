@@ -180,14 +180,58 @@ function vectorFor(text: string, width: number): number[] {
   });
 }
 
-export function fakeAiEmbedder(dimensions = 8): FakeAiEmbedder {
+/**
+ * Options for a fake that knows a little about meaning.
+ *
+ * `concepts` maps a concept name to the words that express it. A text
+ * mentioning any of a concept's words embeds onto that concept's axis -- one
+ * axis per concept, summed when a text mentions several -- so "grief" and
+ * "mourning" come out identical, and a text mentioning neither comes out as an
+ * unrelated pseudo-vector. That is the one property of a real embedding model
+ * a search test needs: synonyms are near and strangers are far. It is a
+ * stand-in for the model, not a model -- a test built on it asserts that search
+ * *uses* nearness correctly, never that nearness is right.
+ *
+ * `model` names the fake, which matters more than it looks: search filters
+ * stored rows by model, so a suite with its own model name sees only the rows
+ * it embedded, even while another suite writes `fake-embed` rows beside it.
+ */
+export interface FakeEmbedderOptions {
+  model?: string;
+  concepts?: Record<string, string[]>;
+}
+
+function conceptVector(
+  text: string,
+  width: number,
+  concepts: string[][],
+): number[] | null {
+  const words = new Set(text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
+  const vector = new Array<number>(width).fill(0);
+  let matched = false;
+
+  concepts.forEach((synonyms, axis) => {
+    if (axis < width && synonyms.some((word) => words.has(word.toLowerCase()))) {
+      vector[axis] = 1;
+      matched = true;
+    }
+  });
+
+  return matched ? vector : null;
+}
+
+export function fakeAiEmbedder(
+  dimensions = 8,
+  options: FakeEmbedderOptions = {},
+): FakeAiEmbedder {
   const calls: RecordedEmbedCall[] = [];
   let failure: HttpError | null = null;
   let widthOnce: number | null = null;
+  const concepts = Object.values(options.concepts ?? {});
 
   return {
     name: "fake",
-    model: "fake-embed",
+    model: options.model ?? "fake-embed",
     dimensions,
     calls,
 
@@ -220,7 +264,10 @@ export function fakeAiEmbedder(dimensions = 8): FakeAiEmbedder {
       widthOnce = null;
 
       return {
-        vectors: request.texts.map((text) => vectorFor(text, width)),
+        vectors: request.texts.map(
+          (text) =>
+            conceptVector(text, width, concepts) ?? vectorFor(text, width),
+        ),
         usage: {
           provider: "fake",
           model: request.model ?? "fake-embed",

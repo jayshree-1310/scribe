@@ -84,6 +84,15 @@ services:
       # pointing the API at a hosted provider look like it had no effect, and
       # produced a 404 from Ollama rather than an error naming the cause.
       # One file owns the AI settings instead; see `apps/api/.env.example`.
+      #
+      # The one exception is the embedder, and for DATABASE_URL's reason
+      # rather than as an AI setting: it is the `ollama` service below, local
+      # infrastructure that the host reaches on localhost:11434 and this
+      # container reaches only by service name. Without this, search by
+      # meaning answered every query from the keyword half, because the
+      # embedder was dialling the container's own localhost. To use a hosted
+      # embedder under Docker, change this line along with AI_EMBED_PROVIDER.
+      AI_EMBED_BASE_URL: http://ollama:11434
       # Uploads go to a volume rather than the bind-mounted source tree: the
       # container writes as root, and files it left in the working tree would
       # then be unwritable by anything running on the host (`pnpm test`).

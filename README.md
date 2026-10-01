@@ -689,10 +689,12 @@ docker compose exec api pnpm --filter api seed:challenges  # writing challenges,
 ```
 
 One more is not sample content but derived from it — it embeds published
-chapters so the AI retrieval features have something to search. It needs the
-Ollama container and the `nomic-embed-text` model (see `docs/AI-BACKLOG.md`
-§ _Running it for free_), takes a few minutes the first time, and costs
-nothing on every run after: it re-embeds only prose that has changed.
+chapters so the AI retrieval features have something to search — Discover's
+"Search by meaning" toggle, today. It needs the Ollama container and the
+`nomic-embed-text` model (see `docs/AI-BACKLOG.md` § _Running it for free_),
+takes a few minutes the first time, and costs nothing on every run after: it
+re-embeds only prose that has changed. It also builds the search index, so run
+it once on any database embedded before semantic search landed.
 
 ```bash
 docker compose --profile ai up -d ollama
@@ -701,11 +703,11 @@ docker compose exec ollama ollama pull nomic-embed-text
 pnpm --filter api seed:embeddings          # from the host
 ```
 
-From the host rather than inside the `api` container, because the embedder
-defaults to `http://localhost:11434` and inside that container nothing is
-listening there. To run it in the container instead, pass the service name:
-`docker compose exec -e AI_EMBED_BASE_URL=http://ollama:11434 api pnpm --filter
-api seed:embeddings`.
+Either place works. On the host the embedder defaults to
+`http://localhost:11434`; inside the `api` container `docker-compose.yml` points
+it at `http://ollama:11434` instead, since there the container's own localhost
+has nothing listening — `docker compose exec api pnpm --filter api
+seed:embeddings`.
 
 The view and like counts these set are invented starting values, not counted
 events — see the note under
@@ -1328,7 +1330,9 @@ The web app has no test suite yet.
       (AI 10)
 - [ ] Enforcing the per-user daily token budget, which is read but not yet
       applied (AI 18)
-- [ ] The rest — embeddings, semantic search, RAG, moderation, evaluation
+- [x] AI 7 — embeddings: chunked, hashed, and never embedded twice
+- [x] AI 8 — semantic and hybrid search, "Search by meaning" on Discover
+- [ ] The rest — RAG, moderation, evaluation
 
 ### Phase 7 — Production Readiness
 

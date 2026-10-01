@@ -2,7 +2,8 @@
 
 How an AI request flows through Scribe, what each layer is responsible for, and
 what a new AI feature has to add. Written for the state after Tasks AI 0
-through AI 5 of `AI-BACKLOG.md`, the reader half of Task AI 6, and Task AI 7:
+through AI 5 of `AI-BACKLOG.md`, the reader half of Task AI 6, and Tasks AI 7
+and AI 8:
 the module and the provider seam exist, a model can be asked for a shape
 rather than for prose that looks like one, every long answer streams, and five
 features are built on that — Scribble, the chapter recap and passage
@@ -11,9 +12,10 @@ authors — plus `/api/ai/chat`, which is the bare path underneath them and the
 one the `/ai-lab` workbench drives.
 
 Task AI 7 adds the first thing here that no user can see: the corpus is
-embedded into a `pgvector` table, which is what Tasks AI 8 onward read. It has
-no route and no UI, and the section on it below is about cost rather than
-about features.
+embedded into a `pgvector` table. Task AI 8 is the first thing that reads it —
+hybrid search on Discover, which finds a story by what its chapters are about
+as well as by its title — and the first feature where retrieval, not
+generation, is the whole job: no model writes a word of its output.
 
 ## The path
 
@@ -76,7 +78,9 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/prompts/explain.ts` | Three modes — explain, simplify, define — over one system prompt whose load-bearing rule forbids guessing at what the reader has not reached. |
 | `services/ai/chunking.ts` | A chapter as overlapping, hashed windows. Pure and deterministic — the one part of retrieval testable with no database and no model, which is why it is its own file. |
 | `services/ai/embeddings.ts` | Task AI 7: turns chapters into vectors and, mostly, declines to. Owns the `vector(768)` column, which the contract cannot describe, through the raw-SQL lane. |
-| `scripts/seed-embeddings.ts` | `seed:embeddings` — the only thing that fills the table. Re-runnable, and free over a corpus that has not changed. |
+| `scripts/seed-embeddings.ts` | `seed:embeddings` — the only thing that fills the table, and the thing that builds its HNSW index. Re-runnable, and free over a corpus that has not changed. |
+| `services/ai/search.ts` | Task AI 8: embed the query, nearest passages under the visibility rule, fuse with `listStories`, re-authorise every row. Returns `listStories`' page shape. |
+| `services/ai/search-ranking.ts` | The pure half of search: the similarity floor, passages into stories, reciprocal-rank fusion, excerpts. Its own file for the reason `chunking.ts` is. |
 
 ## Rules that the code enforces
 
@@ -369,10 +373,17 @@ Postgres will refuse several statements later.
 
 `docker-compose.yml` runs `pgvector/pgvector:pg17` — `pg_trgm` ships with
 Postgres and `vector` does not — and the migration runs `CREATE EXTENSION
-vector`. But the Prisma Next extension package that would let
-`contract.prisma` write `pgvector.Vector(length: 768)` is not published for
-this release, so the migration adds the column itself with explicit SQL and
-`services/ai/embeddings.ts` reads and writes it through `db.raw.sql`.
+vector`. The contract cannot write `pgvector.Vector(length: 768)` without the
+Prisma Next pgvector extension, so the migration adds the column itself with
+explicit SQL and `services/ai/embeddings.ts` reads and writes it through
+`db.raw.sql`.
+
+Task AI 7 recorded that extension as unpublished, looking for
+`@prisma/extension-pgvector`. It is published — as
+`@prisma/orm-extension-pgvector`, with an `8.0.0-rc.8` that matches this
+repo's `@prisma/orm-postgres`. Adopting it is a dependency, a config entry, a
+runtime codec registration and a migration that declares an existing column,
+so it is its own task rather than a side effect of another.
 
 Two consequences worth knowing before touching this:
 
@@ -384,8 +395,8 @@ Two consequences worth knowing before touching this:
   cheap: an unchanged window's vector is copied out and back in as a string,
   never parsed into floats and never sent to a model.
 
-Swap this for a declared column the day the extension package exists. Nothing
-above the service changes.
+Swap this for a declared column when the extension is adopted. Nothing above
+the service changes — and the HNSW index (below) moves into that migration.
 
 ### Chunks, and the numbers behind them
 
@@ -437,26 +448,109 @@ A chapter is replaced in one transaction, so it is never half re-embedded: a
 failure leaves the previous set intact rather than a mixture of two versions,
 which would retrieve as neither.
 
-### Drafts are not embedded, for now
+### Drafts are not embedded, by default
 
 `embedChapter` embeds whatever it is given — it is the mechanism. The policy
 is in the backfill, which takes published chapters of listed stories only
 unless passed `--all`.
 
-A vector index does not know a draft is a draft. That rule lives in `visibleTo`
-in `services/stories.ts`, and applying it to search results is Task AI 8's
-problem — stated in its prompt, because an embedding leak exposes unpublished
-writing. Until search exists and enforces it, the cheapest defence is for
-unpublished prose not to be in the index at all. Note that this is *not*
-sufficient on its own even then: a chapter can be embedded and then
-unpublished, so AI 8 must filter regardless.
+That is the second line of defence, not the first: a chapter can be embedded
+and then unpublished. Search enforces the rule on every result; see below.
 
-### What is not here
+## Search
 
-No ANN index and no search. Both are Task AI 8, which is also where the
-operator class and the fusion rule get decided. The rows carry `storyId`
-denormalised from the chapter so that a filter does not need a join, which is
-the one thing retrieval needed from this task's schema.
+`GET /api/ai/search?q=&genreId=&source=&mode=&page=&limit=`, behind
+`requireUser` and a request limit, and the "Search by meaning" toggle on
+Discover. `listStories`' own parameters plus `q` and `mode`, and `listStories`'
+own `Page<Story>` back — each item with `passages` (why it matched) and `match`
+(where it ranked), and the page with `basis` (what actually ran).
+
+```
+q ─▶ embedQuery ────────────▶ nearestPassages ─────▶ rankStories ─┐
+     (Redis, by model+text)    (HNSW <=>, pre-filter)  (the floor)  │
+                                                                    ├─▶ fuseRankings ─▶ getStoriesByIds
+q ─▶ listStories (title / author ilike, unchanged) ─────────────────┘   (RRF, k = 60)   findVisibleChapterIds
+```
+
+### The index: HNSW, cosine, built by the backfill
+
+`vector_cosine_ops`, queried with `<=>` and nothing else — the operator has to
+match the operator class or Postgres silently scans instead. Cosine because
+`nomic-embed-text` is trained for it and its vectors are not unit length, so
+inner product would rank long vectors above close ones. HNSW rather than
+IVFFlat because IVFFlat learns its clusters from whatever rows exist when it is
+built, which here is always too few.
+
+It is created by `ensureEmbeddingIndex()`, which `seed:embeddings` runs after
+every pass — **not by a migration**, because none can carry it. The contract
+does not declare the column, so it cannot declare an index on it; and a
+hand-written migration from a contract to the same contract is refused by the
+tooling (`MIGRATION.CHECK_NOOP_SELF_EDGE`) unless it carries a *data*
+invariant, and even then plain `prisma db migrate` — what deploys run — never
+selects it. The backfill is the next-best home: the index is only worth
+anything where vectors exist, and this is the command that puts them there.
+Search is correct without it; Postgres scans exactly, which at a few hundred
+rows is what it would choose anyway.
+
+Two `SET LOCAL`s go with the query. `hnsw.ef_search = 100`, because HNSW
+returns at most `ef_search` rows per scan and the default of 40 would quietly
+truncate `LIMIT 100`. And `hnsw.iterative_scan = relaxed_order` (pgvector
+0.8), so that when filters reject rows the index returned, the scan keeps
+going instead of stopping short.
+
+### Retrieval inherits the visibility rule — twice
+
+A vector index does not know a draft is a draft. Visibility is applied in the
+SQL as a **pre-filter** — so the hundred candidates are a hundred *visible*
+candidates, not a hundred minus however many drafts sat near the query — and
+then **authoritatively** after retrieval, through `getStoriesByIds`
+(`visibleTo`) and `findVisibleChapterIds` in `services/stories.ts`. The second
+is the rule's own home; the first is an efficiency that could drift without
+leaking anything. `ai-search.test.ts` searches as a stranger for a draft that
+is the best match in the corpus, and for an unpublished chapter of a listed
+story; removing the SQL pre-filter leaves both tests passing, and removing both
+layers fails them.
+
+### A floor, because neighbours always exist
+
+Nearest-neighbour search always returns neighbours: "chocolate cake recipe"
+gets the closest chapters of a time-travel novel, ranked as confidently as a
+real match. `AI_SEARCH_MIN_SIMILARITY` (default 0.5) is the cosine similarity
+a passage must reach. **It belongs to the model**: measured on this corpus with
+`nomic-embed-text`, on-topic queries scored 0.55–0.67 against their best
+passage and off-topic ones 0.42–0.45. Change the model, measure again.
+
+### Fusion by rank, not by score
+
+Reciprocal-rank fusion, `Σ 1/(60 + rank)`. The keyword half has no relevance
+score — it is an `ilike` ordered by popularity — and cosine similarity's
+useful range differs per model, so any formula adding the two invents an
+exchange rate between them. Ranks need none. At k = 60 an item in both lists
+within the top 61 always beats an item first in only one, which is the
+"keyword-and-meaning above either alone" property, asserted end to end.
+
+### What it degrades to
+
+An empty `q` is `listStories` with the same filters (`basis: "list"`), no model
+call. In hybrid mode an unreachable embedder degrades to the keyword half
+(`basis: "keyword"`), and Discover says so rather than presenting title matches
+as the usual results; `mode=semantic` returns the provider's status instead.
+`source=CATALOGUE` is semantic only, because `listStories` has never searched
+the catalogue.
+
+### Known limits
+
+- **No task prefixes.** `nomic-embed-text` is trained with `search_query:` /
+  `search_document:` prefixes, and the corpus was embedded without them, so
+  queries are too — the two sides have to match. Measured here, prefixing the
+  query alone moved top similarities by about 0.01; adopting prefixes properly
+  means re-embedding the corpus.
+- **An excerpt cannot point at the matching sentence.** The vector is of a
+  ~1200-character window, so a semantic match is quoted from the window's
+  start, and a keyword one is centred on the query's most distinctive word.
+- **Query vectors are cached, results are not.** The vector is cached in Redis
+  for a day by model, width and text; the search itself runs every time,
+  because visibility can change between two requests.
 
 ## Adding a feature
 
@@ -479,8 +573,8 @@ the one thing retrieval needed from this task's schema.
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The remaining features.** Retrieval and everything built on it — Tasks AI
-  8 onward. Of Task AI 6 only the chapter recap was built; the story-level
+- **The remaining features.** Everything built on retrieval — Tasks AI 9
+  onward. Of Task AI 6 only the chapter recap was built; the story-level
   summary, the spoiler-free summary and the map-reduce that a multi-chapter
   summary needs are not here.
 - **Persisted usage, and budgets everywhere else.** The sink still only logs,
@@ -490,9 +584,9 @@ the one thing retrieval needed from this task's schema.
   reach it rather than only authors); Scribble, the assistant and generation
   are still rate-limited by *request* only, which caps the blast radius but
   not the spend.
-- **Retrieval.** The corpus is embedded, but nothing reads the table: the ANN
-  index, semantic and hybrid search, and the rule that a draft never appears in
-  a result are Task AI 8.
+- **Retrieval-augmented generation.** Search reads the table; nothing yet
+  hands what it retrieves to a model. That is Task AI 9 (Ask This Book), which
+  can reuse `nearestPassages`' visibility pre-filter and the floor.
 - **A hosted embedder in practice.** `createOpenAiCompatibleEmbedder` exists
   and is untested against a real provider, because the hosted endpoint this
   repo points at serves chat only.
@@ -527,3 +621,13 @@ minutes on CPU the first time and two seconds every time after. Postgres must
 be the `pgvector/pgvector:pg17` image `docker-compose.yml` now specifies; an
 existing data volume needs nothing but `docker compose up -d postgres`, plus a
 one-off `REINDEX` noted in that file for the collation change.
+
+The same command builds search's HNSW index, so run it once on any database
+that has chunks but predates Task AI 8 — production included. Search works
+without the index, only slower. Then turn on **Search by meaning** under the
+search box on Discover (signed in), or call the route directly:
+
+```bash
+curl "localhost:1303/api/ai/search?q=a%20girl%20who%20can%20rewind%20time" \
+  -H "X-Scribe-User-Id: 00000000-0000-4000-8000-000000000001"
+```

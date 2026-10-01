@@ -1,0 +1,137 @@
+/* ==========================================================================
+   Search by meaning — results on Discover
+
+   Each result is the existing row card with the passage that matched beneath
+   it, inside one bordered box: the card's own border moves to the wrapper so
+   the passage reads as part of the result rather than as the next item.
+   ========================================================================== */
+
+.search-results__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.search-result {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background-color: var(--surface);
+  overflow: hidden;
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+@media (hover: hover) {
+  .search-result:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+/* The wrapper carries the frame now; the card inside must not draw a second. */
+.search-result .story-card--row,
+.search-result .story-card--row:hover {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.search-result__passages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.search-result__passage {
+  margin: 0;
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--brand-border);
+}
+
+.search-result__passage blockquote {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  margin: 0;
+  font-family: var(--font-reading);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--text-secondary);
+}
+
+.search-result__passage figcaption {
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.search-result__passage figcaption a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.search-result__passage figcaption a:hover {
+  color: var(--brand);
+  text-decoration: underline;
+}
+
+.search-result__reason {
+  margin: 0;
+  padding: 0 var(--space-4) var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.search-results__count {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.search-results__notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: var(--warning-soft);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+/* The toggle under the search box on Discover. */
+.search-mode {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-top: var(--space-3);
+}
+
+.search-mode .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.search-mode__hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 40rem) {
+  .search-result__passages,
+  .search-result__reason {
+    padding-inline: var(--space-3);
+    padding-bottom: var(--space-3);
+  }
+}

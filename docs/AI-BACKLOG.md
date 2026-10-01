@@ -840,6 +840,12 @@ declared and typed, and only the vector is not. `db verify` passes; `db verify
 --strict` will name the extra column. Swap it for a declared column when the
 package exists — nothing above the service changes.
 
+*Correction, found during Task AI 8:* the package **is** published, as
+`@prisma/orm-extension-pgvector` (including an `8.0.0-rc.8` matching this
+repo's `@prisma/orm-postgres`); the search above used the wrong name. Adopting
+it — dependency, config entry, runtime codec, and a migration declaring a
+column that already exists — is now a task of its own rather than a blocker.
+
 **Paragraphs are split on any newline, not on blank lines.** The prompt says to
 reuse `paragraphsOf` from `apps/web/src/types/stories.ts`, which splits on
 `\n{2,}`. The corpus disagrees with it: chapters written in the editor separate
@@ -903,6 +909,49 @@ which Task AI 8's prompt asks for alongside the search that needs them.
 ---
 
 ## Task AI 8 — Semantic and hybrid search
+
+**Status: built.** `services/ai/search.ts` and `services/ai/search-ranking.ts`,
+`GET /api/ai/search` in `routes/ai.ts`, `findVisibleChapterIds` in
+`services/stories.ts`, `ensureEmbeddingIndex()` in `embeddings.ts` (run by
+`seed:embeddings`), `AI_SEARCH_MIN_SIMILARITY` in `config.ts`, and the "Search
+by meaning" toggle on Discover (`components/ai/SearchResults.tsx`). Tests in
+`services/ai/search-ranking.test.ts` and `routes/ai-search.test.ts`; the fake
+embedder gained a `concepts` option so a test can say "these words mean the
+same thing" without a model. Verified against `nomic-embed-text` on the dev
+corpus: "a girl who can rewind time" finds *11:47 — The Girl Who Changed Time*
+on meaning alone, with chapter 7's clock-circle scene as the passage;
+"chocolate cake recipe" finds nothing; a repeated query skips the embedder.
+
+Four things worth knowing before building on it — Task AI 9 will.
+
+**The index is built by the backfill, not a migration.** HNSW with
+`vector_cosine_ops`, queried with `<=>`. No migration could carry it: the
+contract does not declare the column, and a same-contract migration is refused
+by the tooling (`MIGRATION.CHECK_NOOP_SELF_EDGE`) unless it carries a *data*
+invariant — and plain `prisma db migrate`, which deploys run, never selects one
+anyway. So `seed:embeddings` runs an idempotent `CREATE INDEX IF NOT EXISTS`
+after every pass. **Run the backfill once on production** to build it there;
+search is correct without it, only slower. Moves into a real migration when
+the pgvector extension is adopted (see the correction under AI 7).
+
+**Visibility is applied twice.** In the SQL as a pre-filter, so the candidate
+pool is a pool of *visible* passages (with `hnsw.iterative_scan` so filtered-out
+rows do not shrink it), and authoritatively afterwards through
+`getStoriesByIds` and the new `findVisibleChapterIds`, where the rule lives.
+Mutation-checked: with the SQL filter removed the leak tests still pass; with
+both removed they fail.
+
+**The similarity floor is a property of the model.** Nearest-neighbour search
+always returns neighbours, so without `AI_SEARCH_MIN_SIMILARITY` every query
+would return the whole corpus. 0.5 was measured: on-topic queries scored
+0.55–0.67 against their best passage, off-topic 0.42–0.45. Re-measure on a
+model change.
+
+**The prompt's `limit` grew `page`, `mode` and a `basis` in the reply.**
+`page` because the result is `listStories`' `Page<Story>`; `mode=semantic`
+for comparing the halves; `basis` because hybrid degrades to keywords when the
+embedder is down, and the page should say so. `source=CATALOGUE` is semantic
+only — `listStories`, the keyword half, has never searched the catalogue.
 
 **Prompt:**
 

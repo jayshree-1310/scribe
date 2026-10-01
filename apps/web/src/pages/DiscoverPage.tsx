@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
+import { useAuth } from '../lib/auth'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatCount, formatDate, formatRating } from '../lib/format'
 import * as books from '../data/books-api'
@@ -26,6 +27,7 @@ import { BookCover } from '../components/books/BookCover'
 import { ShelfMenu } from '../components/books/ShelfMenu'
 import { StoryCard, StoryCardSkeleton } from '../components/story/StoryCard'
 import { StoryShelf } from '../components/story/StoryShelf'
+import { SearchResults } from '../components/ai/SearchResults'
 import '../components/story/story.css'
 import './pages.css'
 import '../components/books/books.css'
@@ -228,6 +230,7 @@ function StoryRail({
 
 export function DiscoverPage() {
   const [params, setParams] = useSearchParams()
+  const { session } = useAuth()
 
   // Read once: these seed the initial state, and the effect below keeps the
   // URL in step from then on.
@@ -257,8 +260,21 @@ export function DiscoverPage() {
   const [sort, setSort] = useState<BookSort>(
     isSort(initialSort) ? initialSort : 'trending',
   )
+  /**
+   * Search by meaning, for Scribe stories. Off by default and opt-in per
+   * search, because it is a different question from "find this title": it
+   * answers "what is about this?", and a reader looking for a book by name
+   * should not have to wade through near-misses to reach it.
+   *
+   * Signed-in readers only, as every AI route is. The preference lives in the
+   * URL, so a shared link reproduces the same results.
+   */
+  const [byMeaning, setByMeaning] = useState(params.get('meaning') === '1')
+  const canSearchByMeaning = session !== null
 
   const debouncedSearch = useDebouncedValue(search, 280)
+  const searchingByMeaning =
+    byMeaning && canSearchByMeaning && debouncedSearch.trim() !== ''
   const genres = useAsync(() => books.getGenres(), [])
 
   /**
@@ -267,15 +283,18 @@ export function DiscoverPage() {
    */
   const stories = useAsync(
     () =>
-      storiesApi
-        .listStories({
-          search: debouncedSearch,
-          genreId,
-          sort: 'trending',
-          limit: 10,
-        })
-        .then((page) => page.items),
-    [debouncedSearch, genreId],
+      // Not fetched while `SearchResults` is answering the same question.
+      searchingByMeaning
+        ? Promise.resolve(null)
+        : storiesApi
+            .listStories({
+              search: debouncedSearch,
+              genreId,
+              sort: 'trending',
+              limit: 10,
+            })
+            .then((page) => page.items),
+    [debouncedSearch, genreId, searchingByMeaning],
   )
 
   if (pendingGenre !== null && genres.status !== 'loading') {
@@ -304,8 +323,9 @@ export function DiscoverPage() {
     if (genreId) next.set('genre', genreId)
     if (availability !== 'all') next.set('status', availability)
     if (!isBrowsing) next.set('sort', sort)
+    if (byMeaning) next.set('meaning', '1')
     setParams(next, { replace: true })
-  }, [debouncedSearch, genreId, availability, sort, isBrowsing, setParams])
+  }, [debouncedSearch, genreId, availability, sort, isBrowsing, byMeaning, setParams])
 
   /* Paginated results, accumulated across "Load more". ------------------ */
 
@@ -420,6 +440,23 @@ export function DiscoverPage() {
           />
         </div>
 
+        {canSearchByMeaning ? (
+          <div className="search-mode">
+            <SelectableChip
+              selected={byMeaning}
+              onToggle={() => setByMeaning((current) => !current)}
+            >
+              <Icon name="sparkle" size="0.95em" />
+              Search by meaning
+            </SelectableChip>
+            <p className="search-mode__hint">
+              {byMeaning
+                ? 'Finds Scribe stories whose chapters are about what you type — try “a promise kept too long”.'
+                : 'Also find Scribe stories by what happens in them, not just their titles.'}
+            </p>
+          </div>
+        ) : null}
+
         {genres.status === 'ready' && genres.data ? (
           <div className="filters__panel">
             <span className="filters__label">Genres</span>
@@ -504,12 +541,16 @@ export function DiscoverPage() {
         ) : null
       ) : (
         <section className="results">
-          <StoryRail
-            status={stories.status}
-            error={stories.error}
-            stories={stories.data}
-            onRetry={stories.reload}
-          />
+          {searchingByMeaning ? (
+            <SearchResults query={debouncedSearch.trim()} genreId={genreId} />
+          ) : (
+            <StoryRail
+              status={stories.status}
+              error={stories.error}
+              stories={stories.data}
+              onRetry={stories.reload}
+            />
+          )}
 
           <p className="results__count" role="status">
             {listStatus === 'loading' && results.length === 0

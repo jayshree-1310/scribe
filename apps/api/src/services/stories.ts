@@ -869,6 +869,60 @@ export async function findVisibleChapter(
 }
 
 /**
+ * Which of these chapters the caller may read, in one pass.
+ *
+ * Written for semantic search, which retrieves passages from a vector index
+ * that knows nothing about drafts, and has to drop any it may not show before
+ * quoting one. `findVisibleChapter` answers the same question for one chapter
+ * in two queries; a page of search results can name fifty chapters, so this
+ * asks it of all of them in two queries total.
+ *
+ * The rule is the one `chaptersVisibleTo` applies, over stories `visibleTo`
+ * admits: a chapter is readable when its story is visible to the caller and
+ * the chapter is published -- or the caller wrote it. Ids that name nothing
+ * are simply absent from the answer.
+ */
+export async function findVisibleChapterIds(
+  chapterIds: string[],
+  viewerId: string | null,
+): Promise<Set<string>> {
+  if (chapterIds.length === 0) return new Set();
+
+  const chapters = await db.orm.content.Chapter.select(
+    "id",
+    "storyId",
+    "publishedAt",
+  )
+    .where((chapter) => chapter.id.in(chapterIds))
+    .all();
+
+  const storyIds = [...new Set(chapters.map((chapter) => chapter.storyId))];
+  if (storyIds.length === 0) return new Set();
+
+  const stories = await visibleTo(storiesBase(), viewerId)
+    .where((story) => story.id.in(storyIds))
+    .all();
+
+  const authorByStory = new Map(
+    stories.map((story) => [story.id, story.authorId]),
+  );
+
+  return new Set(
+    chapters
+      .filter((chapter) => {
+        // Absent from the map means the story itself is hidden from this
+        // caller, which hides every chapter in it, published or not.
+        if (!authorByStory.has(chapter.storyId)) return false;
+        return (
+          chapter.publishedAt !== null ||
+          authorByStory.get(chapter.storyId) === viewerId
+        );
+      })
+      .map((chapter) => chapter.id),
+  );
+}
+
+/**
  * The chapter before `chapterNumber` that this caller may actually read, with
  * its text.
  *

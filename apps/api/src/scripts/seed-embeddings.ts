@@ -17,14 +17,20 @@
  *
  * **Drafts are skipped unless `--all` is passed.** A vector index does not
  * know that a story is unlisted or a chapter unpublished -- that rule lives in
- * `visibleTo` in `services/stories.ts`, and Task AI 8 has to apply it to
- * search results. Until search exists and enforces it, the cheapest defence is
- * for unpublished writing not to be in the index at all. `--all` is there for
- * working on that task, not for a deployment.
+ * `visibleTo` in `services/stories.ts`, and `services/ai/search.ts` applies
+ * it to every result. Keeping unpublished writing out of the index as well is
+ * the second line of that defence, not the first. `--all` is there for working
+ * on search, not for a deployment.
+ *
+ * It also builds the search index; see `ensureEmbeddingIndex` for why that is
+ * here rather than in a migration.
  */
 
 import { db } from "../prisma/db.js";
-import { embedChapter } from "../services/ai/embeddings.js";
+import {
+  embedChapter,
+  ensureEmbeddingIndex,
+} from "../services/ai/embeddings.js";
 import { loadAiEmbedConfig } from "../services/ai/config.js";
 
 interface ChapterRow {
@@ -118,6 +124,12 @@ async function main(): Promise<void> {
     `\n${chapters.length} chapters, ${unchanged} already current.\n` +
       `${embedded} chunks embedded, ${reused} reused, ${tokens} tokens.`,
   );
+
+  // After the rows, not before: an HNSW index is built incrementally either
+  // way, but building it over a full table is one pass rather than one graph
+  // insertion per row. A no-op on every run after the first.
+  await ensureEmbeddingIndex();
+  console.log("Search index (HNSW, cosine) is in place.");
 }
 
 await main();

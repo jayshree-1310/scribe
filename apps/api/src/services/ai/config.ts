@@ -230,6 +230,22 @@ export interface AiEmbedConfig {
   batchSize: number;
   timeoutMs: number;
   maxRetries: number;
+  /**
+   * The cosine similarity below which a passage is not a search result.
+   *
+   * Nearest-neighbour search always returns neighbours: ask the index for
+   * "chocolate cake recipe" and it hands back the closest chapters of a time
+   * travel novel, ranked as confidently as a real match. Without a floor,
+   * hybrid search would include the whole embedded corpus on every query.
+   *
+   * **This number belongs to the model, not to the feature**, which is why it
+   * lives beside `model`. Measured on this corpus with `nomic-embed-text`:
+   * on-topic queries scored 0.55-0.67 against their best passage, off-topic
+   * ones 0.42-0.45 against theirs. 0.5 sits in the gap. A different model has a
+   * different distribution and needs its own measurement -- see
+   * `docs/ai-architecture.md`.
+   */
+  searchMinSimilarity: number;
 }
 
 const EMBED_DEFAULTS = {
@@ -239,7 +255,19 @@ const EMBED_DEFAULTS = {
   model: "nomic-embed-text",
   dimensions: 768,
   batchSize: 16,
+  searchMinSimilarity: 0.5,
 };
+
+/** `readInt`'s rule for a fraction: a typo falls back rather than becoming NaN. */
+function readFraction(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === "") return fallback;
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= -1 && parsed <= 1
+    ? parsed
+    : fallback;
+}
 
 function readEmbedProvider(): AiProviderName {
   const raw = process.env["AI_EMBED_PROVIDER"]?.trim().toLowerCase();
@@ -267,6 +295,10 @@ export function loadAiEmbedConfig(): AiEmbedConfig {
     // this feature, and a second pair of knobs would only ever be set wrong.
     timeoutMs: chat.timeoutMs,
     maxRetries: chat.maxRetries,
+    searchMinSimilarity: readFraction(
+      "AI_SEARCH_MIN_SIMILARITY",
+      EMBED_DEFAULTS.searchMinSimilarity,
+    ),
   };
 }
 
