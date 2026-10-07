@@ -1,0 +1,340 @@
+/* ==========================================================================
+   Ask This Book
+
+   One panel in two places. On the story page it is painted in the app theme;
+   inside the reader it must be painted in the *reading* theme (`--read-*`),
+   or a reader on Sepia with the app in Night mode gets a dark panel on a
+   cream page — see the header of `reader-ai.css`. So the panel reads its
+   colours from local `--ask-*` properties, and `.ask--reader` re-points them.
+
+   Like the recap and the explain sheet, it should stay quiet: the answer and
+   its passages are the content, and nothing here competes with them.
+   ========================================================================== */
+
+.ask {
+  --ask-ink: var(--text);
+  --ask-ink-soft: var(--text-secondary);
+  --ask-rule: var(--border);
+  --ask-brand: var(--brand);
+  --ask-brand-soft: var(--brand-soft);
+  --ask-brand-border: var(--brand-border);
+  --ask-hover: var(--surface-hover);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  font-family: var(--font-sans);
+  color: var(--ask-ink);
+}
+
+.ask--reader {
+  --ask-ink: var(--read-ink);
+  --ask-ink-soft: var(--read-ink-soft);
+  --ask-rule: var(--read-rule);
+  --ask-brand: var(--read-brand);
+  --ask-brand-soft: var(--read-brand-soft);
+  --ask-brand-border: var(--read-brand-border);
+  --ask-hover: var(--read-brand-soft);
+}
+
+/*
+ * The shared field and select paint in app tokens. Inside the reader they
+ * would stay dark on a Sepia page whenever the app is in Night mode, so the
+ * sheet re-points their surface at the reading theme. Focus keeps the
+ * component's own ring.
+ */
+.ask--reader .field__control,
+.ask--reader .select__control {
+  border-color: var(--read-rule);
+  background-color: var(--read-bg);
+  color: var(--read-ink);
+}
+
+.ask--reader .field__control::placeholder {
+  color: var(--read-ink-soft);
+}
+
+/* The form ---------------------------------------------------------------- */
+
+.ask__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.ask__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.ask__row .field {
+  flex: 1;
+}
+
+.ask__range {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ask-ink-soft);
+}
+
+.ask__range .select {
+  min-width: 0;
+  max-width: 22rem;
+}
+
+/* The conversation -------------------------------------------------------- */
+
+.ask__toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.ask__toolbar .select {
+  flex: 1;
+  min-width: 10rem;
+  max-width: 24rem;
+}
+
+.ask__confirm {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--ask-ink-soft);
+}
+
+.ask__thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* One question and its answer. A rule between turns, not a box around each:
+   a thread of cards competes with the passages inside them. */
+.ask__turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-block-start: var(--space-4);
+  border-block-start: 1px solid var(--ask-rule);
+}
+
+.ask__turn:first-child {
+  padding-block-start: 0;
+  border-block-start: 0;
+}
+
+/* What retrieval searched with, when it rewrote a follow-up. Quiet: it is
+   for checking, not for reading. */
+.ask__searched {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--ask-ink-soft);
+}
+
+/* The reader's question, as asked. */
+.ask__question {
+  margin: 0;
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--ask-brand-border);
+  font-size: var(--text-sm);
+  color: var(--ask-ink-soft);
+}
+
+.ask__hint,
+.ask__error {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ask-ink-soft);
+}
+
+.ask__error {
+  color: var(--ask-brand);
+}
+
+.ask__answer {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+  /* Models sometimes answer in lines; keep them rather than run them together. */
+  white-space: pre-wrap;
+}
+
+/* "Not in the story" is a notice from the app, not an answer from a model. */
+.ask__answer.is-declined {
+  font-size: var(--text-sm);
+  color: var(--ask-ink-soft);
+}
+
+.ask__markers {
+  display: inline-flex;
+  gap: 2px;
+  margin-inline-start: 2px;
+  vertical-align: 0.15em;
+}
+
+.ask__marker {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.25rem;
+  border: 1px solid var(--ask-brand-border);
+  border-radius: var(--radius-full);
+  background: var(--ask-brand-soft);
+  color: var(--ask-brand);
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.ask__marker:hover {
+  border-color: var(--ask-brand);
+}
+
+/* Shown as written while streaming; not yet known to point anywhere. */
+.ask__marker.is-pending {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* The passages ------------------------------------------------------------ */
+
+.ask__citations {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ask__citation {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--ask-rule);
+  border-radius: var(--radius-md);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    background-color var(--dur-fast) var(--ease),
+    border-color var(--dur-fast) var(--ease);
+}
+
+.ask__citation:hover,
+.ask__citation:focus-visible {
+  border-color: var(--ask-brand-border);
+  background-color: var(--ask-hover);
+}
+
+.ask__citation > :last-child {
+  flex: none;
+  align-self: center;
+  color: var(--ask-ink-soft);
+}
+
+.ask__citation-marker {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-full);
+  background: var(--ask-brand-soft);
+  color: var(--ask-brand);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.ask__citation-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+}
+
+.ask__citation-chapter {
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* The author's words, in the reading face, clamped: it is a pointer into the
+   chapter, which is one click away, not a second copy of it. */
+.ask__citation-quote {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  font-family: var(--font-reading);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--ask-ink-soft);
+}
+
+/* Said plainly, never behind a tooltip: a reader deciding how far to trust
+   this should not have to hover to learn a machine wrote it. */
+.ask__note {
+  margin: 0;
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--ask-ink-soft);
+}
+
+@media (max-width: 30rem) {
+  .ask__range {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ask__range .select {
+    max-width: none;
+  }
+}
+
+/* The reader's sheet ------------------------------------------------------ */
+
+/*
+ * The explain sheet's shell (`.explain-sheet*` in `reader-ai.css`), taller:
+ * an answer plus its passages is more than a definition, and the sheet still
+ * has exactly one scroll region.
+ */
+.explain-sheet.ask-sheet {
+  max-height: min(75vh, 40rem);
+}
+
+.ask-sheet__title {
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--read-ink);
+}
+
+.ask-sheet .explain-sheet__body {
+  padding-block: var(--space-3) var(--space-1);
+}
+
+@media print {
+  .ask-sheet {
+    display: none;
+  }
+}

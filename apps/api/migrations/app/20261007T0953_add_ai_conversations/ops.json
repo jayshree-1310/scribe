@@ -1,0 +1,647 @@
+[
+  {
+    "id": "table.conversation",
+    "label": "Create table \"conversation\"",
+    "summary": "Creates table \"conversation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "conversation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"conversation\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversation\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"conversation\"",
+        "sql": "CREATE TABLE \"ai\".\"conversation\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"summarizedThrough\" int4 DEFAULT 0 NOT NULL,\n  \"summary\" text DEFAULT '' NOT NULL,\n  \"title\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"conversation\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversation\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.conversationCitation",
+    "label": "Create table \"conversationCitation\"",
+    "summary": "Creates table \"conversationCitation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "conversationCitation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"conversationCitation\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversationCitation\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"conversationCitation\"",
+        "sql": "CREATE TABLE \"ai\".\"conversationCitation\" (\n  \"chapterId\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"marker\" int4 NOT NULL,\n  \"messageId\" text NOT NULL,\n  \"ordinal\" int4 NOT NULL,\n  \"quote\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"conversationCitation\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversationCitation\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.conversationMessage",
+    "label": "Create table \"conversationMessage\"",
+    "summary": "Creates table \"conversationMessage\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "conversationMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"conversationMessage\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversationMessage\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"conversationMessage\"",
+        "sql": "CREATE TABLE \"ai\".\"conversationMessage\" (\n  \"answerable\" bool DEFAULT true NOT NULL,\n  \"content\" text NOT NULL,\n  \"conversationId\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"inputTokens\" int4 DEFAULT 0 NOT NULL,\n  \"ordinal\" int4 NOT NULL,\n  \"outputTokens\" int4 DEFAULT 0 NOT NULL,\n  \"role\" text NOT NULL,\n  \"scopeBasis\" text,\n  \"standaloneQuestion\" text,\n  \"upToChapter\" int4,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"conversationMessage\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversationMessage\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.conversationCitation.conversationCitation_messageId_marker_key",
+    "label": "Add unique constraint on \"conversationCitation\" (messageId, marker)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "unique",
+        "name": "conversationCitation_messageId_marker_key",
+        "table": "conversationCitation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"conversationCitation_messageId_marker_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversationCitation_messageId_marker_key",
+          "ai",
+          "\"ai\".\"conversationCitation\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"conversationCitation_messageId_marker_key\"",
+        "sql": "ALTER TABLE \"ai\".\"conversationCitation\" ADD CONSTRAINT \"conversationCitation_messageId_marker_key\" UNIQUE (\"messageId\", \"marker\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"conversationCitation_messageId_marker_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversationCitation_messageId_marker_key",
+          "ai",
+          "\"ai\".\"conversationCitation\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.conversationMessage.conversationMessage_conversationId_ordinal_key",
+    "label": "Add unique constraint on \"conversationMessage\" (conversationId, ordinal)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "unique",
+        "name": "conversationMessage_conversationId_ordinal_key",
+        "table": "conversationMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"conversationMessage_conversationId_ordinal_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversationMessage_conversationId_ordinal_key",
+          "ai",
+          "\"ai\".\"conversationMessage\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"conversationMessage_conversationId_ordinal_key\"",
+        "sql": "ALTER TABLE \"ai\".\"conversationMessage\" ADD CONSTRAINT \"conversationMessage_conversationId_ordinal_key\" UNIQUE (\"conversationId\", \"ordinal\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"conversationMessage_conversationId_ordinal_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversationMessage_conversationId_ordinal_key",
+          "ai",
+          "\"ai\".\"conversationMessage\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.conversation.conversation_storyId_idx_cd452158",
+    "label": "Create index \"conversation_storyId_idx_cd452158\" on \"conversation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "conversation_storyId_idx_cd452158",
+        "table": "conversation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"conversation_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversation_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"conversation_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"conversation_storyId_idx_cd452158\" ON \"ai\".\"conversation\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"conversation_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversation_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.conversation.conversation_userId_idx_a489d58a",
+    "label": "Create index \"conversation_userId_idx_a489d58a\" on \"conversation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "conversation_userId_idx_a489d58a",
+        "table": "conversation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"conversation_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversation_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"conversation_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"conversation_userId_idx_a489d58a\" ON \"ai\".\"conversation\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"conversation_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversation_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.conversation.conversation_userId_storyId_idx_57dae79f",
+    "label": "Create index \"conversation_userId_storyId_idx_57dae79f\" on \"conversation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "conversation_userId_storyId_idx_57dae79f",
+        "table": "conversation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"conversation_userId_storyId_idx_57dae79f\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversation_userId_storyId_idx_57dae79f\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"conversation_userId_storyId_idx_57dae79f\"",
+        "sql": "CREATE INDEX \"conversation_userId_storyId_idx_57dae79f\" ON \"ai\".\"conversation\" (\"userId\", \"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"conversation_userId_storyId_idx_57dae79f\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversation_userId_storyId_idx_57dae79f\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.conversationCitation.conversationCitation_chapterId_idx_411dd3d6",
+    "label": "Create index \"conversationCitation_chapterId_idx_411dd3d6\" on \"conversationCitation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "conversationCitation_chapterId_idx_411dd3d6",
+        "table": "conversationCitation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"conversationCitation_chapterId_idx_411dd3d6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversationCitation_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"conversationCitation_chapterId_idx_411dd3d6\"",
+        "sql": "CREATE INDEX \"conversationCitation_chapterId_idx_411dd3d6\" ON \"ai\".\"conversationCitation\" (\"chapterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"conversationCitation_chapterId_idx_411dd3d6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversationCitation_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.conversationCitation.conversationCitation_messageId_idx_3cdded8d",
+    "label": "Create index \"conversationCitation_messageId_idx_3cdded8d\" on \"conversationCitation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "conversationCitation_messageId_idx_3cdded8d",
+        "table": "conversationCitation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"conversationCitation_messageId_idx_3cdded8d\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversationCitation_messageId_idx_3cdded8d\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"conversationCitation_messageId_idx_3cdded8d\"",
+        "sql": "CREATE INDEX \"conversationCitation_messageId_idx_3cdded8d\" ON \"ai\".\"conversationCitation\" (\"messageId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"conversationCitation_messageId_idx_3cdded8d\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversationCitation_messageId_idx_3cdded8d\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.conversationMessage.conversationMessage_conversationId_idx_669215a6",
+    "label": "Create index \"conversationMessage_conversationId_idx_669215a6\" on \"conversationMessage\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "conversationMessage_conversationId_idx_669215a6",
+        "table": "conversationMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"conversationMessage_conversationId_idx_669215a6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversationMessage_conversationId_idx_669215a6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"conversationMessage_conversationId_idx_669215a6\"",
+        "sql": "CREATE INDEX \"conversationMessage_conversationId_idx_669215a6\" ON \"ai\".\"conversationMessage\" (\"conversationId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"conversationMessage_conversationId_idx_669215a6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"conversationMessage_conversationId_idx_669215a6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.conversation.conversation_userId_fkey",
+    "label": "Add foreign key \"conversation_userId_fkey\" on \"conversation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "conversation_userId_fkey",
+        "table": "conversation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"conversation_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversation_userId_fkey",
+          "ai",
+          "\"ai\".\"conversation\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"conversation_userId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"conversation\"\nADD CONSTRAINT \"conversation_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"conversation_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversation_userId_fkey",
+          "ai",
+          "\"ai\".\"conversation\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.conversation.conversation_storyId_fkey",
+    "label": "Add foreign key \"conversation_storyId_fkey\" on \"conversation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "conversation_storyId_fkey",
+        "table": "conversation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"conversation_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversation_storyId_fkey",
+          "ai",
+          "\"ai\".\"conversation\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"conversation_storyId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"conversation\"\nADD CONSTRAINT \"conversation_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"conversation_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversation_storyId_fkey",
+          "ai",
+          "\"ai\".\"conversation\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.conversationCitation.conversationCitation_messageId_fkey",
+    "label": "Add foreign key \"conversationCitation_messageId_fkey\" on \"conversationCitation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "conversationCitation_messageId_fkey",
+        "table": "conversationCitation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"conversationCitation_messageId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversationCitation_messageId_fkey",
+          "ai",
+          "\"ai\".\"conversationCitation\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"conversationCitation_messageId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"conversationCitation\"\nADD CONSTRAINT \"conversationCitation_messageId_fkey\"\nFOREIGN KEY (\"messageId\")\nREFERENCES \"ai\".\"conversationMessage\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"conversationCitation_messageId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversationCitation_messageId_fkey",
+          "ai",
+          "\"ai\".\"conversationCitation\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.conversationCitation.conversationCitation_chapterId_fkey",
+    "label": "Add foreign key \"conversationCitation_chapterId_fkey\" on \"conversationCitation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "conversationCitation_chapterId_fkey",
+        "table": "conversationCitation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"conversationCitation_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversationCitation_chapterId_fkey",
+          "ai",
+          "\"ai\".\"conversationCitation\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"conversationCitation_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"conversationCitation\"\nADD CONSTRAINT \"conversationCitation_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"conversationCitation_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversationCitation_chapterId_fkey",
+          "ai",
+          "\"ai\".\"conversationCitation\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.conversationMessage.conversationMessage_conversationId_fkey",
+    "label": "Add foreign key \"conversationMessage_conversationId_fkey\" on \"conversationMessage\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "conversationMessage_conversationId_fkey",
+        "table": "conversationMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"conversationMessage_conversationId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversationMessage_conversationId_fkey",
+          "ai",
+          "\"ai\".\"conversationMessage\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"conversationMessage_conversationId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"conversationMessage\"\nADD CONSTRAINT \"conversationMessage_conversationId_fkey\"\nFOREIGN KEY (\"conversationId\")\nREFERENCES \"ai\".\"conversation\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"conversationMessage_conversationId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "conversationMessage_conversationId_fkey",
+          "ai",
+          "\"ai\".\"conversationMessage\""
+        ]
+      }
+    ]
+  }
+]

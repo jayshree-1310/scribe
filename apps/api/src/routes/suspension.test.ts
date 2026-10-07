@@ -158,6 +158,11 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
       "ai.ts POST /generate/refine",
       "ai.ts POST /explain",
       "ai.ts POST /explain/stream",
+      "ai.ts POST /ask",
+      "ai.ts POST /ask/stream",
+      "ai.ts POST /conversations",
+      "ai.ts POST /conversations/:id/messages",
+      "ai.ts DELETE /conversations/:id",
     ].map((route) => [route, "answers the caller and writes nothing public"]),
 
     /**

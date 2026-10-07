@@ -482,6 +482,156 @@ export function streamExplain(
   return streamRequest<ExplainEvent>('/ai/explain/stream', payload, signal)
 }
 
+/* Reader: ask this book -------------------------------------------------- */
+
+/**
+ * A passage an answer leans on. `quote` is read out of the stored chapter, so
+ * it is the author's words — only the *choice* of passage came from a model.
+ */
+export interface AskCitation {
+  /** The `[n]` the answer uses for it. */
+  marker: number
+  chapterId: string
+  chapterNumber: number
+  chapterTitle: string
+  quote: string
+}
+
+/** Where the spoiler bound came from; see `AskScopeBasis` in `services/ai/ask-book.ts`. */
+export type AskScopeBasis = 'request' | 'progress' | 'start' | 'author'
+
+export interface AskScope {
+  /** Null means the whole story. */
+  upToChapter: number | null
+  basis: AskScopeBasis
+}
+
+export interface AskBookPayload {
+  /** Slug or id. */
+  storyId: string
+  question: string
+  /** Omit to let the server use the reader's saved position. */
+  upToChapter?: number
+}
+
+export type AskBookEvent =
+  | { type: 'text'; text: string }
+  | {
+      type: 'done'
+      /** False when nothing in range covered the question and no model was asked. */
+      answerable: boolean
+      citations: AskCitation[]
+      scope: AskScope
+      tokensUsed: number
+    }
+  | { type: 'error'; code: string; message: string }
+
+/** The answer as it is written, then its citations on the terminal event. */
+export function streamAskBook(
+  payload: AskBookPayload,
+  signal?: AbortSignal,
+): AsyncGenerator<AskBookEvent> {
+  return streamRequest<AskBookEvent>('/ai/ask/stream', payload, signal)
+}
+
+/* Reader: conversations -------------------------------------------------- */
+
+/**
+ * Ask This Book with memory. Each turn's question is rewritten on the server
+ * to stand alone before it is searched with — "what happened after that?"
+ * becomes something retrieval can use — and `standaloneQuestion` reports what
+ * it became, so the reader can see what was actually looked for.
+ */
+export interface ConversationSummary {
+  id: string
+  storyId: string
+  /** The opening question; empty until one has been asked. */
+  title: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ConversationMessage {
+  id: string
+  ordinal: number
+  role: 'user' | 'assistant'
+  content: string
+  standaloneQuestion: string | null
+  answerable: boolean
+  scope: AskScope | null
+  citations: AskCitation[]
+  createdAt: string
+}
+
+export interface Conversation extends ConversationSummary {
+  messages: ConversationMessage[]
+}
+
+export type ConversationEvent =
+  | { type: 'text'; text: string }
+  | {
+      type: 'done'
+      questionId: string
+      answerId: string
+      standaloneQuestion: string | null
+      answerable: boolean
+      citations: AskCitation[]
+      scope: AskScope
+      tokensUsed: number
+    }
+  | { type: 'error'; code: string; message: string }
+
+export async function startConversation(
+  storyId: string,
+): Promise<ConversationSummary> {
+  return request<ConversationSummary>('/ai/conversations', {
+    method: 'POST',
+    headers: readerHeaders(),
+    body: { storyId },
+  })
+}
+
+export async function listConversations(
+  storyId: string,
+  signal?: AbortSignal,
+): Promise<{ items: ConversationSummary[] }> {
+  return request<{ items: ConversationSummary[] }>('/ai/conversations', {
+    headers: readerHeaders(),
+    query: { storyId },
+    ...(signal ? { signal } : {}),
+  })
+}
+
+export async function getConversation(
+  id: string,
+  signal?: AbortSignal,
+): Promise<Conversation> {
+  return request<Conversation>(`/ai/conversations/${encodeURIComponent(id)}`, {
+    headers: readerHeaders(),
+    ...(signal ? { signal } : {}),
+  })
+}
+
+export async function deleteConversation(id: string): Promise<void> {
+  await request<null>(`/ai/conversations/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: readerHeaders(),
+  })
+}
+
+/** One turn: the answer as it is written, then its citations and rewrite. */
+export function streamConversationMessage(
+  conversationId: string,
+  payload: { content: string; upToChapter?: number },
+  signal?: AbortSignal,
+): AsyncGenerator<ConversationEvent> {
+  return streamRequest<ConversationEvent>(
+    `/ai/conversations/${encodeURIComponent(conversationId)}/messages`,
+    payload,
+    signal,
+  )
+}
+
 /* Chat ------------------------------------------------------------------- */
 
 /**

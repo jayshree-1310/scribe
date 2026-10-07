@@ -33,9 +33,9 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'2e2d925a6f69cc5591018756d801b51e12b9ad2040b4f99951a8634370365d3f'>;
+  StorageHashBase<'639fea0256b9f96efffea05a925f290f0f5bd3b6c913360494701bd16bff675c'>;
 export type ExecutionHash =
-  ExecutionHashBase<'6ffef856154cc72abdefc222bd3f765bd864801e4240230d490bafa092b14f39'>;
+  ExecutionHashBase<'74a1c2158dc8f7e88d5cffc4b88e84f1389bd9845530fd9c31ee541ea67a6253'>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
@@ -261,6 +261,38 @@ export type FieldOutputTypes = {
       readonly promptVersion: CodecTypes['pg/int4@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    };
+    readonly Conversation: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+      readonly storyId: CodecTypes['pg/text@1']['output'];
+      readonly title: CodecTypes['pg/text@1']['output'];
+      readonly summary: CodecTypes['pg/text@1']['output'];
+      readonly summarizedThrough: CodecTypes['pg/int4@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    };
+    readonly ConversationCitation: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly messageId: CodecTypes['pg/text@1']['output'];
+      readonly marker: CodecTypes['pg/int4@1']['output'];
+      readonly chapterId: CodecTypes['pg/text@1']['output'];
+      readonly ordinal: CodecTypes['pg/int4@1']['output'];
+      readonly quote: CodecTypes['pg/text@1']['output'];
+    };
+    readonly ConversationMessage: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly conversationId: CodecTypes['pg/text@1']['output'];
+      readonly ordinal: CodecTypes['pg/int4@1']['output'];
+      readonly role: CodecTypes['pg/text@1']['output'];
+      readonly content: CodecTypes['pg/text@1']['output'];
+      readonly standaloneQuestion: CodecTypes['pg/text@1']['output'] | null;
+      readonly upToChapter: CodecTypes['pg/int4@1']['output'] | null;
+      readonly scopeBasis: CodecTypes['pg/text@1']['output'] | null;
+      readonly answerable: CodecTypes['pg/bool@1']['output'];
+      readonly inputTokens: CodecTypes['pg/int4@1']['output'];
+      readonly outputTokens: CodecTypes['pg/int4@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
   };
   readonly auth: {
@@ -596,6 +628,38 @@ export type FieldInputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
+    readonly Conversation: {
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+      readonly storyId: CodecTypes['pg/text@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly summary: CodecTypes['pg/text@1']['input'];
+      readonly summarizedThrough: CodecTypes['pg/int4@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+    };
+    readonly ConversationCitation: {
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly messageId: CodecTypes['pg/text@1']['input'];
+      readonly marker: CodecTypes['pg/int4@1']['input'];
+      readonly chapterId: CodecTypes['pg/text@1']['input'];
+      readonly ordinal: CodecTypes['pg/int4@1']['input'];
+      readonly quote: CodecTypes['pg/text@1']['input'];
+    };
+    readonly ConversationMessage: {
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly conversationId: CodecTypes['pg/text@1']['input'];
+      readonly ordinal: CodecTypes['pg/int4@1']['input'];
+      readonly role: CodecTypes['pg/text@1']['input'];
+      readonly content: CodecTypes['pg/text@1']['input'];
+      readonly standaloneQuestion: CodecTypes['pg/text@1']['input'] | null;
+      readonly upToChapter: CodecTypes['pg/int4@1']['input'] | null;
+      readonly scopeBasis: CodecTypes['pg/text@1']['input'] | null;
+      readonly answerable: CodecTypes['pg/bool@1']['input'];
+      readonly inputTokens: CodecTypes['pg/int4@1']['input'];
+      readonly outputTokens: CodecTypes['pg/int4@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+    };
   };
   readonly auth: {
     readonly GenrePreference: {
@@ -930,6 +994,38 @@ export type StorageColumnTypes = {
       readonly text: CodecTypes['pg/text@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
+    readonly conversation: {
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly storyId: CodecTypes['pg/text@1']['output'];
+      readonly summarizedThrough: CodecTypes['pg/int4@1']['output'];
+      readonly summary: CodecTypes['pg/text@1']['output'];
+      readonly title: CodecTypes['pg/text@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+    };
+    readonly conversationCitation: {
+      readonly chapterId: CodecTypes['pg/text@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly marker: CodecTypes['pg/int4@1']['output'];
+      readonly messageId: CodecTypes['pg/text@1']['output'];
+      readonly ordinal: CodecTypes['pg/int4@1']['output'];
+      readonly quote: CodecTypes['pg/text@1']['output'];
+    };
+    readonly conversationMessage: {
+      readonly answerable: CodecTypes['pg/bool@1']['output'];
+      readonly content: CodecTypes['pg/text@1']['output'];
+      readonly conversationId: CodecTypes['pg/text@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly inputTokens: CodecTypes['pg/int4@1']['output'];
+      readonly ordinal: CodecTypes['pg/int4@1']['output'];
+      readonly outputTokens: CodecTypes['pg/int4@1']['output'];
+      readonly role: CodecTypes['pg/text@1']['output'];
+      readonly scopeBasis: CodecTypes['pg/text@1']['output'] | null;
+      readonly standaloneQuestion: CodecTypes['pg/text@1']['output'] | null;
+      readonly upToChapter: CodecTypes['pg/int4@1']['output'] | null;
+    };
   };
   readonly auth: {
     readonly genrePreference: {
@@ -1263,6 +1359,38 @@ export type StorageColumnInputTypes = {
       readonly promptVersion: CodecTypes['pg/int4@1']['input'];
       readonly text: CodecTypes['pg/text@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+    };
+    readonly conversation: {
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly storyId: CodecTypes['pg/text@1']['input'];
+      readonly summarizedThrough: CodecTypes['pg/int4@1']['input'];
+      readonly summary: CodecTypes['pg/text@1']['input'];
+      readonly title: CodecTypes['pg/text@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+    };
+    readonly conversationCitation: {
+      readonly chapterId: CodecTypes['pg/text@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly marker: CodecTypes['pg/int4@1']['input'];
+      readonly messageId: CodecTypes['pg/text@1']['input'];
+      readonly ordinal: CodecTypes['pg/int4@1']['input'];
+      readonly quote: CodecTypes['pg/text@1']['input'];
+    };
+    readonly conversationMessage: {
+      readonly answerable: CodecTypes['pg/bool@1']['input'];
+      readonly content: CodecTypes['pg/text@1']['input'];
+      readonly conversationId: CodecTypes['pg/text@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly inputTokens: CodecTypes['pg/int4@1']['input'];
+      readonly ordinal: CodecTypes['pg/int4@1']['input'];
+      readonly outputTokens: CodecTypes['pg/int4@1']['input'];
+      readonly role: CodecTypes['pg/text@1']['input'];
+      readonly scopeBasis: CodecTypes['pg/text@1']['input'] | null;
+      readonly standaloneQuestion: CodecTypes['pg/text@1']['input'] | null;
+      readonly upToChapter: CodecTypes['pg/int4@1']['input'] | null;
     };
   };
   readonly auth: {
@@ -1749,6 +1877,285 @@ type ContractBase = Omit<
                   readonly target: {
                     readonly namespaceId: 'content' & NamespaceId;
                     readonly tableName: 'chapter';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
+            readonly conversation: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly userId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly storyId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly title: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly summary: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', ''>;
+                  };
+                };
+                readonly summarizedThrough: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/int4@1', 0>;
+                  };
+                };
+                readonly createdAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly updatedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [
+                {
+                  readonly name: 'conversation_userId_storyId_idx_57dae79f';
+                  readonly prefix: 'conversation_userId_storyId_idx';
+                  readonly columns: readonly ['userId', 'storyId'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'conversation_userId_idx_a489d58a';
+                  readonly prefix: 'conversation_userId_idx';
+                  readonly columns: readonly ['userId'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'conversation_storyId_idx_cd452158';
+                  readonly prefix: 'conversation_storyId_idx';
+                  readonly columns: readonly ['storyId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'ai' & NamespaceId;
+                    readonly tableName: 'conversation';
+                    readonly columns: readonly ['userId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'auth' & NamespaceId;
+                    readonly tableName: 'user';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'ai' & NamespaceId;
+                    readonly tableName: 'conversation';
+                    readonly columns: readonly ['storyId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'content' & NamespaceId;
+                    readonly tableName: 'story';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
+            readonly conversationCitation: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly messageId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly marker: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly chapterId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly ordinal: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly quote: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['messageId', 'marker'] }];
+              indexes: readonly [
+                {
+                  readonly name: 'conversationCitation_chapterId_idx_411dd3d6';
+                  readonly prefix: 'conversationCitation_chapterId_idx';
+                  readonly columns: readonly ['chapterId'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'conversationCitation_messageId_idx_3cdded8d';
+                  readonly prefix: 'conversationCitation_messageId_idx';
+                  readonly columns: readonly ['messageId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'ai' & NamespaceId;
+                    readonly tableName: 'conversationCitation';
+                    readonly columns: readonly ['messageId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'ai' & NamespaceId;
+                    readonly tableName: 'conversationMessage';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'ai' & NamespaceId;
+                    readonly tableName: 'conversationCitation';
+                    readonly columns: readonly ['chapterId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'content' & NamespaceId;
+                    readonly tableName: 'chapter';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
+            readonly conversationMessage: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly conversationId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly ordinal: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly role: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly content: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly standaloneQuestion: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly upToChapter: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
+                readonly scopeBasis: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly answerable: {
+                  readonly nativeType: 'bool';
+                  readonly codecId: 'pg/bool@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/bool@1', true>;
+                  };
+                };
+                readonly inputTokens: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/int4@1', 0>;
+                  };
+                };
+                readonly outputTokens: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/int4@1', 0>;
+                  };
+                };
+                readonly createdAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['conversationId', 'ordinal'] }];
+              indexes: readonly [
+                {
+                  readonly name: 'conversationMessage_conversationId_idx_669215a6';
+                  readonly prefix: 'conversationMessage_conversationId_idx';
+                  readonly columns: readonly ['conversationId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'ai' & NamespaceId;
+                    readonly tableName: 'conversationMessage';
+                    readonly columns: readonly ['conversationId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'ai' & NamespaceId;
+                    readonly tableName: 'conversation';
                     readonly columns: readonly ['id'];
                   };
                 },
@@ -4501,6 +4908,18 @@ type ContractBase = Omit<
       readonly namespace: 'ai' & NamespaceId;
       readonly model: 'ChapterChunk';
     };
+    readonly conversation: {
+      readonly namespace: 'ai' & NamespaceId;
+      readonly model: 'Conversation';
+    };
+    readonly conversationMessage: {
+      readonly namespace: 'ai' & NamespaceId;
+      readonly model: 'ConversationMessage';
+    };
+    readonly conversationCitation: {
+      readonly namespace: 'ai' & NamespaceId;
+      readonly model: 'ConversationCitation';
+    };
   };
   readonly domain: {
     readonly namespaces: {
@@ -4654,6 +5073,255 @@ type ContractBase = Omit<
                 readonly promptVersion: { readonly column: 'promptVersion' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
+              };
+            };
+          };
+          readonly Conversation: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly storyId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly title: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly summary: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly summarizedThrough: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+              readonly updatedAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+            };
+            readonly relations: {
+              readonly messages: {
+                readonly to: {
+                  readonly namespace: 'ai' & NamespaceId;
+                  readonly model: 'ConversationMessage';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['conversationId'];
+                };
+              };
+              readonly story: {
+                readonly to: {
+                  readonly namespace: 'content' & NamespaceId;
+                  readonly model: 'Story';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['storyId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly user: {
+                readonly to: { readonly namespace: 'auth' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['userId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'conversation';
+              readonly namespaceId: 'ai';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly userId: { readonly column: 'userId' };
+                readonly storyId: { readonly column: 'storyId' };
+                readonly title: { readonly column: 'title' };
+                readonly summary: { readonly column: 'summary' };
+                readonly summarizedThrough: { readonly column: 'summarizedThrough' };
+                readonly createdAt: { readonly column: 'createdAt' };
+                readonly updatedAt: { readonly column: 'updatedAt' };
+              };
+            };
+          };
+          readonly ConversationCitation: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly messageId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly marker: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly chapterId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly ordinal: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly quote: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+            };
+            readonly relations: {
+              readonly chapter: {
+                readonly to: {
+                  readonly namespace: 'content' & NamespaceId;
+                  readonly model: 'Chapter';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['chapterId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly message: {
+                readonly to: {
+                  readonly namespace: 'ai' & NamespaceId;
+                  readonly model: 'ConversationMessage';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['messageId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'conversationCitation';
+              readonly namespaceId: 'ai';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly messageId: { readonly column: 'messageId' };
+                readonly marker: { readonly column: 'marker' };
+                readonly chapterId: { readonly column: 'chapterId' };
+                readonly ordinal: { readonly column: 'ordinal' };
+                readonly quote: { readonly column: 'quote' };
+              };
+            };
+          };
+          readonly ConversationMessage: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly conversationId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly ordinal: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly role: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly content: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly standaloneQuestion: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly upToChapter: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly scopeBasis: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly answerable: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+              };
+              readonly inputTokens: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly outputTokens: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+            };
+            readonly relations: {
+              readonly citations: {
+                readonly to: {
+                  readonly namespace: 'ai' & NamespaceId;
+                  readonly model: 'ConversationCitation';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['messageId'];
+                };
+              };
+              readonly conversation: {
+                readonly to: {
+                  readonly namespace: 'ai' & NamespaceId;
+                  readonly model: 'Conversation';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['conversationId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'conversationMessage';
+              readonly namespaceId: 'ai';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly conversationId: { readonly column: 'conversationId' };
+                readonly ordinal: { readonly column: 'ordinal' };
+                readonly role: { readonly column: 'role' };
+                readonly content: { readonly column: 'content' };
+                readonly standaloneQuestion: { readonly column: 'standaloneQuestion' };
+                readonly upToChapter: { readonly column: 'upToChapter' };
+                readonly scopeBasis: { readonly column: 'scopeBasis' };
+                readonly answerable: { readonly column: 'answerable' };
+                readonly inputTokens: { readonly column: 'inputTokens' };
+                readonly outputTokens: { readonly column: 'outputTokens' };
+                readonly createdAt: { readonly column: 'createdAt' };
               };
             };
           };
@@ -4940,6 +5608,17 @@ type ContractBase = Omit<
                 readonly to: {
                   readonly namespace: 'engagement' & NamespaceId;
                   readonly model: 'Comment';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['userId'];
+                };
+              };
+              readonly conversations: {
+                readonly to: {
+                  readonly namespace: 'ai' & NamespaceId;
+                  readonly model: 'Conversation';
                 };
                 readonly cardinality: '1:N';
                 readonly on: {
@@ -5921,6 +6600,17 @@ type ContractBase = Omit<
                   readonly targetFields: readonly ['chapterId'];
                 };
               };
+              readonly conversationCitations: {
+                readonly to: {
+                  readonly namespace: 'ai' & NamespaceId;
+                  readonly model: 'ConversationCitation';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['chapterId'];
+                };
+              };
               readonly embeddingChunks: {
                 readonly to: {
                   readonly namespace: 'ai' & NamespaceId;
@@ -6269,6 +6959,17 @@ type ContractBase = Omit<
                 readonly to: {
                   readonly namespace: 'engagement' & NamespaceId;
                   readonly model: 'Comment';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['storyId'];
+                };
+              };
+              readonly conversations: {
+                readonly to: {
+                  readonly namespace: 'ai' & NamespaceId;
+                  readonly model: 'Conversation';
                 };
                 readonly cardinality: '1:N';
                 readonly on: {
@@ -7534,6 +8235,30 @@ type ContractBase = Omit<
           readonly ref: {
             readonly namespace: 'engagement';
             readonly table: 'comment';
+            readonly column: 'id';
+          };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
+        {
+          readonly ref: {
+            readonly namespace: 'ai';
+            readonly table: 'conversation';
+            readonly column: 'id';
+          };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
+        {
+          readonly ref: {
+            readonly namespace: 'ai';
+            readonly table: 'conversationCitation';
+            readonly column: 'id';
+          };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
+        {
+          readonly ref: {
+            readonly namespace: 'ai';
+            readonly table: 'conversationMessage';
             readonly column: 'id';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };

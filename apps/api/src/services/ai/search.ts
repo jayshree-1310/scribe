@@ -80,7 +80,11 @@ import {
 } from "./search-ranking.js";
 import type { AiEmbedder } from "./types.js";
 
-/** Keyed on in every usage record this feature produces. */
+/**
+ * Keyed on in every usage record this feature produces. Other features that
+ * embed a query through `embedQuery` pass their own, so the cost stays
+ * attributable to whoever asked.
+ */
 const FEATURE = "search.query";
 
 export const SEARCH_MODES = ["hybrid", "semantic"] as const;
@@ -180,11 +184,16 @@ export interface SearchPage extends Page<SearchResult> {
  *
  * The cache is a convenience. Redis failing is logged and ignored -- a slower
  * search is better than a failed one.
+ *
+ * Exported for Ask This Book (`ask-book.ts`), which embeds a question exactly
+ * the way search embeds a query: same model, same cache. `feature` is only
+ * the label on the usage record -- the vector does not depend on who asked.
  */
-async function embedQuery(
+export async function embedQuery(
   text: string,
   embedder: AiEmbedder,
   signal?: AbortSignal,
+  feature: string = FEATURE,
 ): Promise<string> {
   const key =
     "ai:search:query:" +
@@ -201,7 +210,7 @@ async function embedQuery(
   }
 
   const result = await embedder.embed({
-    feature: FEATURE,
+    feature,
     texts: [text],
     ...(signal ? { signal } : {}),
   });
@@ -230,9 +239,27 @@ async function embedQuery(
 
 /* Step 2: nearest passages ----------------------------------------------- */
 
-interface Filters {
+export interface PassageFilters {
   genreId: string | null;
   source: StorySource | null;
+  /**
+   * One story only. Search never sets it; Ask This Book always does, because
+   * a passage from another story is not context for this one -- it is a
+   * wrong answer with a citation.
+   */
+  storyId?: string | null;
+  /**
+   * Chapters numbered above this are excluded: the spoiler bound. A filter in
+   * the scan rather than on the results, so a later chapter is never even a
+   * candidate -- see `ask-book.ts` on why that distinction matters.
+   */
+  maxChapterNumber?: number | null;
+  /**
+   * A POSIX regex the passage text must match: Ask This Book's keyword half,
+   * which looks for the names in a question because a name has no meaning to
+   * embed. Built only from letters by its caller, never from raw input.
+   */
+  textPattern?: string | null;
 }
 
 /**
@@ -273,22 +300,34 @@ interface Filters {
  * At today's corpus size Postgres will usually ignore the index and scan
  * exactly, which is both correct and faster for a few hundred rows; the
  * settings matter from the day it stops doing that.
+ *
+ * Exported for Ask This Book, so retrieval for an answer inherits this exact
+ * visibility predicate rather than a second copy of it. `maxChapterNumber`
+ * uses 0 as its "absent" sentinel for the same reason the strings use '':
+ * chapters are numbered from 1.
  */
-async function nearestPassages(
+export async function nearestPassages(
   vector: string,
   embedder: AiEmbedder,
-  filters: Filters,
+  filters: PassageFilters,
   viewerId: string | null,
+  limit: number = CANDIDATE_PASSAGES,
 ): Promise<PassageHit[]> {
   const viewer = viewerId ?? "";
   const source = filters.source ?? "";
   const genreId = filters.genreId ?? "";
+  const storyId = filters.storyId ?? "";
+  const maxChapter = filters.maxChapterNumber ?? 0;
+  const pattern = filters.textPattern ?? "";
+  // `ef_search` caps what one scan returns; see `CANDIDATE_PASSAGES`.
+  const rows = Math.min(Math.max(1, limit), CANDIDATE_PASSAGES);
 
   const plan = db.raw.sql`
     SELECT c."storyId",
            c."chapterId",
            ch."chapterNumber",
            ch."title" AS "chapterTitle",
+           c."ordinal",
            c."text",
            (1 - (c."embedding" <=> ${vector}::vector))::float8 AS "similarity"
       FROM "ai"."chapterChunk" AS c
@@ -300,6 +339,9 @@ async function nearestPassages(
        AND (s."listedAt" IS NOT NULL OR s."authorId" = ${viewer})
        AND (ch."publishedAt" IS NOT NULL OR s."authorId" = ${viewer})
        AND (${source} = '' OR s."source" = ${source})
+       AND (${storyId} = '' OR c."storyId" = ${storyId})
+       AND (${maxChapter}::int4 = 0 OR ch."chapterNumber" <= ${maxChapter}::int4)
+       AND (${pattern} = '' OR c."text" ~ ${pattern})
        AND (
          ${genreId} = ''
          OR EXISTS (
@@ -310,13 +352,14 @@ async function nearestPassages(
          )
        )
      ORDER BY c."embedding" <=> ${vector}::vector
-     LIMIT ${CANDIDATE_PASSAGES}
+     LIMIT ${rows}
   `
     .returnsRow({
       storyId: "pg/text@1",
       chapterId: "pg/text@1",
       chapterNumber: "pg/int4@1",
       chapterTitle: "pg/text@1",
+      ordinal: "pg/int4@1",
       text: "pg/text@1",
       similarity: "pg/float8@1",
     })
@@ -345,7 +388,7 @@ async function nearestPassages(
  */
 async function semanticRanking(
   q: string,
-  filters: Filters,
+  filters: PassageFilters,
   viewerId: string | null,
   signal?: AbortSignal,
 ): Promise<StoryHit[]> {
@@ -370,7 +413,7 @@ async function semanticRanking(
  */
 async function keywordRanking(
   q: string,
-  filters: Filters,
+  filters: PassageFilters,
   viewerId: string | null,
 ): Promise<string[]> {
   if (filters.source === "CATALOGUE") return [];
@@ -438,7 +481,7 @@ export async function search(
   signal?: AbortSignal,
 ): Promise<SearchPage> {
   const q = query.q.replace(/\s+/g, " ").trim();
-  const filters: Filters = {
+  const filters: PassageFilters = {
     genreId: query.genreId ?? null,
     source: query.source ?? null,
   };

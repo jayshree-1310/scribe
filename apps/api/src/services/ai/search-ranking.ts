@@ -15,6 +15,8 @@ export interface PassageHit {
   chapterId: string;
   chapterNumber: number;
   chapterTitle: string;
+  /** The window's position within its chapter, so passages can be put back in reading order. */
+  ordinal: number;
   text: string;
   /** Cosine similarity to the query, 1 being identical direction. */
   similarity: number;

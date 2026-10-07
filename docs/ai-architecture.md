@@ -3,7 +3,7 @@
 How an AI request flows through Scribe, what each layer is responsible for, and
 what a new AI feature has to add. Written for the state after Tasks AI 0
 through AI 5 of `AI-BACKLOG.md`, the reader half of Task AI 6, and Tasks AI 7
-and AI 8:
+through AI 10:
 the module and the provider seam exist, a model can be asked for a shape
 rather than for prose that looks like one, every long answer streams, and five
 features are built on that — Scribble, the chapter recap and passage
@@ -16,6 +16,13 @@ embedded into a `pgvector` table. Task AI 8 is the first thing that reads it —
 hybrid search on Discover, which finds a story by what its chapters are about
 as well as by its title — and the first feature where retrieval, not
 generation, is the whole job: no model writes a word of its output.
+
+Task AI 9 puts the two together. Ask This Book retrieves passages from one
+story, up to where the reader has read, and hands them to a model to answer
+from — the first feature where what reaches the model is chosen by retrieval
+rather than by the caller, and so the first where retrieved text is untrusted
+input in the prompt. Task AI 10 makes it a conversation, which is mostly a
+question of what *not* to send back to the model.
 
 ## The path
 
@@ -81,6 +88,10 @@ design. A model call is the least interesting part of an AI feature.
 | `scripts/seed-embeddings.ts` | `seed:embeddings` — the only thing that fills the table, and the thing that builds its HNSW index. Re-runnable, and free over a corpus that has not changed. |
 | `services/ai/search.ts` | Task AI 8: embed the query, nearest passages under the visibility rule, fuse with `listStories`, re-authorise every row. Returns `listStories`' page shape. |
 | `services/ai/search-ranking.ts` | The pure half of search: the similarity floor, passages into stories, reciprocal-rank fusion, excerpts. Its own file for the reason `chunking.ts` is. |
+| `services/ai/ask-book.ts` | Task AI 9: resolve the spoiler bound, retrieve from one story (meaning and names, fused), decline without a model when nothing qualifies, answer, and derive citations from the markers the answer used. |
+| `services/ai/conversations.ts` | Task AI 10: a turn is remember (`foldIntoSummary`), rewrite (`rewriteQuestion`, gated by `needsRewrite`), retrieve, recall (`selectHistory`), answer, store. Ownership and visibility on every read. |
+| `services/ai/prompts/conversation.ts` | The rewrite and summary prompts. Bookkeeping calls whose output the application reads, not the reader. |
+| `services/ai/prompts/ask-book.ts` | The grounding rules, the fences, and `defang` — what stops a retrieved chapter closing its own fence and speaking as the application. |
 
 ## Rules that the code enforces
 
@@ -283,8 +294,8 @@ because the tokens were generated either way.
 admin view and the same check on every other feature are Task AI 18; this is
 what makes the setting mean something in the meantime.
 
-The two reader features are charged against it as well, and they are the reason
-it stopped being enough to charge `/api/ai/chat` alone. Everything else here is
+The reader features — recap, explain and ask — are charged against it as well,
+and they are the reason it stopped being enough to charge `/api/ai/chat` alone. Everything else here is
 reachable by an *author*, working on their own story — a bounded population
 doing bounded work. `/api/ai/explain` is reachable by every signed-in reader on
 every published chapter, which makes it the widest-open AI surface in the app
@@ -322,7 +333,8 @@ can select the rows that need regenerating.
 
 ### Streaming, in one place
 
-Four routes stream — chat, Scribble, the assistant and explain — through
+Six routes stream — chat, Scribble, the assistant, explain, ask and a
+conversation turn — through
 `writeEvent` and `reportStreamFailure` in `routes/ai.ts`. Headers are written on the *first*
 event, never up front: every service does its authorisation and its first
 provider call before yielding anything, so a 403 or a 503 still reaches
@@ -332,7 +344,7 @@ byte `errorHandler` can no longer answer, so a mid-stream failure is reported
 in-band as an `error` frame, and a stream that ends without its terminal event
 is a failure the client must treat as one.
 
-The browser side is `streamRequest` in `data/ai-api.ts`, shared by all four: `request()` always ends in `response.json()`, so streaming cannot go
+The browser side is `streamRequest` in `data/ai-api.ts`, shared by all six: `request()` always ends in `response.json()`, so streaming cannot go
 through it, and the chunk-boundary handling is the part that is wrong
 *intermittently* when it is wrong — which is the worst way to be wrong twice.
 
@@ -552,6 +564,133 @@ the catalogue.
   for a day by model, width and text; the search itself runs every time,
   because visibility can change between two requests.
 
+## Ask This Book
+
+`POST /api/ai/ask` and `/ask/stream`, taking `{ storyId, question,
+upToChapter? }` — `storyId` may be a slug — behind `requireUser`, a request
+limit and the daily token budget. The "Ask this book" section on the story
+page and the sparkle button in the reader's top bar.
+
+```
+question ─▶ embedQuery ─┬▶ nearestPassages (story, ≤ bound) ─▶ floor ─┐
+                        └▶ nearestPassages (…naming who was asked) ───┴▶ RRF ─▶ findVisibleChapterIds ─▶ top 6
+                                                     nothing left? ─▶ fixed decline, no model call
+                                                                else ─▶ prompt ─▶ stream ─▶ citations
+```
+
+### What reaches the model is decided before it is asked
+
+- **One story, applied twice.** `nearestPassages` takes a `storyId` and the
+  service re-checks every hit against it. The visibility pre-filter is search's
+  own, and `findVisibleChapterIds` is the authority afterwards, exactly as in
+  search.
+- **The spoiler bound is a filter, not an instruction.** Chapters past it are
+  never candidates. It comes from the request, else nothing for the story's
+  author, else the reader's saved position, else the first chapter they can
+  open — the last deliberately conservative, since a reader who has not
+  started has read nothing. The reply's `scope` says which, so the UI can.
+- **Nothing retrieved, no model call.** When no passage qualifies, the answer
+  is a fixed server sentence (`answerable: false`, zero tokens charged). An
+  empty context handed to a model is where a RAG feature's inventions come
+  from. The sentence suggests widening the range only when the range stopped
+  short of the last chapter the reader can open.
+
+### Hybrid, because names do not embed
+
+`namesIn` takes capitalised non-question words from the question; a second
+`nearestPassages` call with a `textPattern` (`\m(Kabir|Arjun)\M`, letters
+only) keeps windows that contain one; the two lists are fused with
+`fuseRankings`. The floor applies to the semantic list only — a window that
+names who was asked about is relevant by that fact, however a six-character
+outline embeds. Measured: "Who is Kabir?" scored 0.49 against the outline that
+answers it. A name the story never mentions finds nothing, so "Who is Ezinma?"
+still declines.
+
+The floor itself is search's `AI_SEARCH_MIN_SIMILARITY`, because it belongs to
+the model. Re-measured for questions on the dev corpus: on-topic 0.61–0.78,
+off-topic 0.40–0.49.
+
+### Citations are derived from the answer, not taken from it
+
+Passages are numbered in reading order (chapter, then window) and the model is
+asked to cite `[n]`. `MARKER_GROUP` accepts `[n]`, `[1, 3]`, `【n】` and
+`【n†source】` — the fullwidth forms because `gpt-oss-120b` used them for every
+citation regardless of the prompt — keeps only numbers that were sent, and
+quotes the *stored* passage for each, with the editor's markdown marks removed
+(`readableQuote`). The JSON reply has invalid markers stripped; the stream
+cannot be rewritten after the fact, so `lib/ask-citations.ts` applies the same
+grammar against the citations on the terminal `done` event.
+
+Citations ride on `done` because they cannot come first: which passages an
+answer leans on is known only once it exists. Nothing is yielded before the
+provider's first delta when there is a model call, so an unreachable model is
+still a 503; the decline path yields at once, having no model call to fail.
+
+### Retrieved text is untrusted, and the defence is structure
+
+Rules live only in the system message. Passages, chapter titles, the story
+title and the question sit inside fences in the user message, and `defang`
+turns `<<<` / `>>>` runs into look-alikes, so a chapter cannot forge the
+closing fence. `ai-ask.test.ts` attacks this with a chapter that says to ignore
+the rules and then writes the closing marker: the system prompt is unchanged,
+the attempt sits inside the fence, the real marker appears once, and the
+request shape matches an ordinary chapter's.
+
+## Conversations
+
+`POST /api/ai/conversations` starts one for a story; `POST …/:id/messages`
+asks a turn (streamed); `GET /api/ai/conversations?storyId=`, `GET …/:id` and
+`DELETE …/:id` read and remove. Turns share Ask This Book's request limit and
+token budget, and `tokensUsed` on the terminal event covers every call the
+turn made.
+
+```
+turn ─▶ ownedConversation (id + owner, story visible) ─▶ resolveAskSetting (bound, per turn)
+     ─▶ foldIntoSummary   (only when 2 old exchanges have piled up)
+     ─▶ rewriteQuestion   (only if needsRewrite)         ─▶ retrievePassages(rewrite)
+     ─▶ selectHistory     (latest + up to 2 by similarity ≥ 0.65)
+     ─▶ answer (passages + summary + recalled exchanges)  ─▶ saveTurn (both halves, one transaction)
+```
+
+### The prompt stays the same size
+
+A twelve-turn conversation does not send twelve turns. The answer prompt holds
+the rolling summary (≤ ~1200 characters), at most three earlier exchanges with
+their answers cut to a paragraph, the passages, and the question — the reader's
+words with the rewrite beside them. The rewrite prompt holds the summary and
+at most three unfolded exchanges. `ai-conversations.test.ts` runs eight turns
+and asserts both bounds on every one, and that turn eight's prompt is no larger
+than turn four's by more than half.
+
+### What goes back, and how
+
+Earlier exchanges are a fenced block of data, not replayed `user` /
+`assistant` messages: their citation markers referred to passages numbered in
+a prompt that no longer exists, and an assistant turn in the history invites
+the model to continue its own earlier mistakes. The conversation system prompt
+adds one rule to Ask This Book's: earlier turns explain what the reader means
+and are never a source. The summary and every recalled answer are model output
+and are defanged and fenced like passages.
+
+### Rewriting only what needs it
+
+`needsRewrite` asks whether the question points back (he, that, there…) or is
+an ellipsis (four words or fewer, no name). Measured against gpt-oss, a model
+asked to "rewrite" a question that already stood alone did not reliably leave
+it alone — "Who is Kabir?" came back with a description of Kabir from an
+earlier answer attached, which then steered retrieval. The gate saves a call on
+most turns and removes that failure. A rewrite that is unusable after the
+repair attempt degrades to searching with the reader's words.
+
+### Storage
+
+`ai.Conversation` (owner, story, title, `summary`, `summarizedThrough`),
+`ai.ConversationMessage` (role, content, the standalone question for user
+turns, the bound and token usage for answers) and `ai.ConversationCitation`
+(chapter, window ordinal, quote). Not chunk ids: chunk rows are replaced on
+re-embedding. Every foreign key cascades. Citations are joined to the
+chapter's current title and re-authorised on every read.
+
 ## Adding a feature
 
 1. A prompt module under `services/ai/prompts/` — never a template literal in a
@@ -573,20 +712,20 @@ the catalogue.
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The remaining features.** Everything built on retrieval — Tasks AI 9
-  onward. Of Task AI 6 only the chapter recap was built; the story-level
+- **The remaining features.** Recommendations and everything after them —
+  Tasks AI 11 onward. Of Task AI 6 only the chapter recap was built; the story-level
   summary, the spoiler-free summary and the map-reduce that a multi-chapter
   summary needs are not here.
 - **Persisted usage, and budgets everywhere else.** The sink still only logs,
   and the table is Task AI 18. `services/ai/budget.ts` enforces
-  `AI_DAILY_TOKEN_BUDGET` on `/api/ai/chat` and on both reader features
-  (`/api/ai/recap` and `/api/ai/explain`, where every signed-in reader can
-  reach it rather than only authors); Scribble, the assistant and generation
+  `AI_DAILY_TOKEN_BUDGET` on `/api/ai/chat` and on the reader features
+  (`/api/ai/recap`, `/api/ai/explain`, `/api/ai/ask` and conversation turns,
+  which every signed-in reader can reach rather than only authors); Scribble, the assistant and generation
   are still rate-limited by *request* only, which caps the blast radius but
   not the spend.
-- **Retrieval-augmented generation.** Search reads the table; nothing yet
-  hands what it retrieves to a model. That is Task AI 9 (Ask This Book), which
-  can reuse `nearestPassages`' visibility pre-filter and the floor.
+- **Answer regeneration.** A conversation turn cannot be re-asked or
+  edited, and the summary is never rebuilt from scratch, so an early
+  summarisation mistake persists for the life of the conversation.
 - **A hosted embedder in practice.** `createOpenAiCompatibleEmbedder` exists
   and is untested against a real provider, because the hosted endpoint this
   repo points at serves chat only.

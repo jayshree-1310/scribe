@@ -295,6 +295,8 @@ namespace auth {
     preference       UserPreference?
     genrePreferences GenrePreference[]
     notificationMutes NotificationMute[]
+    /// Ask This Book conversations this reader started; see `ai.Conversation`.
+    conversations    ai.Conversation[]
   }
 
   /// One reader's settings: what they want recommended, and what they would
@@ -454,6 +456,8 @@ namespace content {
     clubReads        clubs.BookClub[]
     /// Embedded passages of this story's chapters; see `ai.ChapterChunk`.
     embeddingChunks  ai.ChapterChunk[]
+    /// Readers' Ask This Book conversations about this story.
+    conversations    ai.Conversation[]
   }
 
   model Chapter {
@@ -482,6 +486,8 @@ namespace content {
     summary        ai.ChapterSummary?
     /// This chapter's embedded passages; see `ai.ChapterChunk`.
     embeddingChunks ai.ChapterChunk[]
+    /// Places an Ask This Book answer cited this chapter.
+    conversationCitations ai.ConversationCitation[]
 
     @@unique([storyId, chapterNumber])
   }
@@ -1325,5 +1331,111 @@ namespace ai {
     /// Retrieval filters by story; the backfill and reuse path looks up by hash.
     @@index([storyId])
     @@index([chapterId, contentHash])
+  }
+
+  /// One reader's Ask This Book conversation about one story.
+  ///
+  /// **Private to its owner, and asserted on every read**: the service looks
+  /// a conversation up by id *and* `userId` together, so somebody else's id
+  /// resolves to nothing -- a 404, never a 403 that confirms it exists. It is
+  /// also re-checked against the story's visibility, because a conversation
+  /// quotes chapters, and a story its author has since unlisted should not
+  /// keep being quoted through a side door.
+  ///
+  /// **`summary` and `summarizedThrough` are the rolling memory.** A long
+  /// conversation is not replayed to the model turn by turn; once turns fall
+  /// out of the recent window they are folded into `summary`, and
+  /// `summarizedThrough` is the ordinal of the last message folded in. Both
+  /// are model output and are treated as untrusted when they go back into a
+  /// prompt. See `foldIntoSummary` in `services/ai/conversations.ts`.
+  ///
+  /// Every foreign key cascades, as `ChapterChunk`'s do: a conversation has
+  /// no worth once its reader or its story is gone, and the reader's own
+  /// questions are personal data that an account deletion has to take with
+  /// it -- the cascade is what guarantees nobody has to remember to.
+  model Conversation {
+    id                String   @id @default(uuid())
+    userId            String
+    storyId           String
+    /// The opening question, trimmed. A label for the history list.
+    title             String
+    /// Generated; empty until the conversation outgrows its recent window.
+    summary           String   @default("")
+    /// Ordinal of the last message folded into `summary`; 0 for none.
+    summarizedThrough Int      @default(0)
+    createdAt         DateTime @default(now())
+    updatedAt         DateTime @default(now())
+
+    user     auth.User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    story    content.Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    messages ConversationMessage[]
+
+    /// The history list: one reader's conversations about one story.
+    @@index([userId, storyId])
+  }
+
+  /// One turn: a reader's question or the answer to it.
+  ///
+  /// `ordinal` orders the conversation and is unique within it, which is what
+  /// makes "append the next turn" safe against a double-submitted question --
+  /// the second insert collides rather than interleaving.
+  ///
+  /// A question records the **standalone** form it was rewritten to as well as
+  /// what the reader typed: "what happened after that?" is what they asked,
+  /// the rewritten question is what was embedded and retrieved with, and when
+  /// an answer is wrong the rewrite is the first thing to look at.
+  model ConversationMessage {
+    id                 String   @id @default(uuid())
+    conversationId     String
+    ordinal            Int
+    /// `user` or `assistant`.
+    role               String
+    content            String
+    /// User turns: the question rewritten to stand alone. Null on the first
+    /// turn, which needs no rewriting.
+    standaloneQuestion String?
+    /// Assistant turns: the spoiler bound the answer was drawn under, and the
+    /// rule that chose it (`AskScopeBasis`). Null `upToChapter` is the whole story.
+    upToChapter        Int?
+    scopeBasis         String?
+    /// Assistant turns: false when nothing in range covered the question and
+    /// the answer is the app's fixed decline rather than a model's.
+    answerable         Boolean  @default(true)
+    /// Every model call this turn cost -- rewrite, summary and answer.
+    inputTokens        Int      @default(0)
+    outputTokens       Int      @default(0)
+    createdAt          DateTime @default(now())
+
+    conversation Conversation           @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+    citations    ConversationCitation[]
+
+    @@unique([conversationId, ordinal])
+  }
+
+  /// One passage an answer cited, kept so the conversation can be reopened
+  /// with its citations intact.
+  ///
+  /// **Not a chunk id.** The backfill replaces a chapter's chunk rows when it
+  /// re-embeds them, so a chunk id goes stale on the next edit. What is kept
+  /// is the chapter, the window's position in it, and the quote exactly as
+  /// the reader was shown it -- which is what reopening needs, and what stays
+  /// true after an edit. Deleting the chapter deletes the citation; the answer
+  /// keeps its text and loses the link, which the client already handles for
+  /// a marker that points at nothing.
+  model ConversationCitation {
+    id        String @id @default(uuid())
+    messageId String
+    /// The `[n]` the answer used for it.
+    marker    Int
+    chapterId String
+    /// The window's ordinal within the chapter; see `ChapterChunk.ordinal`.
+    ordinal   Int
+    quote     String
+
+    message ConversationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+    chapter content.Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+    @@unique([messageId, marker])
+    @@index([chapterId])
   }
 }

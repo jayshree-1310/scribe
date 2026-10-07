@@ -60,10 +60,27 @@ const usageFor = (model: string, text: string): AiUsage => ({
   durationMs: 1,
 });
 
-export function fakeAiProvider(replies: string[] = ["ok"]): FakeAiProvider {
+export interface FakeProviderOptions {
+  /**
+   * Answers a request directly when it returns a string, before the queue is
+   * consulted. For features that make several different calls per request --
+   * a conversation turn may summarise, rewrite and answer -- where a queue
+   * would encode the call order rather than the behaviour under test.
+   */
+  respond?: (request: AiRequest) => string | undefined;
+}
+
+export function fakeAiProvider(
+  replies: string[] = ["ok"],
+  options: FakeProviderOptions = {},
+): FakeAiProvider {
   const queue = [...replies];
   const calls: RecordedCall[] = [];
   let failure: HttpError | null = null;
+
+  function replyTo(request: AiRequest): string {
+    return options.respond?.(request) ?? nextReply();
+  }
 
   function nextReply(): string {
     // Falls back to the last reply rather than throwing, so a test that makes
@@ -114,7 +131,7 @@ export function fakeAiProvider(replies: string[] = ["ok"]): FakeAiProvider {
       const error = takeFailure();
       if (error) throw error;
 
-      const text = nextReply();
+      const text = replyTo(request);
       return { text, usage: usageFor(request.model ?? "fake-model", text) };
     },
 
@@ -124,7 +141,7 @@ export function fakeAiProvider(replies: string[] = ["ok"]): FakeAiProvider {
       const error = takeFailure();
       if (error) throw error;
 
-      const text = nextReply();
+      const text = replyTo(request);
 
       // Split into several deltas so a consumer that only handles one chunk,
       // or that reassembles them wrongly, is caught.

@@ -129,3 +129,24 @@ export const chapterOutlineSchema = z.object({
 });
 
 export type ChapterOutline = z.infer<typeof chapterOutlineSchema>;
+
+/* Conversation: the standalone question ---------------------------------- */
+
+/**
+ * A follow-up rewritten so it can be searched on its own.
+ *
+ * An object rather than bare text for the reason the other shapes here are
+ * objects: a constrained, validated reply cannot arrive wrapped in "Sure!
+ * Here's the rewritten question:", which a small model will otherwise add.
+ * The cap matches the route's own limit on a question.
+ */
+export const standaloneQuestionSchema = z.object({
+  question: z
+    .string()
+    .trim()
+    .min(1)
+    .max(300)
+    .describe("The reader's latest question, rewritten to make sense with no conversation before it."),
+});
+
+export type StandaloneQuestion = z.infer<typeof standaloneQuestionSchema>;

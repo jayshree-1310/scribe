@@ -27,6 +27,7 @@ import {
 import { LikeButton } from '../components/engagement/LikeButton'
 import { RecapCard } from '../components/ai/RecapCard'
 import { ExplainSheet } from '../components/ai/ExplainSheet'
+import { AskBookSheet } from '../components/ai/AskBookSheet'
 import { readSelection, type ChapterSelection } from '../lib/chapter-selection'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
@@ -178,6 +179,10 @@ export function ReaderPage() {
   const [anchorPoint, setAnchorPoint] = useState({ top: 0, left: 0 })
   const [explaining, setExplaining] = useState(false)
 
+  /** Ask This Book. One sheet at a time: opening it closes the explain sheet. */
+  const [asking, setAsking] = useState(false)
+  const closeAsk = useCallback(() => setAsking(false), [])
+
   /**
    * Offers the trigger when the reader has highlighted something explicable.
    *
@@ -319,6 +324,27 @@ export function ReaderPage() {
             startIcon={<Icon name={bookmarked ? 'bookmark-filled' : 'bookmark'} size="1.1rem" />}
           />
 
+          {/*
+            Only once the chapter list has arrived: the sheet's range picker
+            is built from it, and a story with nothing readable has nothing
+            to ask about.
+          */}
+          {storyId && chapters.status === 'ready' && total > 0 ? (
+            <Button
+              variant="ghost"
+              iconOnly
+              aria-label="Ask this book"
+              title="Ask this book"
+              aria-pressed={asking}
+              onClick={() => {
+                setExplaining(false)
+                setSelection(null)
+                setAsking((open) => !open)
+              }}
+              startIcon={<Icon name="sparkle" size="1.1rem" />}
+            />
+          ) : null}
+
           <Button
             variant="ghost"
             iconOnly
@@ -401,7 +427,10 @@ export function ReaderPage() {
                   top: `${anchorPoint.top}px`,
                   left: `${anchorPoint.left}px`,
                 }}
-                onClick={() => setExplaining(true)}
+                onClick={() => {
+                  setAsking(false)
+                  setExplaining(true)
+                }}
               >
                 <Icon name="sparkle" size="0.9em" />
                 Ask about this
@@ -612,6 +641,25 @@ export function ReaderPage() {
           </article>
         )}
       </main>
+
+      {/*
+        Not keyed by chapter: turning the page with the sheet open keeps the
+        conversation, and its range follows the chapter being read until the
+        reader picks one themselves.
+      */}
+      {asking && storyId && current ? (
+        <AskBookSheet
+          storyId={storyId}
+          storySlug={slug}
+          chapters={chapters.data ?? []}
+          chapterNumber={current.number}
+          onCite={() => {
+            setAsking(false)
+            window.scrollTo({ top: 0 })
+          }}
+          onClose={closeAsk}
+        />
+      ) : null}
 
       {/* Settings ------------------------------------------------------- */}
       <Dialog

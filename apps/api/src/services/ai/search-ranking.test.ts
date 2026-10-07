@@ -29,6 +29,7 @@ function hit(
     chapterId,
     chapterNumber: 1,
     chapterTitle: "Chapter",
+    ordinal: 0,
     text,
     similarity,
   };

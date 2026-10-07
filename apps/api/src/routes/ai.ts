@@ -52,6 +52,19 @@ import {
   getChapterRecap,
 } from "../services/ai/recap.js";
 import { QUERY_LIMIT, SEARCH_MODES, search } from "../services/ai/search.js";
+import {
+  QUESTION_LIMIT,
+  askBook,
+  askBookStream,
+  type AskBookInput,
+} from "../services/ai/ask-book.js";
+import {
+  createConversation,
+  deleteConversation,
+  getConversation,
+  listConversations,
+  sendMessageStream,
+} from "../services/ai/conversations.js";
 import { MAX_PAGE_SIZE } from "../services/stories.js";
 import { logger } from "../lib/logger.js";
 
@@ -868,6 +881,258 @@ router.post("/explain/stream", requireUser, async (req, res, next) => {
         error,
         "The explanation stopped unexpectedly.",
         "explain stream failed after headers",
+      )
+    ) {
+      return;
+    }
+
+    next(error);
+  }
+});
+
+/* Reader: ask this book -------------------------------------------------- */
+
+/**
+ * Explain's numbers, for explain's reason: every signed-in reader can reach
+ * this on every published story, and each answer is an embedding plus a
+ * generation. A reader asks a handful of questions about a book, not one a
+ * second, so the limit is tight and the daily token budget applies.
+ */
+const ASK_LIMIT = 20;
+const NOT_A_CONVERSATION = "That conversation could not be found.";
+const ASK_WINDOW_SECONDS = 60 * 10;
+
+/**
+ * A story and a question, and optionally how far the reader has read.
+ *
+ * The question is free text -- unlike explain's offsets, there is no stored
+ * thing it could be instead. What stops this being a general model proxy is
+ * the service: the model is only ever asked when passages *from this story*
+ * cleared the similarity floor, and is told to answer from them alone.
+ */
+const askBookSchema = z.object({
+  storyId: z.string().trim().min(1, "That story could not be found.").max(200),
+  question: z
+    .string()
+    .trim()
+    .min(3, "Ask a question about the story.")
+    .max(
+      QUESTION_LIMIT,
+      `Keep it under ${QUESTION_LIMIT} characters — one question at a time.`,
+    ),
+  upToChapter: z.coerce
+    .number()
+    .int()
+    .min(1, "Chapters are numbered from 1.")
+    .max(100000)
+    .nullish(),
+});
+
+function toAskBookInput(parsed: z.infer<typeof askBookSchema>): AskBookInput {
+  return {
+    storyKey: parsed.storyId,
+    question: parsed.question,
+    upToChapter: parsed.upToChapter ?? null,
+  };
+}
+
+async function chargeAsk(userId: string): Promise<void> {
+  const key = `ai:ask:${userId}`;
+  const status = await isRateLimited(key, ASK_LIMIT);
+  if (status.limited) {
+    throw HttpError.tooManyRequests(
+      "You have asked a lot of questions in a short time. Try again shortly.",
+      status.retryAfter,
+    );
+  }
+  await assertWithinDailyBudget(userId);
+  await recordAttempt(key, ASK_WINDOW_SECONDS);
+}
+
+router.post("/ask", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const input = toAskBookInput(parseOrThrow(askBookSchema, req.body));
+
+    await chargeAsk(userId);
+
+    const result = await askBook(userId, input, abortOnDisconnect(res).signal);
+    // Zero when the story did not cover the question: no model was asked.
+    await recordTokenUsage(userId, result.tokensUsed);
+
+    res.json({
+      answer: result.answer,
+      answerable: result.answerable,
+      citations: result.citations,
+      scope: result.scope,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** The answer streamed, then its citations on the terminal event. */
+router.post("/ask/stream", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const input = toAskBookInput(parseOrThrow(askBookSchema, req.body));
+
+    await chargeAsk(userId);
+
+    const disconnect = abortOnDisconnect(res);
+
+    for await (const event of askBookStream(userId, input, disconnect.signal)) {
+      if (event.type === "done") {
+        // Same trade as `/explain/stream`: an abandoned stream goes uncharged,
+        // and the request limit above caps doing that on purpose.
+        await recordTokenUsage(userId, event.tokensUsed);
+      }
+      if (!writeEvent(res, event)) break;
+    }
+
+    res.end();
+  } catch (error) {
+    if (
+      reportStreamFailure(
+        res,
+        error,
+        "The answer stopped unexpectedly.",
+        "ask stream failed after headers",
+      )
+    ) {
+      return;
+    }
+
+    next(error);
+  }
+});
+
+/* Reader: conversations -------------------------------------------------- */
+
+/**
+ * Starting a conversation calls no model, but writes a row; this caps a
+ * script filling the table, not a reader, who starts a handful a week.
+ */
+const CONVERSATION_CREATE_LIMIT = 30;
+const CONVERSATION_CREATE_WINDOW_SECONDS = 60 * 10;
+
+const conversationIdSchema = z.object({
+  id: z.uuid(NOT_A_CONVERSATION),
+});
+
+const startConversationSchema = z.object({
+  storyId: z.string().trim().min(1, "That story could not be found.").max(200),
+});
+
+const listConversationsSchema = z.object({
+  storyId: z.string().trim().min(1, "Which story?").max(200),
+});
+
+/** A turn is a question with a bound: Ask This Book's body, minus the story. */
+const sendMessageSchema = z.object({
+  content: askBookSchema.shape.question,
+  upToChapter: askBookSchema.shape.upToChapter,
+});
+
+router.post("/conversations", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const { storyId } = parseOrThrow(startConversationSchema, req.body);
+
+    const key = `ai:conversation:create:${userId}`;
+    const status = await isRateLimited(key, CONVERSATION_CREATE_LIMIT);
+    if (status.limited) {
+      throw HttpError.tooManyRequests(
+        "You have started a lot of conversations in a short time. Try again shortly.",
+        status.retryAfter,
+      );
+    }
+    await recordAttempt(key, CONVERSATION_CREATE_WINDOW_SECONDS);
+
+    res.status(201).json(await createConversation(userId, storyId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * The reads and the delete are not rate-limited, for the reason recap's
+ * `GET` is not: none of them can reach a model, and every one is scoped to
+ * the caller's own rows.
+ */
+router.get("/conversations", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const { storyId } = parseOrThrow(listConversationsSchema, req.query);
+
+    res.json(await listConversations(userId, storyId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/conversations/:id", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const { id } = parseOrThrow(conversationIdSchema, req.params);
+
+    res.json(await getConversation(userId, id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/conversations/:id", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const { id } = parseOrThrow(conversationIdSchema, req.params);
+
+    await deleteConversation(userId, id);
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Ask, in a conversation. Streamed only: a turn is the slowest thing a reader
+ * can ask for here -- up to three model calls -- and nothing reads it but the
+ * panel, which streams.
+ *
+ * Charged against Ask This Book's limit and budget rather than its own, so a
+ * conversation is not a way around them. `tokensUsed` on the terminal event
+ * covers the rewrite and the summary as well as the answer.
+ */
+router.post("/conversations/:id/messages", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const { id } = parseOrThrow(conversationIdSchema, req.params);
+    const body = parseOrThrow(sendMessageSchema, req.body);
+
+    await chargeAsk(userId);
+
+    const disconnect = abortOnDisconnect(res);
+
+    for await (const event of sendMessageStream(
+      userId,
+      id,
+      { content: body.content, upToChapter: body.upToChapter ?? null },
+      disconnect.signal,
+    )) {
+      if (event.type === "done") {
+        await recordTokenUsage(userId, event.tokensUsed);
+      }
+      if (!writeEvent(res, event)) break;
+    }
+
+    res.end();
+  } catch (error) {
+    if (
+      reportStreamFailure(
+        res,
+        error,
+        "The answer stopped unexpectedly.",
+        "conversation stream failed after headers",
       )
     ) {
       return;

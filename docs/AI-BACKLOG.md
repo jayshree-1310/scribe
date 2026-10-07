@@ -991,6 +991,68 @@ only — `listStories`, the keyword half, has never searched the catalogue.
 
 The flagship. Everything so far exists to make this possible.
 
+**Status: built.** `services/ai/ask-book.ts`, `services/ai/prompts/ask-book.ts`,
+`POST /api/ai/ask` and `/ask/stream`, `nearestPassages` and `embedQuery` in
+`search.ts` exported and generalised (a `storyId`, a `maxChapterNumber`, a
+`textPattern`, a row limit, and `ordinal` on every hit),
+`components/ai/AskBookPanel.tsx` as an "Ask this book" section on
+`StoryDetailPage` and `AskBookSheet.tsx` behind a sparkle button in the reader's
+top bar, `lib/ask-citations.ts`. Tests in `routes/ai-ask.test.ts` and
+`services/ai/ask-book.test.ts`. Verified against `nomic-embed-text` and
+`gpt-oss-120b` on Groq over the dev corpus: answers in one to two seconds with
+every claim cited back to its chapter; "What is the capital of France?" and
+"Who is Ezinma?" decline in ~30ms without a model call.
+
+Five things worth knowing before building on it — Task AI 10 will.
+
+**Retrieval is hybrid, because a name has no meaning to embed.** "Who is
+Kabir?" is the most natural question a reader asks, and it scored 0.49 against
+the character outline that answers it — a window describing six people is
+about none of them. So `namesIn` pulls capitalised non-question words out of
+the question, a second `nearestPassages` call keeps only windows that contain
+one (a Postgres `\m…\M` regex, built from letters only), and the two lists are
+fused with search's own `fuseRankings`. The similarity floor applies to the
+semantic list only: a passage naming who was asked about is relevant by that
+fact. A name the story never mentions finds nothing and still declines.
+
+**The floor is search's, re-measured for questions.** On the dev corpus,
+questions about the story scored 0.61–0.78 against their best passage and
+off-topic ones 0.40–0.49, so `AI_SEARCH_MIN_SIMILARITY` (0.5) holds — with a
+thinner margin than for search queries ("What colour is the dragon's saddle?"
+scored 0.494). The model's own instruction to say when the passages do not
+cover it is the second line in that 0.5–0.6 band.
+
+**The spoiler bound is resolved in a fixed order**: the reader's
+`upToChapter`; nothing at all for the story's author; the chapter of their
+saved reading position; and, with no position, the first chapter they can
+open. That last default is deliberately conservative — a reader asking from the
+story page before reading a word has read nothing — and the reply's `scope`
+says which rule applied so the panel can tell them, and offer a wider range as
+an explicit choice labelled as one that may spoil. The bound is a filter in the
+scan, not an instruction: later chapters are never candidates.
+
+**Citations are parsed, not trusted — and gpt-oss writes `【2】`.** Every
+citation `gpt-oss-120b` produced came back in fullwidth brackets despite the
+prompt, so a parser for `[n]` alone returned answers with no citations. The
+grammar (`MARKER_GROUP`) accepts `[n]`, `[1, 3]`, `【n】` and `【n†source】`, keeps
+only numbers that were sent, and quotes the *stored* passage (markdown marks
+removed) for each. The web client repeats the grammar in `lib/ask-citations.ts`
+because a streamed answer is rendered before the server could rewrite it.
+
+**The injection defence is structural.** Rules live only in the system message;
+passages, titles and the question sit inside fences in the user message; and
+`defang` replaces `<<<`/`>>>` runs so a chapter cannot close its own fence.
+`ai-ask.test.ts` embeds a chapter that tries exactly that and asserts the
+system prompt is the constant, the attempt sits inside the fence, the real
+closing marker appears once, and the request shape matches an ordinary
+chapter's. Mutation-checked: dropping the story and chapter filters from both
+the SQL and the code fails seven tests.
+
+Still open: a citation opens its chapter
+but does not scroll to or highlight the passage; and the panel on the story
+page cannot know the saved position client-side, so its range opens on "Where
+I've read to" and the server's `scope` names the chapter afterwards.
+
 **Prompt:**
 
 > Let a reader ask a question about a story and get an answer grounded in its
@@ -1036,6 +1098,76 @@ The flagship. Everything so far exists to make this possible.
 ---
 
 ## Task AI 10 — Conversational book assistant
+
+**Status: built.** `services/ai/conversations.ts`, `services/ai/prompts/conversation.ts`,
+`ai.Conversation`, `ai.ConversationMessage` and `ai.ConversationCitation` in
+`contract.prisma` plus migration `20261007T0953_add_ai_conversations`,
+`POST`/`GET /api/ai/conversations`, `GET`/`DELETE /api/ai/conversations/:id` and
+`POST /api/ai/conversations/:id/messages` (streamed), `standaloneQuestionSchema`
+in `schemas.ts`, and `AskBookPanel` reworked into a conversation (thread,
+per-answer citations, "Searched for …" under a rewritten follow-up, a picker of
+earlier conversations, New, and delete with an inline confirm). Ask This
+Book's own `ask-book.ts` was split into `resolveAskSetting` and
+`retrievePassages` so a turn retrieves with its rewrite rather than copying
+the retrieval. Tests in `routes/ai-conversations.test.ts` and
+`services/ai/conversations.test.ts`; the fake provider gained a `respond`
+option so a test can answer by feature instead of by call order. Verified
+against `gpt-oss-120b` and `nomic-embed-text` on the dev corpus over a
+seven-turn conversation: "What does he want from her?" was searched as "What
+does Arjun want from Anya?", and the rolling summary folded the first two
+exchanges on turn five as designed.
+
+Five things worth knowing before building on it.
+
+**The three context functions, and their numbers.** `rewriteQuestion` sees the
+summary plus every exchange not yet folded (at most three). `foldIntoSummary`
+keeps the last `RECENT_EXCHANGES` (2) out of the summary and folds the rest in
+batches of `FOLD_BATCH` (2), so a fold costs a model call on half the turns
+after the fourth, not on every one; the summary is capped at ~1200 characters
+and persisted as soon as it is written. `selectHistory` always sends the latest
+exchange and adds up to two older ones whose questions sit within
+`HISTORY_MIN_SIMILARITY` (0.65) of the current one. That threshold was measured:
+related questions scored 0.72–0.83, unrelated 0.38–0.48, with two awkward cases
+at 0.61 and 0.62. Its embeddings are almost always cache hits, because every
+standalone question was embedded with exactly that text when it was asked.
+
+**Only questions that need it are rewritten.** `needsRewrite` gates the call:
+a referring word (he, that, there…) or a short question that names nobody.
+This was a fix, not an optimisation — asked to rewrite "Who is Kabir?" with
+history in view, gpt-oss returned "Who is Kabir, the character who whispered
+Arjun's name to Anya?", smuggling an earlier answer into the search query. The
+prompt now says to add nothing, and the gate means it is rarely asked to. An
+unusable rewrite (a 502 after the repair attempt) degrades to searching with
+the reader's words rather than failing the turn.
+
+**Earlier turns go back as fenced data, not as chat roles.** Their citation
+markers referred to passages numbered in a prompt that no longer exists, and
+an `assistant` message invites the model to continue its own earlier mistakes.
+The conversation system prompt (`ASK_BOOK_CONVERSATION_SYSTEM_PROMPT`) says
+earlier turns are context and never a source: answers still rest on passages
+only.
+
+**Citations are a table, not chunk ids.** The prompt asked for "cited chunk
+ids", but the backfill deletes and re-inserts a chapter's chunk rows on
+re-embedding, so those ids go stale on the next edit — and scalar lists are
+rejected by this Prisma version anyway. `ConversationCitation` keeps the
+chapter, the window's ordinal and the quote as shown; it cascades from the
+chapter, and on every read it is joined to the chapter's current title and
+re-authorised through `findVisibleChapterIds`.
+
+**Privacy and lifetime.** Every read is by id *and* owner (404 otherwise, mutation-
+checked) and re-checks the story's visibility, so an unlisted story stops being
+quotable through an old conversation — though its owner can still delete it.
+Every foreign key cascades, so neither `deleteAccount` nor `deleteStory` needs
+to know these tables exist. A turn is stored only when its answer completes,
+both halves in one transaction, and `(conversationId, ordinal)` makes a
+double-submitted question collide rather than interleave. A conversation caps
+at 200 messages.
+
+Still open: no "regenerate this answer" or editing an earlier question; the
+summary is never re-folded from scratch, so an early summarisation mistake
+persists; and the reader sheet remembers the open conversation per tab
+(`sessionStorage`), not across devices.
 
 **Prompt:**
 

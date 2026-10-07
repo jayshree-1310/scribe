@@ -39,6 +39,7 @@ import { EmptyState, ErrorState } from '../components/ui/States'
 import { StoryCard, StoryCardSkeleton } from '../components/story/StoryCard'
 import { StoryCover } from '../components/story/StoryCover'
 import { RatingBars } from '../components/charts/RatingBars'
+import { AskBookPanel } from '../components/ai/AskBookPanel'
 import './pages.css'
 import './story-detail.css'
 
@@ -752,6 +753,29 @@ export function StoryDetailPage() {
             </ul>
           )}
         </TabPanel>
+      ) : null}
+
+      {/* Ask this book -------------------------------------------------- */}
+      {/*
+        Only once there is something readable to answer from. The range
+        starts at "where I've read to" — the server's default from the
+        reader's saved position — because from here the page cannot know.
+      */}
+      {data.chapterCount > 0 && chapters.status === 'ready' ? (
+        <section className="page-section" aria-label="Ask this book">
+          <SectionHead
+            title="Ask this book"
+            subtitle="Ask, then ask a follow-up. Answered from the story’s own chapters, with the passages to check — and nothing past where you’ve read."
+          />
+          <Card>
+            <AskBookPanel
+              storyId={data.id}
+              storySlug={data.slug}
+              chapters={chapters.data ?? []}
+              defaultUpTo={null}
+            />
+          </Card>
+        </section>
       ) : null}
 
       {/* About the author ----------------------------------------------- */}
