@@ -1212,8 +1212,11 @@ hidden.
 The ranking is **one SQL statement and one documented scoring function**
 (`WEIGHTS` in `services/recommendations.ts`): a preferred genre is worth more
 than every other term combined, then a followed author, then the genres implied
-by the reader's shelves, reading history and ratings, then length fit, then the
-story's own rating, freshness and popularity. It is deterministic — no
+by the reader's shelves, reading history and ratings and how closely the prose
+reads like the nearest story they liked (stored embeddings compared in SQL — no
+model is called to rank), then length fit, then the story's own rating,
+freshness and popularity. The page is picked from that ranking under two caps,
+two stories per author and half the page per genre. It is deterministic — no
 randomness, no per-request shuffle, `id` as the final tie-break — so two
 identical requests return the same order and a rail cannot jump under somebody.
 Stories the reader has already met, drafts, catalogue editions and their own

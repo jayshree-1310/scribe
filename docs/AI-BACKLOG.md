@@ -1214,6 +1214,65 @@ dominant term, and falls back to trending for a reader with no signal. So three
 of the four things below are in place and this task is the semantic signal plus
 the diversity caps.
 
+**Status: built.** A `similar` term in `rankStories` and `WEIGHTS`
+(`services/recommendations.ts`), `services/recommendation-diversity.ts`,
+`embeddingSpace()` in `services/ai/embeddings.ts`,
+`AI_RECOMMEND_MIN_SIMILARITY` / `AI_RECOMMEND_FULL_SIMILARITY` in `config.ts`.
+No new endpoint, no schema change, no change to the response shape — the home
+rail already prints `reason`. Tests in `routes/recommendations.test.ts` and
+`services/recommendation-diversity.test.ts`. Verified against
+`nomic-embed-text`: a reader who rated *11:47 — The Girl Who Changed Time*
+was offered six one-chapter stories written for the check, and the time-loop
+one scored 2.78 against 2.20 for each of the other five.
+
+Five things worth knowing before building on it.
+
+**No model is called to rank.** There are no story embeddings in the tree —
+Task AI 7 stores passage vectors — so a story's vector is the average of its
+published passages, computed in the statement with pgvector's `AVG`. The term
+compares stored rows with stored rows: zero tokens, no outage path, and the
+ranking is exactly as deterministic as it was. A story the backfill has not
+embedded scores zero on this term and is ranked by the other seven. The
+recommender still imports no provider: it asks `embeddingSpace()` which model's
+rows are comparable and binds the name into the SQL.
+
+**A candidate is scored against its nearest liked story, not an average
+taste.** A reader who likes heist novels and pastoral romance has no meaningful
+midpoint, and "similar to this one book" is the only version of the reason a
+card can state. Anchors are stories whose signal weights sum above zero —
+shelved, read, rated 4 or 5 — that are still listed, the twenty most recently
+touched. A disliked story is not an anchor: the term only adds.
+
+**The band is narrow, and thinly measured.** Averaging pulls every story toward
+the middle of the space, so unrelated fiction scored 0.64–0.71 against other
+fiction whatever the genres, a real thematic match 0.73–0.78, and two halves
+of one novel 0.94+. The term pays nothing at 0.70, in full at 0.85, linearly
+between. **The dev corpus has one embedded story**, so those numbers come from
+it and six passages written for the purpose — re-measure once a dozen stories
+are embedded. In practice a real match earns well under the full 2.5, which
+means the sentence under the card is often a different term's: the reason is
+whichever term contributed most, and that rule was not bent to show off this
+one.
+
+**The reason says "similar", not "similar in tone".** The vectors measure what
+the prose is about. The title and the shelf in the sentence are read off the
+same row that earned the points (`similarTitle`, `similarVia`), so the card
+cannot name a book the score was not measured against.
+
+**The caps reorder; they never shorten the rail.** Two stories per author, half
+the page per genre (a story counts against every genre it carries), chosen
+greedily over a pool four pages deep after hydration — on the author and
+genres printed on the card. A story over a cap is held back and fills whatever
+room is left, so a corpus with one author returns the plain ranking. This is
+the one part of the feature not in SQL: a greedy pass depends on what was
+already picked, and it is a pure function so the caps are tested without a
+database.
+
+Still open: every candidate's vector is re-averaged on every request, which is
+a few hundred rows today — the fix is a stored vector per story written by the
+embedding pass; and Scribble's retrieval stage could now call this scorer
+instead of `listBooks`, as the note above says.
+
 **Prompt:**
 
 > `services/recommendations.ts` produces a deterministic recommendation score

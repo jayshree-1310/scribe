@@ -295,6 +295,30 @@ export interface AiEmbedConfig {
    * rather than to exclude. Measured as for search; see `docs/ai-architecture.md`.
    */
   bibleMinSimilarity: number;
+  /**
+   * The band a story-to-story similarity is scored across, for
+   * recommendations: nothing at or below `recommendMinSimilarity`, full marks
+   * at `recommendFullSimilarity`, linear between.
+   *
+   * A third pair of numbers because this is a third comparison: a whole story
+   * against a whole story, each the average of its passages' vectors. Averaging
+   * pulls every story towards the middle of the space, so two novels with
+   * nothing in common still score far above anything search would call a
+   * match, and the useful range is narrow and high.
+   *
+   * Measured with `nomic-embed-text`, and thinly: the dev corpus has one
+   * embedded story, so it was compared against six short passages written for
+   * the purpose, one per genre. Fiction against unrelated fiction scored
+   * 0.64-0.71 whatever the genres; the one real thematic match (a time-loop
+   * passage against a time-travel novel) 0.78; two halves of the same novel
+   * 0.94 and up. Run through the real chunker and the endpoint, that match
+   * came out at 0.73 and five unrelated stories at or under 0.70. So 0.70 is
+   * the top of "it is also fiction" and 0.85 is close enough that more
+   * closeness should not buy more rank. Re-measure both once
+   * there are a dozen embedded stories to measure between.
+   */
+  recommendMinSimilarity: number;
+  recommendFullSimilarity: number;
 }
 
 const EMBED_DEFAULTS = {
@@ -306,6 +330,8 @@ const EMBED_DEFAULTS = {
   batchSize: 16,
   searchMinSimilarity: 0.5,
   bibleMinSimilarity: 0.45,
+  recommendMinSimilarity: 0.7,
+  recommendFullSimilarity: 0.85,
 };
 
 /** `readInt`'s rule for a fraction: a typo falls back rather than becoming NaN. */
@@ -352,6 +378,14 @@ export function loadAiEmbedConfig(): AiEmbedConfig {
     bibleMinSimilarity: readFraction(
       "AI_BIBLE_MIN_SIMILARITY",
       EMBED_DEFAULTS.bibleMinSimilarity,
+    ),
+    recommendMinSimilarity: readFraction(
+      "AI_RECOMMEND_MIN_SIMILARITY",
+      EMBED_DEFAULTS.recommendMinSimilarity,
+    ),
+    recommendFullSimilarity: readFraction(
+      "AI_RECOMMEND_FULL_SIMILARITY",
+      EMBED_DEFAULTS.recommendFullSimilarity,
     ),
   };
 }

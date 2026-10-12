@@ -691,6 +691,24 @@ turns, the bound and token usage for answers) and `ai.ConversationCitation`
 re-embedding. Every foreign key cascades. Citations are joined to the
 chapter's current title and re-authorised on every read.
 
+## Recommendations
+
+`GET /api/recommendations` is not an AI route and calls no model. Its scorer
+(`services/recommendations.ts`) gained one term, `similar`, that reads the
+chunk table: a story's vector is the average of its published passages, a
+candidate is compared with the nearest story the reader liked, and the cosine
+similarity is scaled across `AI_RECOMMEND_MIN_SIMILARITY` –
+`AI_RECOMMEND_FULL_SIMILARITY` (0.70 – 0.85 for `nomic-embed-text`; whole
+stories sit far closer together than a query and a passage, so the band is
+narrow and high). It is arithmetic on stored rows inside the one ranking
+statement, so it costs no tokens and has no outage path; `embeddingSpace()`
+names the model whose rows are comparable, and rows from any other model are
+ignored. Unpublished chapters are excluded from the average.
+
+The page is then chosen from a pool four pages deep by
+`services/recommendation-diversity.ts`: two stories per author, half the page
+per genre, with held-back stories filling any room left.
+
 ## Adding a feature
 
 1. A prompt module under `services/ai/prompts/` — never a template literal in a
@@ -712,8 +730,8 @@ chapter's current title and re-authorised on every read.
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The remaining features.** Recommendations and everything after them —
-  Tasks AI 11 onward. Of Task AI 6 only the chapter recap was built; the story-level
+- **The remaining features.** Moderation and everything after it —
+  Tasks AI 12 onward. Of Task AI 6 only the chapter recap was built; the story-level
   summary, the spoiler-free summary and the map-reduce that a multi-chapter
   summary needs are not here.
 - **Persisted usage, and budgets everywhere else.** The sink still only logs,

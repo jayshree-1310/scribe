@@ -385,6 +385,35 @@ export async function ensureEmbeddingIndex(): Promise<void> {
   await db.runtime().query(plan);
 }
 
+/* The space stored vectors live in ---------------------------------------- */
+
+/** The model and width a stored row must carry to be compared with another. */
+export interface EmbeddingSpace {
+  model: string;
+  dimensions: number;
+}
+
+/**
+ * Which stored vectors are comparable right now, or null when no embedder is
+ * configured.
+ *
+ * For a caller that compares stored vectors with each other and never embeds
+ * anything -- recommendations rank stories against stories -- so it needs the
+ * name of the space and no model call. Null rather than a throw because such a
+ * caller has an answer without embeddings; only "not configured" is swallowed,
+ * since that is the one failure that means "this server has no vectors" rather
+ * than "something is broken".
+ */
+export function embeddingSpace(): EmbeddingSpace | null {
+  try {
+    const embedder = aiEmbedder();
+    return { model: embedder.model, dimensions: embedder.dimensions };
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 503) return null;
+    throw error;
+  }
+}
+
 /* Inspection ------------------------------------------------------------- */
 
 /** How many windows are stored for a chapter. For tests and the backfill. */

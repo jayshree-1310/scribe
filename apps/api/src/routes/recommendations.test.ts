@@ -1,7 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { embedChapter } from "../services/ai/embeddings.js";
+import { resetAiEmbedder, setAiEmbedder } from "../services/ai/provider.js";
+import { fakeAiEmbedder } from "../services/ai/testing.js";
 import { TestApi, databaseAvailable } from "../test/harness.js";
 import type {
   AuthorSuggestion,
+  Recommendation,
   Recommendations,
 } from "../services/recommendations.js";
 
@@ -36,6 +40,43 @@ function rankOf(list: Recommendations, storyId: string): number {
   return at === -1 ? Number.POSITIVE_INFINITY : at;
 }
 
+function itemOf(
+  list: Recommendations,
+  storyId: string,
+): Recommendation | undefined {
+  return list.items.find((item) => item.story.id === storyId);
+}
+
+/**
+ * A fake that knows two things: some words are about the sea, and some are
+ * about money. A chapter mentioning either embeds onto that concept's axis, so
+ * two sea chapters are identical and a sea chapter and a money chapter have
+ * nothing in common -- which is all a ranking test needs from a model.
+ *
+ * Its own model name, so the ranker compares only rows this suite embedded
+ * and the fixtures above, which have no vectors at all, are untouched by it.
+ */
+const CONCEPTS = {
+  sea: ["lighthouse", "harbour", "tide"],
+  money: ["ledger", "audit", "invoice"],
+};
+
+function conceptEmbedder(model = "fake-recommend") {
+  return fakeAiEmbedder(768, { model, concepts: CONCEPTS });
+}
+
+/** A chapter, embedded through the real pass. */
+async function chapterOf(
+  storyId: string,
+  number: number,
+  content: string,
+  published = true,
+): Promise<string> {
+  const id = await api.createChapter({ storyId, number, content, published });
+  await embedChapter({ id, storyId, content });
+  return id;
+}
+
 async function recommend(
   userId: string,
   query = "?limit=24",
@@ -67,6 +108,22 @@ let draftStory: { id: string; slug: string };
 let catalogueBook: string;
 let finishedStory: { id: string; slug: string };
 let finishedChapter: string;
+
+/** The similarity fixtures: two readers with opposite shelves, three stories. */
+let seaReader: string;
+let moneyReader: string;
+let seaBook: string;
+let moneyBook: string;
+let seaStory: { id: string; slug: string };
+let moneyStory: { id: string; slug: string };
+let hiddenSeaStory: { id: string; slug: string };
+
+/** The diversity fixtures. */
+let fan: string;
+let prolific: string;
+let prolificStories: string[];
+let crowdReader: string;
+let crowdStories: string[];
 
 beforeAll(async () => {
   if (!available) return;
@@ -128,10 +185,83 @@ beforeAll(async () => {
     storyId: finishedStory.id,
     number: 1,
   });
+
+  setAiEmbedder(conceptEmbedder());
+
+  seaReader = await api.createUser("rsea");
+  moneyReader = await api.createUser("rmon");
+  const seaAuthor = await api.createUser("rsa", { isAuthor: true });
+  const moneyAuthor = await api.createUser("rma", { isAuthor: true });
+
+  // No genres anywhere in this group: shelving one of the books must teach
+  // the ranker nothing through tags, so prose is the only thing that can
+  // separate the two stories.
+  seaBook = await api.createBook({ title: "The Keeper Light", authorId: other });
+  await chapterOf(seaBook, 1, "The lighthouse stood where the charts ended.");
+
+  moneyBook = await api.createBook({ title: "Audit Season", authorId: other });
+  await chapterOf(moneyBook, 1, "Every invoice was accounted for but one.");
+
+  seaStory = await api.createStory({
+    title: "Salt And Signal",
+    authorId: seaAuthor,
+  });
+  await chapterOf(seaStory.id, 1, "The harbour emptied with the tide.");
+
+  moneyStory = await api.createStory({
+    title: "Double Entry",
+    authorId: moneyAuthor,
+  });
+  await chapterOf(moneyStory.id, 1, "The ledger did not balance.");
+
+  // Reads like the sea only in chapters nobody else can open, and they
+  // outnumber the one that is published: counted, they would make this the
+  // sea reader's best match. They were embedded anyway -- a chapter can be
+  // embedded and then unpublished.
+  hiddenSeaStory = await api.createStory({
+    title: "Still In Draft",
+    authorId: seaAuthor,
+  });
+  await chapterOf(hiddenSeaStory.id, 1, "An audit, to begin with.");
+  await chapterOf(hiddenSeaStory.id, 2, "The lighthouse, at last.", false);
+  await chapterOf(hiddenSeaStory.id, 3, "The tide came in.", false);
+
+  // Followed, so all four of this author's stories outscore everything else
+  // this reader is offered -- with no genre in play to trip the other cap.
+  fan = await api.createUser("rfan");
+  prolific = await api.createUser("rpro", { isAuthor: true });
+  await api.createFollow({ followerId: fan, followingId: prolific });
+  prolificStories = [];
+  for (const title of ["First", "Second", "Third", "Fourth"]) {
+    const story = await api.createStory({
+      title: `Prolific ${title}`,
+      authorId: prolific,
+    });
+    await api.createChapter({ storyId: story.id, number: 1 });
+    prolificStories.push(story.id);
+  }
+
+  // One genre, four authors: only the genre cap can hold any of these back.
+  crowdReader = await api.createUser("rcrd");
+  const crowd = await api.createGenre("rec-crowd");
+  await api.setPreferences(crowdReader, { genreIds: [crowd] });
+  crowdStories = [];
+  for (const label of ["c1", "c2", "c3", "c4"]) {
+    const writer = await api.createUser(`r${label}`, { isAuthor: true });
+    const story = await api.createStory({
+      title: `Crowded ${label}`,
+      authorId: writer,
+      genreIds: [crowd],
+    });
+    await api.createChapter({ storyId: story.id, number: 1 });
+    crowdStories.push(story.id);
+  }
 }, 30_000);
 
 afterAll(async () => {
-  if (available) await api.stop();
+  if (!available) return;
+  resetAiEmbedder();
+  await api.stop();
 });
 
 describe.skipIf(!available)("cold start", () => {
@@ -299,6 +429,132 @@ describe.skipIf(!available)("other signals", () => {
     expect(rankOf(list, sagaStory.id)).toBeLessThan(
       rankOf(list, noirStory.id),
     );
+  });
+});
+
+describe.skipIf(!available)("content similarity", () => {
+  it("lifts the story that reads like one on the reader's shelf", async () => {
+    const shelved = await api.request("/api/library", {
+      method: "POST",
+      as: seaReader,
+      body: { bookId: seaBook, status: "FINISHED" },
+    });
+    expect(shelved.status).toBe(201);
+    api.track((shelved.body as { entry: { id: string } }).entry.id);
+
+    const list = await recommend(seaReader);
+
+    expect(positionOf(list, seaStory.id)).toBeGreaterThanOrEqual(0);
+    expect(rankOf(list, seaStory.id)).toBeLessThan(
+      rankOf(list, moneyStory.id),
+    );
+  });
+
+  it("lifts the other story for a reader with the other taste", async () => {
+    // The same two candidates, an opposite signal, the opposite order: the
+    // term follows the reader, not something about either story.
+    await api.createRating({ userId: moneyReader, storyId: moneyBook, rating: 5 });
+
+    const list = await recommend(moneyReader);
+
+    expect(positionOf(list, moneyStory.id)).toBeGreaterThanOrEqual(0);
+    expect(rankOf(list, moneyStory.id)).toBeLessThan(
+      rankOf(list, seaStory.id),
+    );
+  });
+
+  it("names the story it resembles and the shelf it is on", async () => {
+    const list = await recommend(seaReader);
+
+    expect(itemOf(list, seaStory.id)?.reason).toBe(
+      "Similar to The Keeper Light on your Finished shelf",
+    );
+  });
+
+  it("words a rating differently from a shelf", async () => {
+    const list = await recommend(moneyReader);
+
+    expect(itemOf(list, moneyStory.id)?.reason).toBe(
+      "Similar to Audit Season, which you rated highly",
+    );
+  });
+
+  it("gives no similarity reason to a story that earned no similarity", async () => {
+    const list = await recommend(seaReader);
+
+    // Absent is fine -- it scored lower -- but it may not claim a likeness.
+    expect(itemOf(list, moneyStory.id)?.reason ?? "").not.toMatch(/^Similar to/);
+  });
+
+  it("is not moved by a chapter the reader cannot open", async () => {
+    const list = await recommend(seaReader);
+
+    expect(itemOf(list, hiddenSeaStory.id)?.reason ?? "").not.toMatch(
+      /^Similar to/,
+    );
+    expect(rankOf(list, seaStory.id)).toBeLessThan(
+      rankOf(list, hiddenSeaStory.id),
+    );
+  });
+
+  it("never offers the liked story back as its own nearest match", async () => {
+    const list = await recommend(seaReader);
+
+    expect(positionOf(list, seaBook)).toBe(-1);
+  });
+
+  it("ignores vectors written by a model it is not configured with", async () => {
+    const before = itemOf(await recommend(seaReader), seaStory.id);
+    expect(before?.reason).toMatch(/^Similar to/);
+
+    // The rows are still there; they are in another space now.
+    setAiEmbedder(conceptEmbedder("fake-recommend-other"));
+    try {
+      const after = itemOf(await recommend(seaReader), seaStory.id);
+
+      expect(after?.reason ?? "").not.toMatch(/^Similar to/);
+      expect(after?.score ?? 0).toBeLessThan(before?.score ?? 0);
+    } finally {
+      setAiEmbedder(conceptEmbedder());
+    }
+  });
+
+  it("ranks without calling a model", async () => {
+    const embedder = conceptEmbedder();
+    setAiEmbedder(embedder);
+
+    await recommend(seaReader);
+
+    expect(embedder.calls).toHaveLength(0);
+  });
+});
+
+describe.skipIf(!available)("diversity", () => {
+  it("holds one author to two stories on a page", async () => {
+    const list = await recommend(fan, "?limit=4");
+    const byProlific = list.items.filter(
+      (item) => item.story.author.id === prolific,
+    );
+
+    expect(list.items).toHaveLength(4);
+    expect(byProlific).toHaveLength(2);
+    // The two that made it are the top of the page, not somewhere on it.
+    expect(list.items.slice(0, 2).map((item) => item.story.author.id)).toEqual(
+      [prolific, prolific],
+    );
+  });
+
+  it("holds one genre to half the page", async () => {
+    const list = await recommend(crowdReader, "?limit=4");
+    const crowded = list.items.filter((item) =>
+      crowdStories.includes(item.story.id),
+    );
+
+    expect(list.items).toHaveLength(4);
+    expect(crowded).toHaveLength(2);
+    expect(
+      list.items.slice(0, 2).every((item) => crowdStories.includes(item.story.id)),
+    ).toBe(true);
   });
 });
 
