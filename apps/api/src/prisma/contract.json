@@ -104,6 +104,14 @@
       "model": "LibraryEntry",
       "namespace": "library"
     },
+    "moderationDecision": {
+      "model": "ModerationDecision",
+      "namespace": "ai"
+    },
+    "moderationScore": {
+      "model": "ModerationScore",
+      "namespace": "ai"
+    },
     "multimedia": {
       "model": "Multimedia",
       "namespace": "content"
@@ -1411,6 +1419,232 @@
               },
               "namespaceId": "ai",
               "table": "conversationMessage"
+            }
+          },
+          "ModerationDecision": {
+            "fields": {
+              "category": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "contentHash": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "failure": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "outcome": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ModerationOutcome",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              },
+              "promptVersion": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "rejectThreshold": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/numeric@1",
+                  "kind": "scalar"
+                }
+              },
+              "reportId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "reviewThreshold": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/numeric@1",
+                  "kind": "scalar"
+                }
+              },
+              "targetId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "targetType": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                },
+                "valueSet": {
+                  "entityKind": "enum",
+                  "entityName": "ReportTarget",
+                  "namespaceId": "public",
+                  "plane": "domain"
+                }
+              }
+            },
+            "relations": {
+              "scores": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "decisionId"
+                  ]
+                },
+                "to": {
+                  "model": "ModerationScore",
+                  "namespace": "ai"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "category": {
+                  "column": "category"
+                },
+                "contentHash": {
+                  "column": "contentHash"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "failure": {
+                  "column": "failure"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "outcome": {
+                  "column": "outcome"
+                },
+                "promptVersion": {
+                  "column": "promptVersion"
+                },
+                "rejectThreshold": {
+                  "column": "rejectThreshold"
+                },
+                "reportId": {
+                  "column": "reportId"
+                },
+                "reviewThreshold": {
+                  "column": "reviewThreshold"
+                },
+                "targetId": {
+                  "column": "targetId"
+                },
+                "targetType": {
+                  "column": "targetType"
+                }
+              },
+              "namespaceId": "ai",
+              "table": "moderationDecision"
+            }
+          },
+          "ModerationScore": {
+            "fields": {
+              "category": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "confidence": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/numeric@1",
+                  "kind": "scalar"
+                }
+              },
+              "decisionId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "decision": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "decisionId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "ModerationDecision",
+                  "namespace": "ai"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "category": {
+                  "column": "category"
+                },
+                "confidence": {
+                  "column": "confidence"
+                },
+                "decisionId": {
+                  "column": "decisionId"
+                }
+              },
+              "namespaceId": "ai",
+              "table": "moderationScore"
             }
           },
           "StoryFact": {
@@ -5633,7 +5867,7 @@
                 }
               },
               "reporterId": {
-                "nullable": false,
+                "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
                   "kind": "scalar"
@@ -5992,6 +6226,27 @@
               {
                 "name": "CATALOGUE",
                 "value": "CATALOGUE"
+              }
+            ]
+          },
+          "ModerationOutcome": {
+            "codecId": "pg/text@1",
+            "members": [
+              {
+                "name": "ALLOW",
+                "value": "ALLOW"
+              },
+              {
+                "name": "REVIEW",
+                "value": "REVIEW"
+              },
+              {
+                "name": "REJECT",
+                "value": "REJECT"
+              },
+              {
+                "name": "UNCHECKED",
+                "value": "UNCHECKED"
               }
             ]
           },
@@ -7257,6 +7512,194 @@
                   ]
                 }
               ]
+            },
+            "moderationDecision": {
+              "checks": [
+                {
+                  "expression": "\"outcome\" IN ('ALLOW', 'REVIEW', 'REJECT', 'UNCHECKED')",
+                  "name": "moderationDecision_outcome_check_a24db8d8",
+                  "prefix": "moderationDecision_outcome_check"
+                },
+                {
+                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST')",
+                  "name": "moderationDecision_targetType_check_2c6acd2f",
+                  "prefix": "moderationDecision_targetType_check"
+                }
+              ],
+              "columns": {
+                "category": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "contentHash": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "failure": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "outcome": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ModerationOutcome",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                },
+                "promptVersion": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "rejectThreshold": {
+                  "codecId": "pg/numeric@1",
+                  "nativeType": "numeric",
+                  "nullable": false
+                },
+                "reportId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "reviewThreshold": {
+                  "codecId": "pg/numeric@1",
+                  "nativeType": "numeric",
+                  "nullable": false
+                },
+                "targetId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "targetType": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false,
+                  "valueSet": {
+                    "entityKind": "valueSet",
+                    "entityName": "ReportTarget",
+                    "namespaceId": "public",
+                    "plane": "storage"
+                  }
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "outcome",
+                    "createdAt"
+                  ],
+                  "name": "moderationDecision_outcome_createdAt_idx_f02d4ff3",
+                  "prefix": "moderationDecision_outcome_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "reportId"
+                  ],
+                  "name": "moderationDecision_reportId_idx_d163019e",
+                  "prefix": "moderationDecision_reportId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "targetType",
+                    "targetId",
+                    "createdAt"
+                  ],
+                  "name": "moderationDecision_targetType_targetId_createdAt_idx_e37b8716",
+                  "prefix": "moderationDecision_targetType_targetId_createdAt_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
+            "moderationScore": {
+              "columns": {
+                "category": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "confidence": {
+                  "codecId": "pg/numeric@1",
+                  "nativeType": "numeric",
+                  "nullable": false
+                },
+                "decisionId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "decisionId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "moderationScore"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "moderationDecision"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "decisionId"
+                  ],
+                  "name": "moderationScore_decisionId_idx_8a798f77",
+                  "prefix": "moderationScore_decisionId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "decisionId",
+                  "category"
+                ]
+              },
+              "uniques": []
             },
             "storyFact": {
               "columns": {
@@ -10560,7 +11003,7 @@
                 "reporterId": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
-                  "nullable": false
+                  "nullable": true
                 },
                 "resolvedAt": {
                   "codecId": "pg/timestamptz-temporal@1",
@@ -10904,6 +11347,15 @@
                 "CATALOGUE"
               ]
             },
+            "ModerationOutcome": {
+              "kind": "valueSet",
+              "values": [
+                "ALLOW",
+                "REVIEW",
+                "REJECT",
+                "UNCHECKED"
+              ]
+            },
             "MultimediaType": {
               "kind": "valueSet",
               "values": [
@@ -10976,10 +11428,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "0c167f3d32cb8e11103360cae4c1ec9ed7bbdaf214fef734a0c4c5e27363b96f"
+    "storageHash": "1564cbe72a2717524fd177d00afbcaef672712e0e43186ddf2baafe11ac05344"
   },
   "execution": {
-    "executionHash": "b8f3f8a09301b31cdc2a4c89aa817bb3a16ce2ab38cfc0bda5797ae672d718fb",
+    "executionHash": "e8f10f7994f9924e80d74777ccb6ae789bf0509d2e3a57563d42908184c44051",
     "mutations": {
       "defaults": [
         {
@@ -11222,6 +11674,17 @@
             "column": "id",
             "namespace": "library",
             "table": "libraryEntry"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "ai",
+            "table": "moderationDecision"
           }
         },
         {

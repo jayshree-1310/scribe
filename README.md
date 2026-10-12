@@ -1335,7 +1335,9 @@ The web app has no test suite yet.
       applied (AI 18)
 - [x] AI 7 — embeddings: chunked, hashed, and never embedded twice
 - [x] AI 8 — semantic and hybrid search, "Search by meaning" on Discover
-- [ ] The rest — RAG, moderation, evaluation
+- [x] AI 11 — a content-similarity term and diversity caps in the recommender
+- [x] AI 12 — automated moderation of new comments, into the existing queue
+- [ ] The rest — the story bible onward, evaluation
 
 ### Phase 7 — Production Readiness
 

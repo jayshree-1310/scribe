@@ -399,3 +399,68 @@ export function isAiEmbedConfigured(
   }
   return config.baseUrl.length > 0;
 }
+
+/* Moderation -------------------------------------------------------------- */
+
+/**
+ * The automated content check (Task AI 12).
+ *
+ * The two thresholds are the whole policy a deployment can tune without a
+ * code change, which is why they are here and not beside the comparison they
+ * feed: moving one is a judgement about how many wrong calls a queue of
+ * humans can absorb, and that differs per community and per model.
+ *
+ * - At or above `reviewThreshold` a finding is filed for a person and the
+ *   content stays up. Deliberately low: a false positive here costs a
+ *   moderator ten seconds, a false negative costs somebody an abusive reply.
+ * - At or above `rejectThreshold` the content is hidden at once *and* filed.
+ *   Deliberately high: a false positive here silences somebody who did nothing
+ *   wrong until a person undoes it.
+ *
+ * The defaults are starting points, not measurements -- nothing in the dev
+ * corpus is abusive, so there was nothing to measure against. Task AI 16 is
+ * where they get evidence.
+ *
+ * `model` lets this run on a smaller model than chat does. It is one call per
+ * comment on every comment, which makes it the highest-volume feature here
+ * and the first one worth right-sizing.
+ */
+export interface AiModerationConfig {
+  enabled: boolean;
+  reviewThreshold: number;
+  rejectThreshold: number;
+  /** Undefined means the chat model. */
+  model: string | undefined;
+}
+
+const MODERATION_DEFAULTS = {
+  enabled: true,
+  reviewThreshold: 0.5,
+  rejectThreshold: 0.9,
+};
+
+/** A confidence is 0 to 1; anything else falls back rather than being clamped. */
+function readConfidence(name: string, fallback: number): number {
+  const value = readFraction(name, fallback);
+  return value >= 0 ? value : fallback;
+}
+
+export function loadAiModerationConfig(): AiModerationConfig {
+  const review = readConfidence(
+    "AI_MODERATION_REVIEW_THRESHOLD",
+    MODERATION_DEFAULTS.reviewThreshold,
+  );
+  const reject = readConfidence(
+    "AI_MODERATION_REJECT_THRESHOLD",
+    MODERATION_DEFAULTS.rejectThreshold,
+  );
+
+  return {
+    enabled: readFlag("AI_MODERATION", MODERATION_DEFAULTS.enabled),
+    reviewThreshold: review,
+    // A reject bar under the review bar would hide things nobody is asked to
+    // look at. Whatever was configured, hiding is never the easier outcome.
+    rejectThreshold: Math.max(reject, review),
+    model: process.env["AI_MODERATION_MODEL"]?.trim() || undefined,
+  };
+}

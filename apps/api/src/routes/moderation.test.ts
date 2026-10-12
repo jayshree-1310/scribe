@@ -125,7 +125,7 @@ describe.skipIf(!available)("filing a report", () => {
     expect(first.body.report.action).toBeNull();
     expect(first.body.report.target?.excerpt).toBe("Buy my thing.");
     expect(first.body.report.target?.author.id).toBe(offender);
-    expect(first.body.report.reporter.id).toBe(reporter);
+    expect(first.body.report.reporter?.id).toBe(reporter);
 
     const second = await fileReport(reporter, {
       targetType: "COMMENT",

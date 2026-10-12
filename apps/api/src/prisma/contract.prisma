@@ -133,6 +133,21 @@ enum ReportStatus {
   RESOLVED
 }
 
+/// What the automated check concluded about one piece of content.
+///
+/// `UNCHECKED` is not a fourth verdict but the absence of one: the model could
+/// not be reached or answered unusably, and the content was left exactly as it
+/// was posted. It is a value rather than a missing row so that "what has never
+/// been looked at?" is a query -- see `services/ai/moderation.ts`.
+enum ModerationOutcome {
+  @@type("pg/text@1")
+
+  ALLOW
+  REVIEW
+  REJECT
+  UNCHECKED
+}
+
 /// What a moderator did about it. Null while the report is open.
 ///
 /// `DISMISS` is not "do nothing": it restores content an earlier call hid and
@@ -1200,9 +1215,18 @@ namespace moderation {
   /// **`status` and `action` are two questions.** Whether anybody still has
   /// to look at this, and what was done. Folding them into one column would
   /// make "show me the queue" enumerate the resolutions.
+  ///
+  /// **A null `reporterId` is the automated check, not a missing person.** The
+  /// classifier in `services/ai/moderation.ts` files its findings here so they
+  /// reach the same queue, the same actions and the same undo as a reader's
+  /// report. A service account was the alternative and was not taken: it would
+  /// be a row in `auth.User` that every follower count, author list, admin
+  /// check and account deletion then has to remember is not a person. Null
+  /// says what is true -- nobody reported this -- and the one place that has to
+  /// handle it is the queue.
   model Report {
     id         String       @id @default(uuid())
-    reporterId String
+    reporterId String?
     targetType ReportTarget
     targetId   String
     reason     ReportReason
@@ -1223,7 +1247,7 @@ namespace moderation {
     createdAt  DateTime @default(now())
     updatedAt  DateTime @default(now())
 
-    reporter   auth.User  @relation("ReportReporter", fields: [reporterId], references: [id])
+    reporter   auth.User? @relation("ReportReporter", fields: [reporterId], references: [id])
     resolvedBy auth.User? @relation("ReportResolver", fields: [resolvedById], references: [id])
 
     /// The queue: open first, newest first.
@@ -1640,5 +1664,75 @@ namespace ai {
     story content.Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
 
     @@unique([storyId, fingerprint])
+  }
+
+  /// One run of the automated content check over one piece of member text.
+  ///
+  /// **Why this is not `moderation.Report`.** A finding that needs a person
+  /// *is* filed there, and `reportId` points at it. But most runs conclude
+  /// nothing is wrong, and a report is somebody asking for a look -- a row per
+  /// clean comment would bury the queue it exists to feed. And a report has
+  /// nowhere to put what makes a machine's call explainable: which model, which
+  /// prompt, how sure it was of each category. So the queue is reused for what
+  /// it is, and this is the record behind it.
+  ///
+  /// **Append-only.** A re-run adds a row rather than replacing one, because
+  /// the question this table answers months later is "why was this hidden?",
+  /// and an overwrite would answer it with whatever the latest prompt thinks.
+  ///
+  /// **No copy of the text, and no foreign key.** The target is polymorphic for
+  /// the reason `moderation.Report`'s is. `contentHash` says what was read
+  /// without keeping it, which is also what lets an unchanged row be skipped
+  /// and lets these rows outlive a deleted comment or account holding nothing
+  /// that was theirs.
+  model ModerationDecision {
+    id            String            @id @default(uuid())
+    targetType    ReportTarget
+    targetId      String
+    outcome       ModerationOutcome
+    /// The category that decided the outcome; null for `ALLOW` and `UNCHECKED`.
+    category      String?
+    /// SHA-256 of the text that was classified.
+    contentHash   String
+    /// The model that judged it, as the provider named it. Empty for
+    /// `UNCHECKED`, when no model answered.
+    model         String
+    /// `MODERATION_PROMPT_VERSION` at the time.
+    promptVersion Int
+    /// The thresholds in force, so a decision can be re-read against the
+    /// numbers that made it rather than today's configuration.
+    reviewThreshold Decimal
+    rejectThreshold Decimal
+    /// Why there is no verdict, for `UNCHECKED`: a short fixed word, never a
+    /// provider's message.
+    failure       String?
+    /// The report this run filed, when it filed one.
+    reportId      String?
+    createdAt     DateTime @default(now())
+
+    scores ModerationScore[]
+
+    /// The latest decision for a target, and its history.
+    @@index([targetType, targetId, createdAt])
+    /// What has not been looked at, for the backfill.
+    @@index([outcome, createdAt])
+    @@index([reportId])
+  }
+
+  /// How sure one run was about one category.
+  ///
+  /// A table rather than a column of JSON so that "every decision where
+  /// harassment scored above 0.8" is a query -- which is the question asked
+  /// whenever a threshold is being moved.
+  model ModerationScore {
+    decisionId String
+    /// One of `MODERATION_CATEGORIES`' ids in `services/ai/moderation.ts`.
+    category   String
+    /// 0 to 1.
+    confidence Decimal
+
+    decision ModerationDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+    @@id([decisionId, category])
   }
 }

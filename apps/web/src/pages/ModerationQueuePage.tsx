@@ -15,6 +15,7 @@ import { SegmentedControl } from '../components/ui/Tabs'
 import { TextField } from '../components/ui/TextField'
 import { useAsync } from '../hooks/useAsync'
 import {
+  CATEGORY_LABELS,
   REASON_LABELS,
   REPORT_ACTIONS,
   TARGET_LABELS,
@@ -229,6 +230,13 @@ function ReportRow({ report, onAct }: { report: Report; onAct: () => void }) {
               Hidden
             </span>
           ) : null}
+          {/*
+            Nobody reported this one: a model did. Said on the row itself, so
+            a machine's finding is never read as a person's complaint.
+          */}
+          {report.reporter === null ? (
+            <span className="report-row__badge">Automated</span>
+          ) : null}
         </span>
 
         <span className="report-row__when">
@@ -260,14 +268,41 @@ function ReportRow({ report, onAct }: { report: Report; onAct: () => void }) {
 
       {report.details ? (
         <p className="report-row__details">
-          <span className="report-row__label">Reporter said</span>
+          <span className="report-row__label">
+            {report.reporter === null ? 'Automated check' : 'Reporter said'}
+          </span>
           {report.details}
+        </p>
+      ) : null}
+
+      {/*
+        How sure the model was, per category. Only the ones it gave any
+        weight to: five rows of 0% under every report would teach a moderator
+        to stop reading them.
+      */}
+      {report.automated ? (
+        <p className="report-row__details">
+          <span className="report-row__label">Confidence</span>
+          <span className="report-row__badges">
+            {report.automated.scores
+              .filter((score) => score.confidence >= 0.05)
+              .map((score) => (
+                <span key={score.category} className="report-row__badge">
+                  {CATEGORY_LABELS[score.category] ?? score.category}{' '}
+                  {Math.round(score.confidence * 100)}%
+                </span>
+              ))}
+          </span>
         </p>
       ) : null}
 
       <div className="report-row__foot">
         <span className="report-row__by">
-          Reported by @{report.reporter.username}
+          {report.reporter
+            ? `Reported by @${report.reporter.username}`
+            : report.automated
+              ? `Flagged by the automated check (${report.automated.model}, prompt v${report.automated.promptVersion})`
+              : 'Flagged by the automated check'}
           {report.status === 'RESOLVED' && report.resolvedBy ? (
             <>
               {' · '}

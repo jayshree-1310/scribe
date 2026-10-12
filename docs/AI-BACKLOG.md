@@ -1315,6 +1315,84 @@ somewhere for a decision to go: `moderation.Report`, `ReportTarget`, the
 audited list of read paths that filter on `hiddenAt`, which a classifier
 hiding content on its own has to satisfy exactly as a human moderator does.
 
+**Status: built.** `services/ai/moderation.ts`, `services/ai/prompts/moderation.ts`,
+`fileAutomatedReport` and `readModerationTarget` in `services/moderation.ts`,
+`ai.ModerationDecision` and `ai.ModerationScore` in `contract.prisma` plus
+migration `20261012T1249_add_ai_moderation` (which also makes
+`moderation.Report.reporterId` nullable), `AI_MODERATION*` in `config.ts`, one
+line in `createComment`, `moderation:pending`, and the queue page showing an
+automated finding as one. Tests in `routes/ai-moderation.test.ts` and
+`services/ai/moderation.test.ts`. No new route. Verified against
+`gpt-oss-120b` on Groq through the live API: three comments posted in under
+40ms each; a remark about a villain being "brutally erased from the timeline"
+scored 0 everywhere, an insult aimed at the author scored 0.90 harassment and
+an advert 1.00 spam, and both were hidden, queued and their author told —
+about 760 tokens a comment.
+
+Six things worth knowing before building on it.
+
+**The reporter that is not a person is a null, not an account.** The first
+decision this task makes. A service account would be a row in `auth.User` that
+every follower count, author list, admin check and account deletion then has
+to remember is not a person; null says what is true, and the one place that
+has to handle it is the queue (`Report.reporter` is nullable, and `automated`
+carries the finding instead).
+
+**`Report` is reused for what it is, and a second table holds the rest.** A
+finding that needs a person is a report: same queue, same three actions, same
+undo. But an *allow* is not a report — a row per clean comment would bury the
+queue — and a report has nowhere to put what makes a machine's call
+explainable. So `ai.ModerationDecision` records every run (outcome, deciding
+category, model, prompt version, the thresholds in force, a hash of the text
+rather than the text), with a confidence per category in `ai.ModerationScore`,
+and points at the report it filed. It is append-only: a re-run adds a row, so
+"why was this hidden?" is never answered by whatever the latest prompt thinks.
+
+**The model gives numbers; code gives the verdict.** One structured call
+returns a confidence per category and `decide` — pure, and the only place a
+threshold is compared — turns them into ALLOW, REVIEW (filed, comment stays
+up) or REJECT (hidden now *and* filed, left open). A reject is still open
+because a machine hiding something is a claim a person has to confirm.
+Categories are data (`MODERATION_CATEGORIES`): the prompt, the reply schema,
+the stored scores and the policy all read one list. Two carry their own rule —
+sexual content involving minors is hidden as soon as it reaches the review
+bar, and self-harm is never hidden automatically, because somebody saying they
+are in danger is not somebody to silence and send a takedown notice to.
+
+**When the model cannot be asked, the comment is published and recorded
+`UNCHECKED`; nothing is filed.** Holding comments would make an AI outage an
+outage of commenting. Filing every unclassified comment for review would turn
+an hour of provider trouble into hundreds of queue rows with nothing wrong
+with them, burying the reports readers filed. So an outage degrades to exactly
+what the site had before this existed, and `pnpm moderation:pending` checks
+whatever has no verdict once the model is back. There is no job runner, so
+nothing else will.
+
+**A person's ruling wins, permanently.** `DISMISS` on an automated report
+restores the comment and tells its author it is back — the one dismiss an
+author hears about, since they were told a machine hid it. After that
+`fileAutomatedReport` refuses to act on the row at all, so a backfill or a new
+prompt version cannot quietly reverse somebody's decision. The decision rows
+are not edited to match: they say what the classifier thought, which is what
+you want when its threshold is being questioned.
+
+**Tests post comments, so the check is off for the suite.**
+`vitest.config.ts` sets `AI_MODERATION=off`; without it every suite that posts
+a comment would call whatever model `.env` points at. The moderation suite
+turns it on for itself behind the fake. Its automated reports and decisions
+have no user for the harness's per-user sweep to find, so it deletes its own.
+
+Still open: only comments are checked — club discussions and channel posts go
+through the same `moderateContent(type, id)` and are one line each to wire.
+The thresholds (0.5 and 0.9) are starting points, not measurements; nothing
+in the dev corpus is abusive, and Task AI 16 is where they get evidence. The
+check is not charged to anybody's daily token budget, deliberately — a reader
+must not be able to exhaust their way out of being moderated — so its spend
+is bounded by the comment rate limit and `AI_MODERATION_MODEL` until Task AI
+18. And between a comment landing and the check finishing, a reply's
+notification has already reached the person it was aimed at; hiding sweeps it,
+a second or so late.
+
 **Prompt:**
 
 > Classify user-generated content on the way in.

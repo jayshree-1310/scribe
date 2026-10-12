@@ -33,9 +33,9 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'0c167f3d32cb8e11103360cae4c1ec9ed7bbdaf214fef734a0c4c5e27363b96f'>;
+  StorageHashBase<'1564cbe72a2717524fd177d00afbcaef672712e0e43186ddf2baafe11ac05344'>;
 export type ExecutionHash =
-  ExecutionHashBase<'b8f3f8a09301b31cdc2a4c89aa817bb3a16ce2ab38cfc0bda5797ae672d718fb'>;
+  ExecutionHashBase<'e8f10f7994f9924e80d74777ccb6ae789bf0509d2e3a57563d42908184c44051'>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
@@ -346,6 +346,26 @@ export type FieldOutputTypes = {
       readonly outputTokens: CodecTypes['pg/int4@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
+    readonly ModerationDecision: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
+      readonly targetId: CodecTypes['pg/text@1']['output'];
+      readonly outcome: 'ALLOW' | 'REVIEW' | 'REJECT' | 'UNCHECKED';
+      readonly category: CodecTypes['pg/text@1']['output'] | null;
+      readonly contentHash: CodecTypes['pg/text@1']['output'];
+      readonly model: CodecTypes['pg/text@1']['output'];
+      readonly promptVersion: CodecTypes['pg/int4@1']['output'];
+      readonly reviewThreshold: CodecTypes['pg/numeric@1']['output'];
+      readonly rejectThreshold: CodecTypes['pg/numeric@1']['output'];
+      readonly failure: CodecTypes['pg/text@1']['output'] | null;
+      readonly reportId: CodecTypes['pg/text@1']['output'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    };
+    readonly ModerationScore: {
+      readonly decisionId: CodecTypes['pg/text@1']['output'];
+      readonly category: CodecTypes['pg/text@1']['output'];
+      readonly confidence: CodecTypes['pg/numeric@1']['output'];
+    };
     readonly StoryFact: {
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly storyId: CodecTypes['pg/text@1']['output'];
@@ -637,7 +657,7 @@ export type FieldOutputTypes = {
   readonly moderation: {
     readonly Report: {
       readonly id: CodecTypes['pg/text@1']['output'];
-      readonly reporterId: CodecTypes['pg/text@1']['output'];
+      readonly reporterId: CodecTypes['pg/text@1']['output'] | null;
       readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
       readonly targetId: CodecTypes['pg/text@1']['output'];
       readonly reason: 'SPAM' | 'HARASSMENT' | 'HATE' | 'SEXUAL' | 'VIOLENCE' | 'SPOILER' | 'OTHER';
@@ -784,6 +804,26 @@ export type FieldInputTypes = {
       readonly outputTokens: CodecTypes['pg/int4@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
+    readonly ModerationDecision: {
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
+      readonly targetId: CodecTypes['pg/text@1']['input'];
+      readonly outcome: 'ALLOW' | 'REVIEW' | 'REJECT' | 'UNCHECKED';
+      readonly category: CodecTypes['pg/text@1']['input'] | null;
+      readonly contentHash: CodecTypes['pg/text@1']['input'];
+      readonly model: CodecTypes['pg/text@1']['input'];
+      readonly promptVersion: CodecTypes['pg/int4@1']['input'];
+      readonly reviewThreshold: CodecTypes['pg/numeric@1']['input'];
+      readonly rejectThreshold: CodecTypes['pg/numeric@1']['input'];
+      readonly failure: CodecTypes['pg/text@1']['input'] | null;
+      readonly reportId: CodecTypes['pg/text@1']['input'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+    };
+    readonly ModerationScore: {
+      readonly decisionId: CodecTypes['pg/text@1']['input'];
+      readonly category: CodecTypes['pg/text@1']['input'];
+      readonly confidence: CodecTypes['pg/numeric@1']['input'];
+    };
     readonly StoryFact: {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly storyId: CodecTypes['pg/text@1']['input'];
@@ -1075,7 +1115,7 @@ export type FieldInputTypes = {
   readonly moderation: {
     readonly Report: {
       readonly id: CodecTypes['pg/text@1']['input'];
-      readonly reporterId: CodecTypes['pg/text@1']['input'];
+      readonly reporterId: CodecTypes['pg/text@1']['input'] | null;
       readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
       readonly targetId: CodecTypes['pg/text@1']['input'];
       readonly reason: 'SPAM' | 'HARASSMENT' | 'HATE' | 'SEXUAL' | 'VIOLENCE' | 'SPOILER' | 'OTHER';
@@ -1221,6 +1261,26 @@ export type StorageColumnTypes = {
       readonly scopeBasis: CodecTypes['pg/text@1']['output'] | null;
       readonly standaloneQuestion: CodecTypes['pg/text@1']['output'] | null;
       readonly upToChapter: CodecTypes['pg/int4@1']['output'] | null;
+    };
+    readonly moderationDecision: {
+      readonly category: CodecTypes['pg/text@1']['output'] | null;
+      readonly contentHash: CodecTypes['pg/text@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly failure: CodecTypes['pg/text@1']['output'] | null;
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly model: CodecTypes['pg/text@1']['output'];
+      readonly outcome: 'ALLOW' | 'REVIEW' | 'REJECT' | 'UNCHECKED';
+      readonly promptVersion: CodecTypes['pg/int4@1']['output'];
+      readonly rejectThreshold: CodecTypes['pg/numeric@1']['output'];
+      readonly reportId: CodecTypes['pg/text@1']['output'] | null;
+      readonly reviewThreshold: CodecTypes['pg/numeric@1']['output'];
+      readonly targetId: CodecTypes['pg/text@1']['output'];
+      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
+    };
+    readonly moderationScore: {
+      readonly category: CodecTypes['pg/text@1']['output'];
+      readonly confidence: CodecTypes['pg/numeric@1']['output'];
+      readonly decisionId: CodecTypes['pg/text@1']['output'];
     };
     readonly storyFact: {
       readonly attribute: CodecTypes['pg/text@1']['output'];
@@ -1518,7 +1578,7 @@ export type StorageColumnTypes = {
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly note: CodecTypes['pg/text@1']['output'] | null;
       readonly reason: 'SPAM' | 'HARASSMENT' | 'HATE' | 'SEXUAL' | 'VIOLENCE' | 'SPOILER' | 'OTHER';
-      readonly reporterId: CodecTypes['pg/text@1']['output'];
+      readonly reporterId: CodecTypes['pg/text@1']['output'] | null;
       readonly resolvedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly resolvedById: CodecTypes['pg/text@1']['output'] | null;
       readonly status: 'OPEN' | 'RESOLVED';
@@ -1659,6 +1719,26 @@ export type StorageColumnInputTypes = {
       readonly scopeBasis: CodecTypes['pg/text@1']['input'] | null;
       readonly standaloneQuestion: CodecTypes['pg/text@1']['input'] | null;
       readonly upToChapter: CodecTypes['pg/int4@1']['input'] | null;
+    };
+    readonly moderationDecision: {
+      readonly category: CodecTypes['pg/text@1']['input'] | null;
+      readonly contentHash: CodecTypes['pg/text@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly failure: CodecTypes['pg/text@1']['input'] | null;
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly model: CodecTypes['pg/text@1']['input'];
+      readonly outcome: 'ALLOW' | 'REVIEW' | 'REJECT' | 'UNCHECKED';
+      readonly promptVersion: CodecTypes['pg/int4@1']['input'];
+      readonly rejectThreshold: CodecTypes['pg/numeric@1']['input'];
+      readonly reportId: CodecTypes['pg/text@1']['input'] | null;
+      readonly reviewThreshold: CodecTypes['pg/numeric@1']['input'];
+      readonly targetId: CodecTypes['pg/text@1']['input'];
+      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
+    };
+    readonly moderationScore: {
+      readonly category: CodecTypes['pg/text@1']['input'];
+      readonly confidence: CodecTypes['pg/numeric@1']['input'];
+      readonly decisionId: CodecTypes['pg/text@1']['input'];
     };
     readonly storyFact: {
       readonly attribute: CodecTypes['pg/text@1']['input'];
@@ -1956,7 +2036,7 @@ export type StorageColumnInputTypes = {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly note: CodecTypes['pg/text@1']['input'] | null;
       readonly reason: 'SPAM' | 'HARASSMENT' | 'HATE' | 'SEXUAL' | 'VIOLENCE' | 'SPOILER' | 'OTHER';
-      readonly reporterId: CodecTypes['pg/text@1']['input'];
+      readonly reporterId: CodecTypes['pg/text@1']['input'] | null;
       readonly resolvedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly resolvedById: CodecTypes['pg/text@1']['input'] | null;
       readonly status: 'OPEN' | 'RESOLVED';
@@ -2862,6 +2942,142 @@ type ContractBase = Omit<
                   readonly target: {
                     readonly namespaceId: 'ai' & NamespaceId;
                     readonly tableName: 'conversation';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
+            readonly moderationDecision: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly targetType: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly targetId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly outcome: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly category: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly contentHash: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly model: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly promptVersion: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly reviewThreshold: {
+                  readonly nativeType: 'numeric';
+                  readonly codecId: 'pg/numeric@1';
+                  readonly nullable: false;
+                };
+                readonly rejectThreshold: {
+                  readonly nativeType: 'numeric';
+                  readonly codecId: 'pg/numeric@1';
+                  readonly nullable: false;
+                };
+                readonly failure: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly reportId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly createdAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [];
+              indexes: readonly [
+                {
+                  readonly name: 'moderationDecision_targetType_targetId_createdAt_idx_e37b8716';
+                  readonly prefix: 'moderationDecision_targetType_targetId_createdAt_idx';
+                  readonly columns: readonly ['targetType', 'targetId', 'createdAt'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'moderationDecision_outcome_createdAt_idx_f02d4ff3';
+                  readonly prefix: 'moderationDecision_outcome_createdAt_idx';
+                  readonly columns: readonly ['outcome', 'createdAt'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'moderationDecision_reportId_idx_d163019e';
+                  readonly prefix: 'moderationDecision_reportId_idx';
+                  readonly columns: readonly ['reportId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [];
+            };
+            readonly moderationScore: {
+              columns: {
+                readonly decisionId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly category: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly confidence: {
+                  readonly nativeType: 'numeric';
+                  readonly codecId: 'pg/numeric@1';
+                  readonly nullable: false;
+                };
+              };
+              primaryKey: { readonly columns: readonly ['decisionId', 'category'] };
+              uniques: readonly [];
+              indexes: readonly [
+                {
+                  readonly name: 'moderationScore_decisionId_idx_8a798f77';
+                  readonly prefix: 'moderationScore_decisionId_idx';
+                  readonly columns: readonly ['decisionId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'ai' & NamespaceId;
+                    readonly tableName: 'moderationScore';
+                    readonly columns: readonly ['decisionId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'ai' & NamespaceId;
+                    readonly tableName: 'moderationDecision';
                     readonly columns: readonly ['id'];
                   };
                 },
@@ -5334,7 +5550,7 @@ type ContractBase = Omit<
                 readonly reporterId: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
-                  readonly nullable: false;
+                  readonly nullable: true;
                 };
                 readonly targetType: {
                   readonly nativeType: 'text';
@@ -5602,6 +5818,10 @@ type ContractBase = Omit<
               readonly kind: 'valueSet';
               readonly values: readonly ['SCRIBE', 'CATALOGUE'];
             };
+            readonly ModerationOutcome: {
+              readonly kind: 'valueSet';
+              readonly values: readonly ['ALLOW', 'REVIEW', 'REJECT', 'UNCHECKED'];
+            };
             readonly MultimediaType: {
               readonly kind: 'valueSet';
               readonly values: readonly ['IMAGE', 'AUDIO', 'VIDEO', 'LINK'];
@@ -5784,6 +6004,14 @@ type ContractBase = Omit<
     readonly continuityDismissal: {
       readonly namespace: 'ai' & NamespaceId;
       readonly model: 'ContinuityDismissal';
+    };
+    readonly moderationDecision: {
+      readonly namespace: 'ai' & NamespaceId;
+      readonly model: 'ModerationDecision';
+    };
+    readonly moderationScore: {
+      readonly namespace: 'ai' & NamespaceId;
+      readonly model: 'ModerationScore';
     };
   };
   readonly domain: {
@@ -6561,6 +6789,135 @@ type ContractBase = Omit<
                 readonly inputTokens: { readonly column: 'inputTokens' };
                 readonly outputTokens: { readonly column: 'outputTokens' };
                 readonly createdAt: { readonly column: 'createdAt' };
+              };
+            };
+          };
+          readonly ModerationDecision: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly targetType: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly targetId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly outcome: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly category: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly contentHash: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly model: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly promptVersion: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly reviewThreshold: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/numeric@1' };
+              };
+              readonly rejectThreshold: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/numeric@1' };
+              };
+              readonly failure: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly reportId: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+            };
+            readonly relations: {
+              readonly scores: {
+                readonly to: {
+                  readonly namespace: 'ai' & NamespaceId;
+                  readonly model: 'ModerationScore';
+                };
+                readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['decisionId'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'moderationDecision';
+              readonly namespaceId: 'ai';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly targetType: { readonly column: 'targetType' };
+                readonly targetId: { readonly column: 'targetId' };
+                readonly outcome: { readonly column: 'outcome' };
+                readonly category: { readonly column: 'category' };
+                readonly contentHash: { readonly column: 'contentHash' };
+                readonly model: { readonly column: 'model' };
+                readonly promptVersion: { readonly column: 'promptVersion' };
+                readonly reviewThreshold: { readonly column: 'reviewThreshold' };
+                readonly rejectThreshold: { readonly column: 'rejectThreshold' };
+                readonly failure: { readonly column: 'failure' };
+                readonly reportId: { readonly column: 'reportId' };
+                readonly createdAt: { readonly column: 'createdAt' };
+              };
+            };
+          };
+          readonly ModerationScore: {
+            readonly fields: {
+              readonly decisionId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly category: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly confidence: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/numeric@1' };
+              };
+            };
+            readonly relations: {
+              readonly decision: {
+                readonly to: {
+                  readonly namespace: 'ai' & NamespaceId;
+                  readonly model: 'ModerationDecision';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['decisionId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'moderationScore';
+              readonly namespaceId: 'ai';
+              readonly fields: {
+                readonly decisionId: { readonly column: 'decisionId' };
+                readonly category: { readonly column: 'category' };
+                readonly confidence: { readonly column: 'confidence' };
               };
             };
           };
@@ -9312,7 +9669,7 @@ type ContractBase = Omit<
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly reporterId: {
-                readonly nullable: false;
+                readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly targetType: {
@@ -9578,6 +9935,15 @@ type ContractBase = Omit<
               { readonly name: 'RESOLVED'; readonly value: 'RESOLVED' },
             ];
           };
+          readonly ModerationOutcome: {
+            readonly codecId: 'pg/text@1';
+            readonly members: readonly [
+              { readonly name: 'ALLOW'; readonly value: 'ALLOW' },
+              { readonly name: 'REVIEW'; readonly value: 'REVIEW' },
+              { readonly name: 'REJECT'; readonly value: 'REJECT' },
+              { readonly name: 'UNCHECKED'; readonly value: 'UNCHECKED' },
+            ];
+          };
           readonly ReportAction: {
             readonly codecId: 'pg/text@1';
             readonly members: readonly [
@@ -9794,6 +10160,14 @@ type ContractBase = Omit<
           readonly ref: {
             readonly namespace: 'library';
             readonly table: 'libraryEntry';
+            readonly column: 'id';
+          };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
+        {
+          readonly ref: {
+            readonly namespace: 'ai';
+            readonly table: 'moderationDecision';
             readonly column: 'id';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };

@@ -91,6 +91,9 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/ask-book.ts` | Task AI 9: resolve the spoiler bound, retrieve from one story (meaning and names, fused), decline without a model when nothing qualifies, answer, and derive citations from the markers the answer used. |
 | `services/ai/conversations.ts` | Task AI 10: a turn is remember (`foldIntoSummary`), rewrite (`rewriteQuestion`, gated by `needsRewrite`), retrieve, recall (`selectHistory`), answer, store. Ownership and visibility on every read. |
 | `services/ai/prompts/conversation.ts` | The rewrite and summary prompts. Bookkeeping calls whose output the application reads, not the reader. |
+| `services/ai/moderation.ts` | Task AI 12: score a new comment per category, turn the scores into allow / review / reject in `decide`, and hand anything that needs a person to `services/moderation.ts`. Fire-and-forget from `createComment`; never fails or slows a post. |
+| `services/ai/prompts/moderation.ts` | The scoring prompt, built from the category list. Asks for numbers, never a verdict, and says in as many words that discussing a story's violence is not violence. |
+| `scripts/moderate-pending.ts` | `moderation:pending` — checks comments with no verdict: posted during an outage, or before the check existed. |
 | `services/ai/prompts/ask-book.ts` | The grounding rules, the fences, and `defang` — what stops a retrieved chapter closing its own fence and speaking as the application. |
 
 ## Rules that the code enforces
@@ -691,6 +694,40 @@ turns, the bound and token usage for answers) and `ai.ConversationCitation`
 re-embedding. Every foreign key cascades. Citations are joined to the
 chapter's current title and re-authorised on every read.
 
+## Moderation
+
+Every new comment is scored after it is posted. `createComment` commits and
+calls `moderate("COMMENT", id)`, which returns at once; the check runs behind
+it and is settled by `drainDeferredWrites` like badges and notifications.
+
+One `completeStructured` call returns a confidence from 0 to 1 for each entry
+in `MODERATION_CATEGORIES`. The model never chooses an outcome: `decide`
+compares the scores with `AI_MODERATION_REVIEW_THRESHOLD` (0.5) and
+`AI_MODERATION_REJECT_THRESHOLD` (0.9) and returns one of three.
+
+| Outcome | What happens |
+| --- | --- |
+| `ALLOW` | Nothing. A decision row is the only trace. |
+| `REVIEW` | A report with a null `reporterId` is filed; the comment stays up. |
+| `REJECT` | The comment is hidden through `hideContent`, its author told it was automatic, and the report filed and left open. |
+| `UNCHECKED` | The model could not be asked. The comment stays published, nothing is filed, and `moderation:pending` picks it up later. |
+
+The classifier can only touch content through `fileAutomatedReport` in
+`services/moderation.ts`, so every read path that filters on `hiddenAt` treats
+its call as it treats a moderator's. A moderator resolves an automated report
+with the usual actions, and once any person has ruled on a row the classifier
+may not act on it again.
+
+Every run writes `ai.ModerationDecision` — outcome, deciding category, model,
+`MODERATION_PROMPT_VERSION`, the thresholds in force and a hash of the text —
+with a row per category in `ai.ModerationScore`. Append-only, and never the
+text itself.
+
+The comment is the most hostile input in the module, since its author may know
+a classifier is reading. The defence is the usual one: rules in the system
+message, the text fenced in the user message, `defang` so it cannot close the
+fence. The check is switched off for the test suite in `vitest.config.ts`.
+
 ## Recommendations
 
 `GET /api/recommendations` is not an AI route and calls no model. Its scorer
@@ -730,8 +767,7 @@ per genre, with held-back stories filling any room left.
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The remaining features.** Moderation and everything after it —
-  Tasks AI 12 onward. Of Task AI 6 only the chapter recap was built; the story-level
+- **The remaining features.** Tasks AI 13 onward. Of Task AI 6 only the chapter recap was built; the story-level
   summary, the spoiler-free summary and the map-reduce that a multi-chapter
   summary needs are not here.
 - **Persisted usage, and budgets everywhere else.** The sink still only logs,

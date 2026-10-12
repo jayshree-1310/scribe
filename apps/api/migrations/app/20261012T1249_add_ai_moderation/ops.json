@@ -1,0 +1,321 @@
+[
+  {
+    "id": "table.moderationDecision",
+    "label": "Create table \"moderationDecision\"",
+    "summary": "Creates table \"moderationDecision\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "moderationDecision"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"moderationDecision\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"moderationDecision\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"moderationDecision\"",
+        "sql": "CREATE TABLE \"ai\".\"moderationDecision\" (\n  \"category\" text,\n  \"contentHash\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"failure\" text,\n  \"id\" text NOT NULL,\n  \"model\" text NOT NULL,\n  \"outcome\" text NOT NULL,\n  \"promptVersion\" int4 NOT NULL,\n  \"rejectThreshold\" numeric NOT NULL,\n  \"reportId\" text,\n  \"reviewThreshold\" numeric NOT NULL,\n  \"targetId\" text NOT NULL,\n  \"targetType\" text NOT NULL,\n  PRIMARY KEY (\"id\"),\n  CONSTRAINT \"moderationDecision_outcome_check_a24db8d8\" CHECK (\"outcome\" IN ('ALLOW', 'REVIEW', 'REJECT', 'UNCHECKED')),\n  CONSTRAINT \"moderationDecision_targetType_check_2c6acd2f\" CHECK (\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST'))\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"moderationDecision\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"moderationDecision\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.moderationScore",
+    "label": "Create table \"moderationScore\"",
+    "summary": "Creates table \"moderationScore\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "moderationScore"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"moderationScore\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"moderationScore\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"moderationScore\"",
+        "sql": "CREATE TABLE \"ai\".\"moderationScore\" (\n  \"category\" text NOT NULL,\n  \"confidence\" numeric NOT NULL,\n  \"decisionId\" text NOT NULL,\n  PRIMARY KEY (\"decisionId\", \"category\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"moderationScore\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"moderationScore\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "alterNullability.dropNotNull.report.reporterId",
+    "label": "Drop NOT NULL on \"report\".\"reporterId\"",
+    "operationClass": "widening",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "moderation",
+        "objectType": "column",
+        "name": "reporterId",
+        "table": "report"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"reporterId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "moderation",
+          "report",
+          "reporterId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop NOT NULL on \"reporterId\"",
+        "sql": "ALTER TABLE \"moderation\".\"report\" ALTER COLUMN \"reporterId\" DROP NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"reporterId\" is nullable",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3 AND \"is_nullable\" = $4)) AS \"result\"",
+        "params": [
+          "moderation",
+          "report",
+          "reporterId",
+          "YES"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.moderationDecision.moderationDecision_outcome_createdAt_idx_f02d4ff3",
+    "label": "Create index \"moderationDecision_outcome_createdAt_idx_f02d4ff3\" on \"moderationDecision\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "moderationDecision_outcome_createdAt_idx_f02d4ff3",
+        "table": "moderationDecision"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"moderationDecision_outcome_createdAt_idx_f02d4ff3\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"moderationDecision_outcome_createdAt_idx_f02d4ff3\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"moderationDecision_outcome_createdAt_idx_f02d4ff3\"",
+        "sql": "CREATE INDEX \"moderationDecision_outcome_createdAt_idx_f02d4ff3\" ON \"ai\".\"moderationDecision\" (\"outcome\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"moderationDecision_outcome_createdAt_idx_f02d4ff3\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"moderationDecision_outcome_createdAt_idx_f02d4ff3\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.moderationDecision.moderationDecision_reportId_idx_d163019e",
+    "label": "Create index \"moderationDecision_reportId_idx_d163019e\" on \"moderationDecision\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "moderationDecision_reportId_idx_d163019e",
+        "table": "moderationDecision"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"moderationDecision_reportId_idx_d163019e\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"moderationDecision_reportId_idx_d163019e\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"moderationDecision_reportId_idx_d163019e\"",
+        "sql": "CREATE INDEX \"moderationDecision_reportId_idx_d163019e\" ON \"ai\".\"moderationDecision\" (\"reportId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"moderationDecision_reportId_idx_d163019e\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"moderationDecision_reportId_idx_d163019e\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.moderationDecision.moderationDecision_targetType_targetId_createdAt_idx_e37b8716",
+    "label": "Create index \"moderationDecision_targetType_targetId_createdAt_idx_e37b8716\" on \"moderationDecision\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "moderationDecision_targetType_targetId_createdAt_idx_e37b8716",
+        "table": "moderationDecision"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"moderationDecision_targetType_targetId_createdAt_idx_e37b8716\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"moderationDecision_targetType_targetId_createdAt_idx_e37b8716\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"moderationDecision_targetType_targetId_createdAt_idx_e37b8716\"",
+        "sql": "CREATE INDEX \"moderationDecision_targetType_targetId_createdAt_idx_e37b8716\" ON \"ai\".\"moderationDecision\" (\"targetType\", \"targetId\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"moderationDecision_targetType_targetId_createdAt_idx_e37b8716\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"moderationDecision_targetType_targetId_createdAt_idx_e37b8716\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.moderationScore.moderationScore_decisionId_idx_8a798f77",
+    "label": "Create index \"moderationScore_decisionId_idx_8a798f77\" on \"moderationScore\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "moderationScore_decisionId_idx_8a798f77",
+        "table": "moderationScore"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"moderationScore_decisionId_idx_8a798f77\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"moderationScore_decisionId_idx_8a798f77\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"moderationScore_decisionId_idx_8a798f77\"",
+        "sql": "CREATE INDEX \"moderationScore_decisionId_idx_8a798f77\" ON \"ai\".\"moderationScore\" (\"decisionId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"moderationScore_decisionId_idx_8a798f77\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"moderationScore_decisionId_idx_8a798f77\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.moderationScore.moderationScore_decisionId_fkey",
+    "label": "Add foreign key \"moderationScore_decisionId_fkey\" on \"moderationScore\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "moderationScore_decisionId_fkey",
+        "table": "moderationScore"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"moderationScore_decisionId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "moderationScore_decisionId_fkey",
+          "ai",
+          "\"ai\".\"moderationScore\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"moderationScore_decisionId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"moderationScore\"\nADD CONSTRAINT \"moderationScore_decisionId_fkey\"\nFOREIGN KEY (\"decisionId\")\nREFERENCES \"ai\".\"moderationDecision\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"moderationScore_decisionId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "moderationScore_decisionId_fkey",
+          "ai",
+          "\"ai\".\"moderationScore\""
+        ]
+      }
+    ]
+  }
+]

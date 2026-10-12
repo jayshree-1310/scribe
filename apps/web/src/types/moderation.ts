@@ -109,6 +109,23 @@ export interface ReportedContent {
   href: string
 }
 
+/**
+ * What the automated check found, on a report it filed rather than a reader.
+ *
+ * `REJECT` means the content was hidden before anybody looked; `REVIEW` means
+ * it is still up. Either way the report is open until a moderator rules.
+ */
+export interface AutomatedFinding {
+  outcome: 'REVIEW' | 'REJECT'
+  /** The category that decided it; a key of `CATEGORY_LABELS`. */
+  category: string | null
+  model: string
+  promptVersion: number
+  /** Every category the model scored, highest first. 0 to 1. */
+  scores: { category: string; confidence: number }[]
+  decidedAt: string
+}
+
 export interface Report {
   id: string
   targetType: ReportTarget
@@ -120,7 +137,9 @@ export interface Report {
   action: ReportAction | null
   /** The moderator's own note. Never shown to the reporter. */
   note: string | null
-  reporter: ModerationUser
+  /** Null when the automated check filed it; `automated` is set instead. */
+  reporter: ModerationUser | null
+  automated: AutomatedFinding | null
   resolvedBy: ModerationUser | null
   resolvedAt: string | null
   createdAt: string
@@ -146,6 +165,19 @@ export const TARGET_LABELS: Record<ReportTarget, string> = {
   COMMENT: 'Comment',
   CLUB_DISCUSSION: 'Club post',
   CHANNEL_POST: 'Channel post',
+}
+
+/**
+ * What the automated check calls its categories, as a moderator reads them.
+ * Mirrors `MODERATION_CATEGORIES` in `apps/api/src/services/ai/moderation.ts`;
+ * an id that is not here yet is shown as it arrives rather than hidden.
+ */
+export const CATEGORY_LABELS: Record<string, string> = {
+  sexual_minors: 'Sexual content involving minors',
+  harassment: 'Harassment',
+  graphic_violence: 'Graphic violence',
+  self_harm: 'Self-harm',
+  spam: 'Spam',
 }
 
 /** The reason labels again, keyed for the queue's one-line summaries. */

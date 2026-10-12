@@ -16,6 +16,7 @@
     "seed:stories": "tsx src/scripts/seed-stories.ts",
     "seed:challenges": "tsx src/scripts/seed-challenges.ts",
     "seed:embeddings": "tsx src/scripts/seed-embeddings.ts",
+    "moderation:pending": "tsx src/scripts/moderate-pending.ts",
     "admin:grant": "tsx src/scripts/grant-admin.ts"
   },
   "keywords": [],

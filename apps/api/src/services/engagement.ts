@@ -40,6 +40,7 @@
 import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
+import { moderate } from "./ai/moderation.js";
 import { evaluateBadges } from "./gamification.js";
 import { notify } from "./notifications.js";
 import { assertNotSuspended } from "./roles.js";
@@ -516,6 +517,14 @@ export async function createComment(
    * of the same condition written in two places.
    */
   notify({ event: "story-comment", actorId: userId, commentId: comment.id });
+
+  /**
+   * The automated content check, after the commit and without waiting for it:
+   * the reader has their comment back before a model has read it. If the check
+   * then hides the comment, it sweeps the notification fired on the line above
+   * the same way a moderator's hide does. See `services/ai/moderation.ts`.
+   */
+  moderate("COMMENT", comment.id);
 
   return comment;
 }

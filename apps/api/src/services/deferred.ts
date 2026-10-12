@@ -27,6 +27,7 @@
  * writer nothing else feeds drains in the first.
  */
 
+import { flushModeration } from "./ai/moderation.js";
 import { flushAnalytics } from "./analytics.js";
 import { flushBadges } from "./gamification.js";
 import { flushNotifications } from "./notifications.js";
@@ -35,8 +36,10 @@ export async function drainDeferredWrites(): Promise<void> {
   /**
    * First band: writers that can *cause* further deferred work. Analytics
    * causes none and is here only because it can settle alongside for free.
+   * The content check belongs here for the same reason badges do: hiding a
+   * comment tells its author, which is a notification issued as it lands.
    */
-  await Promise.all([flushBadges(), flushAnalytics()]);
+  await Promise.all([flushBadges(), flushAnalytics(), flushModeration()]);
 
   /**
    * Second band: writers the first band feeds. A badge landing above issues a

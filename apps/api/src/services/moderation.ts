@@ -47,6 +47,17 @@
  *   of them ask -- so what that test enforces is that nobody adds the seventh
  *   seam without saying which kind it is.
  *
+ * - **The automated check is a reporter with no account, and nothing more.**
+ *   `services/ai/moderation.ts` scores new comments and calls
+ *   `fileAutomatedReport` here when one needs a person. That function is the
+ *   only way it can touch content: it files a report with a null `reporterId`
+ *   and, above the reject threshold, hides through the same `hideContent` a
+ *   moderator's `HIDE` uses -- so every read path below that filters on
+ *   `hiddenAt` treats a machine's call exactly as it treats a person's, and
+ *   the classifier never learns the list. Its report sits in the same queue
+ *   and is resolved by the same three actions; `DISMISS` is the override, and
+ *   once a person has ruled on a row the classifier may not act on it again.
+ *
  * **Every public read path that had to learn about `hiddenAt`**, audited when
  * this landed, and the place to add to when a new one appears:
  *
@@ -162,6 +173,22 @@ export interface ReportedContent {
   href: string;
 }
 
+/**
+ * What the automated check found, for a report it filed. Shown beside the
+ * report so a moderator can see how sure the machine was and of what, and so
+ * nothing in the queue reads as though a person had written it.
+ */
+export interface AutomatedFinding {
+  /** `REJECT` means the content was hidden before anybody looked. */
+  outcome: "REVIEW" | "REJECT";
+  /** The category that decided it, as the classifier names it. */
+  category: string | null;
+  model: string;
+  promptVersion: number;
+  scores: { category: string; confidence: number }[];
+  decidedAt: string;
+}
+
 export interface Report {
   id: string;
   targetType: ReportTarget;
@@ -174,7 +201,10 @@ export interface Report {
   action: ReportAction | null;
   /** The moderator's own note. Never shown to the reporter. */
   note: string | null;
-  reporter: ModerationUser;
+  /** Null when the automated check filed it; see `automated`. */
+  reporter: ModerationUser | null;
+  /** Null for a report a person filed. */
+  automated: AutomatedFinding | null;
   resolvedBy: ModerationUser | null;
   resolvedAt: string | null;
   createdAt: string;
@@ -583,7 +613,7 @@ export async function createReport(
 
 interface ReportRow {
   id: string;
-  reporterId: string;
+  reporterId: string | null;
   targetType: string;
   targetId: string;
   reason: string;
@@ -647,8 +677,12 @@ async function hydrateReports(rows: ReportRow[]): Promise<Report[]> {
     }
   }
 
+  const findings = await findingsFor(
+    rows.filter((row) => row.reporterId === null).map((row) => row.id),
+  );
+
   const users = await usersByIds([
-    ...rows.map((row) => row.reporterId),
+    ...rows.flatMap((row) => (row.reporterId ? [row.reporterId] : [])),
     ...rows.flatMap((row) => (row.resolvedById ? [row.resolvedById] : [])),
     ...[...targets.values()].map((target) => target.authorId),
   ]);
@@ -658,8 +692,9 @@ async function hydrateReports(rows: ReportRow[]): Promise<Report[]> {
       // A report whose reporter was deleted drops out rather than failing the
       // whole page, the way `services/library.ts` drops a vanished book. The
       // *target* going is different and expected -- see `Report.target`.
-      const reporter = users.get(row.reporterId);
-      if (!reporter) return null;
+      const reporter =
+        row.reporterId === null ? null : users.get(row.reporterId);
+      if (reporter === undefined) return null;
 
       const target = targets.get(`${row.targetType}:${row.targetId}`);
       const author = target ? users.get(target.authorId) : undefined;
@@ -674,6 +709,7 @@ async function hydrateReports(rows: ReportRow[]): Promise<Report[]> {
         action: row.action === null ? null : (row.action as ReportAction),
         note: row.note,
         reporter,
+        automated: findings.get(row.id) ?? null,
         resolvedBy:
           row.resolvedById === null
             ? null
@@ -695,6 +731,196 @@ async function hydrateReports(rows: ReportRow[]): Promise<Report[]> {
       };
     })
     .filter((report): report is Report => report !== null);
+}
+
+/**
+ * The classifier's working for each report it filed, keyed by report id.
+ *
+ * Read from `ai.ModerationDecision`, which is where a machine's call is
+ * explained -- model, prompt version, a confidence per category. Two keyed
+ * reads for a page, like every other hydration here. A report with no
+ * decision behind it (the row was pruned, or filed by a version that recorded
+ * none) simply has no finding and still renders.
+ */
+async function findingsFor(
+  reportIds: string[],
+): Promise<Map<string, AutomatedFinding>> {
+  if (reportIds.length === 0) return new Map();
+
+  const decisions = await db.orm.ai.ModerationDecision.select(
+    "id",
+    "reportId",
+    "outcome",
+    "category",
+    "model",
+    "promptVersion",
+    "createdAt",
+  )
+    .where((row) => row.reportId.in(reportIds))
+    .orderBy((row) => row.createdAt.asc())
+    .all();
+
+  if (decisions.length === 0) return new Map();
+
+  const scores = await db.orm.ai.ModerationScore.select(
+    "decisionId",
+    "category",
+    "confidence",
+  )
+    .where((row) => row.decisionId.in(decisions.map((row) => row.id)))
+    .all();
+
+  const findings = new Map<string, AutomatedFinding>();
+
+  // Oldest first, so the decision that *filed* the report is the one kept:
+  // that is the call the row in the queue is about.
+  for (const decision of decisions) {
+    if (decision.reportId === null || findings.has(decision.reportId)) continue;
+    if (decision.outcome !== "REVIEW" && decision.outcome !== "REJECT") continue;
+
+    findings.set(decision.reportId, {
+      outcome: decision.outcome,
+      category: decision.category ?? null,
+      model: decision.model,
+      promptVersion: decision.promptVersion,
+      scores: scores
+        .filter((score) => score.decisionId === decision.id)
+        .map((score) => ({
+          category: score.category,
+          confidence: Number(score.confidence),
+        }))
+        .sort((a, b) => b.confidence - a.confidence),
+      decidedAt: isoOf(decision.createdAt),
+    });
+  }
+
+  return findings;
+}
+
+/* The automated check ----------------------------------------------------- */
+
+/** What the classifier is allowed to know about a row before judging it. */
+export interface ModerationTarget {
+  body: string;
+  hidden: boolean;
+}
+
+/**
+ * The text of one target, for the automated check.
+ *
+ * A narrow view of `loadTarget` rather than the function itself: the
+ * classifier needs the words and whether somebody already took them down, and
+ * has no business with who wrote them -- a score that could depend on the
+ * author is one that eventually does.
+ */
+export async function readModerationTarget(
+  type: ReportTarget,
+  id: string,
+): Promise<ModerationTarget | null> {
+  const target = await loadTarget(type, id);
+  return target ? { body: target.body, hidden: target.hidden } : null;
+}
+
+export interface AutomatedReportInput {
+  targetType: ReportTarget;
+  targetId: string;
+  reason: ReportReason;
+  /** A sentence saying what was found and how sure; shown in the queue. */
+  details: string;
+  /** Take the content down now, rather than only asking somebody to look. */
+  hide: boolean;
+}
+
+/**
+ * Files the automated check's finding, and hides the content if asked to.
+ *
+ * Returns the id of the report the finding now sits under, or null when
+ * nothing was filed.
+ *
+ * **A person's ruling wins, permanently.** If any report on this target was
+ * ever resolved by a moderator, this does nothing at all: somebody has read
+ * that exact row and decided, and a model re-reading it -- on a backfill, on a
+ * new prompt version -- is not new information. Without this a dismissed
+ * false positive would be re-hidden by the next run, and the override would be
+ * an override only until the classifier got another turn.
+ *
+ * **One open automated report per target**, by the same `INSERT ... WHERE NOT
+ * EXISTS` `createReport` uses and with the same tolerated race. A second run
+ * that finds one open reuses it rather than stacking a duplicate.
+ *
+ * **The report is written before the content is hidden**, so there is no
+ * moment at which something is hidden by a machine with nothing in the queue
+ * saying so. A failure between the two leaves a visible comment and an open
+ * report, which is the review outcome -- the safe way to be half done.
+ *
+ * Hiding goes through `hideContent`, so the notifications that quoted the row
+ * are swept exactly as they are for a moderator. The author is told, and told
+ * that it was automatic: a notice that read as a person's judgement would be
+ * the one place in the app where generated output passed for human.
+ */
+export async function fileAutomatedReport(
+  input: AutomatedReportInput,
+): Promise<string | null> {
+  const target = await loadTarget(input.targetType, input.targetId);
+  if (!target) return null;
+
+  const ruled = await db.orm.moderation.Report.select("id")
+    .where((row) => row.targetType.eq(input.targetType))
+    .where((row) => row.targetId.eq(input.targetId))
+    .where((row) => row.resolvedById.isNotNull())
+    .first();
+
+  if (ruled) return null;
+
+  const plan = db.raw.sql`
+    INSERT INTO "moderation"."report"
+      ("id", "targetType", "targetId", "reason", "details",
+       "status", "createdAt", "updatedAt")
+    SELECT gen_random_uuid()::text, ${input.targetType}, ${input.targetId},
+           ${input.reason}, ${input.details.slice(0, DETAILS_MAX_LENGTH)},
+           'OPEN', now(), now()
+     WHERE NOT EXISTS (
+       SELECT 1
+         FROM "moderation"."report" AS existing
+        WHERE existing."reporterId" IS NULL
+          AND existing."targetType" = ${input.targetType}
+          AND existing."targetId" = ${input.targetId}
+          AND existing."status" = 'OPEN'
+     )
+    RETURNING "id"
+  `
+    .returnsRow({ id: "pg/text@1" })
+    .build();
+
+  const [inserted] = await db.runtime().query(plan);
+
+  const reportId =
+    inserted?.id ??
+    (
+      await db.orm.moderation.Report.select("id")
+        .where((row) => row.targetType.eq(input.targetType))
+        .where((row) => row.targetId.eq(input.targetId))
+        .where((row) => row.reporterId.isNull())
+        .where((row) => row.status.eq("OPEN"))
+        .first()
+    )?.id ??
+    null;
+
+  if (input.hide && !target.hidden) {
+    await hideContent(input.targetType, input.targetId);
+
+    notify({
+      event: "content-hidden",
+      userId: target.authorId,
+      title: `Your ${TARGET_WORDS[input.targetType]} was hidden for review`,
+      reason:
+        `An automated check flagged it for possible ${REASON_WORDS[input.reason]}. ` +
+        "A moderator will look at it and restore it if the check was wrong.",
+      href: target.href,
+    });
+  }
+
+  return reportId;
 }
 
 export interface ReportQuery {
@@ -866,10 +1092,12 @@ export async function resolveReport(
             AND "status" = 'OPEN')
     RETURNING "reporterId"
   `
-    .returnsRow({ reporterId: "pg/text@1" })
+    .returnsRow({ reporterId: { codecId: "pg/text@1", nullable: true } })
     .build();
 
-  const swept = (await db.runtime().query(plan)) as { reporterId: string }[];
+  const swept = (await db.runtime().query(plan)) as {
+    reporterId: string | null;
+  }[];
 
   const resolved = await findReport(reportId);
   if (!resolved) throw HttpError.notFound(REPORT_NOT_FOUND);
@@ -880,7 +1108,14 @@ export async function resolveReport(
     targetType,
     target,
     callerId,
-    reporterIds: swept.map((row) => row.reporterId),
+    // The automated check has no bell to ring.
+    reporterIds: swept.flatMap((row) =>
+      row.reporterId === null ? [] : [row.reporterId],
+    ),
+    restoredFromAutomatedHide:
+      input.action === "DISMISS" &&
+      report.reporterId === null &&
+      target?.hidden === true,
   });
 
   return resolved;
@@ -908,9 +1143,28 @@ function announceOutcome(input: {
   target: TargetRow | null;
   callerId: string;
   reporterIds: string[];
+  restoredFromAutomatedHide: boolean;
 }): void {
   const { action, reason, targetType, target } = input;
   const thing = TARGET_WORDS[targetType];
+
+  /**
+   * The one `DISMISS` an author does hear about. They were told a machine hid
+   * their post; a moderator has now said the machine was wrong, and leaving
+   * that unsaid would leave them believing they broke a rule. Sent as the same
+   * notification type as the notice it corrects, so a reader who muted
+   * moderation notices is not told about the undo of something they never saw.
+   */
+  if (target && input.restoredFromAutomatedHide) {
+    notify({
+      event: "content-hidden",
+      userId: target.authorId,
+      title: `Your ${thing} is visible again`,
+      reason:
+        "A moderator reviewed the automated check that hid it and found nothing wrong.",
+      href: target.href,
+    });
+  }
 
   /**
    * The author, but only when something was actually done to them. A

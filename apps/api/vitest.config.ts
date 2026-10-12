@@ -13,6 +13,11 @@ export default defineConfig({
       // upload to a live bucket. `dotenv` does not overwrite a variable that
       // is already set, so an empty value here wins.
       S3_BUCKET: "",
+      // Posting a comment schedules an automated content check. Off for the
+      // whole suite, so the dozens of tests that post one do not each call
+      // whatever model `apps/api/.env` points at; the moderation suite turns
+      // it back on for itself, behind the fake provider.
+      AI_MODERATION: "off",
     },
   },
 });
