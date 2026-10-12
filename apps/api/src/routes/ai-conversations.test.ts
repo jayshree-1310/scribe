@@ -433,6 +433,30 @@ describe.skipIf(!available)("/api/ai/conversations", () => {
     expect(view.body.messages[1]).toMatchObject({ answerable: false, citations: [] });
   });
 
+  it("answers a pleasantry as one, without searching, and keeps it out of memory", async () => {
+    const id = await start();
+    await say(id, "Who knocked on the door?");
+    provider.reset();
+    embedder.reset();
+
+    const thanks = await say(id, "okay thanks");
+    expect(thanks.events[0]?.text).toMatch(/^You're welcome/);
+    expect(done(thanks)).toMatchObject({ answerable: false, scope: null, tokensUsed: 0 });
+    // No model, no embedding: nothing was searched.
+    expect(provider.calls).toHaveLength(0);
+    expect(embedder.calls).toHaveLength(0);
+
+    const view = await api.request<any>(`/api/ai/conversations/${id}`, { as: ownerId });
+    expect(view.body.messages[3]).toMatchObject({ role: "assistant", scope: null });
+    expect(view.body.messages[3].content).toMatch(/^You're welcome/);
+
+    // The next follow-up resolves against the real exchange, not the thanks.
+    await say(id, "What happened after that?");
+    const rewrite = textOf(callsOf("ask.conversation.rewrite")[0]);
+    expect(rewrite).toContain("Reader: Who knocked on the door?");
+    expect(rewrite).not.toContain("okay thanks");
+  });
+
   describe("privacy", () => {
     it("answers another reader's conversation with 404 on every route", async () => {
       const id = await start();

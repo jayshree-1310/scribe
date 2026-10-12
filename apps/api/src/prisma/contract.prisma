@@ -458,6 +458,12 @@ namespace content {
     embeddingChunks  ai.ChapterChunk[]
     /// Readers' Ask This Book conversations about this story.
     conversations    ai.Conversation[]
+    /// The author's story bible; see `ai.StoryFact`.
+    storyFacts           ai.StoryFact[]
+    chapterExtractions   ai.ChapterExtraction[]
+    continuityChecks     ai.ContinuityCheck[]
+    continuityFindings   ai.ContinuityFinding[]
+    continuityDismissals ai.ContinuityDismissal[]
   }
 
   model Chapter {
@@ -488,6 +494,16 @@ namespace content {
     embeddingChunks ai.ChapterChunk[]
     /// Places an Ask This Book answer cited this chapter.
     conversationCitations ai.ConversationCitation[]
+    /// Story-bible facts this chapter is the evidence for.
+    storyFacts            ai.StoryFact[]
+    /// When this chapter's facts were last extracted, and from what.
+    extraction            ai.ChapterExtraction?
+    /// When this chapter was last checked for continuity, and from what.
+    continuityCheck       ai.ContinuityCheck?
+    /// Continuity findings raised *about* this chapter...
+    continuityFindings    ai.ContinuityFinding[] @relation("ContinuityFindingChapter")
+    /// ...and findings whose contradicting evidence comes *from* it.
+    continuityEvidence    ai.ContinuityFinding[] @relation("ContinuityFindingEvidence")
 
     @@unique([storyId, chapterNumber])
   }
@@ -1437,5 +1453,192 @@ namespace ai {
 
     @@unique([messageId, marker])
     @@index([chapterId])
+  }
+
+  /// One fact of an author's story bible: a character's attribute, a place, a
+  /// relationship or an event, with the chapter that says so.
+  ///
+  /// **Two origins, one table.** `extracted` rows are a model's reading of a
+  /// chapter and are replaced wholesale whenever that chapter's text changes.
+  /// `author` rows are the author's own -- a correction of an extracted fact
+  /// (converted in place, keeping its evidence) or a fact they added -- and
+  /// re-extraction never touches them. Within one chapter, an author row wins
+  /// over any extracted fact with the same `factKey`; that precedence is the
+  /// whole of "a corrected fact survives re-extraction", and it lives in
+  /// `services/ai/story-bible.ts`.
+  ///
+  /// **A rejected fact is kept, not deleted**, because deleting it would let
+  /// the next extraction of the same unchanged sentence put it straight back.
+  /// `rejected` rows are never shown and never sent to a model; they exist
+  /// only to suppress a re-extraction of the same claim (`factKey` plus
+  /// `valueKey`) in the same chapter.
+  ///
+  /// `quote` is the evidence, and for an extracted fact it has been checked to
+  /// occur in the chapter text -- a fact whose quote the chapter does not
+  /// contain is dropped at extraction rather than stored on a model's word.
+  ///
+  /// The `embedding` column is `vector(768)` and, like `ChapterChunk`'s, is
+  /// added by the migration and read through the raw-SQL lane: the contract
+  /// cannot declare it. `embedModel` says which model wrote it, null when the
+  /// fact has not been embedded (an embedder outage at extraction time).
+  ///
+  /// Every foreign key cascades: a bible is derived from, and private to, the
+  /// story it describes.
+  model StoryFact {
+    id            String   @id @default(uuid())
+    storyId       String
+    /// The evidence chapter. Null only for a fact the author added for the
+    /// whole story rather than for one chapter.
+    chapterId     String?
+    /// `character`, `location`, `relationship` or `event`.
+    kind          String
+    subject       String
+    attribute     String
+    value         String
+    /// For a relationship, the other party; null otherwise.
+    related       String?
+    /// The chapter's own words for this fact. Null for an author's own fact.
+    quote         String?
+    /// Normalised kind, subject and attribute: the identity precedence uses.
+    factKey       String
+    /// Normalised value, so a rejection can recognise the same claim again.
+    valueKey      String
+    /// `extracted` or `author`.
+    origin        String
+    rejected      Boolean  @default(false)
+    /// The chat model and prompt version that extracted it; null for `author`.
+    model         String?
+    promptVersion Int?
+    /// The model that wrote the raw `embedding` column, or null.
+    embedModel    String?
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @default(now())
+
+    story   content.Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    chapter content.Chapter? @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+    @@index([storyId])
+    @@index([chapterId])
+  }
+
+  /// The record that one chapter's facts were extracted, and from what text.
+  ///
+  /// `contentHash` does here what it does on `ChapterSummary`: a chapter
+  /// whose text and prompt version are unchanged is not sent to a model again,
+  /// whoever asks and however often. A story has a bible exactly when at least
+  /// one of its chapters has a row here, which is also what switches the
+  /// continuity checker on for it.
+  model ChapterExtraction {
+    id            String   @id @default(uuid())
+    chapterId     String   @unique
+    storyId       String
+    contentHash   String
+    model         String
+    promptVersion Int
+    /// Facts kept, after grounding and author precedence.
+    factCount     Int      @default(0)
+    /// Facts the model offered whose quote the chapter does not contain.
+    droppedCount  Int      @default(0)
+    /// True when the chapter was longer than the extraction reads, and its
+    /// end contributed no facts. Said rather than hidden.
+    truncated     Boolean  @default(false)
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @default(now())
+
+    story   content.Story   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    chapter content.Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+    @@index([storyId])
+  }
+
+  /// The last continuity check of one chapter.
+  ///
+  /// `contentHash` is the text that was checked: a save that changes nothing
+  /// does not check again, and a page can tell an author their findings
+  /// describe an older draft. `contextHash` is what it was checked *against*
+  /// -- the chapter's claims and the established facts chosen for them -- so
+  /// a fix to chapter two makes chapter five's findings stale even though
+  /// chapter five's text never moved. A `failed` outcome stores no findings
+  /// and is retried on the next save: a check that could not run is not a
+  /// clean bill of health.
+  model ContinuityCheck {
+    id            String   @id @default(uuid())
+    chapterId     String   @unique
+    storyId       String
+    contentHash   String
+    contextHash   String   @default("")
+    /// `ok` or `failed`.
+    outcome       String
+    /// Established facts the chapter's own facts were compared against.
+    comparedCount Int      @default(0)
+    model         String?
+    promptVersion Int
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @default(now())
+
+    story   content.Story   @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    chapter content.Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+    @@index([storyId])
+  }
+
+  /// One possible contradiction between a chapter and the rest of its story.
+  ///
+  /// **Both pieces of evidence are copied onto the row** -- the claim from the
+  /// checked chapter and the fact it contradicts -- rather than pointing at
+  /// `StoryFact` rows, which are replaced whenever either chapter is
+  /// re-extracted. A finding has to stay readable exactly as it was raised.
+  ///
+  /// `fingerprint` identifies the *pair of claims*, not the row: a hash of
+  /// both facts' chapter, key and value, so the same contradiction found on
+  /// a later check has the same fingerprint, and a dismissal of it holds.
+  model ContinuityFinding {
+    id             String   @id @default(uuid())
+    storyId        String
+    /// The chapter that was checked: where the claim is.
+    chapterId      String
+    /// Where the contradicted fact is; null for a story-wide author fact.
+    otherChapterId String?
+    fingerprint    String
+    /// `attribute`, `whereabouts`, `timeline`, `death`, `relationship` or `other`.
+    kind           String
+    /// Generated: one sentence saying what does not add up.
+    explanation    String
+    /// 0-100, as the model reported it. Below the configured floor is never stored.
+    confidence     Int
+    claimSubject   String
+    claimAttribute String
+    claimValue     String
+    claimQuote     String
+    factSubject    String
+    factAttribute  String
+    factValue      String
+    factQuote      String?
+    /// `extracted` or `author`: whether the contradicted fact is one the author confirmed.
+    factOrigin     String
+    createdAt      DateTime @default(now())
+
+    story        content.Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    chapter      content.Chapter  @relation("ContinuityFindingChapter", fields: [chapterId], references: [id], onDelete: Cascade)
+    otherChapter content.Chapter? @relation("ContinuityFindingEvidence", fields: [otherChapterId], references: [id], onDelete: Cascade)
+
+    @@unique([chapterId, fingerprint])
+    @@index([storyId])
+  }
+
+  /// A contradiction the author has said is not one. Never raised again.
+  ///
+  /// Keyed by the finding's `fingerprint`, per story, so it outlives the
+  /// finding row it was made from: the next check of an edited chapter that
+  /// finds the same pair of claims recognises it and stays silent.
+  model ContinuityDismissal {
+    id          String   @id @default(uuid())
+    storyId     String
+    fingerprint String
+    createdAt   DateTime @default(now())
+
+    story content.Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+    @@unique([storyId, fingerprint])
   }
 }

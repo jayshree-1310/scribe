@@ -1,0 +1,1113 @@
+[
+  {
+    "id": "table.chapterExtraction",
+    "label": "Create table \"chapterExtraction\"",
+    "summary": "Creates table \"chapterExtraction\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "chapterExtraction"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"chapterExtraction\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterExtraction\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"chapterExtraction\"",
+        "sql": "CREATE TABLE \"ai\".\"chapterExtraction\" (\n  \"chapterId\" text NOT NULL,\n  \"contentHash\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"droppedCount\" int4 DEFAULT 0 NOT NULL,\n  \"factCount\" int4 DEFAULT 0 NOT NULL,\n  \"id\" text NOT NULL,\n  \"model\" text NOT NULL,\n  \"promptVersion\" int4 NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"truncated\" bool DEFAULT false NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"chapterExtraction\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterExtraction\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.continuityCheck",
+    "label": "Create table \"continuityCheck\"",
+    "summary": "Creates table \"continuityCheck\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "continuityCheck"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"continuityCheck\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityCheck\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"continuityCheck\"",
+        "sql": "CREATE TABLE \"ai\".\"continuityCheck\" (\n  \"chapterId\" text NOT NULL,\n  \"comparedCount\" int4 DEFAULT 0 NOT NULL,\n  \"contentHash\" text NOT NULL,\n  \"contextHash\" text DEFAULT '' NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"model\" text,\n  \"outcome\" text NOT NULL,\n  \"promptVersion\" int4 NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"continuityCheck\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityCheck\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.continuityDismissal",
+    "label": "Create table \"continuityDismissal\"",
+    "summary": "Creates table \"continuityDismissal\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "continuityDismissal"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"continuityDismissal\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityDismissal\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"continuityDismissal\"",
+        "sql": "CREATE TABLE \"ai\".\"continuityDismissal\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"fingerprint\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"storyId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"continuityDismissal\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityDismissal\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.continuityFinding",
+    "label": "Create table \"continuityFinding\"",
+    "summary": "Creates table \"continuityFinding\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "continuityFinding"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"continuityFinding\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityFinding\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"continuityFinding\"",
+        "sql": "CREATE TABLE \"ai\".\"continuityFinding\" (\n  \"chapterId\" text NOT NULL,\n  \"claimAttribute\" text NOT NULL,\n  \"claimQuote\" text NOT NULL,\n  \"claimSubject\" text NOT NULL,\n  \"claimValue\" text NOT NULL,\n  \"confidence\" int4 NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"explanation\" text NOT NULL,\n  \"factAttribute\" text NOT NULL,\n  \"factOrigin\" text NOT NULL,\n  \"factQuote\" text,\n  \"factSubject\" text NOT NULL,\n  \"factValue\" text NOT NULL,\n  \"fingerprint\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"kind\" text NOT NULL,\n  \"otherChapterId\" text,\n  \"storyId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"continuityFinding\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityFinding\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.storyFact",
+    "label": "Create table \"storyFact\"",
+    "summary": "Creates table \"storyFact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "storyFact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"storyFact\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"storyFact\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"storyFact\"",
+        "sql": "CREATE TABLE \"ai\".\"storyFact\" (\n  \"attribute\" text NOT NULL,\n  \"chapterId\" text,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"embedModel\" text,\n  \"factKey\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"kind\" text NOT NULL,\n  \"model\" text,\n  \"origin\" text NOT NULL,\n  \"promptVersion\" int4,\n  \"quote\" text,\n  \"rejected\" bool DEFAULT false NOT NULL,\n  \"related\" text,\n  \"storyId\" text NOT NULL,\n  \"subject\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"value\" text NOT NULL,\n  \"valueKey\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"storyFact\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"storyFact\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.storyFact.embedding",
+    "label": "Add column \"embedding\" vector(768) to \"storyFact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Add column \"embedding\" to \"ai\".\"storyFact\"",
+        "sql": "ALTER TABLE \"ai\".\"storyFact\" ADD COLUMN \"embedding\" vector(768)"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "unique.chapterExtraction.chapterExtraction_chapterId_key",
+    "label": "Add unique constraint on \"chapterExtraction\" (chapterId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "unique",
+        "name": "chapterExtraction_chapterId_key",
+        "table": "chapterExtraction"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"chapterExtraction_chapterId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterExtraction_chapterId_key",
+          "ai",
+          "\"ai\".\"chapterExtraction\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"chapterExtraction_chapterId_key\"",
+        "sql": "ALTER TABLE \"ai\".\"chapterExtraction\" ADD CONSTRAINT \"chapterExtraction_chapterId_key\" UNIQUE (\"chapterId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"chapterExtraction_chapterId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterExtraction_chapterId_key",
+          "ai",
+          "\"ai\".\"chapterExtraction\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.continuityCheck.continuityCheck_chapterId_key",
+    "label": "Add unique constraint on \"continuityCheck\" (chapterId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "unique",
+        "name": "continuityCheck_chapterId_key",
+        "table": "continuityCheck"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"continuityCheck_chapterId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityCheck_chapterId_key",
+          "ai",
+          "\"ai\".\"continuityCheck\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"continuityCheck_chapterId_key\"",
+        "sql": "ALTER TABLE \"ai\".\"continuityCheck\" ADD CONSTRAINT \"continuityCheck_chapterId_key\" UNIQUE (\"chapterId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"continuityCheck_chapterId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityCheck_chapterId_key",
+          "ai",
+          "\"ai\".\"continuityCheck\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.continuityDismissal.continuityDismissal_storyId_fingerprint_key",
+    "label": "Add unique constraint on \"continuityDismissal\" (storyId, fingerprint)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "unique",
+        "name": "continuityDismissal_storyId_fingerprint_key",
+        "table": "continuityDismissal"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"continuityDismissal_storyId_fingerprint_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityDismissal_storyId_fingerprint_key",
+          "ai",
+          "\"ai\".\"continuityDismissal\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"continuityDismissal_storyId_fingerprint_key\"",
+        "sql": "ALTER TABLE \"ai\".\"continuityDismissal\" ADD CONSTRAINT \"continuityDismissal_storyId_fingerprint_key\" UNIQUE (\"storyId\", \"fingerprint\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"continuityDismissal_storyId_fingerprint_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityDismissal_storyId_fingerprint_key",
+          "ai",
+          "\"ai\".\"continuityDismissal\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.continuityFinding.continuityFinding_chapterId_fingerprint_key",
+    "label": "Add unique constraint on \"continuityFinding\" (chapterId, fingerprint)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "unique",
+        "name": "continuityFinding_chapterId_fingerprint_key",
+        "table": "continuityFinding"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"continuityFinding_chapterId_fingerprint_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityFinding_chapterId_fingerprint_key",
+          "ai",
+          "\"ai\".\"continuityFinding\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"continuityFinding_chapterId_fingerprint_key\"",
+        "sql": "ALTER TABLE \"ai\".\"continuityFinding\" ADD CONSTRAINT \"continuityFinding_chapterId_fingerprint_key\" UNIQUE (\"chapterId\", \"fingerprint\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"continuityFinding_chapterId_fingerprint_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityFinding_chapterId_fingerprint_key",
+          "ai",
+          "\"ai\".\"continuityFinding\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapterExtraction.chapterExtraction_storyId_idx_cd452158",
+    "label": "Create index \"chapterExtraction_storyId_idx_cd452158\" on \"chapterExtraction\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "chapterExtraction_storyId_idx_cd452158",
+        "table": "chapterExtraction"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapterExtraction_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterExtraction_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapterExtraction_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"chapterExtraction_storyId_idx_cd452158\" ON \"ai\".\"chapterExtraction\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapterExtraction_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"chapterExtraction_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.continuityCheck.continuityCheck_storyId_idx_cd452158",
+    "label": "Create index \"continuityCheck_storyId_idx_cd452158\" on \"continuityCheck\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "continuityCheck_storyId_idx_cd452158",
+        "table": "continuityCheck"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"continuityCheck_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityCheck_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"continuityCheck_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"continuityCheck_storyId_idx_cd452158\" ON \"ai\".\"continuityCheck\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"continuityCheck_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityCheck_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.continuityDismissal.continuityDismissal_storyId_idx_cd452158",
+    "label": "Create index \"continuityDismissal_storyId_idx_cd452158\" on \"continuityDismissal\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "continuityDismissal_storyId_idx_cd452158",
+        "table": "continuityDismissal"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"continuityDismissal_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityDismissal_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"continuityDismissal_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"continuityDismissal_storyId_idx_cd452158\" ON \"ai\".\"continuityDismissal\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"continuityDismissal_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityDismissal_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.continuityFinding.continuityFinding_chapterId_idx_411dd3d6",
+    "label": "Create index \"continuityFinding_chapterId_idx_411dd3d6\" on \"continuityFinding\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "continuityFinding_chapterId_idx_411dd3d6",
+        "table": "continuityFinding"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"continuityFinding_chapterId_idx_411dd3d6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityFinding_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"continuityFinding_chapterId_idx_411dd3d6\"",
+        "sql": "CREATE INDEX \"continuityFinding_chapterId_idx_411dd3d6\" ON \"ai\".\"continuityFinding\" (\"chapterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"continuityFinding_chapterId_idx_411dd3d6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityFinding_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.continuityFinding.continuityFinding_otherChapterId_idx_fa80d29b",
+    "label": "Create index \"continuityFinding_otherChapterId_idx_fa80d29b\" on \"continuityFinding\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "continuityFinding_otherChapterId_idx_fa80d29b",
+        "table": "continuityFinding"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"continuityFinding_otherChapterId_idx_fa80d29b\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityFinding_otherChapterId_idx_fa80d29b\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"continuityFinding_otherChapterId_idx_fa80d29b\"",
+        "sql": "CREATE INDEX \"continuityFinding_otherChapterId_idx_fa80d29b\" ON \"ai\".\"continuityFinding\" (\"otherChapterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"continuityFinding_otherChapterId_idx_fa80d29b\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityFinding_otherChapterId_idx_fa80d29b\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.continuityFinding.continuityFinding_storyId_idx_cd452158",
+    "label": "Create index \"continuityFinding_storyId_idx_cd452158\" on \"continuityFinding\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "continuityFinding_storyId_idx_cd452158",
+        "table": "continuityFinding"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"continuityFinding_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityFinding_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"continuityFinding_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"continuityFinding_storyId_idx_cd452158\" ON \"ai\".\"continuityFinding\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"continuityFinding_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"continuityFinding_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.storyFact.storyFact_chapterId_idx_411dd3d6",
+    "label": "Create index \"storyFact_chapterId_idx_411dd3d6\" on \"storyFact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "storyFact_chapterId_idx_411dd3d6",
+        "table": "storyFact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"storyFact_chapterId_idx_411dd3d6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"storyFact_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"storyFact_chapterId_idx_411dd3d6\"",
+        "sql": "CREATE INDEX \"storyFact_chapterId_idx_411dd3d6\" ON \"ai\".\"storyFact\" (\"chapterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"storyFact_chapterId_idx_411dd3d6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"storyFact_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.storyFact.storyFact_storyId_idx_cd452158",
+    "label": "Create index \"storyFact_storyId_idx_cd452158\" on \"storyFact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "storyFact_storyId_idx_cd452158",
+        "table": "storyFact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"storyFact_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"storyFact_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"storyFact_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"storyFact_storyId_idx_cd452158\" ON \"ai\".\"storyFact\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"storyFact_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"storyFact_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chapterExtraction.chapterExtraction_storyId_fkey",
+    "label": "Add foreign key \"chapterExtraction_storyId_fkey\" on \"chapterExtraction\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "chapterExtraction_storyId_fkey",
+        "table": "chapterExtraction"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chapterExtraction_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterExtraction_storyId_fkey",
+          "ai",
+          "\"ai\".\"chapterExtraction\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chapterExtraction_storyId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"chapterExtraction\"\nADD CONSTRAINT \"chapterExtraction_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chapterExtraction_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterExtraction_storyId_fkey",
+          "ai",
+          "\"ai\".\"chapterExtraction\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.chapterExtraction.chapterExtraction_chapterId_fkey",
+    "label": "Add foreign key \"chapterExtraction_chapterId_fkey\" on \"chapterExtraction\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "chapterExtraction_chapterId_fkey",
+        "table": "chapterExtraction"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"chapterExtraction_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterExtraction_chapterId_fkey",
+          "ai",
+          "\"ai\".\"chapterExtraction\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"chapterExtraction_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"chapterExtraction\"\nADD CONSTRAINT \"chapterExtraction_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"chapterExtraction_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "chapterExtraction_chapterId_fkey",
+          "ai",
+          "\"ai\".\"chapterExtraction\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.continuityCheck.continuityCheck_storyId_fkey",
+    "label": "Add foreign key \"continuityCheck_storyId_fkey\" on \"continuityCheck\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "continuityCheck_storyId_fkey",
+        "table": "continuityCheck"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"continuityCheck_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityCheck_storyId_fkey",
+          "ai",
+          "\"ai\".\"continuityCheck\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"continuityCheck_storyId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"continuityCheck\"\nADD CONSTRAINT \"continuityCheck_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"continuityCheck_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityCheck_storyId_fkey",
+          "ai",
+          "\"ai\".\"continuityCheck\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.continuityCheck.continuityCheck_chapterId_fkey",
+    "label": "Add foreign key \"continuityCheck_chapterId_fkey\" on \"continuityCheck\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "continuityCheck_chapterId_fkey",
+        "table": "continuityCheck"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"continuityCheck_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityCheck_chapterId_fkey",
+          "ai",
+          "\"ai\".\"continuityCheck\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"continuityCheck_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"continuityCheck\"\nADD CONSTRAINT \"continuityCheck_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"continuityCheck_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityCheck_chapterId_fkey",
+          "ai",
+          "\"ai\".\"continuityCheck\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.continuityDismissal.continuityDismissal_storyId_fkey",
+    "label": "Add foreign key \"continuityDismissal_storyId_fkey\" on \"continuityDismissal\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "continuityDismissal_storyId_fkey",
+        "table": "continuityDismissal"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"continuityDismissal_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityDismissal_storyId_fkey",
+          "ai",
+          "\"ai\".\"continuityDismissal\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"continuityDismissal_storyId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"continuityDismissal\"\nADD CONSTRAINT \"continuityDismissal_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"continuityDismissal_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityDismissal_storyId_fkey",
+          "ai",
+          "\"ai\".\"continuityDismissal\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.continuityFinding.continuityFinding_storyId_fkey",
+    "label": "Add foreign key \"continuityFinding_storyId_fkey\" on \"continuityFinding\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "continuityFinding_storyId_fkey",
+        "table": "continuityFinding"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"continuityFinding_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityFinding_storyId_fkey",
+          "ai",
+          "\"ai\".\"continuityFinding\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"continuityFinding_storyId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"continuityFinding\"\nADD CONSTRAINT \"continuityFinding_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"continuityFinding_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityFinding_storyId_fkey",
+          "ai",
+          "\"ai\".\"continuityFinding\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.continuityFinding.continuityFinding_chapterId_fkey",
+    "label": "Add foreign key \"continuityFinding_chapterId_fkey\" on \"continuityFinding\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "continuityFinding_chapterId_fkey",
+        "table": "continuityFinding"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"continuityFinding_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityFinding_chapterId_fkey",
+          "ai",
+          "\"ai\".\"continuityFinding\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"continuityFinding_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"continuityFinding\"\nADD CONSTRAINT \"continuityFinding_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"continuityFinding_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityFinding_chapterId_fkey",
+          "ai",
+          "\"ai\".\"continuityFinding\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.continuityFinding.continuityFinding_otherChapterId_fkey",
+    "label": "Add foreign key \"continuityFinding_otherChapterId_fkey\" on \"continuityFinding\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "continuityFinding_otherChapterId_fkey",
+        "table": "continuityFinding"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"continuityFinding_otherChapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityFinding_otherChapterId_fkey",
+          "ai",
+          "\"ai\".\"continuityFinding\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"continuityFinding_otherChapterId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"continuityFinding\"\nADD CONSTRAINT \"continuityFinding_otherChapterId_fkey\"\nFOREIGN KEY (\"otherChapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"continuityFinding_otherChapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "continuityFinding_otherChapterId_fkey",
+          "ai",
+          "\"ai\".\"continuityFinding\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.storyFact.storyFact_storyId_fkey",
+    "label": "Add foreign key \"storyFact_storyId_fkey\" on \"storyFact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "storyFact_storyId_fkey",
+        "table": "storyFact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"storyFact_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyFact_storyId_fkey",
+          "ai",
+          "\"ai\".\"storyFact\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"storyFact_storyId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"storyFact\"\nADD CONSTRAINT \"storyFact_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"storyFact_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyFact_storyId_fkey",
+          "ai",
+          "\"ai\".\"storyFact\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.storyFact.storyFact_chapterId_fkey",
+    "label": "Add foreign key \"storyFact_chapterId_fkey\" on \"storyFact\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "storyFact_chapterId_fkey",
+        "table": "storyFact"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"storyFact_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyFact_chapterId_fkey",
+          "ai",
+          "\"ai\".\"storyFact\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"storyFact_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"storyFact\"\nADD CONSTRAINT \"storyFact_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"storyFact_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyFact_chapterId_fkey",
+          "ai",
+          "\"ai\".\"storyFact\""
+        ]
+      }
+    ]
+  }
+]

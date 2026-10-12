@@ -526,8 +526,16 @@ function AnswerTurn({ turn, idBase, storySlug, onCite, scopeText }: AnswerTurnPr
 
       {turn.error ? <p className="ask__error">{turn.error}</p> : null}
 
+      {/* Muted only for a decline. A reply to "thanks" is neither an AI
+          answer nor a failure to find one; it has no scope, and reads as
+          ordinary text. */}
       {turn.answer.length > 0 ? (
-        <p className={cn('ask__answer', !turn.answerable && 'is-declined')}>
+        <p
+          className={cn(
+            'ask__answer',
+            !turn.answerable && turn.scope !== null && 'is-declined',
+          )}
+        >
           {segmentAnswer(turn.answer, valid).map((segment, index) =>
             segment.kind === 'text' ? (
               <span key={index}>{withEmphasis(segment.text)}</span>

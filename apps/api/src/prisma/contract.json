@@ -32,6 +32,10 @@
       "model": "ChapterChunk",
       "namespace": "ai"
     },
+    "chapterExtraction": {
+      "model": "ChapterExtraction",
+      "namespace": "ai"
+    },
     "chapterLike": {
       "model": "ChapterLike",
       "namespace": "engagement"
@@ -59,6 +63,18 @@
     "commentLike": {
       "model": "CommentLike",
       "namespace": "engagement"
+    },
+    "continuityCheck": {
+      "model": "ContinuityCheck",
+      "namespace": "ai"
+    },
+    "continuityDismissal": {
+      "model": "ContinuityDismissal",
+      "namespace": "ai"
+    },
+    "continuityFinding": {
+      "model": "ContinuityFinding",
+      "namespace": "ai"
     },
     "conversation": {
       "model": "Conversation",
@@ -115,6 +131,10 @@
     "story": {
       "model": "Story",
       "namespace": "content"
+    },
+    "storyFact": {
+      "model": "StoryFact",
+      "namespace": "ai"
     },
     "storyGenre": {
       "model": "StoryGenre",
@@ -277,6 +297,158 @@
               "table": "chapterChunk"
             }
           },
+          "ChapterExtraction": {
+            "fields": {
+              "chapterId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "contentHash": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "droppedCount": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "factCount": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "promptVersion": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "storyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "truncated": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "chapter": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "chapterId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Chapter",
+                  "namespace": "content"
+                }
+              },
+              "story": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "storyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Story",
+                  "namespace": "content"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "chapterId": {
+                  "column": "chapterId"
+                },
+                "contentHash": {
+                  "column": "contentHash"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "droppedCount": {
+                  "column": "droppedCount"
+                },
+                "factCount": {
+                  "column": "factCount"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "promptVersion": {
+                  "column": "promptVersion"
+                },
+                "storyId": {
+                  "column": "storyId"
+                },
+                "truncated": {
+                  "column": "truncated"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "ai",
+              "table": "chapterExtraction"
+            }
+          },
           "ChapterSummary": {
             "fields": {
               "chapterId": {
@@ -382,6 +554,462 @@
               },
               "namespaceId": "ai",
               "table": "chapterSummary"
+            }
+          },
+          "ContinuityCheck": {
+            "fields": {
+              "chapterId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "comparedCount": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "contentHash": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "contextHash": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "outcome": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "promptVersion": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "storyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "chapter": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "chapterId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Chapter",
+                  "namespace": "content"
+                }
+              },
+              "story": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "storyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Story",
+                  "namespace": "content"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "chapterId": {
+                  "column": "chapterId"
+                },
+                "comparedCount": {
+                  "column": "comparedCount"
+                },
+                "contentHash": {
+                  "column": "contentHash"
+                },
+                "contextHash": {
+                  "column": "contextHash"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "outcome": {
+                  "column": "outcome"
+                },
+                "promptVersion": {
+                  "column": "promptVersion"
+                },
+                "storyId": {
+                  "column": "storyId"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "ai",
+              "table": "continuityCheck"
+            }
+          },
+          "ContinuityDismissal": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "fingerprint": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "storyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "story": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "storyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Story",
+                  "namespace": "content"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "fingerprint": {
+                  "column": "fingerprint"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "storyId": {
+                  "column": "storyId"
+                }
+              },
+              "namespaceId": "ai",
+              "table": "continuityDismissal"
+            }
+          },
+          "ContinuityFinding": {
+            "fields": {
+              "chapterId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "claimAttribute": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "claimQuote": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "claimSubject": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "claimValue": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "confidence": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "explanation": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "factAttribute": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "factOrigin": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "factQuote": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "factSubject": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "factValue": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "fingerprint": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "kind": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "otherChapterId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "storyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "chapter": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "chapterId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Chapter",
+                  "namespace": "content"
+                }
+              },
+              "otherChapter": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "otherChapterId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Chapter",
+                  "namespace": "content"
+                }
+              },
+              "story": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "storyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Story",
+                  "namespace": "content"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "chapterId": {
+                  "column": "chapterId"
+                },
+                "claimAttribute": {
+                  "column": "claimAttribute"
+                },
+                "claimQuote": {
+                  "column": "claimQuote"
+                },
+                "claimSubject": {
+                  "column": "claimSubject"
+                },
+                "claimValue": {
+                  "column": "claimValue"
+                },
+                "confidence": {
+                  "column": "confidence"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "explanation": {
+                  "column": "explanation"
+                },
+                "factAttribute": {
+                  "column": "factAttribute"
+                },
+                "factOrigin": {
+                  "column": "factOrigin"
+                },
+                "factQuote": {
+                  "column": "factQuote"
+                },
+                "factSubject": {
+                  "column": "factSubject"
+                },
+                "factValue": {
+                  "column": "factValue"
+                },
+                "fingerprint": {
+                  "column": "fingerprint"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "kind": {
+                  "column": "kind"
+                },
+                "otherChapterId": {
+                  "column": "otherChapterId"
+                },
+                "storyId": {
+                  "column": "storyId"
+                }
+              },
+              "namespaceId": "ai",
+              "table": "continuityFinding"
             }
           },
           "Conversation": {
@@ -783,6 +1411,228 @@
               },
               "namespaceId": "ai",
               "table": "conversationMessage"
+            }
+          },
+          "StoryFact": {
+            "fields": {
+              "attribute": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "chapterId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "embedModel": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "factKey": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "kind": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "origin": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "promptVersion": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "quote": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "rejected": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "related": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "storyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "subject": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "value": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "valueKey": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "chapter": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "chapterId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Chapter",
+                  "namespace": "content"
+                }
+              },
+              "story": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "storyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Story",
+                  "namespace": "content"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "attribute": {
+                  "column": "attribute"
+                },
+                "chapterId": {
+                  "column": "chapterId"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "embedModel": {
+                  "column": "embedModel"
+                },
+                "factKey": {
+                  "column": "factKey"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "kind": {
+                  "column": "kind"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "origin": {
+                  "column": "origin"
+                },
+                "promptVersion": {
+                  "column": "promptVersion"
+                },
+                "quote": {
+                  "column": "quote"
+                },
+                "rejected": {
+                  "column": "rejected"
+                },
+                "related": {
+                  "column": "related"
+                },
+                "storyId": {
+                  "column": "storyId"
+                },
+                "subject": {
+                  "column": "subject"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                },
+                "value": {
+                  "column": "value"
+                },
+                "valueKey": {
+                  "column": "valueKey"
+                }
+              },
+              "namespaceId": "ai",
+              "table": "storyFact"
             }
           }
         }
@@ -2699,6 +3549,51 @@
                   "namespace": "engagement"
                 }
               },
+              "continuityCheck": {
+                "cardinality": "1:1",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "chapterId"
+                  ]
+                },
+                "to": {
+                  "model": "ContinuityCheck",
+                  "namespace": "ai"
+                }
+              },
+              "continuityEvidence": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "otherChapterId"
+                  ]
+                },
+                "to": {
+                  "model": "ContinuityFinding",
+                  "namespace": "ai"
+                }
+              },
+              "continuityFindings": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "chapterId"
+                  ]
+                },
+                "to": {
+                  "model": "ContinuityFinding",
+                  "namespace": "ai"
+                }
+              },
               "conversationCitations": {
                 "cardinality": "1:N",
                 "on": {
@@ -2726,6 +3621,21 @@
                 },
                 "to": {
                   "model": "ChapterChunk",
+                  "namespace": "ai"
+                }
+              },
+              "extraction": {
+                "cardinality": "1:1",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "chapterId"
+                  ]
+                },
+                "to": {
+                  "model": "ChapterExtraction",
                   "namespace": "ai"
                 }
               },
@@ -2802,6 +3712,21 @@
                 "to": {
                   "model": "Story",
                   "namespace": "content"
+                }
+              },
+              "storyFacts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "chapterId"
+                  ]
+                },
+                "to": {
+                  "model": "StoryFact",
+                  "namespace": "ai"
                 }
               },
               "summary": {
@@ -3209,6 +4134,21 @@
                   "namespace": "challenges"
                 }
               },
+              "chapterExtractions": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "storyId"
+                  ]
+                },
+                "to": {
+                  "model": "ChapterExtraction",
+                  "namespace": "ai"
+                }
+              },
               "chapters": {
                 "cardinality": "1:N",
                 "on": {
@@ -3252,6 +4192,51 @@
                 "to": {
                   "model": "Comment",
                   "namespace": "engagement"
+                }
+              },
+              "continuityChecks": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "storyId"
+                  ]
+                },
+                "to": {
+                  "model": "ContinuityCheck",
+                  "namespace": "ai"
+                }
+              },
+              "continuityDismissals": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "storyId"
+                  ]
+                },
+                "to": {
+                  "model": "ContinuityDismissal",
+                  "namespace": "ai"
+                }
+              },
+              "continuityFindings": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "storyId"
+                  ]
+                },
+                "to": {
+                  "model": "ContinuityFinding",
+                  "namespace": "ai"
                 }
               },
               "conversations": {
@@ -3342,6 +4327,21 @@
                 "to": {
                   "model": "ChapterRead",
                   "namespace": "engagement"
+                }
+              },
+              "storyFacts": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "storyId"
+                  ]
+                },
+                "to": {
+                  "model": "StoryFact",
+                  "namespace": "ai"
                 }
               },
               "views": {
@@ -5293,6 +6293,143 @@
                 }
               ]
             },
+            "chapterExtraction": {
+              "columns": {
+                "chapterId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "contentHash": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "droppedCount": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "factCount": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "promptVersion": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "storyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "truncated": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": false
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "storyId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "chapterExtraction"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "story"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "chapterId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "chapterExtraction"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "chapter"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "storyId"
+                  ],
+                  "name": "chapterExtraction_storyId_idx_cd452158",
+                  "prefix": "chapterExtraction_storyId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "chapterId"
+                  ]
+                }
+              ]
+            },
             "chapterSummary": {
               "columns": {
                 "chapterId": {
@@ -5372,6 +6509,399 @@
                 {
                   "columns": [
                     "chapterId"
+                  ]
+                }
+              ]
+            },
+            "continuityCheck": {
+              "columns": {
+                "chapterId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "comparedCount": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "contentHash": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "contextHash": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": ""
+                  },
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "outcome": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "promptVersion": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "storyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "storyId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "continuityCheck"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "story"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "chapterId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "continuityCheck"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "chapter"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "storyId"
+                  ],
+                  "name": "continuityCheck_storyId_idx_cd452158",
+                  "prefix": "continuityCheck_storyId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "chapterId"
+                  ]
+                }
+              ]
+            },
+            "continuityDismissal": {
+              "columns": {
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "fingerprint": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "storyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "storyId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "continuityDismissal"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "story"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "storyId"
+                  ],
+                  "name": "continuityDismissal_storyId_idx_cd452158",
+                  "prefix": "continuityDismissal_storyId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "storyId",
+                    "fingerprint"
+                  ]
+                }
+              ]
+            },
+            "continuityFinding": {
+              "columns": {
+                "chapterId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "claimAttribute": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "claimQuote": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "claimSubject": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "claimValue": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "confidence": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "explanation": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "factAttribute": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "factOrigin": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "factQuote": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "factSubject": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "factValue": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "fingerprint": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "kind": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "otherChapterId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "storyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "storyId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "continuityFinding"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "story"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "chapterId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "continuityFinding"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "chapter"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "otherChapterId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "continuityFinding"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "chapter"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "chapterId"
+                  ],
+                  "name": "continuityFinding_chapterId_idx_411dd3d6",
+                  "prefix": "continuityFinding_chapterId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "otherChapterId"
+                  ],
+                  "name": "continuityFinding_otherChapterId_idx_fa80d29b",
+                  "prefix": "continuityFinding_otherChapterId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "storyId"
+                  ],
+                  "name": "continuityFinding_storyId_idx_cd452158",
+                  "prefix": "continuityFinding_storyId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "chapterId",
+                    "fingerprint"
                   ]
                 }
               ]
@@ -5727,6 +7257,172 @@
                   ]
                 }
               ]
+            },
+            "storyFact": {
+              "columns": {
+                "attribute": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "chapterId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "embedModel": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "factKey": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "kind": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "origin": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "promptVersion": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
+                "quote": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "rejected": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": false
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "related": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "storyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "subject": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "value": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "valueKey": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "storyId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "storyFact"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "story"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "chapterId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "storyFact"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "chapter"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "chapterId"
+                  ],
+                  "name": "storyFact_chapterId_idx_411dd3d6",
+                  "prefix": "storyFact_chapterId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "storyId"
+                  ],
+                  "name": "storyFact_storyId_idx_cd452158",
+                  "prefix": "storyFact_storyId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
             }
           }
         },
@@ -9280,10 +10976,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "639fea0256b9f96efffea05a925f290f0f5bd3b6c913360494701bd16bff675c"
+    "storageHash": "0c167f3d32cb8e11103360cae4c1ec9ed7bbdaf214fef734a0c4c5e27363b96f"
   },
   "execution": {
-    "executionHash": "74a1c2158dc8f7e88d5cffc4b88e84f1389bd9845530fd9c31ee541ea67a6253",
+    "executionHash": "b8f3f8a09301b31cdc2a4c89aa817bb3a16ce2ab38cfc0bda5797ae672d718fb",
     "mutations": {
       "defaults": [
         {
@@ -9370,6 +11066,17 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "ai",
+            "table": "chapterExtraction"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
             "namespace": "engagement",
             "table": "chapterRead"
           }
@@ -9416,6 +11123,39 @@
             "column": "id",
             "namespace": "engagement",
             "table": "comment"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "ai",
+            "table": "continuityCheck"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "ai",
+            "table": "continuityDismissal"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "ai",
+            "table": "continuityFinding"
           }
         },
         {
@@ -9548,6 +11288,17 @@
             "column": "id",
             "namespace": "content",
             "table": "story"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "ai",
+            "table": "storyFact"
           }
         },
         {

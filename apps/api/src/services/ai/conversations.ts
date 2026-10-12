@@ -372,6 +372,70 @@ function clampSummary(raw: string): string {
     : `${cut.slice(0, cut.lastIndexOf(" "))}…`;
 }
 
+/* 0. Pleasantries -------------------------------------------------------- */
+
+const THANKS = new Set("thanks thank thankyou thx ty tysm cheers appreciated appreciate".split(" "));
+const FAREWELL = new Set("bye goodbye cya farewell goodnight".split(" "));
+const GREETING = new Set("hi hello hey hiya heya".split(" "));
+const ACK = new Set(
+  "ok okay k kk cool great nice alright awesome perfect fine good sure yes yep yeah understood noted".split(" "),
+);
+/** Words that pad a pleasantry without making it a question. */
+const FILLER = new Set(
+  "you u so very much a lot for that the this your help it got i see makes sense oh ah well then and again all now there bro man".split(" "),
+);
+
+/** Longer than this is a sentence, and a sentence might be asking something. */
+const PLEASANTRY_WORDS = 6;
+
+/**
+ * A reply to a message that is only a pleasantry -- "okay thanks", "hi",
+ * "bye" -- or null when the message might be about the story.
+ *
+ * Without this, "okay thanks" is embedded, retrieves nothing, and is told the
+ * story does not cover it, which is true and absurd. A conversation is a
+ * place people say thank you.
+ *
+ * Fixed replies from the server rather than a model's, for the reason the
+ * decline is: there is no passage to answer from, so a model would be
+ * improvising -- and a reply that costs an embedding, a retrieval and a
+ * generation to say "you're welcome" is a poor trade.
+ *
+ * Deliberately strict: *every* word must be a pleasantry or padding, and
+ * there must be few of them. "Thanks, and who is Kabir?" is a question and is
+ * treated as one. A false negative just falls through to the ordinary path.
+ */
+export function pleasantryReply(message: string): string | null {
+  const words = message.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+  if (words.length === 0 || words.length > PLEASANTRY_WORDS) return null;
+
+  const known = (word: string) =>
+    THANKS.has(word) ||
+    FAREWELL.has(word) ||
+    GREETING.has(word) ||
+    ACK.has(word) ||
+    FILLER.has(word);
+  if (!words.every(known)) return null;
+
+  const has = (set: Set<string>) => words.some((word) => set.has(word));
+  if (has(THANKS)) return "You're welcome! Ask me anything else about the story.";
+  if (has(FAREWELL)) return "Goodbye — enjoy the story!";
+  if (has(GREETING)) return "Hi! Ask me anything about this story.";
+  if (has(ACK)) return "Glad that helped. Ask me anything else about the story.";
+  // Padding alone ("so much", "and then") says nothing either way.
+  return null;
+}
+
+/**
+ * Whether a stored exchange was a pleasantry: answered without a model and
+ * under no spoiler bound, because nothing was searched. Such exchanges are
+ * kept for the thread and left out of memory -- "Reader: thanks / Answer:
+ * you're welcome" is not context for the next question.
+ */
+function isPleasantry(exchange: Exchange): boolean {
+  return !exchange.answer.answerable && exchange.answer.scopeBasis === null;
+}
+
 /* 2. Query rewriting ----------------------------------------------------- */
 
 /**
@@ -722,7 +786,8 @@ interface Turn {
   standalone: string | null;
   answer: string;
   answerable: boolean;
-  scope: AskScope;
+  /** Null for a pleasantry: nothing was searched, so no bound applied. */
+  scope: AskScope | null;
   citations: AskCitation[];
   passages: NumberedPassage[];
   usage: UsageTally;
@@ -755,8 +820,8 @@ async function saveTurn(turn: Turn): Promise<{ questionId: string; answerId: str
         ordinal: turn.nextOrdinal + 1,
         role: "assistant",
         content: turn.answer,
-        upToChapter: turn.scope.upToChapter,
-        scopeBasis: turn.scope.basis,
+        upToChapter: turn.scope?.upToChapter ?? null,
+        scopeBasis: turn.scope?.basis ?? null,
         answerable: turn.answerable,
         inputTokens: turn.usage.inputTokens,
         outputTokens: turn.usage.outputTokens,
@@ -809,7 +874,8 @@ export type ConversationEvent =
       standaloneQuestion: string | null;
       answerable: boolean;
       citations: AskCitation[];
-      scope: AskScope;
+      /** Null when the turn was a pleasantry and nothing was searched. */
+      scope: AskScope | null;
       /** Every model call this turn made: rewrite, summary and answer. */
       tokensUsed: number;
     };
@@ -841,9 +907,42 @@ export async function* sendMessageStream(
       "This conversation is as long as one can get. Start a new one to keep asking.",
     );
   }
-  const exchanges = exchangesOf(messages);
   const nextOrdinal = (messages.at(-1)?.ordinal ?? 0) + 1;
   const usage = new UsageTally();
+
+  // "Okay thanks" is not a question about the story: answer it as what it
+  // is, with no model, no embedding and no retrieval.
+  const pleasantry = pleasantryReply(input.content);
+  if (pleasantry !== null) {
+    yield { type: "text", text: pleasantry };
+    const saved = await saveTurn({
+      conversation,
+      nextOrdinal,
+      question: input.content,
+      standalone: null,
+      answer: pleasantry,
+      answerable: false,
+      scope: null,
+      citations: [],
+      passages: [],
+      usage,
+    });
+    yield {
+      type: "done",
+      questionId: saved.questionId,
+      answerId: saved.answerId,
+      standaloneQuestion: null,
+      answerable: false,
+      citations: [],
+      scope: null,
+      tokensUsed: 0,
+    };
+    return;
+  }
+
+  const exchanges = exchangesOf(messages).filter(
+    (exchange) => !isPleasantry(exchange),
+  );
 
   const memory = await foldIntoSummary(conversation, exchanges, usage, signal);
   const unsummarized = exchanges.filter(

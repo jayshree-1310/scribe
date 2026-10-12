@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { needsRewrite } from "./conversations.js";
+import { needsRewrite, pleasantryReply } from "./conversations.js";
 
 describe("needsRewrite", () => {
   it("rewrites a question that points back into the conversation", () => {
@@ -27,5 +27,23 @@ describe("needsRewrite", () => {
 
   it("does not count the reader referring to themselves", () => {
     expect(needsRewrite("Remind me where Mira found the lamp")).toBe(false);
+  });
+});
+
+describe("pleasantryReply", () => {
+  it("answers thanks, greetings, goodbyes and acknowledgements", () => {
+    expect(pleasantryReply("okay thanks")).toMatch(/^You're welcome/);
+    expect(pleasantryReply("Thank you so much!!")).toMatch(/^You're welcome/);
+    expect(pleasantryReply("hi")).toMatch(/^Hi/);
+    expect(pleasantryReply("ok bye")).toMatch(/^Goodbye/);
+    expect(pleasantryReply("Got it, cool.")).toMatch(/^Glad/);
+  });
+
+  it("leaves anything that might be about the story alone", () => {
+    expect(pleasantryReply("Thanks, and who is Kabir?")).toBeNull();
+    expect(pleasantryReply("Is Mira okay?")).toBeNull();
+    expect(pleasantryReply("Why?")).toBeNull();
+    expect(pleasantryReply("And then?")).toBeNull();
+    expect(pleasantryReply("thanks thanks thanks thanks thanks thanks thanks")).toBeNull();
   });
 });

@@ -150,3 +150,129 @@ export const standaloneQuestionSchema = z.object({
 });
 
 export type StandaloneQuestion = z.infer<typeof standaloneQuestionSchema>;
+
+/* Story bible: what a chapter establishes -------------------------------- */
+
+/**
+ * The four kinds of fact a bible holds. A closed list because each one is
+ * treated differently downstream: relationships are keyed by who they are
+ * between, events are what "recent" means, and characters are what a name
+ * match is looking for.
+ */
+export const FACT_KINDS = [
+  "character",
+  "location",
+  "relationship",
+  "event",
+] as const;
+
+export type FactKind = (typeof FACT_KINDS)[number];
+
+/**
+ * Per extraction call, not per chapter: a long chapter is read in sections
+ * (`story-bible.ts`), and a cap per section is what a model can be told.
+ */
+export const MAX_FACTS_PER_SECTION = 25;
+
+/**
+ * One fact, as a model reports it.
+ *
+ * `quote` is the field that makes the rest trustworthy. It is checked against
+ * the chapter before anything is stored, and a fact whose quote the chapter
+ * does not contain is dropped -- so the bounds here are generous enough for a
+ * sentence and no more, because a long quote is a paraphrase waiting to fail
+ * that check.
+ */
+export const extractedFactSchema = z.object({
+  kind: z.enum(FACT_KINDS),
+  subject: name.describe(
+    "The person, place or event this fact is about, named exactly as the chapter names it.",
+  ),
+  attribute: z
+    .string()
+    .trim()
+    .min(1)
+    .max(60)
+    .describe(
+      "A short label for what is being said: eye colour, age, occupation, status, whereabouts, lives in, sister of, what happened, when.",
+    ),
+  value: sentence.describe("The fact itself, in a few words."),
+  related: name
+    .nullable()
+    .describe("For a relationship, the other person's name. Otherwise null."),
+  quote: z
+    .string()
+    .trim()
+    .min(1)
+    .max(400)
+    .describe(
+      "The shortest passage of the chapter that states this fact, copied word for word.",
+    ),
+});
+
+export type ExtractedFact = z.infer<typeof extractedFactSchema>;
+
+/**
+ * An object around the list for the reason `standaloneQuestionSchema` is one:
+ * a bare array invites "Here are the facts:" in front of it. An empty list is
+ * a valid answer -- a chapter of pure mood establishes nothing to check.
+ */
+export const chapterFactsSchema = z.object({
+  facts: z.array(extractedFactSchema).max(MAX_FACTS_PER_SECTION),
+});
+
+export type ChapterFacts = z.infer<typeof chapterFactsSchema>;
+
+/* Continuity: what does not add up ---------------------------------------- */
+
+export const CONTINUITY_KINDS = [
+  "attribute",
+  "whereabouts",
+  "timeline",
+  "death",
+  "relationship",
+  "other",
+] as const;
+
+export type ContinuityKind = (typeof CONTINUITY_KINDS)[number];
+
+/** A ceiling, and a low one: a chapter with ten contradictions has a bigger problem. */
+export const MAX_FINDINGS = 8;
+
+/**
+ * One reported contradiction, as references rather than restatements.
+ *
+ * `claim` and `fact` are the labels the prompt gave (`N3`, `E7`), never text:
+ * the evidence an author is shown is looked up from what was *sent*, so a
+ * model cannot misquote a chapter into a contradiction that is not there. A
+ * label that names nothing that was sent is dropped by the service.
+ */
+export const continuityFindingsSchema = z.object({
+  findings: z
+    .array(
+      z.object({
+        claim: z
+          .string()
+          .trim()
+          .max(8)
+          .describe("The label of the new claim, such as N2."),
+        fact: z
+          .string()
+          .trim()
+          .max(8)
+          .describe("The label of the established fact it contradicts, such as E5."),
+        kind: z.enum(CONTINUITY_KINDS),
+        explanation: sentence.describe(
+          "One sentence an author can act on: what does not add up, and why.",
+        ),
+        confidence: z
+          .number()
+          .min(0)
+          .max(1)
+          .describe("How sure you are that the two cannot both be true, from 0 to 1."),
+      }),
+    )
+    .max(MAX_FINDINGS),
+});
+
+export type ContinuityFindings = z.infer<typeof continuityFindingsSchema>;

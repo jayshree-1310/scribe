@@ -55,6 +55,32 @@ export interface AiConfig {
   structuredOutput: boolean;
   /** Per-user daily ceiling, enforced by the routes. 0 disables the check. */
   dailyTokenBudget: number;
+  /**
+   * Whether saving a chapter schedules a continuity check (Task AI 14).
+   *
+   * An operator switch rather than a per-story setting: a story opts in by
+   * having a bible at all (see `continuity.ts`), and this is the way to stop
+   * every background check on a server without a deploy.
+   */
+  continuityChecks: boolean;
+  /**
+   * How long a chapter must go unsaved before it is checked.
+   *
+   * The editor autosaves a second and a half after typing stops, so a check
+   * per save would be a model call per pause. A minute of quiet is "the author
+   * has stopped working on this paragraph", which is the moment a warning is
+   * worth reading rather than an interruption.
+   */
+  continuityQuietMs: number;
+  /**
+   * The confidence below which a reported contradiction is never shown.
+   *
+   * High on purpose. The cost of a missed contradiction is one the author
+   * would probably have caught on a read-through; the cost of a wrong one is
+   * an author who stops reading the warnings. Re-tune against a stronger
+   * model rather than lowering it to make a weak one look useful.
+   */
+  continuityMinConfidence: number;
 }
 
 /** Defaults describe the free local stack, because that is the default path. */
@@ -68,6 +94,9 @@ const DEFAULTS = {
   maxRetries: 1,
   structuredOutput: true,
   dailyTokenBudget: 200_000,
+  continuityChecks: true,
+  continuityQuietMs: 60_000,
+  continuityMinConfidence: 0.8,
 };
 
 /**
@@ -132,6 +161,15 @@ export function loadAiConfig(): AiConfig {
     dailyTokenBudget: readInt(
       "AI_DAILY_TOKEN_BUDGET",
       DEFAULTS.dailyTokenBudget,
+    ),
+    continuityChecks: readFlag("AI_CONTINUITY", DEFAULTS.continuityChecks),
+    continuityQuietMs: readInt(
+      "AI_CONTINUITY_QUIET_MS",
+      DEFAULTS.continuityQuietMs,
+    ),
+    continuityMinConfidence: readFraction(
+      "AI_CONTINUITY_MIN_CONFIDENCE",
+      DEFAULTS.continuityMinConfidence,
     ),
   };
 }
@@ -246,6 +284,17 @@ export interface AiEmbedConfig {
    * `docs/ai-architecture.md`.
    */
   searchMinSimilarity: number;
+  /**
+   * The floor for a story-bible fact to count as near a passage.
+   *
+   * Separate from `searchMinSimilarity` because the comparison is different:
+   * a one-line fact against a paragraph of prose, not a query against a
+   * passage, and a short text scores lower against a long one for the same
+   * relevance. Lower stakes too -- the similar list only supplements the facts
+   * a passage names, inside a fixed budget -- so the floor is set to admit
+   * rather than to exclude. Measured as for search; see `docs/ai-architecture.md`.
+   */
+  bibleMinSimilarity: number;
 }
 
 const EMBED_DEFAULTS = {
@@ -256,6 +305,7 @@ const EMBED_DEFAULTS = {
   dimensions: 768,
   batchSize: 16,
   searchMinSimilarity: 0.5,
+  bibleMinSimilarity: 0.45,
 };
 
 /** `readInt`'s rule for a fraction: a typo falls back rather than becoming NaN. */
@@ -298,6 +348,10 @@ export function loadAiEmbedConfig(): AiEmbedConfig {
     searchMinSimilarity: readFraction(
       "AI_SEARCH_MIN_SIMILARITY",
       EMBED_DEFAULTS.searchMinSimilarity,
+    ),
+    bibleMinSimilarity: readFraction(
+      "AI_BIBLE_MIN_SIMILARITY",
+      EMBED_DEFAULTS.bibleMinSimilarity,
     ),
   };
 }

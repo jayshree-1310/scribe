@@ -576,7 +576,8 @@ export type ConversationEvent =
       standaloneQuestion: string | null
       answerable: boolean
       citations: AskCitation[]
-      scope: AskScope
+      /** Null when the turn was a pleasantry and nothing was searched. */
+      scope: AskScope | null
       tokensUsed: number
     }
   | { type: 'error'; code: string; message: string }
