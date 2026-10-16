@@ -142,7 +142,7 @@ describe.skipIf(!available)("POST /api/ai/chat", () => {
     // The separation that matters: a caller's words reach the model as a user
     // message and are never concatenated into the instructions.
     expect(call?.system).not.toContain(prompt);
-    expect(call?.messages).toEqual([{ role: "user", content: prompt }]);
+    expect(call?.messages).toEqual([{ role: "user", content: `<<<THE PERSON'S MESSAGE>>>\n${prompt}\n<<<END MESSAGE>>>` }]);
   });
 
   it("returns the reply with what the call cost", async () => {

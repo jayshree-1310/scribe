@@ -356,6 +356,13 @@
                   "kind": "scalar"
                 }
               },
+              "promptId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "promptVersion": {
                 "nullable": false,
                 "type": {
@@ -440,6 +447,9 @@
                 "model": {
                   "column": "model"
                 },
+                "promptId": {
+                  "column": "promptId"
+                },
                 "promptVersion": {
                   "column": "promptVersion"
                 },
@@ -488,6 +498,13 @@
                 }
               },
               "model": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "promptId": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
@@ -549,6 +566,9 @@
                 },
                 "model": {
                   "column": "model"
+                },
+                "promptId": {
+                  "column": "promptId"
                 },
                 "promptVersion": {
                   "column": "promptVersion"
@@ -616,6 +636,13 @@
                 }
               },
               "outcome": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "promptId": {
                 "nullable": false,
                 "type": {
                   "codecId": "pg/text@1",
@@ -701,6 +728,9 @@
                 },
                 "outcome": {
                   "column": "outcome"
+                },
+                "promptId": {
+                  "column": "promptId"
                 },
                 "promptVersion": {
                   "column": "promptVersion"
@@ -1057,6 +1087,20 @@
                   "kind": "scalar"
                 }
               },
+              "summaryPromptId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "summaryPromptVersion": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "title": {
                 "nullable": false,
                 "type": {
@@ -1142,6 +1186,12 @@
                 },
                 "summary": {
                   "column": "summary"
+                },
+                "summaryPromptId": {
+                  "column": "summaryPromptId"
+                },
+                "summaryPromptVersion": {
+                  "column": "summaryPromptVersion"
                 },
                 "title": {
                   "column": "title"
@@ -1317,6 +1367,20 @@
                   "kind": "scalar"
                 }
               },
+              "promptId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "promptVersion": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
               "role": {
                 "nullable": false,
                 "type": {
@@ -1404,6 +1468,12 @@
                 "outputTokens": {
                   "column": "outputTokens"
                 },
+                "promptId": {
+                  "column": "promptId"
+                },
+                "promptVersion": {
+                  "column": "promptVersion"
+                },
                 "role": {
                   "column": "role"
                 },
@@ -1476,6 +1546,13 @@
                   "entityName": "ModerationOutcome",
                   "namespaceId": "public",
                   "plane": "domain"
+                }
+              },
+              "promptId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
                 }
               },
               "promptVersion": {
@@ -1566,6 +1643,9 @@
                 },
                 "outcome": {
                   "column": "outcome"
+                },
+                "promptId": {
+                  "column": "promptId"
                 },
                 "promptVersion": {
                   "column": "promptVersion"
@@ -6597,6 +6677,15 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "promptId": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "story-bible.extract"
+                  },
+                  "nativeType": "text",
+                  "nullable": false
+                },
                 "promptVersion": {
                   "codecId": "pg/int4@1",
                   "nativeType": "int4",
@@ -6716,6 +6805,15 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "promptId": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "recap"
+                  },
+                  "nativeType": "text",
+                  "nullable": false
+                },
                 "promptVersion": {
                   "codecId": "pg/int4@1",
                   "nativeType": "int4",
@@ -6819,6 +6917,15 @@
                 },
                 "outcome": {
                   "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "promptId": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "continuity"
+                  },
                   "nativeType": "text",
                   "nullable": false
                 },
@@ -7200,6 +7307,16 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "summaryPromptId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "summaryPromptVersion": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
                 "title": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -7449,6 +7566,16 @@
                   "nativeType": "int4",
                   "nullable": false
                 },
+                "promptId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "promptVersion": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
                 "role": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -7571,6 +7698,15 @@
                     "namespaceId": "public",
                     "plane": "storage"
                   }
+                },
+                "promptId": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "moderation"
+                  },
+                  "nativeType": "text",
+                  "nullable": false
                 },
                 "promptVersion": {
                   "codecId": "pg/int4@1",
@@ -11428,7 +11564,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "1564cbe72a2717524fd177d00afbcaef672712e0e43186ddf2baafe11ac05344"
+    "storageHash": "635824784b98792ea123199a1c0fc7c01fa647c37584c288704e0d342507d931"
   },
   "execution": {
     "executionHash": "e8f10f7994f9924e80d74777ccb6ae789bf0509d2e3a57563d42908184c44051",

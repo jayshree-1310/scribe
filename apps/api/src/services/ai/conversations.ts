@@ -52,11 +52,13 @@ import {
   type NumberedPassage,
 } from "./ask-book.js";
 import {
+  ASK_BOOK_CONVERSATION_PROMPT,
   ASK_BOOK_CONVERSATION_SYSTEM_PROMPT,
   askBookMessage,
   type RecalledExchange,
 } from "./prompts/ask-book.js";
 import {
+  CONVERSATION_SUMMARY_PROMPT,
   REWRITE_SYSTEM_PROMPT,
   SUMMARY_SYSTEM_PROMPT,
   rewriteMessage,
@@ -353,9 +355,11 @@ async function foldIntoSummary(
     summarizedThrough: pending.at(-1)?.answer.ordinal ?? memory.summarizedThrough,
   };
 
-  await db.orm.ai.Conversation.where((row) => row.id.eq(conversation.id)).update(
-    next,
-  );
+  await db.orm.ai.Conversation.where((row) => row.id.eq(conversation.id)).update({
+    ...next,
+    summaryPromptId: CONVERSATION_SUMMARY_PROMPT.id,
+    summaryPromptVersion: CONVERSATION_SUMMARY_PROMPT.version,
+  });
 
   return next;
 }
@@ -823,6 +827,10 @@ async function saveTurn(turn: Turn): Promise<{ questionId: string; answerId: str
         upToChapter: turn.scope?.upToChapter ?? null,
         scopeBasis: turn.scope?.basis ?? null,
         answerable: turn.answerable,
+        // Only a model's answer has a prompt; a pleasantry or the fixed
+        // decline is the application's own text.
+        promptId: turn.answerable ? ASK_BOOK_CONVERSATION_PROMPT.id : null,
+        promptVersion: turn.answerable ? ASK_BOOK_CONVERSATION_PROMPT.version : null,
         inputTokens: turn.usage.inputTokens,
         outputTokens: turn.usage.outputTokens,
       });

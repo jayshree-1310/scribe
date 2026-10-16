@@ -13,7 +13,8 @@ import {
   namesIn,
   readableQuote,
 } from "./ask-book.js";
-import { ASK_BOOK_MARKERS, defang } from "./prompts/ask-book.js";
+import { ASK_BOOK_MARKERS } from "./prompts/ask-book.js";
+import { defang } from "./prompts/base.js";
 
 describe("namesIn", () => {
   it("finds the names and skips the question words", () => {

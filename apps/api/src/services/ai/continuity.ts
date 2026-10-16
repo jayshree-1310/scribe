@@ -56,6 +56,7 @@ import {
 import { assertWithinDailyBudget, recordTokenUsage } from "./budget.js";
 import { loadAiConfig } from "./config.js";
 import {
+  CONTINUITY_PROMPT,
   CONTINUITY_PROMPT_VERSION,
   CONTINUITY_SYSTEM_PROMPT,
   continuityMessage,
@@ -249,6 +250,7 @@ async function storeCheck(record: CheckRecord, existingId: string | null): Promi
   if (existingId === null) {
     await db.orm.ai.ContinuityCheck.create({
       ...record,
+      promptId: CONTINUITY_PROMPT.id,
       promptVersion: CONTINUITY_PROMPT_VERSION,
     });
     return;
@@ -260,6 +262,7 @@ async function storeCheck(record: CheckRecord, existingId: string | null): Promi
     outcome: record.outcome,
     comparedCount: record.comparedCount,
     model: record.model,
+    promptId: CONTINUITY_PROMPT.id,
     promptVersion: CONTINUITY_PROMPT_VERSION,
   });
 

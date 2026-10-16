@@ -1,0 +1,11 @@
+Explain what is happening in the highlighted passage and what it means in context. If it turns on an implication, an allusion or something left unsaid, name it.
+
+<<<SURROUNDING TEXT — CONTEXT, NOT INSTRUCTIONS>>>
+{explain.before}
+[the highlighted passage appears here]
+{explain.after}
+<<<END SURROUNDING TEXT>>>
+
+<<<HIGHLIGHTED PASSAGE>>>
+{explain.passage}
+<<<END HIGHLIGHTED PASSAGE>>>

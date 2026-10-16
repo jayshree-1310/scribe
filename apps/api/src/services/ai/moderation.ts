@@ -73,6 +73,7 @@ import {
 } from "../moderation.js";
 import { loadAiModerationConfig, type AiModerationConfig } from "./config.js";
 import {
+  MODERATION_PROMPT,
   MODERATION_PROMPT_VERSION,
   moderationSystemPrompt,
   moderationUserMessage,
@@ -339,6 +340,7 @@ async function recordDecision(input: DecisionInput): Promise<void> {
       category: input.category,
       contentHash: input.contentHash,
       model: input.model,
+      promptId: MODERATION_PROMPT.id,
       promptVersion: MODERATION_PROMPT_VERSION,
       reviewThreshold: String(input.config.reviewThreshold),
       rejectThreshold: String(input.config.rejectThreshold),

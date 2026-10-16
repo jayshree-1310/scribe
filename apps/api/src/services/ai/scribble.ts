@@ -22,8 +22,9 @@ import { listStories } from "../stories.js";
 import { createNarrationScanner } from "./json-stream.js";
 import {
   NARRATION_SYSTEM_PROMPT,
-  candidateBlock,
+  intentMessage,
   intentSystemPrompt,
+  narrationMessage,
 } from "./prompts/scribble.js";
 import { aiProvider } from "./provider.js";
 import { extractJson } from "./structured.js";
@@ -147,8 +148,8 @@ export async function interpret(
    */
   const { value: parsed } = await aiProvider().completeStructured(intentSchema, {
     feature: "scribble.intent",
-    system: intentSystemPrompt(genres, context),
-    messages: [{ role: "user", content: message }],
+    system: intentSystemPrompt(genres),
+    messages: [{ role: "user", content: intentMessage(message, context) }],
     /**
      * Filters are a few dozen tokens, but a reasoning model spends its budget
      * thinking before it writes any of them -- at 200 `gpt-oss-120b` used 196
@@ -437,11 +438,7 @@ function narrationRequest(
     messages: [
       {
         role: "user" as const,
-        content: [
-          candidateBlock(candidates),
-          "",
-          `The reader asked: ${message}`,
-        ].join("\n"),
+        content: narrationMessage(candidates, message),
       },
     ],
     maxTokens: 1500,

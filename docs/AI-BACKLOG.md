@@ -1790,6 +1790,54 @@ three".
 
 By now prompts are scattered across features. Consolidate before there are more.
 
+**Status: built.** `prompts/base.ts` (`definePrompt`, `systemPrompt` over the
+shared `SCRIBE_BASE` / `DATA_RULE`, and `fenced` — the one way outside text
+enters a prompt), `prompts/registry.ts` (`resolvePrompt`), `prompts/repair.ts`
+(moved out of `structured.ts`); every prompt module rebuilt on them and bumped
+to version 2 with a history line (the judge stays at 1, deliberately without
+the base). Migration `20261016T0940_record_prompt_ids` adds `promptId` beside
+`promptVersion` on recap, extraction, continuity-check and moderation rows,
+and both to conversation answers and summaries. Tests:
+`prompts/prompts.test.ts` (40 rendered snapshots under `__snapshots__/`, a
+planted injection in every input of every builder, registry completeness, a
+scan for prompt text outside `prompts/`) and `routes/ai-prompt-records.test.ts`
+(each kind of stored artefact, produced through its service, resolves).
+
+Four things worth knowing before building on it.
+
+**What consolidating found.** The prompts were already in `prompts/`; what was
+not uniform was how input entered them. Five builders let it into the wrong
+place: recap and explain fenced chapter text without defanging it, so a
+chapter containing `<<<END CHAPTER>>>` could close its own fence; the
+assistant interpolated the author's `tone` into its instruction line;
+Scribble wrote the client-supplied previous filters — `search` included —
+into its *system* prompt, and appended the reader's request to the narration
+call unfenced; and the agent named the story on screen outside any fence.
+The planted-injection test is mutation-checked: dropping the defang in
+`fenced` fails 21 cases, and moving the agent's input back out of its fence
+fails that one.
+
+**The version bump has a cost, and it is the designed one.** Recap, story
+bible and continuity use the prompt version in their "is this current?" check,
+so every stored recap, chapter reading and check is now stale and regenerates
+on its next request or refresh — a model call per row. That is the recovery
+path the version exists for.
+
+**Measured with `ai:eval`, before and after.** Same model, same embedder:
+retrieval unchanged (hit@1 0.78, MRR 0.88), the right chapter cited in every
+answer, declines 1.00, extraction and assistant 1.00; faithfulness 0.98 →
+0.95, one case — the judge marked "At the diner" partly unsupported because
+only the chapter's title says diner. The one failure in the run was the
+eval's again: "she did not specify which sea" read as a refusal, so a
+negated-verb decline must now have the story or the passages as its subject.
+The two runs are on dataset versions 1 and 2, so `compare` (correctly)
+refused to diff them; the numbers above are read side by side, and the only
+case whose grading differs between the versions is `sisters-diner`.
+
+**Changing a prompt from here** is edit, `npx vitest run -u
+src/services/ai/prompts`, read the snapshot diff, bump the version, add a
+history line, run `ai:eval`.
+
 **Prompt:**
 
 > Give prompts the same treatment as any other versioned artefact.

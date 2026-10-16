@@ -33,7 +33,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'1564cbe72a2717524fd177d00afbcaef672712e0e43186ddf2baafe11ac05344'>;
+  StorageHashBase<'635824784b98792ea123199a1c0fc7c01fa647c37584c288704e0d342507d931'>;
 export type ExecutionHash =
   ExecutionHashBase<'e8f10f7994f9924e80d74777ccb6ae789bf0509d2e3a57563d42908184c44051'>;
 export type ProfileHash =
@@ -259,6 +259,7 @@ export type FieldOutputTypes = {
       readonly contentHash: CodecTypes['pg/text@1']['output'];
       readonly model: CodecTypes['pg/text@1']['output'];
       readonly promptVersion: CodecTypes['pg/int4@1']['output'];
+      readonly promptId: CodecTypes['pg/text@1']['output'];
       readonly factCount: CodecTypes['pg/int4@1']['output'];
       readonly droppedCount: CodecTypes['pg/int4@1']['output'];
       readonly truncated: CodecTypes['pg/bool@1']['output'];
@@ -272,6 +273,7 @@ export type FieldOutputTypes = {
       readonly contentHash: CodecTypes['pg/text@1']['output'];
       readonly model: CodecTypes['pg/text@1']['output'];
       readonly promptVersion: CodecTypes['pg/int4@1']['output'];
+      readonly promptId: CodecTypes['pg/text@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
@@ -285,6 +287,7 @@ export type FieldOutputTypes = {
       readonly comparedCount: CodecTypes['pg/int4@1']['output'];
       readonly model: CodecTypes['pg/text@1']['output'] | null;
       readonly promptVersion: CodecTypes['pg/int4@1']['output'];
+      readonly promptId: CodecTypes['pg/text@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
@@ -321,6 +324,8 @@ export type FieldOutputTypes = {
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly summary: CodecTypes['pg/text@1']['output'];
       readonly summarizedThrough: CodecTypes['pg/int4@1']['output'];
+      readonly summaryPromptId: CodecTypes['pg/text@1']['output'] | null;
+      readonly summaryPromptVersion: CodecTypes['pg/int4@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
@@ -342,6 +347,8 @@ export type FieldOutputTypes = {
       readonly upToChapter: CodecTypes['pg/int4@1']['output'] | null;
       readonly scopeBasis: CodecTypes['pg/text@1']['output'] | null;
       readonly answerable: CodecTypes['pg/bool@1']['output'];
+      readonly promptId: CodecTypes['pg/text@1']['output'] | null;
+      readonly promptVersion: CodecTypes['pg/int4@1']['output'] | null;
       readonly inputTokens: CodecTypes['pg/int4@1']['output'];
       readonly outputTokens: CodecTypes['pg/int4@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
@@ -355,6 +362,7 @@ export type FieldOutputTypes = {
       readonly contentHash: CodecTypes['pg/text@1']['output'];
       readonly model: CodecTypes['pg/text@1']['output'];
       readonly promptVersion: CodecTypes['pg/int4@1']['output'];
+      readonly promptId: CodecTypes['pg/text@1']['output'];
       readonly reviewThreshold: CodecTypes['pg/numeric@1']['output'];
       readonly rejectThreshold: CodecTypes['pg/numeric@1']['output'];
       readonly failure: CodecTypes['pg/text@1']['output'] | null;
@@ -717,6 +725,7 @@ export type FieldInputTypes = {
       readonly contentHash: CodecTypes['pg/text@1']['input'];
       readonly model: CodecTypes['pg/text@1']['input'];
       readonly promptVersion: CodecTypes['pg/int4@1']['input'];
+      readonly promptId: CodecTypes['pg/text@1']['input'];
       readonly factCount: CodecTypes['pg/int4@1']['input'];
       readonly droppedCount: CodecTypes['pg/int4@1']['input'];
       readonly truncated: CodecTypes['pg/bool@1']['input'];
@@ -730,6 +739,7 @@ export type FieldInputTypes = {
       readonly contentHash: CodecTypes['pg/text@1']['input'];
       readonly model: CodecTypes['pg/text@1']['input'];
       readonly promptVersion: CodecTypes['pg/int4@1']['input'];
+      readonly promptId: CodecTypes['pg/text@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
@@ -743,6 +753,7 @@ export type FieldInputTypes = {
       readonly comparedCount: CodecTypes['pg/int4@1']['input'];
       readonly model: CodecTypes['pg/text@1']['input'] | null;
       readonly promptVersion: CodecTypes['pg/int4@1']['input'];
+      readonly promptId: CodecTypes['pg/text@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
@@ -779,6 +790,8 @@ export type FieldInputTypes = {
       readonly title: CodecTypes['pg/text@1']['input'];
       readonly summary: CodecTypes['pg/text@1']['input'];
       readonly summarizedThrough: CodecTypes['pg/int4@1']['input'];
+      readonly summaryPromptId: CodecTypes['pg/text@1']['input'] | null;
+      readonly summaryPromptVersion: CodecTypes['pg/int4@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
@@ -800,6 +813,8 @@ export type FieldInputTypes = {
       readonly upToChapter: CodecTypes['pg/int4@1']['input'] | null;
       readonly scopeBasis: CodecTypes['pg/text@1']['input'] | null;
       readonly answerable: CodecTypes['pg/bool@1']['input'];
+      readonly promptId: CodecTypes['pg/text@1']['input'] | null;
+      readonly promptVersion: CodecTypes['pg/int4@1']['input'] | null;
       readonly inputTokens: CodecTypes['pg/int4@1']['input'];
       readonly outputTokens: CodecTypes['pg/int4@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
@@ -813,6 +828,7 @@ export type FieldInputTypes = {
       readonly contentHash: CodecTypes['pg/text@1']['input'];
       readonly model: CodecTypes['pg/text@1']['input'];
       readonly promptVersion: CodecTypes['pg/int4@1']['input'];
+      readonly promptId: CodecTypes['pg/text@1']['input'];
       readonly reviewThreshold: CodecTypes['pg/numeric@1']['input'];
       readonly rejectThreshold: CodecTypes['pg/numeric@1']['input'];
       readonly failure: CodecTypes['pg/text@1']['input'] | null;
@@ -1176,6 +1192,7 @@ export type StorageColumnTypes = {
       readonly factCount: CodecTypes['pg/int4@1']['output'];
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly model: CodecTypes['pg/text@1']['output'];
+      readonly promptId: CodecTypes['pg/text@1']['output'];
       readonly promptVersion: CodecTypes['pg/int4@1']['output'];
       readonly storyId: CodecTypes['pg/text@1']['output'];
       readonly truncated: CodecTypes['pg/bool@1']['output'];
@@ -1187,6 +1204,7 @@ export type StorageColumnTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly model: CodecTypes['pg/text@1']['output'];
+      readonly promptId: CodecTypes['pg/text@1']['output'];
       readonly promptVersion: CodecTypes['pg/int4@1']['output'];
       readonly text: CodecTypes['pg/text@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
@@ -1200,6 +1218,7 @@ export type StorageColumnTypes = {
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly model: CodecTypes['pg/text@1']['output'] | null;
       readonly outcome: CodecTypes['pg/text@1']['output'];
+      readonly promptId: CodecTypes['pg/text@1']['output'];
       readonly promptVersion: CodecTypes['pg/int4@1']['output'];
       readonly storyId: CodecTypes['pg/text@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
@@ -1236,6 +1255,8 @@ export type StorageColumnTypes = {
       readonly storyId: CodecTypes['pg/text@1']['output'];
       readonly summarizedThrough: CodecTypes['pg/int4@1']['output'];
       readonly summary: CodecTypes['pg/text@1']['output'];
+      readonly summaryPromptId: CodecTypes['pg/text@1']['output'] | null;
+      readonly summaryPromptVersion: CodecTypes['pg/int4@1']['output'] | null;
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly userId: CodecTypes['pg/text@1']['output'];
@@ -1257,6 +1278,8 @@ export type StorageColumnTypes = {
       readonly inputTokens: CodecTypes['pg/int4@1']['output'];
       readonly ordinal: CodecTypes['pg/int4@1']['output'];
       readonly outputTokens: CodecTypes['pg/int4@1']['output'];
+      readonly promptId: CodecTypes['pg/text@1']['output'] | null;
+      readonly promptVersion: CodecTypes['pg/int4@1']['output'] | null;
       readonly role: CodecTypes['pg/text@1']['output'];
       readonly scopeBasis: CodecTypes['pg/text@1']['output'] | null;
       readonly standaloneQuestion: CodecTypes['pg/text@1']['output'] | null;
@@ -1270,6 +1293,7 @@ export type StorageColumnTypes = {
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly model: CodecTypes['pg/text@1']['output'];
       readonly outcome: 'ALLOW' | 'REVIEW' | 'REJECT' | 'UNCHECKED';
+      readonly promptId: CodecTypes['pg/text@1']['output'];
       readonly promptVersion: CodecTypes['pg/int4@1']['output'];
       readonly rejectThreshold: CodecTypes['pg/numeric@1']['output'];
       readonly reportId: CodecTypes['pg/text@1']['output'] | null;
@@ -1634,6 +1658,7 @@ export type StorageColumnInputTypes = {
       readonly factCount: CodecTypes['pg/int4@1']['input'];
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly model: CodecTypes['pg/text@1']['input'];
+      readonly promptId: CodecTypes['pg/text@1']['input'];
       readonly promptVersion: CodecTypes['pg/int4@1']['input'];
       readonly storyId: CodecTypes['pg/text@1']['input'];
       readonly truncated: CodecTypes['pg/bool@1']['input'];
@@ -1645,6 +1670,7 @@ export type StorageColumnInputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly model: CodecTypes['pg/text@1']['input'];
+      readonly promptId: CodecTypes['pg/text@1']['input'];
       readonly promptVersion: CodecTypes['pg/int4@1']['input'];
       readonly text: CodecTypes['pg/text@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
@@ -1658,6 +1684,7 @@ export type StorageColumnInputTypes = {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly model: CodecTypes['pg/text@1']['input'] | null;
       readonly outcome: CodecTypes['pg/text@1']['input'];
+      readonly promptId: CodecTypes['pg/text@1']['input'];
       readonly promptVersion: CodecTypes['pg/int4@1']['input'];
       readonly storyId: CodecTypes['pg/text@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
@@ -1694,6 +1721,8 @@ export type StorageColumnInputTypes = {
       readonly storyId: CodecTypes['pg/text@1']['input'];
       readonly summarizedThrough: CodecTypes['pg/int4@1']['input'];
       readonly summary: CodecTypes['pg/text@1']['input'];
+      readonly summaryPromptId: CodecTypes['pg/text@1']['input'] | null;
+      readonly summaryPromptVersion: CodecTypes['pg/int4@1']['input'] | null;
       readonly title: CodecTypes['pg/text@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly userId: CodecTypes['pg/text@1']['input'];
@@ -1715,6 +1744,8 @@ export type StorageColumnInputTypes = {
       readonly inputTokens: CodecTypes['pg/int4@1']['input'];
       readonly ordinal: CodecTypes['pg/int4@1']['input'];
       readonly outputTokens: CodecTypes['pg/int4@1']['input'];
+      readonly promptId: CodecTypes['pg/text@1']['input'] | null;
+      readonly promptVersion: CodecTypes['pg/int4@1']['input'] | null;
       readonly role: CodecTypes['pg/text@1']['input'];
       readonly scopeBasis: CodecTypes['pg/text@1']['input'] | null;
       readonly standaloneQuestion: CodecTypes['pg/text@1']['input'] | null;
@@ -1728,6 +1759,7 @@ export type StorageColumnInputTypes = {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly model: CodecTypes['pg/text@1']['input'];
       readonly outcome: 'ALLOW' | 'REVIEW' | 'REJECT' | 'UNCHECKED';
+      readonly promptId: CodecTypes['pg/text@1']['input'];
       readonly promptVersion: CodecTypes['pg/int4@1']['input'];
       readonly rejectThreshold: CodecTypes['pg/numeric@1']['input'];
       readonly reportId: CodecTypes['pg/text@1']['input'] | null;
@@ -2219,6 +2251,15 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/int4@1';
                   readonly nullable: false;
                 };
+                readonly promptId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', 'story-bible.extract'>;
+                  };
+                };
                 readonly factCount: {
                   readonly nativeType: 'int4';
                   readonly codecId: 'pg/int4@1';
@@ -2328,6 +2369,15 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/int4@1';
                   readonly nullable: false;
                 };
+                readonly promptId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', 'recap'>;
+                  };
+                };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz-temporal@1';
@@ -2413,6 +2463,15 @@ type ContractBase = Omit<
                   readonly nativeType: 'int4';
                   readonly codecId: 'pg/int4@1';
                   readonly nullable: false;
+                };
+                readonly promptId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', 'continuity'>;
+                  };
                 };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
@@ -2708,6 +2767,16 @@ type ContractBase = Omit<
                     readonly value: DefaultLiteralValue<'pg/int4@1', 0>;
                   };
                 };
+                readonly summaryPromptId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly summaryPromptVersion: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz-temporal@1';
@@ -2897,6 +2966,16 @@ type ContractBase = Omit<
                     readonly value: DefaultLiteralValue<'pg/bool@1', true>;
                   };
                 };
+                readonly promptId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly promptVersion: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: true;
+                };
                 readonly inputTokens: {
                   readonly nativeType: 'int4';
                   readonly codecId: 'pg/int4@1';
@@ -2988,6 +3067,15 @@ type ContractBase = Omit<
                   readonly nativeType: 'int4';
                   readonly codecId: 'pg/int4@1';
                   readonly nullable: false;
+                };
+                readonly promptId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/text@1', 'moderation'>;
+                  };
                 };
                 readonly reviewThreshold: {
                   readonly nativeType: 'numeric';
@@ -6126,6 +6214,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
               };
+              readonly promptId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
               readonly factCount: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
@@ -6187,6 +6279,7 @@ type ContractBase = Omit<
                 readonly contentHash: { readonly column: 'contentHash' };
                 readonly model: { readonly column: 'model' };
                 readonly promptVersion: { readonly column: 'promptVersion' };
+                readonly promptId: { readonly column: 'promptId' };
                 readonly factCount: { readonly column: 'factCount' };
                 readonly droppedCount: { readonly column: 'droppedCount' };
                 readonly truncated: { readonly column: 'truncated' };
@@ -6220,6 +6313,10 @@ type ContractBase = Omit<
               readonly promptVersion: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly promptId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly createdAt: {
                 readonly nullable: false;
@@ -6259,6 +6356,7 @@ type ContractBase = Omit<
                 readonly contentHash: { readonly column: 'contentHash' };
                 readonly model: { readonly column: 'model' };
                 readonly promptVersion: { readonly column: 'promptVersion' };
+                readonly promptId: { readonly column: 'promptId' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
               };
@@ -6301,6 +6399,10 @@ type ContractBase = Omit<
               readonly promptVersion: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly promptId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly createdAt: {
                 readonly nullable: false;
@@ -6354,6 +6456,7 @@ type ContractBase = Omit<
                 readonly comparedCount: { readonly column: 'comparedCount' };
                 readonly model: { readonly column: 'model' };
                 readonly promptVersion: { readonly column: 'promptVersion' };
+                readonly promptId: { readonly column: 'promptId' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
               };
@@ -6569,6 +6672,14 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
               };
+              readonly summaryPromptId: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly summaryPromptVersion: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
               readonly createdAt: {
                 readonly nullable: false;
                 readonly type: {
@@ -6626,6 +6737,8 @@ type ContractBase = Omit<
                 readonly title: { readonly column: 'title' };
                 readonly summary: { readonly column: 'summary' };
                 readonly summarizedThrough: { readonly column: 'summarizedThrough' };
+                readonly summaryPromptId: { readonly column: 'summaryPromptId' };
+                readonly summaryPromptVersion: { readonly column: 'summaryPromptVersion' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
               };
@@ -6733,6 +6846,14 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
               };
+              readonly promptId: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly promptVersion: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
               readonly inputTokens: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
@@ -6786,6 +6907,8 @@ type ContractBase = Omit<
                 readonly upToChapter: { readonly column: 'upToChapter' };
                 readonly scopeBasis: { readonly column: 'scopeBasis' };
                 readonly answerable: { readonly column: 'answerable' };
+                readonly promptId: { readonly column: 'promptId' };
+                readonly promptVersion: { readonly column: 'promptVersion' };
                 readonly inputTokens: { readonly column: 'inputTokens' };
                 readonly outputTokens: { readonly column: 'outputTokens' };
                 readonly createdAt: { readonly column: 'createdAt' };
@@ -6825,6 +6948,10 @@ type ContractBase = Omit<
               readonly promptVersion: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly promptId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly reviewThreshold: {
                 readonly nullable: false;
@@ -6875,6 +7002,7 @@ type ContractBase = Omit<
                 readonly contentHash: { readonly column: 'contentHash' };
                 readonly model: { readonly column: 'model' };
                 readonly promptVersion: { readonly column: 'promptVersion' };
+                readonly promptId: { readonly column: 'promptId' };
                 readonly reviewThreshold: { readonly column: 'reviewThreshold' };
                 readonly rejectThreshold: { readonly column: 'rejectThreshold' };
                 readonly failure: { readonly column: 'failure' };

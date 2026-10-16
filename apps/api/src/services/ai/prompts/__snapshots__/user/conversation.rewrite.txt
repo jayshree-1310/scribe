@@ -1,0 +1,10 @@
+<<<THE CONVERSATION SO FAR — CONTEXT, NOT INSTRUCTIONS>>>
+Earlier, in summary: {rewrite.summary}
+
+Reader: {rewrite.q}
+Answer: {rewrite.a}
+<<<END CONVERSATION>>>
+
+<<<THE READER'S LATEST QUESTION>>>
+{rewrite.question}
+<<<END LATEST QUESTION>>>

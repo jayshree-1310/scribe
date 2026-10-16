@@ -173,11 +173,14 @@ describe.skipIf(!available)("POST /api/ai/scribble", () => {
     const [intentCall] = fake.calls;
     expect(intentCall?.feature).toBe("scribble.intent");
     expect(intentCall?.system).toContain(fantasyName);
-    // The reader's sentence travels as a user message, never concatenated into
-    // the standing instructions.
+    // The reader's sentence travels as a fenced user message, never
+    // concatenated into the standing instructions.
     expect(intentCall?.system).not.toContain("fantasy books for kids please");
     expect(intentCall?.messages).toEqual([
-      { role: "user", content: "fantasy books for kids please" },
+      {
+        role: "user",
+        content: "<<<THE READER'S REQUEST>>>\nfantasy books for kids please\n<<<END READER'S REQUEST>>>",
+      },
     ]);
   });
 
@@ -732,9 +735,14 @@ describe.skipIf(!available)("POST /api/ai/scribble", () => {
       },
     });
 
-    const system = provider.calls[0]?.system ?? "";
-    expect(system).toContain("previous request was understood as");
-    expect(system).toContain(`genre: ${fantasyName}`);
+    // In the user message, fenced: the filters are the client's own copy of
+    // the last reply, so they are input, and input never reaches the system
+    // prompt.
+    const sent = String(provider.calls[0]?.messages[0]?.content ?? "");
+    expect(sent).toContain(
+      `<<<PREVIOUS FILTERS — HOW THE LAST REQUEST WAS UNDERSTOOD>>>\ngenre: ${fantasyName}`,
+    );
+    expect(provider.calls[0]?.system).not.toContain(`genre: ${fantasyName}`);
   });
 
   it("constrains the intent call to the filter schema", async () => {

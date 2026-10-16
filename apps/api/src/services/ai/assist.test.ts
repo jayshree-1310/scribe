@@ -141,13 +141,12 @@ describe("the prompts", () => {
     );
   });
 
-  it("names the target tone only for the tone action", () => {
-    expect(assistMessage("tone", "wry", "She waited.", "", "")).toContain(
-      "tone to aim for: wry",
-    );
-    expect(assistMessage("improve", "wry", "She waited.", "", "")).not.toContain(
-      "tone to aim for",
-    );
+  it("names the target tone only for the tone action, and only inside its fence", () => {
+    const toned = assistMessage("tone", "wry", "She waited.", "", "");
+    const [instruction] = toned.split("\n");
+    expect(instruction).not.toContain("wry");
+    expect(toned).toContain("<<<TARGET TONE — THE AUTHOR'S WORDS>>>\nwry\n<<<END TARGET TONE>>>");
+    expect(assistMessage("improve", "wry", "She waited.", "", "")).not.toContain("wry");
   });
 
   it("says so when the passage has no surroundings", () => {

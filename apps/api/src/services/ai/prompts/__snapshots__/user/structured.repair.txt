@@ -1,0 +1,6 @@
+That reply was not valid. The problems are listed below.
+<<<VALIDATION PROBLEMS>>>
+{repair.problems}
+<<<END VALIDATION PROBLEMS>>>
+
+Reply again with the corrected JSON object alone: no explanation, no markdown fence, no other text.

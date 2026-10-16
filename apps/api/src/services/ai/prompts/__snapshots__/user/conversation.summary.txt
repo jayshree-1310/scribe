@@ -1,0 +1,8 @@
+<<<SUMMARY SO FAR>>>
+{fold.summary}
+<<<END SUMMARY SO FAR>>>
+
+<<<EXCHANGES TO FOLD IN>>>
+Reader: {fold.q}
+Answer: {fold.a}
+<<<END EXCHANGES>>>

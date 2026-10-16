@@ -55,8 +55,20 @@ export function scoreRetrieval(
  * misfires the case's `detail.answer` shows exactly what was said, so the
  * pattern can be widened in review.
  */
-const DECLINE =
-  /\b(do(?:es)?(?:n['’]t| not)|did(?:n['’]t| not)|is(?:n['’]t| not)|are(?:n['’]t| not))\s+(?:\w+\s+){0,3}?(say|mention|cover|tell|state|specify|name|reveal|include|appear|give|given|stated|mentioned|named|covered)\b|\bno (?:mention|information|indication|record)\b|\bnot (?:mentioned|stated|named|covered|given|specified|revealed)\b|\b(?:can(?:no|['’])t|unable to) (?:find|tell|answer|say)\b|\bnothing (?:in|about)\b/i;
+const DECLINE = new RegExp(
+  [
+    // "The story does not give…", "That isn't stated…": a negated verb whose
+    // subject is the story or the passages -- never a character. Run 4 marked
+    // "she did not specify which sea" as a refusal before the subject was
+    // required.
+    String.raw`\b(?:the (?:story|passages?|text|chapters?|book)|it|this|that)\s+(?:\w+\s+){0,2}?(?:do(?:es)?|did|is|are)(?:n['’]t| not)\s+(?:\w+\s+){0,3}?(?:say|mention|cover|tell|state|specify|name|reveal|include|appear|give|given|stated|mentioned|named|covered)\b`,
+    String.raw`\bno (?:mention|information|indication|record)\b`,
+    String.raw`\b(?:is|are|was|were)(?:n['’]t| not) (?:mentioned|stated|named|covered|given|specified|revealed)\b`,
+    String.raw`\b(?:can(?:no|['’])t|unable to) (?:find|tell|answer|say)\b`,
+    String.raw`\bnothing (?:in|about)\b`,
+  ].join("|"),
+  "i",
+);
 
 export function isDecline(answer: string): boolean {
   return DECLINE.test(plainText(answer));

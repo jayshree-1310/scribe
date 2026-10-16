@@ -1,0 +1,3 @@
+<<<THE PERSON'S MESSAGE>>>
+{chat.prompt}
+<<<END MESSAGE>>>

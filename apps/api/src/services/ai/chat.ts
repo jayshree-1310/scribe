@@ -15,7 +15,7 @@
  * to itself.
  */
 
-import { CHAT_SYSTEM_PROMPT } from "./prompts/chat.js";
+import { CHAT_SYSTEM_PROMPT, chatMessage } from "./prompts/chat.js";
 import { aiProvider } from "./provider.js";
 import type { AiRequest, AiUsage } from "./types.js";
 
@@ -78,7 +78,7 @@ function requestFor(prompt: string, signal?: AbortSignal): AiRequest {
   return {
     feature: FEATURE,
     system: CHAT_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user", content: chatMessage(prompt) }],
     ...(signal ? { signal } : {}),
   };
 }

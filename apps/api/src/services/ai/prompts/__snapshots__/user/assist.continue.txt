@@ -1,0 +1,5 @@
+Continue the passage below in the author's voice, picking up exactly where it stops. Write one or two paragraphs. Do not repeat the passage, do not summarise it, and do not resolve anything — keep going in the direction it was already heading.
+
+<<<PASSAGE TO WORK ON>>>
+{assist.passage}
+<<<END PASSAGE>>>

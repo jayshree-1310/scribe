@@ -1,0 +1,12 @@
+<<<QUESTION>>>
+{judge.question}
+<<<END QUESTION>>>
+
+<<<PASSAGES>>>
+[1] Chapter 1
+{judge.passage}
+<<<END PASSAGES>>>
+
+<<<ANSWER TO GRADE>>>
+{judge.answer}
+<<<END ANSWER>>>

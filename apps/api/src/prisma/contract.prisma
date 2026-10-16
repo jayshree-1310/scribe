@@ -1300,6 +1300,9 @@ namespace ai {
     model         String
     /// `RECAP_PROMPT_VERSION` at the time of writing.
     promptVersion Int
+    /// Which prompt wrote it; with `promptVersion`, resolvable through
+    /// `prompts/registry.ts`.
+    promptId      String   @default("recap")
     createdAt     DateTime @default(now())
     updatedAt     DateTime @default(now())
 
@@ -1403,6 +1406,9 @@ namespace ai {
     summary           String   @default("")
     /// Ordinal of the last message folded into `summary`; 0 for none.
     summarizedThrough Int      @default(0)
+    /// The prompt that last wrote `summary`; null until there is one.
+    summaryPromptId      String?
+    summaryPromptVersion Int?
     createdAt         DateTime @default(now())
     updatedAt         DateTime @default(now())
 
@@ -1441,6 +1447,11 @@ namespace ai {
     /// Assistant turns: false when nothing in range covered the question and
     /// the answer is the app's fixed decline rather than a model's.
     answerable         Boolean  @default(true)
+    /// Assistant turns a model wrote: the prompt that wrote the answer. Null
+    /// for the reader's own turns, for the fixed decline, and for answers
+    /// stored before prompts were recorded.
+    promptId           String?
+    promptVersion      Int?
     /// Every model call this turn cost -- rewrite, summary and answer.
     inputTokens        Int      @default(0)
     outputTokens       Int      @default(0)
@@ -1559,6 +1570,8 @@ namespace ai {
     contentHash   String
     model         String
     promptVersion Int
+    /// See `ChapterSummary.promptId`.
+    promptId      String   @default("story-bible.extract")
     /// Facts kept, after grounding and author precedence.
     factCount     Int      @default(0)
     /// Facts the model offered whose quote the chapter does not contain.
@@ -1597,6 +1610,8 @@ namespace ai {
     comparedCount Int      @default(0)
     model         String?
     promptVersion Int
+    /// See `ChapterSummary.promptId`.
+    promptId      String   @default("continuity")
     createdAt     DateTime @default(now())
     updatedAt     DateTime @default(now())
 
@@ -1699,6 +1714,8 @@ namespace ai {
     model         String
     /// `MODERATION_PROMPT_VERSION` at the time.
     promptVersion Int
+    /// See `ChapterSummary.promptId`.
+    promptId      String            @default("moderation")
     /// The thresholds in force, so a decision can be re-read against the
     /// numbers that made it rather than today's configuration.
     reviewThreshold Decimal

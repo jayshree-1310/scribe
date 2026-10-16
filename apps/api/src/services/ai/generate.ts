@@ -29,6 +29,7 @@ import {
   avoidMessage,
   briefMessage,
   generateSystemPrompt,
+  refineMessage,
   refineSystemPrompt,
 } from "./prompts/generate.js";
 import { aiProvider } from "./provider.js";
@@ -278,10 +279,11 @@ export async function refine(
 
   const messages: AiMessage[] = [
     ...variant.history,
-    // The author's instruction, as an ordinary user turn. It is a directive
-    // they are entitled to give about their own generated object -- unlike the
-    // brief, which describes material and is fenced as data.
-    { role: "user", content: instruction },
+    // The author's instruction, as a user turn. It is a directive they are
+    // entitled to give about their own generated object, so the refine prompt
+    // says to act on it -- but it is still their text, so it is fenced like
+    // every other value from outside the code.
+    { role: "user", content: refineMessage(instruction) },
   ];
 
   const { value } = await aiProvider().completeStructured(

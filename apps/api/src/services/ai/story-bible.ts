@@ -69,6 +69,7 @@ import {
 } from "./bible-facts.js";
 import { loadAiConfig, loadAiEmbedConfig } from "./config.js";
 import {
+  BIBLE_EXTRACTION_PROMPT,
   BIBLE_EXTRACTION_SYSTEM_PROMPT,
   BIBLE_PROMPT_VERSION,
   bibleExtractionMessage,
@@ -604,6 +605,7 @@ export async function extractChapter(
     const record = {
       contentHash,
       model,
+      promptId: BIBLE_EXTRACTION_PROMPT.id,
       promptVersion: BIBLE_PROMPT_VERSION,
       factCount: kept.length,
       droppedCount: dropped,
@@ -616,6 +618,7 @@ export async function extractChapter(
           UPDATE "ai"."chapterExtraction"
              SET "contentHash" = ${record.contentHash},
                  "model" = ${record.model},
+                 "promptId" = ${record.promptId},
                  "promptVersion" = ${record.promptVersion},
                  "factCount" = ${record.factCount},
                  "droppedCount" = ${record.droppedCount},

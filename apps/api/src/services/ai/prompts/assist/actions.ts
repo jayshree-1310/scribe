@@ -6,8 +6,8 @@
  * of these is. "Improve this" alone produces a longer, blander paragraph with a
  * new metaphor in it; the constraint is the prompt.
  *
- * Kept as data rather than as a switch so that Task AI 17 can version them
- * individually and a snapshot test can render every one of them.
+ * Kept as data rather than as a switch so a snapshot test can render every one
+ * of them; they are versioned with the assistant prompt (`ASSIST_PROMPT`).
  */
 
 import type { AssistAction } from "../../assist-types.js";

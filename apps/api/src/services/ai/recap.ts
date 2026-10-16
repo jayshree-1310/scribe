@@ -39,7 +39,12 @@ import { Temporal } from "temporal-polyfill";
 import { HttpError } from "../../lib/http-error.js";
 import { db } from "../../prisma/db.js";
 import { findPreviousVisibleChapter } from "../stories.js";
-import { RECAP_PROMPT_VERSION, RECAP_SYSTEM_PROMPT, recapMessage } from "./prompts/recap.js";
+import {
+  RECAP_PROMPT,
+  RECAP_PROMPT_VERSION,
+  RECAP_SYSTEM_PROMPT,
+  recapMessage,
+} from "./prompts/recap.js";
 import { aiProvider } from "./provider.js";
 
 /** Keyed on in every usage record this feature produces. */
@@ -236,6 +241,7 @@ async function store(
       text,
       contentHash: hash,
       model,
+      promptId: RECAP_PROMPT.id,
       promptVersion: RECAP_PROMPT_VERSION,
       updatedAt: timestamp,
     });
@@ -248,6 +254,7 @@ async function store(
       text,
       contentHash: hash,
       model,
+      promptId: RECAP_PROMPT.id,
       promptVersion: RECAP_PROMPT_VERSION,
     });
   } catch (error) {

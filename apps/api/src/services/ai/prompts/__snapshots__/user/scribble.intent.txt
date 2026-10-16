@@ -1,0 +1,10 @@
+<<<PREVIOUS FILTERS — HOW THE LAST REQUEST WAS UNDERSTOOD>>>
+genre: {context.genre}
+kidsAppropriate: false
+completed: any
+search: {context.search}
+<<<END PREVIOUS FILTERS>>>
+
+<<<THE READER'S REQUEST>>>
+{scribble.message}
+<<<END READER'S REQUEST>>>

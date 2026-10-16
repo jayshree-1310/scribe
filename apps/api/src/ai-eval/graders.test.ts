@@ -53,6 +53,8 @@ describe("isDecline", () => {
     "Mira climbed ninety-two steps [1].",
     "She did not sleep, and the supervisor asked whether she was sleeping [2].",
     "They laughed at the same moment [1].",
+    // From a real run: an answer that quotes a character's omission.
+    "Their mother had asked for the sea, though she did not specify which sea [2].",
   ])("does not mistake an answer for a refusal: %j", (answer) => {
     expect(isDecline(answer)).toBe(false);
   });

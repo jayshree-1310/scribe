@@ -24,6 +24,7 @@
 import type { ZodError, ZodType } from "zod";
 import { HttpError } from "../../lib/http-error.js";
 import { formatNameFor, jsonSchemaFor } from "./json-schema.js";
+import { repairMessage } from "./prompts/repair.js";
 import type {
   AiClient,
   AiProvider,
@@ -80,23 +81,6 @@ function describeIssues(error: ZodError): string {
       return `- ${path === "" ? "(root)" : path}: ${issue.message}`;
     })
     .join("\n");
-}
-
-/**
- * The repair turn.
- *
- * Phrased as a correction of the assistant's own previous message rather than
- * as a fresh request, because the model has the context to fix what it wrote
- * and re-asking from scratch throws that away -- and often reproduces the same
- * mistake.
- */
-function repairInstruction(problem: string): string {
-  return [
-    "That reply was not valid. The problems were:",
-    problem,
-    "",
-    "Reply again with the corrected JSON object alone: no explanation, no markdown fence, no other text.",
-  ].join("\n");
 }
 
 function sum(total: AiUsage | null, next: AiUsage): AiUsage {
@@ -181,7 +165,7 @@ export function withStructured(
         messages = [
           ...messages,
           { role: "assistant", content: completion.text.slice(0, ECHO_LIMIT) },
-          { role: "user", content: repairInstruction(problem) },
+          { role: "user", content: repairMessage(problem) },
         ];
       }
 

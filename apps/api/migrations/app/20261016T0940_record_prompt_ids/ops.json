@@ -1,0 +1,338 @@
+[
+  {
+    "id": "column.ai.chapterExtraction.promptId",
+    "label": "Add column \"promptId\" to \"chapterExtraction\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "column",
+        "name": "promptId",
+        "table": "chapterExtraction"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"promptId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "chapterExtraction",
+          "promptId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"promptId\"",
+        "sql": "ALTER TABLE \"ai\".\"chapterExtraction\" ADD COLUMN \"promptId\" text DEFAULT 'story-bible.extract' NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"promptId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "chapterExtraction",
+          "promptId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.ai.chapterSummary.promptId",
+    "label": "Add column \"promptId\" to \"chapterSummary\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "column",
+        "name": "promptId",
+        "table": "chapterSummary"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"promptId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "chapterSummary",
+          "promptId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"promptId\"",
+        "sql": "ALTER TABLE \"ai\".\"chapterSummary\" ADD COLUMN \"promptId\" text DEFAULT 'recap' NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"promptId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "chapterSummary",
+          "promptId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.ai.continuityCheck.promptId",
+    "label": "Add column \"promptId\" to \"continuityCheck\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "column",
+        "name": "promptId",
+        "table": "continuityCheck"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"promptId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "continuityCheck",
+          "promptId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"promptId\"",
+        "sql": "ALTER TABLE \"ai\".\"continuityCheck\" ADD COLUMN \"promptId\" text DEFAULT 'continuity' NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"promptId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "continuityCheck",
+          "promptId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.ai.conversation.summaryPromptId",
+    "label": "Add column \"summaryPromptId\" to \"conversation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "column",
+        "name": "summaryPromptId",
+        "table": "conversation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"summaryPromptId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "conversation",
+          "summaryPromptId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"summaryPromptId\"",
+        "sql": "ALTER TABLE \"ai\".\"conversation\" ADD COLUMN \"summaryPromptId\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"summaryPromptId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "conversation",
+          "summaryPromptId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.ai.conversation.summaryPromptVersion",
+    "label": "Add column \"summaryPromptVersion\" to \"conversation\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "column",
+        "name": "summaryPromptVersion",
+        "table": "conversation"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"summaryPromptVersion\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "conversation",
+          "summaryPromptVersion"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"summaryPromptVersion\"",
+        "sql": "ALTER TABLE \"ai\".\"conversation\" ADD COLUMN \"summaryPromptVersion\" int4"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"summaryPromptVersion\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "conversation",
+          "summaryPromptVersion"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.ai.conversationMessage.promptId",
+    "label": "Add column \"promptId\" to \"conversationMessage\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "column",
+        "name": "promptId",
+        "table": "conversationMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"promptId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "conversationMessage",
+          "promptId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"promptId\"",
+        "sql": "ALTER TABLE \"ai\".\"conversationMessage\" ADD COLUMN \"promptId\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"promptId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "conversationMessage",
+          "promptId"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.ai.conversationMessage.promptVersion",
+    "label": "Add column \"promptVersion\" to \"conversationMessage\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "column",
+        "name": "promptVersion",
+        "table": "conversationMessage"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"promptVersion\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "conversationMessage",
+          "promptVersion"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"promptVersion\"",
+        "sql": "ALTER TABLE \"ai\".\"conversationMessage\" ADD COLUMN \"promptVersion\" int4"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"promptVersion\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "conversationMessage",
+          "promptVersion"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.ai.moderationDecision.promptId",
+    "label": "Add column \"promptId\" to \"moderationDecision\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "column",
+        "name": "promptId",
+        "table": "moderationDecision"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"promptId\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "moderationDecision",
+          "promptId"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"promptId\"",
+        "sql": "ALTER TABLE \"ai\".\"moderationDecision\" ADD COLUMN \"promptId\" text DEFAULT 'moderation' NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"promptId\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "ai",
+          "moderationDecision",
+          "promptId"
+        ]
+      }
+    ]
+  }
+]

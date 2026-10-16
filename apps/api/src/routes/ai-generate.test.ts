@@ -314,7 +314,10 @@ describe.skipIf(!available)("POST /api/ai/generate/refine", () => {
     expect(refineCall?.messages).toHaveLength(3);
     expect(refineCall?.messages[1]?.role).toBe("assistant");
     expect(refineCall?.messages[1]?.content).toContain("Before");
-    expect(refineCall?.messages[2]?.content).toBe("Make it colder.");
+    // The author's own words, fenced like every other value from outside.
+    expect(refineCall?.messages[2]?.content).toBe(
+      "<<<THE AUTHOR'S REVISION REQUEST>>>\nMake it colder.\n<<<END REVISION REQUEST>>>",
+    );
   });
 
   it("ignores an object the client tries to supply", async () => {
@@ -354,7 +357,9 @@ describe.skipIf(!available)("POST /api/ai/generate/refine", () => {
 
     const second = provider.calls[2]?.messages ?? [];
     expect(second.map((message) => message.content).join("\n")).toContain("Two");
-    expect(second.at(-1)?.content).toBe("Shorter.");
+    expect(second.at(-1)?.content).toBe(
+      "<<<THE AUTHOR'S REVISION REQUEST>>>\nShorter.\n<<<END REVISION REQUEST>>>",
+    );
   });
 
   it("explains an expired session rather than failing", async () => {
