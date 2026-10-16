@@ -709,6 +709,16 @@ it at `http://ollama:11434` instead, since there the container's own localhost
 has nothing listening — `docker compose exec api pnpm --filter api
 seed:embeddings`.
 
+To measure the AI features rather than read their output, run the evaluation.
+It loads the seed stories into temporary rows (your database is left as it
+was), asks the configured model a fixed set of questions with known answers,
+and prints what moved since the last run — see `docs/ai-architecture.md`
+§ _Evaluation_. It makes real model calls, so it is not part of `pnpm test`:
+
+```bash
+pnpm --filter api ai:eval                # add --no-judge to skip the faithfulness judge
+```
+
 The view and like counts these set are invented starting values, not counted
 events — see the note under
 [Where the project actually stands](#-where-the-project-actually-stands).

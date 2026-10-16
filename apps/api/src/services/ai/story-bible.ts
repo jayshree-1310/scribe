@@ -79,6 +79,7 @@ import {
   type ExtractedFact,
   type FactKind,
 } from "./schemas.js";
+import type { AiRequest } from "./types.js";
 
 /** Keyed on in every usage record extraction produces. */
 const FEATURE = "bible.extract";
@@ -395,6 +396,40 @@ interface GroundedFact extends ExtractedFact {
 }
 
 /**
+ * The request that reads one section of a chapter.
+ *
+ * Exported for the evaluation (`ai-eval/`), which measures how often this
+ * parses on the first attempt and how much of what comes back is grounded --
+ * against the request the bible really sends, not a copy of it.
+ */
+export function extractionRequest(
+  chapter: { chapterNumber: number; title: string },
+  part: { text: string; section: number; sections: number },
+  knownNames: string[],
+  signal?: AbortSignal,
+): AiRequest {
+  return {
+    feature: FEATURE,
+    system: BIBLE_EXTRACTION_SYSTEM_PROMPT,
+    messages: [
+      {
+        role: "user",
+        content: bibleExtractionMessage({
+          chapterNumber: chapter.chapterNumber,
+          chapterTitle: chapter.title,
+          section: part.section,
+          sections: part.sections,
+          text: part.text,
+          knownNames,
+        }),
+      },
+    ],
+    maxTokens: EXTRACTION_MAX_TOKENS,
+    ...(signal ? { signal } : {}),
+  };
+}
+
+/**
  * Reads one chapter into facts, doing nothing at all if it has not changed.
  *
  * Takes the chapter rather than an id so a caller holding it does not read it
@@ -451,25 +486,12 @@ export async function extractChapter(
   for (const [index, text] of sections.entries()) {
     const { value, usage } = await aiProvider().completeStructured(
       chapterFactsSchema,
-      {
-        feature: FEATURE,
-        system: BIBLE_EXTRACTION_SYSTEM_PROMPT,
-        messages: [
-          {
-            role: "user",
-            content: bibleExtractionMessage({
-              chapterNumber: chapter.chapterNumber,
-              chapterTitle: chapter.title,
-              section: index + 1,
-              sections: sections.length,
-              text,
-              knownNames: names,
-            }),
-          },
-        ],
-        maxTokens: EXTRACTION_MAX_TOKENS,
-        ...(signal ? { signal } : {}),
-      },
+      extractionRequest(
+        chapter,
+        { text, section: index + 1, sections: sections.length },
+        names,
+        signal,
+      ),
     );
 
     offered.push(...value.facts);

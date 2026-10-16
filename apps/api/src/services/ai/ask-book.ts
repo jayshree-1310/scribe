@@ -258,21 +258,21 @@ export async function resolveAskSetting(
 }
 
 /**
- * Embed, retrieve, fuse, re-authorise, trim: the passages a question may be
- * answered from, numbered in reading order. Empty means decline.
+ * Embed, retrieve, fuse, re-authorise: every passage a question may be
+ * answered from, best first.
  *
- * `question` is whatever should be *searched with*. For a single question
- * that is the question; for a turn in a conversation it is the turn rewritten
- * to stand alone, because "what happened after that?" retrieves nothing.
- * `feature` labels the embedding's usage record.
+ * The ranked half of `retrievePassages`, exported for the evaluation
+ * (`ai-eval/`), which needs the *order* to score retrieval -- where the right
+ * chapter came, not only whether it made the cut -- and must measure exactly
+ * the retrieval a reader gets rather than a copy of it.
  */
-export async function retrievePassages(
+export async function rankPassages(
   setting: AskSetting,
   question: string,
   userId: string,
   signal?: AbortSignal,
   feature = `${FEATURE}.query`,
-): Promise<NumberedPassage[]> {
+): Promise<PassageHit[]> {
   const { story, scope } = setting;
 
   // Nothing to read means nothing to retrieve -- and no embedding to pay for.
@@ -331,8 +331,28 @@ export async function retrievePassages(
     userId,
   );
 
-  const chosen = fused
-    .filter((hit) => readable.has(hit.chapterId))
+  return fused.filter((hit) => readable.has(hit.chapterId));
+}
+
+/**
+ * The passages a question may be answered from: the best `TOP_K`, numbered in
+ * reading order. Empty means decline.
+ *
+ * `question` is whatever should be *searched with*. For a single question
+ * that is the question; for a turn in a conversation it is the turn rewritten
+ * to stand alone, because "what happened after that?" retrieves nothing.
+ * `feature` labels the embedding's usage record.
+ */
+export async function retrievePassages(
+  setting: AskSetting,
+  question: string,
+  userId: string,
+  signal?: AbortSignal,
+  feature = `${FEATURE}.query`,
+): Promise<NumberedPassage[]> {
+  const ranked = await rankPassages(setting, question, userId, signal, feature);
+
+  const chosen = ranked
     .slice(0, TOP_K)
     // Reading order, not relevance order, for the model: "what happened
     // after the storm?" is answerable only if the passages read forwards.

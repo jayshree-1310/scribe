@@ -1709,6 +1709,52 @@ the dev-only AI lab — no product surface yet.
 
 ## Task AI 16 — Evaluation
 
+**Status: built.** `src/ai-eval/` — `dataset.ts` (28 Ask This Book cases, four
+writing-assistant, three extraction), `corpus.ts`, `graders.ts`, `judge.ts`
+with its prompt in `prompts/eval-judge.ts`, `runner.ts`, `compare.ts`, and
+`run.ts` behind `pnpm --filter api ai:eval`. The seed stories moved to
+`data/seed-stories.ts` so the seed script and the eval read one corpus;
+`rankPassages` was split out of `retrievePassages` and `extractionRequest` out
+of `extractChapter` so the eval measures the real paths. Tests:
+`ai-eval/eval.test.ts` (the harness end to end against the fakes, a stub
+dataset and corpus), `graders.test.ts`, `compare.test.ts`.
+
+The baseline, against `gpt-oss-120b` on Groq and `nomic-embed-text`:
+retrieval hit@1 0.82, hit@3 and hit@K 1.00, MRR 0.90; the right chapter cited
+in every answer; faithfulness 0.95 over 22 judged answers; no false declines;
+extraction parsed first time on every call with every quote grounded.
+
+Four things worth knowing before building on it.
+
+**The corpus is loaded per run, not read from the database.** The seed
+stories go into temporary rows under run-unique slugs, are embedded with the
+configured embedder, and are deleted at the end. A development database that
+never ran `seed:stories` — this one, as it happens — still evaluates, and the
+eval leaves nothing behind.
+
+**The first runs graded the graders.** gpt-oss writes "ninety‑two" with a
+non-breaking hyphen and "3:14 am" with a narrow no-break space, which failed
+`addresses` on right answers until `plainText` folded typography; and "the
+story does not give the supervisor's name" is a decline the first pattern did
+not know. Each is now a test. The second run's one regression was the same
+kind — "laughed" against a whole-word "laugh" — fixed in the dataset (now
+version 2). That run also showed the comparison working end to end: it named
+the decline and the extraction that improved and the one case that regressed.
+Read a failing case's `detail` before believing it.
+
+**Free tiers limit tokens per minute.** A run is a burst of about 60 calls
+and hit Groq's window a third of the way in; the provider's own retry is
+seconds, right for a person waiting and useless here. The runner waits out
+`Retry-After` on a doubling floor, up to five times, and records the case as
+an error beyond that — reported, never folded into the quality numbers.
+
+**What the baseline found.** Short chapters rank behind chapter 1 of the
+same story (hit@1 misses on four ch-2/3 questions, all still cited
+correctly); the extraction of *Nine Hundred Miles* chapter 1 returned one fact
+("back seat") and named neither sister; and the judge marked "3:14 am" as
+partly unsupported, which it is — the text says only "fourteen minutes past
+three".
+
 **Prompt:**
 
 > Stop judging AI changes by reading the output.

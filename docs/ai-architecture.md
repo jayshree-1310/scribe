@@ -821,6 +821,37 @@ decision is logged as name, outcome, code and duration — never arguments or
 results — and the full trace goes back to the caller in `steps`. The AI lab's
 **Agent (tools)** mode shows it.
 
+## Evaluation
+
+`pnpm --filter api ai:eval` (`src/ai-eval/`) runs a fixed dataset against the
+configured provider and embedder and writes `src/ai-eval/results/<timestamp>.json`
+(git-ignored), then compares it with the previous file and names what moved
+and which cases regressed. It costs real calls, so it is not part of
+`pnpm test`; `eval.test.ts` covers the harness against the fakes instead.
+
+- **The corpus is `SEED_STORIES`** (`data/seed-stories.ts`, shared with
+  `seed:stories`), loaded into temporary rows under run-unique slugs, embedded,
+  and deleted at the end — so expected sources are chapters whose text is in
+  the repo, whatever the local database holds.
+- **Each case calls the feature**: `askBook` and `rankPassages` (the ranked
+  half of `retrievePassages`, split out so the order can be scored), `assist`,
+  and the bible's own `extractionRequest` through `completeStructured`.
+- **Code grades what code can** (`graders.ts`): retrieval rank per chapter
+  (hit@1/3/K, MRR), whether a right chapter was cited, whether the answer
+  mentions the expected fact, whether a decline was a decline, whether
+  extraction parsed first time and its quotes are in the chapter, and the
+  assistant's no-preamble / names-kept / shorter checks.
+- **A model grades faithfulness only** (`judge.ts`, prompt
+  `prompts/eval-judge.ts`, versioned). An answer with no citations scores 0
+  without a judge call. `compare.ts` shows faithfulness across judge versions
+  but never calls that change a regression.
+- **Cost is measured**: the provider and embedder are wrapped for the run so
+  every call's reported usage lands on the case that made it, the judge's in a
+  bucket of its own. Dollars only when `AI_EVAL_INPUT_USD_PER_MTOK` and
+  `AI_EVAL_OUTPUT_USD_PER_MTOK` are set — there is no built-in price table.
+- **Bump `DATASET_VERSION`** when a case changes; runs on different versions
+  are not compared.
+
 ## Adding a feature
 
 1. A prompt module under `services/ai/prompts/` — never a template literal in a
@@ -835,6 +866,8 @@ results — and the full trace goes back to the caller in `steps`. The AI lab's
 4. A `feature` string for the usage record, so cost stays attributable.
 5. Tests with the fake: what was sent, how the reply parsed, what happens when
    the reply is malformed.
+6. Cases in `src/ai-eval/dataset.ts` if the feature answers from the corpus or
+   returns structure, so a prompt change to it shows up in `ai:eval`.
 
 ## What is deliberately missing
 
@@ -842,7 +875,7 @@ results — and the full trace goes back to the caller in `steps`. The AI lab's
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The remaining features.** Tasks AI 16 onward. Of Task AI 6 only the chapter recap was built; the story-level
+- **The remaining features.** Tasks AI 17 onward. Of Task AI 6 only the chapter recap was built; the story-level
   summary, the spoiler-free summary and the map-reduce that a multi-chapter
   summary needs are not here.
 - **Persisted usage, and budgets everywhere else.** The sink still only logs,
