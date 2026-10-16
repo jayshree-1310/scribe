@@ -170,8 +170,15 @@ export function quoteLocator(content: string): (quote: string) => string | null 
     const at = haystack.text.indexOf(needle);
     if (at === -1) return null;
 
-    const start = haystack.map[at] as number;
-    const end = (haystack.map[at + needle.length - 1] as number) + 1;
+    let start = haystack.map[at] as number;
+    let end = (haystack.map[at + needle.length - 1] as number) + 1;
+
+    // Emphasis marks are invisible to the search, so a match that begins or
+    // ends on an emphasised word stops inside its marks. Take them back in,
+    // or the stored evidence reads `*green` where the author wrote `*green*`.
+    while (start > 0 && MARKS.has(content[start - 1] as string)) start -= 1;
+    while (end < content.length && MARKS.has(content[end] as string)) end += 1;
+
     return content.slice(start, end).trim();
   };
 }

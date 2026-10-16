@@ -176,6 +176,21 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
      * triggers is the row the next reader would have triggered anyway.
      */
     ["ai.ts POST /recap/:slugOrId/:chapterNumber", "stores a model's recap of somebody else's published chapter; none of the caller's text reaches it"],
+
+    /**
+     * The story bible and the continuity checker. Notes an author keeps about
+     * their own story, readable by nobody else: every one of these asserts
+     * ownership, and nothing they write is ever shown to a reader. Suspension
+     * stops publishing, and none of this publishes.
+     */
+    ...[
+      "ai.ts POST /bible/:storyId/refresh",
+      "ai.ts POST /bible/:storyId/facts",
+      "ai.ts PATCH /bible/facts/:factId",
+      "ai.ts DELETE /bible/facts/:factId",
+      "ai.ts POST /continuity/chapters/:chapterId/check",
+      "ai.ts POST /continuity/findings/:findingId/dismiss",
+    ].map((route): [string, string] => [route, "private to the story's author; writes nothing a reader can see"]),
   ] as [string, string][],
 );
 

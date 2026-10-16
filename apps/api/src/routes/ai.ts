@@ -65,6 +65,19 @@ import {
   listConversations,
   sendMessageStream,
 } from "../services/ai/conversations.js";
+import {
+  addFact,
+  getBible,
+  refreshBible,
+  removeFact,
+  updateFact,
+} from "../services/ai/story-bible.js";
+import {
+  checkChapterNow,
+  dismissFinding,
+  getChapterContinuity,
+} from "../services/ai/continuity.js";
+import { FACT_KINDS } from "../services/ai/schemas.js";
 import { MAX_PAGE_SIZE } from "../services/stories.js";
 import { logger } from "../lib/logger.js";
 
@@ -454,6 +467,9 @@ const assistSchema = z
     after: z.string().max(CONTEXT_LIMIT * 4).default(""),
     tone: z.string().trim().min(1).max(60).nullish(),
     storyId: z.uuid("That story could not be found.").nullish(),
+    // Where in the story the passage is, for the story bible. Never used to
+    // fetch text; see `assist.ts`.
+    chapterId: z.uuid("That chapter could not be found.").nullish(),
   })
   /**
    * The one field that is conditionally required. A `tone` action without a
@@ -473,6 +489,7 @@ function toAssistInput(parsed: z.infer<typeof assistSchema>): AssistInput {
     after: parsed.after,
     tone: parsed.tone ?? null,
     storyId: parsed.storyId ?? null,
+    chapterId: parsed.chapterId ?? null,
   };
 }
 
@@ -1220,5 +1237,244 @@ router.get("/search", requireUser, async (req, res, next) => {
     next(error);
   }
 });
+
+/* Story bible ------------------------------------------------------------- */
+
+/**
+ * Generous per call because the work is deliberately cut small: one chapter
+ * per request, so reading a forty-chapter story is forty of these in a row.
+ * What actually bounds the spend is the daily budget, checked on each one.
+ */
+const BIBLE_REFRESH_LIMIT = 80;
+const BIBLE_REFRESH_WINDOW_SECONDS = 60 * 10;
+
+/** Chapters read by one refresh call. See `refreshBible` for why so few. */
+const BIBLE_REFRESH_MAX_CHAPTERS = 3;
+
+const storyIdParams = z.object({
+  storyId: z.uuid("That story could not be found."),
+});
+
+const factIdParams = z.object({
+  factId: z.uuid("That fact could not be found."),
+});
+
+const refreshBodySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(BIBLE_REFRESH_MAX_CHAPTERS).default(1),
+});
+
+/**
+ * The same bounds `extractedFactSchema` puts on a model's fact: an author's
+ * own fact goes into the same prompts, so it gets the same ceilings.
+ */
+const factFields = {
+  kind: z.enum(FACT_KINDS),
+  subject: z.string().trim().min(1, "Who or what is this about?").max(80),
+  attribute: z.string().trim().min(1, "What is being said about them?").max(60),
+  value: z.string().trim().min(1, "What is the fact?").max(300),
+  related: z.string().trim().max(80).nullish(),
+};
+
+const addFactSchema = z.object({
+  ...factFields,
+  chapterId: z.uuid("That chapter could not be found.").nullish(),
+});
+
+const updateFactSchema = z
+  .object({
+    kind: factFields.kind.optional(),
+    subject: factFields.subject.optional(),
+    attribute: factFields.attribute.optional(),
+    value: factFields.value.optional(),
+    related: factFields.related,
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined), {
+    message: "Nothing to change.",
+  });
+
+/**
+ * The bible as it stands: every live fact with its evidence, and which
+ * chapters have been read. Calls no model, so no limit and no budget.
+ */
+router.get("/bible/:storyId", requireUser, async (req, res, next) => {
+  try {
+    const { storyId } = parseOrThrow(storyIdParams, req.params);
+
+    res.json(await getBible(requireUserId(res), storyId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Reads the next chapter or few that need it. The client calls this until
+ * `bible.pending` is zero; each call is short and whatever it read stays read.
+ */
+router.post("/bible/:storyId/refresh", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const { storyId } = parseOrThrow(storyIdParams, req.params);
+    const { limit } = parseOrThrow(refreshBodySchema, req.body ?? {});
+
+    const key = `ai:bible:${userId}`;
+    const status = await isRateLimited(key, BIBLE_REFRESH_LIMIT);
+    if (status.limited) {
+      throw HttpError.tooManyRequests(
+        "You have refreshed the story bible a lot in a short time. Try again shortly.",
+        status.retryAfter,
+      );
+    }
+    await assertWithinDailyBudget(userId);
+    await recordAttempt(key, BIBLE_REFRESH_WINDOW_SECONDS);
+
+    const result = await refreshBible(
+      userId,
+      storyId,
+      limit,
+      abortOnDisconnect(res).signal,
+    );
+
+    // Zero when every chapter asked about was already current.
+    await recordTokenUsage(userId, result.tokensUsed);
+
+    res.json({ processed: result.processed, bible: result.bible });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/bible/:storyId/facts", requireUser, async (req, res, next) => {
+  try {
+    const { storyId } = parseOrThrow(storyIdParams, req.params);
+    const body = parseOrThrow(addFactSchema, req.body);
+
+    const fact = await addFact(requireUserId(res), storyId, {
+      kind: body.kind,
+      subject: body.subject,
+      attribute: body.attribute,
+      value: body.value,
+      related: body.related ?? null,
+      chapterId: body.chapterId ?? null,
+    });
+
+    res.status(201).json({ fact });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Correcting a fact makes it the author's; see `updateFact`. */
+router.patch("/bible/facts/:factId", requireUser, async (req, res, next) => {
+  try {
+    const { factId } = parseOrThrow(factIdParams, req.params);
+    const body = parseOrThrow(updateFactSchema, req.body);
+
+    const fact = await updateFact(requireUserId(res), factId, {
+      ...(body.kind !== undefined ? { kind: body.kind } : {}),
+      ...(body.subject !== undefined ? { subject: body.subject } : {}),
+      ...(body.attribute !== undefined ? { attribute: body.attribute } : {}),
+      ...(body.value !== undefined ? { value: body.value } : {}),
+      ...(body.related !== undefined ? { related: body.related } : {}),
+    });
+
+    res.json({ fact });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/bible/facts/:factId", requireUser, async (req, res, next) => {
+  try {
+    const { factId } = parseOrThrow(factIdParams, req.params);
+
+    await removeFact(requireUserId(res), factId);
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+/* Continuity -------------------------------------------------------------- */
+
+/** One model call each, sometimes two; an author presses it, not a loop. */
+const CONTINUITY_LIMIT = 20;
+const CONTINUITY_WINDOW_SECONDS = 60 * 10;
+
+const chapterIdParams = z.object({
+  chapterId: z.uuid("That chapter could not be found."),
+});
+
+const findingIdParams = z.object({
+  findingId: z.uuid("That finding could not be found."),
+});
+
+/**
+ * What the last check of this chapter found. A read of stored rows: the
+ * editor asks on every chapter open, and it never reaches a model.
+ */
+router.get(
+  "/continuity/chapters/:chapterId",
+  requireUser,
+  async (req, res, next) => {
+    try {
+      const { chapterId } = parseOrThrow(chapterIdParams, req.params);
+
+      res.json(await getChapterContinuity(requireUserId(res), chapterId));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/** The check a quiet minute would have run, now, because the author asked. */
+router.post(
+  "/continuity/chapters/:chapterId/check",
+  requireUser,
+  async (req, res, next) => {
+    try {
+      const userId = requireUserId(res);
+      const { chapterId } = parseOrThrow(chapterIdParams, req.params);
+
+      const key = `ai:continuity:${userId}`;
+      const status = await isRateLimited(key, CONTINUITY_LIMIT);
+      if (status.limited) {
+        throw HttpError.tooManyRequests(
+          "You have run a lot of continuity checks in a short time. Try again shortly.",
+          status.retryAfter,
+        );
+      }
+      await assertWithinDailyBudget(userId);
+      await recordAttempt(key, CONTINUITY_WINDOW_SECONDS);
+
+      const result = await checkChapterNow(
+        userId,
+        chapterId,
+        abortOnDisconnect(res).signal,
+      );
+
+      await recordTokenUsage(userId, result.tokensUsed);
+
+      res.json(result.continuity);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+/** "Not a mistake": never raised again for this story. */
+router.post(
+  "/continuity/findings/:findingId/dismiss",
+  requireUser,
+  async (req, res, next) => {
+    try {
+      const { findingId } = parseOrThrow(findingIdParams, req.params);
+
+      await dismissFinding(requireUserId(res), findingId);
+      res.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  },
+);
 
 export default router;

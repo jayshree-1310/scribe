@@ -21,7 +21,7 @@ import {
   MAX_MEDIA_BYTES,
   uploadMedia,
 } from '../../data/uploads-api'
-import { Button } from '../../components/ui/Button'
+import { Button, ButtonLink } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { SelectableChip, StatusBadge } from '../../components/ui/Chip'
 import { ConfirmDialog, Dialog } from '../../components/ui/Dialog'
@@ -44,6 +44,7 @@ import {
   type AssistRequest,
 } from '../../components/ai/AssistPanel'
 import type { AssistAction } from '../../data/ai-api'
+import { ContinuityPanel } from '../../components/ai/ContinuityPanel'
 import { countWords, renderChapter } from '../../lib/chapter-markdown'
 import '../pages.css'
 import './author.css'
@@ -525,6 +526,9 @@ export function StoryEditorPage() {
       before: value.slice(Math.max(0, start - original.length - ASSIST_CONTEXT), continuing ? end - original.length : start),
       after: value.slice(end, end + ASSIST_CONTEXT),
       storyId,
+      // Where in the story this is, for the story bible. Null for a chapter
+      // that has never been saved, which has no place in it yet.
+      chapterId: active.id,
       start,
       end,
       replaced: value.slice(start, end),
@@ -1008,6 +1012,18 @@ export function StoryEditorPage() {
           <Button loading={saving} onClick={() => void onSaveDraft()} startIcon={<Icon name="check" size="1em" />}>
             Save draft
           </Button>
+          {/*
+            Only for a saved story: the bible is read from chapters on the
+            server, and a story that is not there yet has none to read.
+          */}
+          {slug && !isNew ? (
+            <ButtonLink
+              to={`/author/stories/${slug}/bible`}
+              startIcon={<Icon name="book-open" size="1em" />}
+            >
+              Story bible
+            </ButtonLink>
+          ) : null}
           <Button
             onClick={() => setMode(mode === 'write' ? 'preview' : 'write')}
             startIcon={<Icon name="eye" size="1em" />}
@@ -1195,6 +1211,21 @@ export function StoryEditorPage() {
                 </ul>
               </section>
             ) : null}
+
+            {/*
+              Warnings about the chapter, under the chapter. Never a block on
+              saving: the panel reads what a background check found and has no
+              say in whether anything is saved or published.
+            */}
+            <ContinuityPanel
+              chapterId={active.id}
+              savedAt={savedAt}
+              unsaved={dirty || active.dirty}
+              onOpenChapter={(chapterId) => {
+                const target = chapters.find((chapter) => chapter.id === chapterId)
+                if (target) setActiveKey(target.key)
+              }}
+            />
 
             <footer className="editor__foot">
               <span>

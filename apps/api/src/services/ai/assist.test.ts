@@ -25,6 +25,7 @@ const input = (patch: Partial<AssistInput> = {}): AssistInput => ({
   after: "",
   tone: null,
   storyId: null,
+  chapterId: null,
   ...patch,
 });
 

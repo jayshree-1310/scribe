@@ -1435,6 +1435,76 @@ a second or so late.
 
 **Depends on Task AI 3 and `BACKLOG.md` Task 6.**
 
+**Status: built.** `services/ai/story-bible.ts` (extraction, the author's
+edits, selection) over `services/ai/bible-facts.ts` (the pure half) and
+`prompts/story-bible.ts`; `ai.StoryFact` and `ai.ChapterExtraction` with
+migration `20261007T1317_add_ai_story_bible`; `GET /api/ai/bible/:storyId`,
+`POST …/refresh`, `POST …/facts`, `PATCH` and `DELETE /api/ai/bible/facts/:factId`;
+`factsForPrompt` wired into `assist.ts`; `pages/author/StoryBiblePage.tsx` at
+`/author/stories/:slug/bible`, linked from the editor. Tests in
+`routes/ai-bible.test.ts` and `services/ai/bible-facts.test.ts`. Verified
+against `gpt-oss-120b` and `nomic-embed-text` on a two-chapter story written
+for the check: 17 facts in about nine seconds, every one with a quote that is
+verbatim in its chapter and none dropped, and a continuation of chapter two
+was shown 15 of them.
+
+Six things worth knowing before building on it — Task AI 14 does.
+
+**A fact without the chapter's own words is not stored.** The model returns a
+quote with every fact; `quoteLocator` looks for it in the chapter — tolerant of
+emphasis marks, curly quotes, case and line breaks, intolerant of paraphrase —
+and what is kept as evidence is cut from the *chapter*, not copied from the
+reply. A fact whose quote is not there is dropped and counted
+(`droppedCount`), and the panel says how many. This is the whole defence
+against a model that summarises instead of reading.
+
+**"A corrected fact wins" is three rules, not one.** A correction converts the
+row in place to `origin = author`, keeping its chapter and quote, and from then
+on no extracted fact with the same key is stored for that chapter. A removal
+leaves a tombstone (`rejected`), because deleting the row would let the next
+reading of the same sentence restore it. And a correction that changes what
+the fact is *about* — its subject or attribute, so its key — leaves a
+tombstone for the claim it replaced. Each has a test that re-reads the chapter
+with a model that still reports the old claim. Mutation-checked: dropping
+either the author-key rule or the tombstone rule fails them.
+
+**Reading is one chapter per request.** A twenty-chapter story is twenty model
+calls, too long for one request to hold and with no job runner to hand it to
+(Task AI 20). So `POST …/refresh` reads the next stale chapter and returns
+`pending`, and the page loops with the count on screen and a Stop button.
+Whatever was read stays read; a failure leaves the previous reading in place
+and the chapter marked stale. Unchanged chapters are skipped by content hash
+and prompt version, so a second refresh costs nothing.
+
+**Selection is three rankings fused, under a hard budget.** Facts about
+whoever the passage *names* (counted twice), *recent* events, and facts near
+it by *embedding* — fused by rank with search's own `fuseRankings` — then at
+most 16 facts or 2400 characters, at most five per subject. Each ranking
+covers what the others miss, and each degrades alone: with the embedder down
+the assistant still gets facts by name. The budget is asserted against a
+story with thirty named characters.
+
+**A story with no bible sends exactly the prompt it always did.** The bible
+block and the sentence about it live in `ASSIST_SYSTEM_PROMPT_WITH_BIBLE`, used
+only when at least one fact was selected; the test compares the no-bible
+request to the original constant. The assistant's reply now says how many
+facts it was shown, and the panel prints it.
+
+**`chapterId` joined the assistant's contract, as a position.** Task AI 3
+deliberately had none, because it could only fetch a staler copy of the text.
+It still does not fetch text: it says where in the story the passage is, which
+is what makes "recent" and "already happened" mean something.
+
+Still open, and seen in the real run. The model worked a bible fact into a
+continuation it was only meant to stay consistent with — the lamp burning
+whale oil, from chapter one, in a chapter that had replaced the lamp — which
+is both a prompt it did not obey and a bible that was out of date about a
+change the chapter itself had made. "Mira" and "Mira Desai" stayed two
+subjects despite the known-names list; selection and the continuity checker
+treat them as one (`shareSubject`), but the panel groups by exact name. The
+bible is refreshed only when the author asks. And `kind` is the model's call:
+it filed the lamp's fuel as an event.
+
 **Prompt:**
 
 > Make the writing assistant know the author's own story.
@@ -1470,6 +1540,62 @@ a second or so late.
 ## Task AI 14 — Continuity checker
 
 **Depends on Task AI 13.**
+
+**Status: built.** `services/ai/continuity.ts`, `services/ai/continuity-queue.ts`,
+`prompts/continuity.ts`; `ai.ContinuityCheck`, `ai.ContinuityFinding` and
+`ai.ContinuityDismissal` (in the story-bible migration); `GET
+/api/ai/continuity/chapters/:chapterId`, `POST …/check`, `POST
+/api/ai/continuity/findings/:findingId/dismiss`; one line in `updateChapter`;
+`components/ai/ContinuityPanel.tsx` under the chapter in the editor. Tests in
+`routes/ai-continuity.test.ts`. Verified against `gpt-oss-120b` on the same
+story: of four differences planted between two chapters it reported the two
+that are contradictions (green eyes then brown, at 95%; "older brother"
+against "four years younger", at 96%) and stayed silent on the two that are
+not — an age going from thirty to thirty-one, and a lamp that had been
+replaced. One call, 1.3 seconds.
+
+Five things worth knowing before building on it.
+
+**A save sets a timer and returns.** `updateChapter` calls
+`scheduleContinuityCheck` after its transaction commits, only when the prose
+changed, and that is all a save does: the check runs
+`AI_CONTINUITY_QUIET_MS` (a minute) after the *last* save of that chapter, so
+an editor autosaving every pause produces one check, not one per pause. The
+test saves four times and asserts one model call, and saves with the model
+down and asserts a 200. The queue is in memory — a restart drops pending
+checks and the next save or a press of **Check now** runs them — and is
+deliberately not part of `drainDeferredWrites`, so shutdown and account
+deletion never wait on a model.
+
+**Four guards stand between a model's reply and an author.** A confidence
+floor (`AI_CONTINUITY_MIN_CONFIDENCE`, 0.8), below which nothing is stored; a
+deterministic check that both claims are about the same subject
+(`shareSubject`), whatever confidence came with the pairing; labels instead of
+quotations, so the evidence shown is copied from the rows that were sent and
+cannot be misquoted; and dismissals. Each has a test and each was
+mutation-checked.
+
+**A dismissal is of a pair of claims, not of a row.** `fingerprintOf` hashes
+both sides' chapter, key and value, so "green in chapter one, blue in chapter
+two" stays dismissed when either chapter is edited elsewhere and checked
+again — and a *different* contradiction about the same eyes is still raised.
+
+**A check is skipped when nothing it would compare has changed** — not just
+the chapter's text (`contentHash`) but the set of claims and established facts
+chosen for it (`contextHash`). So fixing chapter one re-checks chapter two
+though chapter two never moved, and re-reading an unchanged chapter, which
+replaces its rows, re-checks nothing.
+
+**A check that could not run hides nothing.** It is recorded as `failed` and
+retried on the next save, and the previous findings stay where they were. The
+panel says which state it is in — never checked, out of date, failed, or
+clean — rather than showing an empty list that could mean any of them.
+
+Still open: findings are per chapter, with no story-wide list or count on the
+dashboard; a check compares at most thirty claims with forty established
+facts, so a very long chapter in a very large cast is checked partly; and the
+0.8 floor is the default, not a measurement — it held on one planted story,
+which is not evidence about a novel. Task AI 16 is where it gets some.
 
 **Prompt:**
 

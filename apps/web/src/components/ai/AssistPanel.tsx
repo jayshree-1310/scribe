@@ -32,6 +32,8 @@ export interface AssistRequest {
   before: string
   after: string
   storyId: string | null
+  /** The saved chapter being edited, so the story bible knows where this is. */
+  chapterId: string | null
 }
 
 const LABELS: Record<AssistAction, string> = {
@@ -67,6 +69,8 @@ export function AssistPanel({ request, onAccept, onClose }: AssistPanelProps) {
     request.action === 'tone' ? 'asking' : 'streaming',
   )
   const [error, setError] = useState<string | null>(null)
+  /** Story-bible facts the model was shown for the suggestion on screen. */
+  const [facts, setFacts] = useState(0)
 
   /** Abandons an in-flight suggestion when a second one is asked for. */
   const pending = useRef<AbortController | null>(null)
@@ -79,6 +83,7 @@ export function AssistPanel({ request, onAccept, onClose }: AssistPanelProps) {
 
       setSuggestion('')
       setError(null)
+      setFacts(0)
       setStatus('streaming')
 
       const payload: AssistPayload = {
@@ -88,6 +93,7 @@ export function AssistPanel({ request, onAccept, onClose }: AssistPanelProps) {
         after: request.after,
         tone: targetTone,
         storyId: request.storyId,
+        chapterId: request.chapterId,
       }
 
       try {
@@ -99,6 +105,7 @@ export function AssistPanel({ request, onAccept, onClose }: AssistPanelProps) {
             // fence the model opened in its first delta is only recognisable
             // once its last one has arrived.
             setSuggestion(event.text)
+            setFacts(event.facts ?? 0)
           }
         }
         if (!controller.signal.aborted) setStatus('done')
@@ -205,6 +212,14 @@ export function AssistPanel({ request, onAccept, onClose }: AssistPanelProps) {
             </Button>
             <p className="assist__note">
               Nothing changes in your chapter until you accept.
+              {/*
+                Said rather than implied: a suggestion that was held to the
+                story's own facts is a different thing from one that was not,
+                and the author should be able to tell which they are reading.
+              */}
+              {status === 'done' && facts > 0
+                ? ` Checked against ${facts} ${facts === 1 ? 'fact' : 'facts'} from your story bible.`
+                : ''}
             </p>
           </div>
         </>

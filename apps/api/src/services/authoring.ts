@@ -21,6 +21,7 @@ import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
 import { deleteAll } from "../prisma/delete-all.js";
+import { scheduleContinuityCheck } from "./ai/continuity-queue.js";
 import { discardUpload } from "./uploads.js";
 import { evaluateBadges } from "./gamification.js";
 import { notify } from "./notifications.js";
@@ -877,6 +878,11 @@ export async function updateChapter(
 
     await touchStory(tx, chapter.storyId, timestamp);
   });
+
+  // After the commit, and only when the prose moved: a retitled chapter says
+  // nothing new. Returns at once -- the check runs a quiet minute later, if
+  // the story has a bible to check against. See `ai/continuity-queue.ts`.
+  if (patch.content !== undefined) scheduleContinuityCheck(chapterId);
 
   return loadChapter(chapterId);
 }

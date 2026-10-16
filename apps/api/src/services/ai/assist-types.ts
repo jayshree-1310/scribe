@@ -37,4 +37,10 @@ export interface AssistInput {
    * Ownership is asserted on it; see `assist.ts`.
    */
   storyId: string | null;
+  /**
+   * The chapter being edited, when it has been saved. Says only *where in the
+   * story* the passage sits, so the story bible can tell what has already
+   * happened from what has not; the prose still travels in `text`.
+   */
+  chapterId: string | null;
 }

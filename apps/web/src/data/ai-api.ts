@@ -356,18 +356,28 @@ export interface AssistPayload {
   tone?: string | null
   /** Null while a story has never been saved and so has no id yet. */
   storyId?: string | null
+  /**
+   * The saved chapter being edited. Says only where in the story the passage
+   * is, so the story bible knows what has already happened; the prose still
+   * travels in `text`.
+   */
+  chapterId?: string | null
 }
 
 export type AssistEvent =
   | { type: 'text'; text: string }
-  /** The cleaned whole. A wrapper can only be recognised once it has closed. */
-  | { type: 'done'; text: string }
+  /**
+   * The cleaned whole. A wrapper can only be recognised once it has closed.
+   * `facts` is how many story-bible facts the model was shown; 0 for a story
+   * with no bible.
+   */
+  | { type: 'done'; text: string; facts?: number }
   | { type: 'error'; code: string; message: string }
 
 export async function assist(
   payload: AssistPayload,
   signal?: AbortSignal,
-): Promise<{ action: AssistAction; text: string }> {
+): Promise<{ action: AssistAction; text: string; facts: number }> {
   return request('/ai/assist', {
     method: 'POST',
     headers: readerHeaders(),
@@ -382,6 +392,220 @@ export function streamAssist(
   signal?: AbortSignal,
 ): AsyncGenerator<AssistEvent> {
   return streamRequest<AssistEvent>('/ai/assist/stream', payload, signal)
+}
+
+/* Story bible ------------------------------------------------------------- */
+
+export type FactKind = 'character' | 'location' | 'relationship' | 'event'
+
+/** `extracted` is a model's reading of a chapter; `author` is the author's own. */
+export type FactOrigin = 'extracted' | 'author'
+
+export interface StoryFact {
+  id: string
+  kind: FactKind
+  subject: string
+  attribute: string
+  value: string
+  /** For a relationship, the other person. */
+  related: string | null
+  /** The chapter's own words for it; null for a fact the author typed in. */
+  quote: string | null
+  origin: FactOrigin
+  chapterId: string | null
+  chapterNumber: number | null
+  chapterTitle: string | null
+  updatedAt: string | null
+}
+
+/**
+ * - `missing`: never read.
+ * - `stale`: read, but the text has changed since.
+ * - `current`: what is stored is a reading of what is there now.
+ */
+export type ChapterBibleState = 'missing' | 'stale' | 'current'
+
+export interface ChapterBibleStatus {
+  chapterId: string
+  chapterNumber: number
+  title: string
+  state: ChapterBibleState
+  factCount: number
+  /** Facts the model offered that the chapter does not actually say. */
+  droppedCount: number
+  /** The chapter was longer than an extraction reads. */
+  truncated: boolean
+  extractedAt: string | null
+}
+
+export interface StoryBible {
+  storyId: string
+  chapters: ChapterBibleStatus[]
+  /** Chapters a refresh would read. */
+  pending: number
+  facts: StoryFact[]
+}
+
+export interface BibleRefresh {
+  processed: {
+    chapterId: string
+    chapterNumber: number
+    unchanged: boolean
+    facts: number
+    dropped: number
+    truncated: boolean
+  }[]
+  bible: StoryBible
+}
+
+export interface FactDraft {
+  kind: FactKind
+  subject: string
+  attribute: string
+  value: string
+  related?: string | null
+  /** The chapter it is true from; omit for the whole story. */
+  chapterId?: string | null
+}
+
+/** Never calls a model, so it is safe to request on every open. */
+export async function getStoryBible(
+  storyId: string,
+  signal?: AbortSignal,
+): Promise<StoryBible> {
+  return request<StoryBible>(`/ai/bible/${storyId}`, {
+    headers: readerHeaders(),
+    ...(signal ? { signal } : {}),
+  })
+}
+
+/**
+ * Reads the next chapter that needs it. Call until `bible.pending` is 0: one
+ * chapter per request keeps each short and lets a page show its progress.
+ */
+export async function refreshStoryBible(
+  storyId: string,
+  signal?: AbortSignal,
+): Promise<BibleRefresh> {
+  return request<BibleRefresh>(`/ai/bible/${storyId}/refresh`, {
+    method: 'POST',
+    headers: readerHeaders(),
+    body: { limit: 1 },
+    timeoutMs: AI_REQUEST_TIMEOUT_MS,
+    ...(signal ? { signal } : {}),
+  })
+}
+
+export async function addStoryFact(
+  storyId: string,
+  draft: FactDraft,
+): Promise<StoryFact> {
+  const { fact } = await request<{ fact: StoryFact }>(
+    `/ai/bible/${storyId}/facts`,
+    { method: 'POST', headers: readerHeaders(), body: draft },
+  )
+  return fact
+}
+
+/** Correcting a fact makes it the author's: it then survives re-reading. */
+export async function updateStoryFact(
+  factId: string,
+  patch: Partial<Omit<FactDraft, 'chapterId'>>,
+): Promise<StoryFact> {
+  const { fact } = await request<{ fact: StoryFact }>(
+    `/ai/bible/facts/${factId}`,
+    { method: 'PATCH', headers: readerHeaders(), body: patch },
+  )
+  return fact
+}
+
+export async function removeStoryFact(factId: string): Promise<void> {
+  await request<void>(`/ai/bible/facts/${factId}`, {
+    method: 'DELETE',
+    headers: readerHeaders(),
+  })
+}
+
+/* Continuity --------------------------------------------------------------- */
+
+export type ContinuityKind =
+  | 'attribute'
+  | 'whereabouts'
+  | 'timeline'
+  | 'death'
+  | 'relationship'
+  | 'other'
+
+export interface ContinuityFinding {
+  id: string
+  kind: ContinuityKind
+  /** Generated: one sentence on what does not add up. */
+  explanation: string
+  /** 0-100. */
+  confidence: number
+  /** What this chapter says. */
+  claim: { subject: string; attribute: string; value: string; quote: string }
+  /** What the rest of the story says, and where. */
+  fact: {
+    subject: string
+    attribute: string
+    value: string
+    quote: string | null
+    origin: FactOrigin
+    chapterId: string | null
+    chapterNumber: number | null
+    chapterTitle: string | null
+  }
+  createdAt: string | null
+}
+
+export interface ChapterContinuity {
+  chapterId: string
+  /** False when the story has no bible yet, or checks are switched off. */
+  enabled: boolean
+  check: {
+    outcome: 'ok' | 'failed'
+    checkedAt: string | null
+    /** The chapter has changed since it was checked. */
+    stale: boolean
+    compared: number
+  } | null
+  findings: ContinuityFinding[]
+}
+
+/** The last check's findings. Never calls a model. */
+export async function getChapterContinuity(
+  chapterId: string,
+  signal?: AbortSignal,
+): Promise<ChapterContinuity> {
+  return request<ChapterContinuity>(`/ai/continuity/chapters/${chapterId}`, {
+    headers: readerHeaders(),
+    ...(signal ? { signal } : {}),
+  })
+}
+
+/** Checks the saved chapter now rather than a minute after the last save. */
+export async function checkChapterContinuity(
+  chapterId: string,
+  signal?: AbortSignal,
+): Promise<ChapterContinuity> {
+  return request<ChapterContinuity>(
+    `/ai/continuity/chapters/${chapterId}/check`,
+    {
+      method: 'POST',
+      headers: readerHeaders(),
+      timeoutMs: AI_REQUEST_TIMEOUT_MS,
+      ...(signal ? { signal } : {}),
+    },
+  )
+}
+
+/** "Not a mistake": this pair of claims is never raised again. */
+export async function dismissContinuityFinding(findingId: string): Promise<void> {
+  await request<void>(`/ai/continuity/findings/${findingId}/dismiss`, {
+    method: 'POST',
+    headers: readerHeaders(),
+  })
 }
 
 /* Reader: recap ---------------------------------------------------------- */

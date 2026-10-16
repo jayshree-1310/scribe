@@ -1337,7 +1337,9 @@ The web app has no test suite yet.
 - [x] AI 8 — semantic and hybrid search, "Search by meaning" on Discover
 - [x] AI 11 — a content-similarity term and diversity caps in the recommender
 - [x] AI 12 — automated moderation of new comments, into the existing queue
-- [ ] The rest — the story bible onward, evaluation
+- [x] AI 13 — a story bible read from the author's chapters, with evidence
+- [x] AI 14 — a continuity checker that warns, never blocks, and can be dismissed
+- [ ] The rest — tool calling, evaluation, prompt management, cost, hardening
 
 ### Phase 7 — Production Readiness
 

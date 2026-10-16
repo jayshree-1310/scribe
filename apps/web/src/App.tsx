@@ -50,6 +50,7 @@ import { IdeaStudioPage } from './pages/author/IdeaStudioPage'
 import { AuthorAnalyticsPage } from './pages/author/AuthorAnalyticsPage'
 import { AuthorChannelsPage } from './pages/author/AuthorChannelsPage'
 import { StoryEditorPage } from './pages/author/StoryEditorPage'
+import { StoryBiblePage } from './pages/author/StoryBiblePage'
 
 /**
  * A data router rather than `<BrowserRouter>`: `useBlocker` — which Settings
@@ -207,6 +208,7 @@ const router = createBrowserRouter(
         <Route path="/author/stories" element={<AuthorStoriesPage />} />
         <Route path="/author/ideas" element={<IdeaStudioPage />} />
         <Route path="/author/stories/:slug" element={<StoryEditorPage />} />
+        <Route path="/author/stories/:slug/bible" element={<StoryBiblePage />} />
         <Route path="/author/analytics" element={<AuthorAnalyticsPage />} />
         <Route path="/author/channels" element={<AuthorChannelsPage />} />
       </Route>

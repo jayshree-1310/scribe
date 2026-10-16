@@ -91,6 +91,12 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/ask-book.ts` | Task AI 9: resolve the spoiler bound, retrieve from one story (meaning and names, fused), decline without a model when nothing qualifies, answer, and derive citations from the markers the answer used. |
 | `services/ai/conversations.ts` | Task AI 10: a turn is remember (`foldIntoSummary`), rewrite (`rewriteQuestion`, gated by `needsRewrite`), retrieve, recall (`selectHistory`), answer, store. Ownership and visibility on every read. |
 | `services/ai/prompts/conversation.ts` | The rewrite and summary prompts. Bookkeeping calls whose output the application reads, not the reader. |
+| `services/ai/story-bible.ts` | Task AI 13: read a chapter into facts with evidence, apply the author's corrections and removals, and pick the few facts relevant to a passage (`factsForPrompt`). |
+| `services/ai/bible-facts.ts` | The pure half: what makes two facts the same fact, whether a quote is really in a chapter, which names a passage mentions, the selection budget, and the fingerprint of a contradiction. |
+| `services/ai/prompts/story-bible.ts` | The extraction prompt — mostly exclusions — and the fenced block the assistant is shown. |
+| `services/ai/continuity.ts` | Task AI 14: a chapter's claims against the rest of the bible, four guards against false positives, findings with both pieces of evidence copied onto them, and dismissal by pair of claims. |
+| `services/ai/continuity-queue.ts` | When a check runs: a quiet minute after the last save. In memory, never awaited by a save, and what keeps `authoring.ts` from importing the AI services that import it. |
+| `services/ai/prompts/continuity.ts` | The comparison prompt. Spends more words on what is not a contradiction than on what is, and has the model answer by label. |
 | `services/ai/moderation.ts` | Task AI 12: score a new comment per category, turn the scores into allow / review / reject in `decide`, and hand anything that needs a person to `services/moderation.ts`. Fire-and-forget from `createComment`; never fails or slows a post. |
 | `services/ai/prompts/moderation.ts` | The scoring prompt, built from the category list. Asks for numbers, never a verdict, and says in as many words that discussing a story's violence is not violence. |
 | `scripts/moderate-pending.ts` | `moderation:pending` — checks comments with no verdict: posted during an outage, or before the check existed. |
@@ -694,6 +700,36 @@ turns, the bound and token usage for answers) and `ai.ConversationCitation`
 re-embedding. Every foreign key cascades. Citations are joined to the
 chapter's current title and re-authorised on every read.
 
+## Story bible and continuity
+
+An author's own chapters, read into facts and used twice.
+
+**Reading** (`extractChapter`): hash the chapter and stop if it and the prompt
+version match the stored `ChapterExtraction`; otherwise one structured call per
+12k-character section asks for facts, each with a quote. Every quote is looked
+for in the chapter and a fact whose quote is not there is dropped. What
+survives is filtered by what the author has already said about that chapter —
+their own facts win by key, their removals suppress the same claim — and
+replaces the chapter's extracted rows in one transaction. Facts are then
+embedded, best effort. `POST /api/ai/bible/:storyId/refresh` reads one stale
+chapter per call; the client loops.
+
+**Use one, the assistant** (`factsForPrompt`): facts about whoever the passage
+names, recent events, and facts near it by embedding, fused by rank, then cut
+to 16 facts / 2400 characters / five per subject and placed in the request as
+a fenced block. A story with no bible gets the original prompt unchanged.
+
+**Use two, the checker** (`checkChapter`): the chapter's facts are the claims;
+established facts are those from other chapters about the same subjects. One
+structured call returns pairs by label with a confidence. A pair is stored
+only if it clears `AI_CONTINUITY_MIN_CONFIDENCE`, names labels that were sent,
+is about one subject, and has not been dismissed. `updateChapter` schedules
+this a quiet minute after the last save and does not wait for it.
+
+Everything here is private to the story's author: every route asserts
+ownership, drafts are read as well as published chapters, and every foreign
+key cascades from the story.
+
 ## Moderation
 
 Every new comment is scored after it is posted. `createComment` commits and
@@ -767,7 +803,7 @@ per genre, with held-back stories filling any room left.
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The remaining features.** Tasks AI 13 onward. Of Task AI 6 only the chapter recap was built; the story-level
+- **The remaining features.** Tasks AI 15 onward. Of Task AI 6 only the chapter recap was built; the story-level
   summary, the spoiler-free summary and the map-reduce that a multi-chapter
   summary needs are not here.
 - **Persisted usage, and budgets everywhere else.** The sink still only logs,

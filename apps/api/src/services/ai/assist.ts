@@ -17,8 +17,15 @@
  * database by id. The editor's buffer is the truth while somebody is typing,
  * and the saved copy is a debounce behind -- so "continue from here" against
  * the stored chapter would continue from a paragraph the author had already
- * replaced. That is also why there is no `chapterId` in the contract: it could
- * only be used to fetch a staler copy of the text we were just given.
+ * replaced. A `chapterId` may accompany it, and is never used to fetch text:
+ * it says where in the story the passage sits, which is what lets the story
+ * bible tell what has already happened from what has not.
+ *
+ * - **What the story already says.** When the story has a bible (Task AI 13),
+ *   the few facts relevant to this passage go into the request, so a
+ *   continuation does not rename a character or move them to a city they left
+ *   two chapters ago. Which facts, and how few, is `story-bible.ts` and
+ *   `bible-facts.ts`; a story without a bible is sent exactly what it was.
  */
 
 import { assertStoryOwned } from "../authoring.js";
@@ -27,8 +34,14 @@ import {
   type AssistAction,
   type AssistInput,
 } from "./assist-types.js";
-import { ASSIST_SYSTEM_PROMPT, assistMessage } from "./prompts/assist/index.js";
+import {
+  ASSIST_SYSTEM_PROMPT,
+  ASSIST_SYSTEM_PROMPT_WITH_BIBLE,
+  assistMessage,
+} from "./prompts/assist/index.js";
+import { bibleBlock } from "./prompts/story-bible.js";
 import { aiProvider } from "./provider.js";
+import { factsForPrompt } from "./story-bible.js";
 
 export { ASSIST_ACTIONS };
 export type { AssistAction, AssistInput };
@@ -125,17 +138,39 @@ export function stripWrapper(text: string): string {
 
 /* The feature ------------------------------------------------------------ */
 
-function requestFor(
+type AssistRequest = Parameters<ReturnType<typeof aiProvider>["complete"]>[0];
+
+/**
+ * The request, and how many bible facts went into it.
+ *
+ * The facts are chosen against the same window the model will see -- what is
+ * relevant to prose that was trimmed away is not relevant to this call. Only
+ * for a saved story: an unsaved one has no bible to read, and `authorise` has
+ * already established that this one is the caller's.
+ */
+async function requestFor(
   input: AssistInput,
   signal?: AbortSignal,
-): Parameters<ReturnType<typeof aiProvider>["complete"]>[0] {
+): Promise<{ request: AssistRequest; facts: number }> {
   const windowed = windowFor(input);
 
-  return {
+  const facts = input.storyId
+    ? await factsForPrompt(
+        input.storyId,
+        [windowed.before, windowed.text, windowed.after]
+          .filter((part) => part !== "")
+          .join("\n"),
+        input.chapterId,
+        signal,
+      )
+    : [];
+
+  const request: AssistRequest = {
     // Per action, so per-action cost is visible in the usage log rather than
     // one undifferentiated `assist` line.
     feature: `assist.${input.action}`,
-    system: ASSIST_SYSTEM_PROMPT,
+    system:
+      facts.length > 0 ? ASSIST_SYSTEM_PROMPT_WITH_BIBLE : ASSIST_SYSTEM_PROMPT,
     messages: [
       {
         role: "user",
@@ -145,12 +180,15 @@ function requestFor(
           windowed.text,
           windowed.before,
           windowed.after,
+          bibleBlock(facts),
         ),
       },
     ],
     maxTokens: TOKEN_BUDGET[input.action],
     ...(signal ? { signal } : {}),
   };
+
+  return { request, facts: facts.length };
 }
 
 /**
@@ -170,18 +208,23 @@ export async function assist(
   userId: string,
   input: AssistInput,
   signal?: AbortSignal,
-): Promise<{ action: AssistAction; text: string }> {
+): Promise<{ action: AssistAction; text: string; facts: number }> {
   await authorise(userId, input);
 
-  const completion = await aiProvider().complete(requestFor(input, signal));
+  const { request, facts } = await requestFor(input, signal);
+  const completion = await aiProvider().complete(request);
 
-  return { action: input.action, text: stripWrapper(completion.text) };
+  return { action: input.action, text: stripWrapper(completion.text), facts };
 }
 
 export type AssistEvent =
   | { type: "text"; text: string }
-  /** Carries the cleaned whole, which is the authority; see below. */
-  | { type: "done"; text: string };
+  /**
+   * Carries the cleaned whole, which is the authority; see below. `facts` is
+   * how many story-bible facts the model was shown, so the panel can say a
+   * suggestion was checked against the story rather than leave it implied.
+   */
+  | { type: "done"; text: string; facts: number };
 
 /**
  * The same work, streamed.
@@ -202,13 +245,14 @@ export async function* assistStream(
 ): AsyncGenerator<AssistEvent> {
   await authorise(userId, input);
 
+  const { request, facts } = await requestFor(input, signal);
   let accumulated = "";
 
-  for await (const event of aiProvider().stream(requestFor(input, signal))) {
+  for await (const event of aiProvider().stream(request)) {
     if (event.type !== "text") continue;
     accumulated += event.text;
     yield { type: "text", text: event.text };
   }
 
-  yield { type: "done", text: stripWrapper(accumulated) };
+  yield { type: "done", text: stripWrapper(accumulated), facts };
 }

@@ -18,6 +18,9 @@ export default defineConfig({
       // whatever model `apps/api/.env` points at; the moderation suite turns
       // it back on for itself, behind the fake provider.
       AI_MODERATION: "off",
+      // Likewise for the continuity check a chapter save schedules: the
+      // authoring suites save chapters constantly. Its own suite turns it on.
+      AI_CONTINUITY: "off",
     },
   },
 });
