@@ -77,6 +77,7 @@ import {
   dismissFinding,
   getChapterContinuity,
 } from "../services/ai/continuity.js";
+import { MESSAGE_LIMIT, runAgent } from "../services/ai/agent.js";
 import { FACT_KINDS } from "../services/ai/schemas.js";
 import { MAX_PAGE_SIZE } from "../services/stories.js";
 import { logger } from "../lib/logger.js";
@@ -1476,5 +1477,65 @@ router.post(
     }
   },
 );
+
+/* Assistant with tools --------------------------------------------------- */
+
+/**
+ * Tighter than Ask This Book's: one request here is up to five model calls and
+ * six lookups, so ten requests is fifty calls. The per-request token budget in
+ * `agent.ts` bounds one request; this bounds how many of them.
+ */
+const AGENT_LIMIT = 10;
+const AGENT_WINDOW_SECONDS = 60 * 10;
+
+const agentSchema = z.object({
+  message: z
+    .string()
+    .trim()
+    .min(2, "Ask the assistant something.")
+    .max(
+      MESSAGE_LIMIT,
+      `Keep it under ${MESSAGE_LIMIT} characters — the assistant looks the rest up.`,
+    ),
+  /** The story on screen, if any. Authorised by each tool that uses it. */
+  storyId: z.string().trim().min(1).max(200).nullish(),
+});
+
+/**
+ * Ask the assistant, which decides for itself what to look up.
+ *
+ * Not streamed: what takes the time is the lookups between model calls, and
+ * the answer arrives in one piece at the end of them. The trace of what was
+ * looked up is returned beside it so nothing about the answer is a black box.
+ */
+router.post("/agent", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const body = parseOrThrow(agentSchema, req.body);
+
+    const key = `ai:agent:${userId}`;
+    const status = await isRateLimited(key, AGENT_LIMIT);
+    if (status.limited) {
+      throw HttpError.tooManyRequests(
+        "You have asked the assistant a lot in a short time. Try again shortly.",
+        status.retryAfter,
+      );
+    }
+    await assertWithinDailyBudget(userId);
+    await recordAttempt(key, AGENT_WINDOW_SECONDS);
+
+    const result = await runAgent(
+      { message: body.message, storyKey: body.storyId ?? null },
+      // The identity every tool runs as. From the session, never the body.
+      { userId, signal: abortOnDisconnect(res).signal },
+    );
+
+    await recordTokenUsage(userId, result.tokensUsed);
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
 
 export default router;

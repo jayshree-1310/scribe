@@ -14,9 +14,63 @@
 
 import type { ZodType } from "zod";
 
-export interface AiMessage {
+/**
+ * One turn of a conversation.
+ *
+ * The two tool variants exist only for the agent loop (`agent.ts`). Every
+ * other feature sends plain user and assistant text, and a provider that is
+ * never sent `tools` never sees the other two shapes.
+ */
+export type AiMessage = AiTextMessage | AiToolCallMessage | AiToolResultMessage;
+
+export interface AiTextMessage {
   role: "user" | "assistant";
   content: string;
+}
+
+/** The model's own turn when it chose tools, replayed so it sees what it asked. */
+export interface AiToolCallMessage {
+  role: "assistant";
+  /** Often empty: a model that calls a tool usually says nothing beside it. */
+  content: string;
+  toolCalls: AiToolCall[];
+}
+
+/** What running one tool produced, answering the call with the same id. */
+export interface AiToolResultMessage {
+  role: "tool";
+  toolCallId: string;
+  /** The tool's name; Ollama keys results by name rather than by id. */
+  name: string;
+  content: string;
+}
+
+/**
+ * A tool the model may ask for, described the way providers want it.
+ *
+ * `parameters` is a JSON schema derived from the zod schema that validates the
+ * arguments (`json-schema.ts`), so what the model is told and what the code
+ * accepts are one definition.
+ */
+export interface AiToolDefinition {
+  /** `[a-z_]+`: providers reject anything fancier. */
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
+/**
+ * A model's request to run a tool.
+ *
+ * `arguments` stays the raw JSON text the model wrote. Parsing it is the
+ * agent's job, through zod, because a model-chosen argument is untrusted input
+ * exactly as a request body is -- and a provider that pre-parsed it would be
+ * deciding what malformed means.
+ */
+export interface AiToolCall {
+  id: string;
+  name: string;
+  arguments: string;
 }
 
 export interface AiRequest {
@@ -42,6 +96,17 @@ export interface AiRequest {
    * why the reply is validated regardless.
    */
   format?: AiResponseFormat;
+  /**
+   * Tools the model may call instead of answering. `complete` only: the agent
+   * loop decides between steps, and a tool call is never streamed to a reader.
+   */
+  tools?: AiToolDefinition[];
+  /**
+   * `none` forbids a tool call while still describing the tools -- for the
+   * last step of a capped loop, whose history holds tool calls that some
+   * servers refuse to read without the definitions beside them.
+   */
+  toolChoice?: "auto" | "none";
   /** Caller cancellation, composed with the configured timeout. */
   signal?: AbortSignal;
 }
@@ -67,6 +132,11 @@ export interface AiUsage {
 export interface AiCompletion {
   text: string;
   usage: AiUsage;
+  /**
+   * Present and non-empty when the model chose tools rather than answering.
+   * Only ever set when the request carried `tools`.
+   */
+  toolCalls?: AiToolCall[];
 }
 
 /**

@@ -902,6 +902,46 @@ export async function chat(
   })
 }
 
+/* Assistant with tools --------------------------------------------------- */
+
+/**
+ * One lookup the assistant chose to make. `arguments` are what the model
+ * asked for (as validated), so the trace shows its reasoning as well as its
+ * result.
+ */
+export interface AgentStep {
+  tool: string
+  arguments: unknown
+  /** `skipped`: the request's lookup cap had been reached, so it did not run. */
+  outcome: 'ok' | 'invalid' | 'refused' | 'error' | 'skipped'
+  code?: string
+  durationMs: number
+}
+
+export interface AgentAnswer {
+  /** Generated, from what the tools returned. */
+  answer: string
+  steps: AgentStep[]
+  stoppedBy: 'answered' | 'tool_limit' | 'model_call_limit' | 'token_budget'
+  modelCalls: number
+  tokensUsed: number
+}
+
+export async function askAgent(
+  message: string,
+  storyId: string | null,
+  signal?: AbortSignal,
+): Promise<AgentAnswer> {
+  return request<AgentAnswer>('/ai/agent', {
+    method: 'POST',
+    headers: readerHeaders(),
+    body: { message, storyId },
+    // Several model calls with lookups between them.
+    timeoutMs: AI_REQUEST_TIMEOUT_MS,
+    ...(signal ? { signal } : {}),
+  })
+}
+
 export function streamChat(
   prompt: string,
   signal?: AbortSignal,

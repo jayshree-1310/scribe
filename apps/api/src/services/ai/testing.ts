@@ -24,6 +24,8 @@ import type {
   AiRequest,
   AiResponseFormat,
   AiStreamEvent,
+  AiToolCall,
+  AiToolDefinition,
   AiUsage,
 } from "./types.js";
 
@@ -35,16 +37,29 @@ export interface RecordedCall {
   maxTokens: number | undefined;
   /** The schema the caller asked the provider to constrain output to, if any. */
   format: AiResponseFormat | undefined;
+  /** The tools offered, if any -- an agent's last call is made without them. */
+  tools: AiToolDefinition[] | undefined;
+  toolChoice: "auto" | "none" | undefined;
   /** Whether the caller's signal was aborted by the time the call ended. */
   aborted: boolean;
   streamed: boolean;
 }
 
+/**
+ * A scripted reply: text, or a choice of tools.
+ *
+ * `arguments` is the raw text the model would have written, so a test can
+ * script a malformed call as easily as a good one.
+ */
+export type FakeReply =
+  | string
+  | { text?: string; toolCalls: Omit<AiToolCall, "id">[] };
+
 export interface FakeAiProvider extends AiProvider {
   /** Every call, in order. */
   readonly calls: RecordedCall[];
   /** Queue another reply; reused when the queue runs dry. */
-  push(reply: string): void;
+  push(reply: FakeReply): void;
   /** Make the next call fail, once. */
   failNext(error: HttpError): void;
   reset(): void;
@@ -67,26 +82,39 @@ export interface FakeProviderOptions {
    * a conversation turn may summarise, rewrite and answer -- where a queue
    * would encode the call order rather than the behaviour under test.
    */
-  respond?: (request: AiRequest) => string | undefined;
+  respond?: (request: AiRequest) => FakeReply | undefined;
+}
+
+/** A tool-call reply as a completion: text beside it, ids made up in order. */
+let fakeCallSequence = 0;
+function toCompletion(reply: FakeReply): { text: string; toolCalls?: AiToolCall[] } {
+  if (typeof reply === "string") return { text: reply };
+  return {
+    text: reply.text ?? "",
+    toolCalls: reply.toolCalls.map((call) => ({
+      id: `fake_call_${(fakeCallSequence += 1)}`,
+      ...call,
+    })),
+  };
 }
 
 export function fakeAiProvider(
-  replies: string[] = ["ok"],
+  replies: FakeReply[] = ["ok"],
   options: FakeProviderOptions = {},
 ): FakeAiProvider {
   const queue = [...replies];
   const calls: RecordedCall[] = [];
   let failure: HttpError | null = null;
 
-  function replyTo(request: AiRequest): string {
+  function replyTo(request: AiRequest): FakeReply {
     return options.respond?.(request) ?? nextReply();
   }
 
-  function nextReply(): string {
+  function nextReply(): FakeReply {
     // Falls back to the last reply rather than throwing, so a test that makes
     // more calls than it scripted fails on its own assertion instead of on a
     // confusing "no reply queued".
-    return queue.length > 1 ? (queue.shift() as string) : (queue[0] ?? "ok");
+    return queue.length > 1 ? (queue.shift() as FakeReply) : (queue[0] ?? "ok");
   }
 
   function record(request: AiRequest, streamed: boolean): void {
@@ -97,6 +125,8 @@ export function fakeAiProvider(
       model: request.model,
       maxTokens: request.maxTokens,
       format: request.format,
+      tools: request.tools,
+      toolChoice: request.toolChoice,
       aborted: request.signal?.aborted === true,
       streamed,
     });
@@ -131,8 +161,17 @@ export function fakeAiProvider(
       const error = takeFailure();
       if (error) throw error;
 
-      const text = replyTo(request);
-      return { text, usage: usageFor(request.model ?? "fake-model", text) };
+      const reply = toCompletion(replyTo(request));
+      // A real model offered no tools cannot call one, so neither can the fake.
+      const toolCalls =
+        request.tools?.length && request.toolChoice !== "none"
+          ? reply.toolCalls
+          : undefined;
+      return {
+        text: reply.text,
+        usage: usageFor(request.model ?? "fake-model", reply.text || "tool"),
+        ...(toolCalls?.length ? { toolCalls } : {}),
+      };
     },
 
     async *stream(request) {
@@ -141,7 +180,7 @@ export function fakeAiProvider(
       const error = takeFailure();
       if (error) throw error;
 
-      const text = replyTo(request);
+      const text = toCompletion(replyTo(request)).text;
 
       // Split into several deltas so a consumer that only handles one chunk,
       // or that reassembles them wrongly, is caught.

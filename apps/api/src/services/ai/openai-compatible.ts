@@ -28,15 +28,23 @@ import type {
   AiCompletion,
   AiEmbedder,
   AiEmbeddings,
+  AiMessage,
   AiProvider,
   AiRequest,
   AiStreamEvent,
+  AiToolCall,
   AiUsage,
 } from "./types.js";
 import type { FetchLike } from "./ollama.js";
 
+interface WireToolCall {
+  id?: string;
+  type?: string;
+  function?: { name?: string; arguments?: string };
+}
+
 interface ChatChoice {
-  message?: { content?: string };
+  message?: { content?: string | null; tool_calls?: WireToolCall[] };
   delta?: { content?: string };
 }
 
@@ -123,6 +131,51 @@ function signalFor(
   return request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
 }
 
+/** The seam's message shapes in the chat-completions dialect. */
+function wireMessage(message: AiMessage): Record<string, unknown> {
+  if (message.role === "tool") {
+    return {
+      role: "tool",
+      tool_call_id: message.toolCallId,
+      content: message.content,
+    };
+  }
+
+  if ("toolCalls" in message) {
+    return {
+      role: "assistant",
+      // `null` rather than "": some servers reject an empty string beside
+      // tool calls, none reject null.
+      content: message.content === "" ? null : message.content,
+      tool_calls: message.toolCalls.map((call) => ({
+        id: call.id,
+        type: "function",
+        function: { name: call.name, arguments: call.arguments },
+      })),
+    };
+  }
+
+  return { role: message.role, content: message.content };
+}
+
+/**
+ * The tool calls in a reply, with the arguments left as the text the model
+ * wrote. A call with no name is dropped: there is nothing it could run.
+ */
+function toolCallsOf(choice: ChatChoice | undefined): AiToolCall[] {
+  return (choice?.message?.tool_calls ?? []).flatMap((call, index) =>
+    call.function?.name
+      ? [
+          {
+            id: call.id ?? `call_${index}`,
+            name: call.function.name,
+            arguments: call.function.arguments ?? "{}",
+          },
+        ]
+      : [],
+  );
+}
+
 function bodyFor(
   request: AiRequest,
   config: AiConfig,
@@ -134,9 +187,24 @@ function bodyFor(
     // provider: never concatenated onto user text.
     messages: [
       { role: "system", content: request.system },
-      ...request.messages,
+      ...request.messages.map(wireMessage),
     ],
     max_tokens: request.maxTokens ?? config.maxTokens,
+    // Never on a stream: the agent loop is the only caller with tools, and it
+    // decides between steps with `complete`.
+    ...(request.tools && request.tools.length > 0 && !stream
+      ? {
+          tools: request.tools.map((tool) => ({
+            type: "function",
+            function: {
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.parameters,
+            },
+          })),
+          tool_choice: request.toolChoice ?? "auto",
+        }
+      : {}),
     // Omitted unless configured: a server that does not know the parameter
     // rejects the whole request rather than ignoring it.
     ...(config.reasoningEffort
@@ -208,9 +276,13 @@ export function createOpenAiCompatibleProvider(
         throw HttpError.upstream("The model could not complete that request.");
       }
 
+      const choice = body.choices?.[0];
+      const toolCalls = request.tools ? toolCallsOf(choice) : [];
+
       return {
-        text: body.choices?.[0]?.message?.content ?? "",
+        text: choice?.message?.content ?? "",
         usage: toUsage(body, request.model ?? config.model, startedAt),
+        ...(toolCalls.length > 0 ? { toolCalls } : {}),
       } satisfies AiCompletion;
     },
 

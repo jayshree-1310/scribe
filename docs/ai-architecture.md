@@ -101,6 +101,9 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/prompts/moderation.ts` | The scoring prompt, built from the category list. Asks for numbers, never a verdict, and says in as many words that discussing a story's violence is not violence. |
 | `scripts/moderate-pending.ts` | `moderation:pending` — checks comments with no verdict: posted during an outage, or before the check existed. |
 | `services/ai/prompts/ask-book.ts` | The grounding rules, the fences, and `defang` — what stops a retrieved chapter closing its own fence and speaking as the application. |
+| `services/ai/tools.ts` | Task AI 15: the five tools — a zod schema and a plain function over an existing service each — and `runTool`, which validates arguments and turns every failure into a result. |
+| `services/ai/agent.ts` | The tool loop: model call, run what it chose, feed results back, until it answers or a cap (tool calls, model calls, tokens) forces the last call. |
+| `services/ai/prompts/agent.ts` | The assistant's rules, the fences around tool results and the user's message, and the wrap-up line for a capped last call. |
 
 ## Rules that the code enforces
 
@@ -782,6 +785,42 @@ The page is then chosen from a pool four pages deep by
 `services/recommendation-diversity.ts`: two stories per author, half the page
 per genre, with held-back stories filling any room left.
 
+## Tools
+
+`POST /api/ai/agent` takes `{ message, storyId? }` and lets the model decide
+what to look up. The seam grew for it: `AiRequest.tools` and `toolChoice`,
+`AiCompletion.toolCalls`, and two message variants — an assistant turn
+carrying tool calls and a `tool` result — which both implementations map onto
+their own wire format (`tool_call_id` for chat completions, `tool_name` and
+object arguments for Ollama). Nothing else sends tools, so no other feature
+sees the new shapes. Tool calls are `complete`-only; nothing streams them.
+
+The tools are `search_stories`, `search_chapters`, `get_story_summary`,
+`get_character_facts` and `check_continuity`, and none of them calls a model.
+Each takes its identity from `ToolContext.userId` — the session — and reaches
+data only through the service the matching route uses, so the guard on a
+draft, a story bible or a continuity finding is the guard that already
+existed. `search_chapters` takes no chapter bound: it applies the reader's,
+as Ask This Book does, so a model cannot widen it. `check_continuity` reports
+the stored findings rather than running a check.
+
+`runTool` never throws (except on abort). An unknown tool, unparseable JSON
+and arguments that fail the tool's zod schema come back as `invalid` without
+the function running; an `HttpError` under 500 is `refused`, anything else
+`error`; each goes to the model as `{ error }` so it can explain or recover.
+Undeclared argument keys are stripped by zod, so an argument cannot choose
+who a tool runs as.
+
+The loop in `agent.ts` is hand-written — there is no model SDK in the repo to
+take a runner from, and the bounds are the part worth owning: at most
+`MAX_TOOL_CALLS` (6) executions, calls past it answered "not run" so the
+history stays well-formed; at most `MAX_MODEL_CALLS` (5) model calls, the last
+with `toolChoice: "none"` plus a wrap-up line so it must answer; and
+`TOKEN_BUDGET` (20k) across the request, checked before every call. Each tool
+decision is logged as name, outcome, code and duration — never arguments or
+results — and the full trace goes back to the caller in `steps`. The AI lab's
+**Agent (tools)** mode shows it.
+
 ## Adding a feature
 
 1. A prompt module under `services/ai/prompts/` — never a template literal in a
@@ -803,7 +842,7 @@ per genre, with held-back stories filling any room left.
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The remaining features.** Tasks AI 15 onward. Of Task AI 6 only the chapter recap was built; the story-level
+- **The remaining features.** Tasks AI 16 onward. Of Task AI 6 only the chapter recap was built; the story-level
   summary, the spoiler-free summary and the map-reduce that a multi-chapter
   summary needs are not here.
 - **Persisted usage, and budgets everywhere else.** The sink still only logs,

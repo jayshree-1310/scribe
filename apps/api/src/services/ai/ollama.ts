@@ -21,17 +21,24 @@ import type {
   AiCompletion,
   AiEmbedder,
   AiEmbeddings,
+  AiMessage,
   AiProvider,
   AiRequest,
   AiStreamEvent,
+  AiToolCall,
   AiUsage,
 } from "./types.js";
 
 /** Injectable so tests exercise the mapping without a server or a network. */
 export type FetchLike = typeof fetch;
 
+interface OllamaToolCall {
+  id?: string;
+  function?: { name?: string; arguments?: unknown };
+}
+
 interface OllamaChunk {
-  message?: { content?: string };
+  message?: { content?: string; tool_calls?: OllamaToolCall[] };
   done?: boolean;
   prompt_eval_count?: number;
   eval_count?: number;
@@ -123,6 +130,62 @@ function signalFor(
   return request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
 }
 
+/**
+ * Ollama wants tool arguments as an object, where the seam keeps the model's
+ * raw text. Text that does not parse goes back as `{}`: the agent already
+ * reported it to the model as invalid, and replaying it is only history.
+ */
+function argumentsObject(text: string): unknown {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/** The seam's message shapes in Ollama's dialect. */
+function wireMessage(message: AiMessage): Record<string, unknown> {
+  if (message.role === "tool") {
+    // Ollama pairs a result with its call by name, not by id.
+    return { role: "tool", tool_name: message.name, content: message.content };
+  }
+
+  if ("toolCalls" in message) {
+    return {
+      role: "assistant",
+      content: message.content,
+      tool_calls: message.toolCalls.map((call) => ({
+        function: { name: call.name, arguments: argumentsObject(call.arguments) },
+      })),
+    };
+  }
+
+  return { role: message.role, content: message.content };
+}
+
+/**
+ * Tool calls with their arguments re-serialised to text, so the agent parses
+ * every provider's arguments the same way. Ollama sends no id on older
+ * versions, so one is made up from the position.
+ */
+function toolCallsOf(chunk: OllamaChunk): AiToolCall[] {
+  return (chunk.message?.tool_calls ?? []).flatMap((call, index) =>
+    call.function?.name
+      ? [
+          {
+            id: call.id ?? `call_${index}`,
+            name: call.function.name,
+            arguments:
+              typeof call.function.arguments === "string"
+                ? call.function.arguments
+                : JSON.stringify(call.function.arguments ?? {}),
+          },
+        ]
+      : [],
+  );
+}
+
 function bodyFor(
   request: AiRequest,
   config: AiConfig,
@@ -135,9 +198,26 @@ function bodyFor(
     // instruction and a user who wants to overwrite it.
     messages: [
       { role: "system", content: request.system },
-      ...request.messages,
+      ...request.messages.map(wireMessage),
     ],
     stream,
+    // Ollama has no `tool_choice`, so "none" is expressed by not offering
+    // any -- it reads tool turns in the history without the definitions.
+    ...(request.tools &&
+    request.tools.length > 0 &&
+    request.toolChoice !== "none" &&
+    !stream
+      ? {
+          tools: request.tools.map((tool) => ({
+            type: "function",
+            function: {
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.parameters,
+            },
+          })),
+        }
+      : {}),
     // Ollama takes a JSON schema directly and compiles it to a grammar, so a
     // constrained reply is genuinely constrained rather than requested. Only
     // sent when a caller asked for a shape: an unconditional `format` would
@@ -190,9 +270,13 @@ export function createOllamaProvider(
         throw HttpError.upstream("The model could not complete that request.");
       }
 
+      const toolCalls =
+        request.tools && request.toolChoice !== "none" ? toolCallsOf(chunk) : [];
+
       return {
         text: chunk.message?.content ?? "",
         usage: toUsage(chunk, request.model ?? config.model, startedAt),
+        ...(toolCalls.length > 0 ? { toolCalls } : {}),
       } satisfies AiCompletion;
     },
 

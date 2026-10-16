@@ -1633,6 +1633,48 @@ which is not evidence about a novel. Task AI 16 is where it gets some.
 **Do this after AI 9 works.** An agent over retrieval you do not yet trust is
 two unknowns at once.
 
+**Status: built.** `services/ai/tools.ts` (five tools and `runTool`),
+`services/ai/agent.ts` (the loop), `prompts/agent.ts`; tool calling added to
+the seam (`AiRequest.tools` / `toolChoice`, `AiCompletion.toolCalls`, tool-call
+and tool-result messages) and to both providers and the fake;
+`POST /api/ai/agent`; an **Agent (tools)** mode on `/ai-lab` showing the trace.
+Tests in `routes/ai-agent.test.ts` and `services/ai/tools.test.ts`. Verified
+against `gpt-oss-120b` on Groq: "find me a story about time travel and tell me
+who the main character is" made one `search_stories` call and answered from
+its result in two model calls; asked about a story bible for a story it did
+not write, it read `isYourStory: false` from `get_story_summary` and said the
+bible was not available without trying.
+
+Four things worth knowing before building on it.
+
+**Hand-written loop, and why.** The task says to prefer an SDK's tool runner.
+There is no model SDK here — the seam speaks HTTP to an OpenAI-compatible
+server or Ollama — and the bounds a runner would hide are the point: a
+tool-call cap separate from a model-call cap, a per-request token budget
+checked before each call, and a last call forced to answer
+(`toolChoice: "none"`, still describing the tools, because some servers refuse
+a history with tool calls and no definitions).
+
+**The refusal is the service's.** Every tool runs as the session's user and
+reaches data only through the function its route uses: `resolveAskSetting`,
+`getStory`/`listChapters`, `getBible`, `getChapterContinuity`. A reader asking
+for another author's draft gets `refused / not_found` from the tool and none of
+its text; the same for a bible or a continuity finding on someone else's
+story. Mutation-checked: removing the zod parse in `runTool` fails the
+invalid-arguments test.
+
+**What a tool cannot do.** Widen the spoiler bound (`search_chapters` has no
+chapter argument), run a model (continuity reports stored findings), write
+anything, or pick its identity (undeclared argument keys are stripped).
+
+**Logging holds the line `usage.ts` draws.** Tool decisions are logged by
+name, outcome, code and duration; arguments and results, which carry the
+user's question and other members' writing, go only to the caller.
+
+Still open: no streaming (progress shows only when the request finishes), no
+conversation memory across requests, and the assistant is reachable only from
+the dev-only AI lab — no product surface yet.
+
 **Prompt:**
 
 > Give the assistant tools instead of one fixed retrieval step, so it can decide

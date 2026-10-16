@@ -1,5 +1,11 @@
 import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
-import { chat, streamChat, type ChatUsage } from '../data/ai-api'
+import {
+  askAgent,
+  chat,
+  streamChat,
+  type AgentAnswer,
+  type ChatUsage,
+} from '../data/ai-api'
 import { ApiError } from '../lib/api-client'
 import { Button } from '../components/ui/Button'
 import { Card, SectionHead } from '../components/ui/Card'
@@ -26,12 +32,23 @@ import './ai-lab.css'
 
 const PROMPT_LIMIT = 4000
 
-type Mode = 'stream' | 'complete'
+type Mode = 'stream' | 'complete' | 'agent'
 
 const MODES: ReadonlyArray<{ value: Mode; label: string }> = [
   { value: 'stream', label: 'Streamed' },
   { value: 'complete', label: 'One response' },
+  { value: 'agent', label: 'Agent (tools)' },
 ]
+
+/** The agent route's own cap, repeated so the field can say it. */
+const AGENT_MESSAGE_LIMIT = 500
+
+const STOPPED_BY: Record<AgentAnswer['stoppedBy'], string> = {
+  answered: 'Answered',
+  tool_limit: 'Lookup cap',
+  model_call_limit: 'Model-call cap',
+  token_budget: 'Token budget',
+}
 
 /** What the round trip looked like from here, rather than from the provider. */
 interface Timing {
@@ -57,6 +74,8 @@ export function AiLabPage() {
   const [mode, setMode] = useState<Mode>('stream')
   const [reply, setReply] = useState('')
   const [usage, setUsage] = useState<ChatUsage | null>(null)
+  const [storyId, setStoryId] = useState('')
+  const [agent, setAgent] = useState<AgentAnswer | null>(null)
   const [timing, setTiming] = useState<Timing | null>(null)
   const [status, setStatus] = useState<'idle' | 'running' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -74,6 +93,7 @@ export function AiLabPage() {
 
     setReply('')
     setUsage(null)
+    setAgent(null)
     setTiming(null)
     setError(null)
     setStatus('running')
@@ -82,7 +102,16 @@ export function AiLabPage() {
     let firstTokenMs: number | null = null
 
     try {
-      if (mode === 'complete') {
+      if (mode === 'agent') {
+        const answer = await askAgent(
+          trimmed,
+          storyId.trim() === '' ? null : storyId.trim(),
+          controller.signal,
+        )
+        if (controller.signal.aborted) return
+        setReply(answer.answer)
+        setAgent(answer)
+      } else if (mode === 'complete') {
         const answer = await chat(trimmed, controller.signal)
         if (controller.signal.aborted) return
         setReply(answer.text)
@@ -157,13 +186,24 @@ export function AiLabPage() {
             onChange={(next) => setMode(next)}
           />
 
+          {mode === 'agent' ? (
+            <TextField
+              label="Story on screen (optional)"
+              value={storyId}
+              maxLength={200}
+              placeholder="A story id or slug"
+              hint="What “this story” means to the assistant. Each tool still checks you may see it."
+              onChange={(event) => setStoryId(event.target.value)}
+            />
+          ) : null}
+
           <TextField
             label="Prompt"
             multiline
             rows={5}
             value={prompt}
-            maxLength={PROMPT_LIMIT}
-            counterMax={PROMPT_LIMIT}
+            maxLength={mode === 'agent' ? AGENT_MESSAGE_LIMIT : PROMPT_LIMIT}
+            counterMax={mode === 'agent' ? AGENT_MESSAGE_LIMIT : PROMPT_LIMIT}
             placeholder="Explain what Scribe is to somebody who has never used it."
             hint="⌘/Ctrl + Enter sends. The server caps the prompt at 4,000 characters."
             onChange={(event) => setPrompt(event.target.value)}
@@ -230,6 +270,46 @@ export function AiLabPage() {
               </p>
             )}
           </Card>
+
+          {agent !== null ? (
+            <Card className="ai-lab__steps">
+              <SectionHead title="What it looked up" />
+              {agent.steps.length === 0 ? (
+                <p className="ai-lab__waiting">
+                  Nothing — it answered without a tool.
+                </p>
+              ) : (
+                <ol className="ai-lab__step-list">
+                  {agent.steps.map((step, index) => (
+                    <li key={index} className="ai-lab__step">
+                      <span className="ai-lab__step-name">{step.tool}</span>
+                      <span
+                        className={`ai-lab__step-outcome is-${step.outcome}`}
+                      >
+                        {step.outcome}
+                        {step.code ? ` · ${step.code}` : ''}
+                      </span>
+                      <span className="ai-lab__step-time">
+                        {ms(step.durationMs)}
+                      </span>
+                      <code className="ai-lab__step-args">
+                        {JSON.stringify(step.arguments)}
+                      </code>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </Card>
+          ) : null}
+
+          {agent !== null ? (
+            <dl className="ai-lab__stats">
+              <Stat label="Stopped by" value={STOPPED_BY[agent.stoppedBy]} />
+              <Stat label="Model calls" value={String(agent.modelCalls)} />
+              <Stat label="Lookups" value={String(agent.steps.length)} />
+              <Stat label="Total tokens" value={String(agent.tokensUsed)} />
+            </dl>
+          ) : null}
 
           {usage !== null || timing !== null ? (
             <dl className="ai-lab__stats">

@@ -126,3 +126,59 @@
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
 }
+
+/* The agent's trace: one row per lookup, its arguments shown literally for
+   the same reason the reply is -- they are model output under inspection. */
+.ai-lab__steps {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.ai-lab__step-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ai-lab__step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  font-size: var(--text-sm);
+}
+
+.ai-lab__step-name {
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.ai-lab__step-outcome {
+  color: var(--text-muted);
+}
+
+.ai-lab__step-outcome.is-refused,
+.ai-lab__step-outcome.is-invalid,
+.ai-lab__step-outcome.is-error {
+  color: var(--danger);
+}
+
+.ai-lab__step-time {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ai-lab__step-args {
+  flex-basis: 100%;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
