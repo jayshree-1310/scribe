@@ -14,6 +14,11 @@
  *   asked, so it is charged to them and refused when they are over budget.
  * - `usage.prune` -- a `DELETE ... WHERE createdAt < cutoff` is idempotent by
  *   construction. Scheduled once a day by the worker.
+ * - `summary.story` -- `generateStorySummary` reuses every chapter summary and
+ *   story summary whose input hash is unchanged, so a re-run writes nothing
+ *   unless asked to `force` (the author's Regenerate, which is meant to).
+ *   Runs as whoever queued it: the author for a regenerate, the platform for
+ *   a reader's missing summary.
  */
 
 import { HttpError } from "../../lib/http-error.js";
@@ -21,7 +26,8 @@ import { registerJobType } from "../../lib/jobs.js";
 import { db } from "../../prisma/db.js";
 import { runAs } from "./caller.js";
 import { embedChapter } from "./embeddings.js";
-import { BIBLE_READ_JOB, EMBED_CHAPTER_JOB, USAGE_PRUNE_JOB } from "./job-schedule.js";
+import { BIBLE_READ_JOB, EMBED_CHAPTER_JOB, SUMMARY_STORY_JOB, USAGE_PRUNE_JOB } from "./job-schedule.js";
+import { generateStorySummary } from "./summaries.js";
 import { refreshBible } from "./story-bible.js";
 import { pruneUsage } from "./usage.js";
 
@@ -72,6 +78,20 @@ export function registerAiJobs(): void {
         if (pending === 0 || result.processed.length === 0) break;
       }
       return { processed, pending };
+    },
+  });
+
+  registerJobType(SUMMARY_STORY_JOB, {
+    maxAttempts: 3,
+    async handler(payload, { job, signal }) {
+      const storyId = String(payload["storyId"] ?? "");
+      const upTo = typeof payload["upToChapter"] === "number" ? payload["upToChapter"] : null;
+      const result = await runAs(
+        job.userId,
+        () => generateStorySummary(storyId, upTo, { force: payload["force"] === true, signal }),
+        job.requestId,
+      );
+      return { calls: result.calls, upToChapter: result.summary?.upToChapter ?? null };
     },
   });
 

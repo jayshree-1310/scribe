@@ -1,0 +1,36 @@
+/* `StorySummaryCard`. Prose about prose, so the text is set in the reading
+   face like the reader's recap; the label is never only an icon. */
+
+.story-summary {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.story-summary__text {
+  margin: 0;
+  font-family: var(--font-reading);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  color: var(--text);
+}
+
+.story-summary__note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.story-summary__pending {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.story-summary__error {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--danger);
+}

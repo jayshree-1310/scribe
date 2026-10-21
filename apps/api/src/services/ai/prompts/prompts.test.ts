@@ -56,6 +56,12 @@ import {
   narrationMessage,
 } from "./scribble.js";
 import { BIBLE_EXTRACTION_SYSTEM_PROMPT, bibleBlock, bibleExtractionMessage } from "./story-bible.js";
+import {
+  SECTION_COMBINE_SYSTEM_PROMPT,
+  STORY_SUMMARY_SYSTEM_PROMPT,
+  sectionCombineMessage,
+  storySummaryMessage,
+} from "./summary.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -178,6 +184,18 @@ function userMessages(text: (field: string) => string): Record<string, string> {
       answer: text("judge.answer"),
     }),
     "structured.repair": repairMessage(text("repair.problems")),
+    "summary.chapter-sections": sectionCombineMessage({
+      chapterTitle: text("sections.title"),
+      parts: [text("sections.one"), text("sections.two")],
+    }),
+    "summary.story": storySummaryMessage({
+      storyTitle: text("summary.story"),
+      upToChapter: 2,
+      items: [
+        { label: `Chapter 1: ${text("summary.chapter1")}`, text: text("summary.text1") },
+        { label: "Chapter 2: Part 2", text: text("summary.text2") },
+      ],
+    }),
   };
 }
 
@@ -210,6 +228,8 @@ const SYSTEM_PROMPTS: Record<string, string> = {
   continuity: CONTINUITY_SYSTEM_PROMPT,
   agent: AGENT_SYSTEM_PROMPT,
   "eval.judge": JUDGE_SYSTEM_PROMPT,
+  "summary.chapter-sections": SECTION_COMBINE_SYSTEM_PROMPT,
+  "summary.story": STORY_SUMMARY_SYSTEM_PROMPT,
 };
 
 /* Fence scanning ---------------------------------------------------------- */

@@ -92,6 +92,9 @@ import {
   getChapterContinuity,
 } from "../services/ai/continuity.js";
 import { MESSAGE_LIMIT, runAgent } from "../services/ai/agent.js";
+import { getStorySummary, regenerateStorySummaries } from "../services/ai/summaries.js";
+import { ensureChapterSummary } from "../services/ai/recap.js";
+import { db } from "../prisma/db.js";
 import { SPEND_WINDOWS, spendReport, type SpendWindow } from "../services/ai/spend.js";
 import { assertAdmin } from "../services/roles.js";
 import { FACT_KINDS } from "../services/ai/schemas.js";
@@ -1400,6 +1403,95 @@ router.post("/bible/:storyId/read", requireUser, async (req, res, next) => {
       dedupeKey: `bible:${storyId}`,
     });
     res.status(202).json({ jobId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/* Story summaries -------------------------------------------------------- */
+
+/**
+ * Regenerating is a model call per stale chapter plus a reduce, so it is
+ * limited like a bible refresh; reading is the baseline limit only, because a
+ * read never calls a model -- a missing summary is queued, not written inline.
+ */
+const SUMMARY_REGENERATE_LIMIT = 10;
+const SUMMARY_REGENERATE_WINDOW_SECONDS = 60 * 10;
+
+const summaryQuerySchema = z.object({
+  upToChapter: z.coerce.number().int().min(1, "Chapters are numbered from 1.").max(100000).optional(),
+});
+
+const storyKeyParams = z.object({ slugOrId: z.string().trim().min(1).max(200) });
+
+async function chargeSummaryRegenerate(userId: string): Promise<void> {
+  const key = `ai:summary:${userId}`;
+  const status = await isRateLimited(key, SUMMARY_REGENERATE_LIMIT);
+  if (status.limited) {
+    throw HttpError.tooManyRequests(
+      "You have regenerated a lot of summaries in a short time. Try again shortly.",
+      status.retryAfter,
+    );
+  }
+  await assertWithinDailyBudget(userId);
+  await recordAttempt(key, SUMMARY_REGENERATE_WINDOW_SECONDS);
+}
+
+/**
+ * The story so far, as far as this reader has read (or the whole story, for
+ * its author). Never calls a model: a missing or stale summary is queued and
+ * the reply says `generating`, so the page can ask again in a few seconds.
+ */
+router.get("/summaries/story/:slugOrId", requireUser, async (req, res, next) => {
+  try {
+    const { slugOrId } = parseOrThrow(storyKeyParams, req.params);
+    const { upToChapter } = parseOrThrow(summaryQuerySchema, req.query);
+    res.json(await getStorySummary(requireUserId(res), slugOrId, upToChapter ?? null));
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * The author's Regenerate: forgets every stored summary of the story and
+ * rewrites the whole-story one in the background, as the author. 202 with a
+ * job to poll.
+ */
+router.post("/summaries/story/:storyId/regenerate", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const { storyId } = parseOrThrow(storyIdParams, req.params);
+    await assertStoryOwned(userId, storyId);
+    if (!loadAiConfig().jobs) {
+      throw HttpError.unavailable("Background work is switched off on this server, so summaries cannot be regenerated.");
+    }
+    await chargeSummaryRegenerate(userId);
+
+    const jobId = await regenerateStorySummaries(storyId, userId, req.id === undefined ? null : String(req.id));
+    res.status(202).json({ jobId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Rewrites one chapter's summary now, for an author who wants different
+ * wording. One chapter is one call (a few for a very long one), so it is
+ * answered inline. Every story summary that included it goes stale with it.
+ */
+router.post("/summaries/chapter/:chapterId/regenerate", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const { chapterId } = parseOrThrow(chapterIdParams, req.params);
+    const chapter = await db.orm.content.Chapter.select("id", "storyId", "title", "content", "chapterNumber")
+      .where((row) => row.id.eq(chapterId))
+      .first();
+    if (!chapter) throw HttpError.notFound("That chapter could not be found.");
+    await assertStoryOwned(userId, chapter.storyId);
+    await chargeSummaryRegenerate(userId);
+
+    const summary = await ensureChapterSummary(chapter, { force: true, signal: abortOnDisconnect(res).signal });
+    res.json({ chapterNumber: chapter.chapterNumber, text: summary.text, generatedAt: summary.generatedAt });
   } catch (error) {
     next(error);
   }

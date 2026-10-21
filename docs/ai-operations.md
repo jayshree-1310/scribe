@@ -65,7 +65,7 @@ with body `{ "feature": "assist", "enabled": false }`.
 ## The background queue
 
 `lib/jobs.ts` is a Redis-backed queue. Its worker runs inside the API process
-when `AI_JOBS=on` (the default), started by `server.ts`. There are three job
+when `AI_JOBS=on` (the default), started by `server.ts`. There are four job
 types (`services/ai/jobs.ts`):
 
 | Job | Queued by | What it does |
@@ -73,6 +73,7 @@ types (`services/ai/jobs.ts`):
 | `embed.chapter` | Publishing a chapter or a story; editing a published chapter's text (debounced by chapter, a minute after the last save) | Embeds the chapter for search, if it is published and its story is listed |
 | `bible.read` | `POST /api/ai/bible/:storyId/read` (the author) | Reads every stale chapter into the story bible, as the author, against their budget |
 | `usage.prune` | The worker, once a day | Deletes `ai.UsageEvent` rows past `AI_USAGE_RETENTION_DAYS` |
+| `summary.story` | A reader opening a story whose summary at their chapter is missing or stale; the author's Regenerate | Writes the story-so-far summary up to that chapter, reusing every chapter summary that is still current |
 
 **Retries.** A failing job is retried on a doubling delay (5s, 10s, 20s … at
 most ten minutes), up to its type's attempt limit: 4 for embedding, 3 for a
@@ -124,6 +125,7 @@ usable: reading, writing, publishing, comments, clubs, search. What changes:
 | Comment moderation | The comment posts; the check is recorded as `UNCHECKED`, and `moderation:pending` re-checks it later | `ai-moderation.test.ts` |
 | Continuity check | The chapter saves (200); the check is recorded as failed and the previous findings stand | `ai-continuity.test.ts` |
 | Story bible | Refresh reports the failure; facts already read stay | `ai-bible.test.ts` |
+| "The story so far" | The card says it is being written, then "No summary yet" if the job keeps failing; a failed load hides the card. The job retries, then dead-letters | `StorySummaryCard.tsx`; `ai-summaries.test.ts` |
 | Embedding on publish | The chapter publishes; the job retries, then dead-letters, and `ai:ops retry` or `seed:embeddings` catches it up | `ai-ops.test.ts` |
 | A switched-off feature | 503, "This AI feature is switched off for now. Everything else still works." | `ai-ops.test.ts` |
 

@@ -13,10 +13,9 @@
  * Two design decisions worth stating, because both look like shortcuts and
  * neither is:
  *
- * - **It is generated lazily, by the first reader who asks.** There is no job
- *   runner in this repo (Task AI 20), and the alternative -- generating on
- *   publish -- would spend tens of seconds of CPU on every chapter, including
- *   the ones nobody ever asks to be caught up on. So the first reader to press
+ * - **It is generated lazily, by the first reader who asks.** Generating on
+ *   publish would spend a model call on every chapter, including the ones
+ *   nobody ever asks to be caught up on. So the first reader to press
  *   the button pays for it and everybody after them gets a cache hit. What
  *   makes that acceptable is that it is a *button*, not an automatic panel: a
  *   reader binge-reading straight through never triggers a model call at all.
@@ -32,6 +31,10 @@
  *
  * The recap is always labelled as machine-written where it is shown. It is a
  * paraphrase of somebody's fiction by a model that has read one chapter of it.
+ *
+ * It is also the **map** step of the story summary (`summaries.ts`, Task AI
+ * 6): a story is summarised from these per-chapter summaries, never from its
+ * chapter bodies. `ensureChapterSummary` is the shared entry point.
  */
 
 import { createHash } from "node:crypto";
@@ -39,12 +42,18 @@ import { Temporal } from "temporal-polyfill";
 import { HttpError } from "../../lib/http-error.js";
 import { db } from "../../prisma/db.js";
 import { findPreviousVisibleChapter } from "../stories.js";
+import { sectionsOf } from "./bible-facts.js";
 import {
   RECAP_PROMPT,
   RECAP_PROMPT_VERSION,
   RECAP_SYSTEM_PROMPT,
   recapMessage,
 } from "./prompts/recap.js";
+import {
+  SECTION_COMBINE_PROMPT,
+  SECTION_COMBINE_SYSTEM_PROMPT,
+  sectionCombineMessage,
+} from "./prompts/summary.js";
 import { aiProvider } from "./provider.js";
 
 /** Keyed on in every usage record this feature produces. */
@@ -58,20 +67,23 @@ const FEATURE = "recap.chapter";
 const MAX_TOKENS = 400;
 
 /**
- * How much of a chapter reaches the model.
+ * How much of a chapter one model call reads.
  *
  * In characters, like the assistant's budgets and for the same reason -- there
  * is no tokeniser here. Roughly 6000 tokens at four characters to a token,
  * which is a long chapter and still inside the context window of the small
  * local models this is built against.
  *
- * A chapter longer than this is summarised from its opening. That is a real
- * limitation and it is the honest one to accept here: the alternative is
- * map-reduce over a chapter's sections, which is worth building when there are
- * chapters that need it, and is a different task. The `truncated` flag on the
- * result records when it happened rather than hiding it.
+ * A chapter longer than this is **map-reduced** (Task AI 6): split at
+ * paragraph boundaries into sections of at most this size, each summarised on
+ * its own, and the section summaries combined into the chapter's recap. Only a
+ * chapter longer than `MAX_SECTIONS` sections is still cut, and the
+ * `truncated` flag says so.
  */
 export const CHAPTER_LIMIT = 24000;
+
+/** Eight sections is ~190k characters -- a novella in one chapter. */
+export const MAX_SECTIONS = 8;
 
 export interface ChapterRecap {
   /** The chapter being recapped -- the one *before* the one being read. */
@@ -80,7 +92,7 @@ export interface ChapterRecap {
   /** Generated. Labelled as such wherever it is rendered. */
   text: string;
   generatedAt: string | null;
-  /** True when the chapter was longer than `CHAPTER_LIMIT` and was cut. */
+  /** True when the chapter was longer than `MAX_SECTIONS` sections and was cut. */
   truncated: boolean;
 }
 
@@ -114,23 +126,28 @@ export interface RecapGeneration extends RecapStatus {
 /* Staleness -------------------------------------------------------------- */
 
 /**
- * The identity of a chapter body, for cache purposes.
+ * The identity of a chapter summary's *input*, for cache purposes: the
+ * chapter body, plus the versions of the prompts that read it and the section
+ * size. A summary is current only while all of those are what wrote it -- so
+ * an edit to the prose, a new prompt version (Task AI 17's whole recovery
+ * path) or a different section size each regenerate it, and nothing else does.
  *
- * SHA-256 of the exact text sent to the model -- which is the truncated text,
- * not the full body. That matters: if the limit above ever changes, every
- * recap written under the old one hashes differently and regenerates, rather
- * than a longer chapter keeping a summary of its first two-thirds forever.
+ * Version 1 of this hashed the body alone, so a prompt bump left old recaps
+ * in place; those rows hash differently now and regenerate once.
  */
-function contentHash(text: string): string {
-  return createHash("sha256").update(text).digest("hex");
+export function chapterSummaryHash(content: string): string {
+  return createHash("sha256")
+    .update(
+      `recap@${RECAP_PROMPT_VERSION}|sections@${SECTION_COMBINE_PROMPT.version}|${CHAPTER_LIMIT}x${MAX_SECTIONS}|`,
+    )
+    .update(content)
+    .digest("hex");
 }
 
-/** The text that actually reaches the model, and whether it was cut. */
-function toPrompt(content: string): { text: string; truncated: boolean } {
-  if (content.length <= CHAPTER_LIMIT) {
-    return { text: content, truncated: false };
-  }
-  return { text: content.slice(0, CHAPTER_LIMIT), truncated: true };
+/** The chapter as the model will read it: one section, or several. */
+function toSections(content: string): { sections: string[]; truncated: boolean } {
+  if (content.length <= CHAPTER_LIMIT) return { sections: [content], truncated: false };
+  return sectionsOf(content, CHAPTER_LIMIT, MAX_SECTIONS);
 }
 
 /* Reading ---------------------------------------------------------------- */
@@ -185,8 +202,8 @@ export async function getChapterRecap(
   const previous = await subjectChapter(slugOrId, chapterNumber, viewerId);
   if (!previous) return { available: false, recap: null };
 
-  const { text, truncated } = toPrompt(previous.content);
-  const stored = await storedRecap(previous.id, contentHash(text));
+  const { truncated } = toSections(previous.content);
+  const stored = await storedRecap(previous.id, chapterSummaryHash(previous.content));
 
   if (!stored) return { available: true, recap: null };
 
@@ -227,6 +244,7 @@ async function store(
   text: string,
   hash: string,
   model: string,
+  prompt: { id: string; version: number },
 ): Promise<void> {
   const timestamp = Temporal.Now.instant();
 
@@ -241,8 +259,8 @@ async function store(
       text,
       contentHash: hash,
       model,
-      promptId: RECAP_PROMPT.id,
-      promptVersion: RECAP_PROMPT_VERSION,
+      promptId: prompt.id,
+      promptVersion: prompt.version,
       updatedAt: timestamp,
     });
     return;
@@ -254,8 +272,8 @@ async function store(
       text,
       contentHash: hash,
       model,
-      promptId: RECAP_PROMPT.id,
-      promptVersion: RECAP_PROMPT_VERSION,
+      promptId: prompt.id,
+      promptVersion: prompt.version,
     });
   } catch (error) {
     if (!isUniqueViolation(error)) throw error;
@@ -279,14 +297,111 @@ function isUniqueViolation(error: unknown): boolean {
   return candidate.cause !== undefined && isUniqueViolation(candidate.cause);
 }
 
+export interface ChapterSummary {
+  /** Generated. */
+  text: string;
+  generatedAt: string | null;
+  /** True only for a chapter longer than `MAX_SECTIONS` sections. */
+  truncated: boolean;
+  /** Zero when the stored summary was current and no model was asked. */
+  tokensUsed: number;
+  /** Model calls made: 0 on a cache hit, 1 for a short chapter, n+1 for n sections. */
+  calls: number;
+}
+
+/**
+ * A chapter's summary: the stored one when it is current, otherwise written
+ * now -- in one call, or by map-reduce over its sections when it is long.
+ *
+ * The map step of the story summary and the whole of the reader's recap.
+ * `force` rewrites a current summary, for an author who wants different
+ * wording; nothing else does, which is the point of the hash.
+ *
+ * Takes the chapter rather than an id: the caller has already decided this
+ * viewer may see it, and this function has no opinion about visibility.
+ */
+export async function ensureChapterSummary(
+  chapter: { id: string; title: string; content: string },
+  options: { force?: boolean; signal?: AbortSignal } = {},
+): Promise<ChapterSummary> {
+  const hash = chapterSummaryHash(chapter.content);
+  const { sections, truncated } = toSections(chapter.content);
+
+  if (!options.force) {
+    const stored = await storedRecap(chapter.id, hash);
+    if (stored) {
+      return { text: stored.text, generatedAt: toIsoInstant(stored.updatedAt), truncated, tokensUsed: 0, calls: 0 };
+    }
+  }
+
+  let tokensUsed = 0;
+  let calls = 0;
+  let model = "";
+  const ask = async (system: string, content: string, feature: string) => {
+    const completion = await aiProvider().complete({
+      feature,
+      system,
+      messages: [{ role: "user", content }],
+      maxTokens: MAX_TOKENS,
+      ...(options.signal ? { signal: options.signal } : {}),
+    });
+    tokensUsed += completion.usage.inputTokens + completion.usage.outputTokens;
+    calls += 1;
+    model = completion.usage.model;
+    const text = completion.text.trim();
+    /**
+     * An empty reply is not stored. Caching it would mean one bad call left a
+     * chapter permanently blank -- the hash would match forever and nothing
+     * would ever try again.
+     */
+    if (text.length === 0) throw HttpError.upstream("The recap came back empty. Please try again.");
+    return text;
+  };
+
+  let text: string;
+  if (sections.length === 1) {
+    text = await ask(RECAP_SYSTEM_PROMPT, recapMessage(chapter.title, sections[0] ?? ""), FEATURE);
+  } else {
+    // Map: each section on its own, under the recap's rules.
+    const parts: string[] = [];
+    for (const [index, section] of sections.entries()) {
+      parts.push(
+        await ask(
+          RECAP_SYSTEM_PROMPT,
+          recapMessage(`${chapter.title} (part ${index + 1} of ${sections.length})`, section),
+          `${FEATURE}.section`,
+        ),
+      );
+    }
+    // Reduce: the section summaries -- never the sections -- into one recap.
+    text = await ask(
+      SECTION_COMBINE_SYSTEM_PROMPT,
+      sectionCombineMessage({ chapterTitle: chapter.title, parts }),
+      `${FEATURE}.combine`,
+    );
+  }
+
+  await store(
+    chapter.id,
+    text,
+    hash,
+    model,
+    sections.length === 1
+      ? { id: RECAP_PROMPT.id, version: RECAP_PROMPT_VERSION }
+      : { id: SECTION_COMBINE_PROMPT.id, version: SECTION_COMBINE_PROMPT.version },
+  );
+
+  return { text, generatedAt: toIsoInstant(Temporal.Now.instant()), truncated, tokensUsed, calls };
+}
+
 /**
  * Writes the recap for the chapter before `chapterNumber`, or returns the
  * stored one when it is still current.
  *
- * The cache check happens here as well as in `getChapterRecap` rather than
- * only in the route, because this is the function that spends money and the
- * check that stops it spending money belongs beside it. A caller who presses
- * the button twice makes one model call.
+ * The cache check is inside `ensureChapterSummary` rather than only in the
+ * route, because that is the function that spends money and the check that
+ * stops it spending money belongs beside it. A caller who presses the button
+ * twice makes one model call.
  */
 export async function generateChapterRecap(
   slugOrId: string,
@@ -297,56 +412,17 @@ export async function generateChapterRecap(
   const previous = await subjectChapter(slugOrId, chapterNumber, viewerId);
   if (!previous) return { available: false, recap: null, tokensUsed: 0 };
 
-  const { text: source, truncated } = toPrompt(previous.content);
-  const hash = contentHash(source);
-
-  const stored = await storedRecap(previous.id, hash);
-  if (stored) {
-    return {
-      available: true,
-      tokensUsed: 0,
-      recap: {
-        chapterNumber: previous.number,
-        chapterTitle: previous.title,
-        text: stored.text,
-        generatedAt: toIsoInstant(stored.updatedAt),
-        truncated,
-      },
-    };
-  }
-
-  const completion = await aiProvider().complete({
-    feature: FEATURE,
-    system: RECAP_SYSTEM_PROMPT,
-    messages: [
-      { role: "user", content: recapMessage(previous.title, source) },
-    ],
-    maxTokens: MAX_TOKENS,
-    ...(signal ? { signal } : {}),
-  });
-
-  const recapText = completion.text.trim();
-
-  /**
-   * An empty reply is not stored. Caching it would mean one bad call left a
-   * chapter permanently blank -- the hash would match forever and nothing
-   * would ever try again.
-   */
-  if (recapText.length === 0) {
-    throw HttpError.upstream("The recap came back empty. Please try again.");
-  }
-
-  await store(previous.id, recapText, hash, completion.usage.model);
+  const summary = await ensureChapterSummary(previous, signal ? { signal } : {});
 
   return {
     available: true,
-    tokensUsed: completion.usage.inputTokens + completion.usage.outputTokens,
+    tokensUsed: summary.tokensUsed,
     recap: {
       chapterNumber: previous.number,
       chapterTitle: previous.title,
-      text: recapText,
-      generatedAt: toIsoInstant(Temporal.Now.instant()),
-      truncated,
+      text: summary.text,
+      generatedAt: summary.generatedAt,
+      truncated: summary.truncated,
     },
   };
 }

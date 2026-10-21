@@ -26,6 +26,7 @@ import { RECAP_PROMPT } from "./recap.js";
 import { REPAIR_PROMPT } from "./repair.js";
 import { SCRIBBLE_INTENT_PROMPT, SCRIBBLE_NARRATION_PROMPT } from "./scribble.js";
 import { BIBLE_EXTRACTION_PROMPT } from "./story-bible.js";
+import { SECTION_COMBINE_PROMPT, STORY_SUMMARY_PROMPT } from "./summary.js";
 
 export const PROMPTS: readonly PromptDefinition[] = [
   AGENT_PROMPT,
@@ -46,6 +47,8 @@ export const PROMPTS: readonly PromptDefinition[] = [
   SCRIBBLE_INTENT_PROMPT,
   SCRIBBLE_NARRATION_PROMPT,
   BIBLE_EXTRACTION_PROMPT,
+  SECTION_COMBINE_PROMPT,
+  STORY_SUMMARY_PROMPT,
 ];
 
 const byId = new Map(PROMPTS.map((prompt) => [prompt.id, prompt]));

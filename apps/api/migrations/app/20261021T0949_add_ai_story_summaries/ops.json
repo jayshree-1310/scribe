@@ -1,0 +1,164 @@
+[
+  {
+    "id": "table.storySummary",
+    "label": "Create table \"storySummary\"",
+    "summary": "Creates table \"storySummary\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "storySummary"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"storySummary\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"storySummary\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"storySummary\"",
+        "sql": "CREATE TABLE \"ai\".\"storySummary\" (\n  \"chapterCount\" int4 NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"kind\" text NOT NULL,\n  \"model\" text NOT NULL,\n  \"promptId\" text DEFAULT 'summary.story' NOT NULL,\n  \"promptVersion\" int4 NOT NULL,\n  \"sourceHash\" text NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"text\" text NOT NULL,\n  \"upToChapter\" int4 NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"storySummary\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"storySummary\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.storySummary.storySummary_storyId_upToChapter_key",
+    "label": "Add unique constraint on \"storySummary\" (storyId, upToChapter)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "unique",
+        "name": "storySummary_storyId_upToChapter_key",
+        "table": "storySummary"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"storySummary_storyId_upToChapter_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storySummary_storyId_upToChapter_key",
+          "ai",
+          "\"ai\".\"storySummary\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"storySummary_storyId_upToChapter_key\"",
+        "sql": "ALTER TABLE \"ai\".\"storySummary\" ADD CONSTRAINT \"storySummary_storyId_upToChapter_key\" UNIQUE (\"storyId\", \"upToChapter\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"storySummary_storyId_upToChapter_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storySummary_storyId_upToChapter_key",
+          "ai",
+          "\"ai\".\"storySummary\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.storySummary.storySummary_storyId_idx_cd452158",
+    "label": "Create index \"storySummary_storyId_idx_cd452158\" on \"storySummary\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "storySummary_storyId_idx_cd452158",
+        "table": "storySummary"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"storySummary_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"storySummary_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"storySummary_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"storySummary_storyId_idx_cd452158\" ON \"ai\".\"storySummary\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"storySummary_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"storySummary_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.storySummary.storySummary_storyId_fkey",
+    "label": "Add foreign key \"storySummary_storyId_fkey\" on \"storySummary\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "storySummary_storyId_fkey",
+        "table": "storySummary"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"storySummary_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storySummary_storyId_fkey",
+          "ai",
+          "\"ai\".\"storySummary\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"storySummary_storyId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"storySummary\"\nADD CONSTRAINT \"storySummary_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"storySummary_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storySummary_storyId_fkey",
+          "ai",
+          "\"ai\".\"storySummary\""
+        ]
+      }
+    ]
+  }
+]

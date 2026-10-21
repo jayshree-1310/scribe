@@ -190,6 +190,8 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
     ...[
       "ai.ts POST /bible/:storyId/refresh",
       "ai.ts POST /bible/:storyId/read",
+      "ai.ts POST /summaries/story/:storyId/regenerate",
+      "ai.ts POST /summaries/chapter/:chapterId/regenerate",
       "ai.ts POST /bible/:storyId/facts",
       "ai.ts PATCH /bible/facts/:factId",
       "ai.ts DELETE /bible/facts/:factId",

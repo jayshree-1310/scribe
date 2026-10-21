@@ -40,6 +40,7 @@ import { StoryCard, StoryCardSkeleton } from '../components/story/StoryCard'
 import { StoryCover } from '../components/story/StoryCover'
 import { RatingBars } from '../components/charts/RatingBars'
 import { AskBookPanel } from '../components/ai/AskBookPanel'
+import { StorySummaryCard } from '../components/ai/StorySummaryCard'
 import './pages.css'
 import './story-detail.css'
 
@@ -753,6 +754,16 @@ export function StoryDetailPage() {
             </ul>
           )}
         </TabPanel>
+      ) : null}
+
+      {/* The story so far ----------------------------------------------- */}
+      {/*
+        Bounded on the server to where this reader has read, or the whole
+        story for its author. Renders nothing when there is no published
+        chapter to summarise, or when the summary cannot be loaded.
+      */}
+      {data.chapterCount > 0 ? (
+        <StorySummaryCard storyKey={data.slug} storyId={data.id} isAuthor={myId === data.author.id} />
       ) : null}
 
       {/* Ask this book -------------------------------------------------- */}

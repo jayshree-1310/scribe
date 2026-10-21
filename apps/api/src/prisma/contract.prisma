@@ -479,6 +479,8 @@ namespace content {
     continuityChecks     ai.ContinuityCheck[]
     continuityFindings   ai.ContinuityFinding[]
     continuityDismissals ai.ContinuityDismissal[]
+    /// Generated summaries of the story, whole or up to a chapter.
+    storySummaries       ai.StorySummary[]
   }
 
   model Chapter {
@@ -1751,6 +1753,39 @@ namespace ai {
     decision ModerationDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
 
     @@id([decisionId, category])
+  }
+
+  /// A generated summary of a story, up to and including one chapter (Task AI 6).
+  ///
+  /// Reduced from the per-chapter summaries (`ChapterSummary`) of the
+  /// story's published chapters 1..`upToChapter`, never from chapter bodies:
+  /// that is what lets a long story be summarised at all, and what makes a
+  /// spoiler-free summary spoiler-free -- the model is given nothing past the
+  /// bound. `kind` is `story` when the bound is the last published chapter
+  /// (the whole story so far) and `spoiler_free` when it is earlier.
+  ///
+  /// `sourceHash` is a hash of the chapter summaries it was reduced from plus
+  /// the prompt versions; a changed chapter changes its summary, which changes
+  /// this, and the row is regenerated on the next request rather than shown.
+  model StorySummary {
+    id            String   @id @default(uuid())
+    storyId       String
+    kind          String
+    upToChapter   Int
+    /// Generated. Always labelled as such where it is shown.
+    text          String
+    sourceHash    String
+    /// How many chapter summaries it was reduced from.
+    chapterCount  Int
+    model         String
+    promptId      String   @default("summary.story")
+    promptVersion Int
+    createdAt     DateTime @default(now())
+    updatedAt     DateTime @default(now())
+
+    story content.Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+    @@unique([storyId, upToChapter])
   }
 
   /// One model or embedding call: what it cost and how it went (Task AI 18).

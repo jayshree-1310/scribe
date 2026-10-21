@@ -1058,3 +1058,42 @@ export async function getSpend(days: SpendWindow): Promise<SpendReport> {
     query: { days: String(days) },
   })
 }
+
+/* Story summaries ---------------------------------------------------------- */
+
+/** One paragraph of "the story so far". Generated; always labelled as such. */
+export interface StorySummary {
+  text: string
+  upToChapter: number
+  /** `story`: every published chapter. `spoiler_free`: it stops earlier. */
+  kind: 'story' | 'spoiler_free'
+  chapterCount: number
+  generatedAt: string | null
+}
+
+export interface StorySummaryStatus {
+  available: boolean
+  scope: { upToChapter: number | null; basis: 'request' | 'progress' | 'start' | 'author' }
+  summary: StorySummary | null
+  /** The server queued it; ask again in a few seconds. */
+  generating: boolean
+}
+
+/** Never calls a model: a missing summary is queued and reported as generating. */
+export async function getStorySummary(
+  storyKey: string,
+  upToChapter?: number | null,
+): Promise<StorySummaryStatus> {
+  return request<StorySummaryStatus>(`/ai/summaries/story/${encodeURIComponent(storyKey)}`, {
+    headers: readerHeaders(),
+    ...(upToChapter ? { query: { upToChapter: String(upToChapter) } } : {}),
+  })
+}
+
+/** The author's Regenerate. Answers with a background job id. */
+export async function regenerateStorySummary(storyId: string): Promise<{ jobId: string }> {
+  return request<{ jobId: string }>(`/ai/summaries/story/${encodeURIComponent(storyId)}/regenerate`, {
+    method: 'POST',
+    headers: readerHeaders(),
+  })
+}

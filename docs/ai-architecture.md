@@ -110,6 +110,8 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/job-schedule.ts` | Queueing AI work from outside `services/ai/` — imported by `authoring.ts`, so it imports nothing that imports authoring. |
 | `services/ai/health.ts` | Provider and embedder health for `/health`, fed by usage records: `ok`, `degraded` or `unknown`, never a failed health check. |
 | `services/ai/switches.ts` | Per-feature kill switches in Redis, checked by `withPolicy`; off within ten seconds, no deploy. |
+| `services/ai/summaries.ts` | Task AI 6: the story so far, map-reduced from chapter summaries, bounded by the reader's position, cached by a hash of its inputs, written by a background job. |
+| `services/ai/prompts/summary.ts` | The two reduce prompts: combining a long chapter's sections, and reducing chapter summaries into the story so far. |
 | `services/ai/caller.ts` | Task AI 18: whose behalf a model call is made on, in an `AsyncLocalStorage` set by the AI router; `runAs` for background work done for someone, `null` for the platform's own. |
 | `services/ai/spend.ts` | The admin spend report: one `GROUPING SETS` scan of `ai.UsageEvent` for the total, by feature, by model and by caller. |
 | `services/ai/result-cache.ts` | Results reused by a hash of everything they depend on (prompt id and version, model, input). Redis, best effort; used by explain. |
@@ -795,6 +797,24 @@ The page is then chosen from a pool four pages deep by
 `services/recommendation-diversity.ts`: two stories per author, half the page
 per genre, with held-back stories filling any room left.
 
+## Summaries
+
+A chapter's summary (`ensureChapterSummary` in `recap.ts`) is the recap a
+reader sees above the next chapter. It is also the **map** step of a story's
+summary (`summaries.ts`), which is reduced from chapter summaries, never
+bodies. That lets any length fit a small context window, and it makes
+"spoiler-free up to chapter N" a matter of which summaries are handed over
+rather than an instruction to keep a secret.
+
+- **Long chapters.** A chapter over 24k characters is itself map-reduced:
+  each section is summarised, then the section summaries are combined.
+- **Freshness.** Both levels are cached by a hash of their input and the
+  prompt versions, so unchanged text is never summarised twice.
+- **Generation.** Readers' story summaries are written by the `summary.story`
+  job and polled. The author can regenerate.
+
+Details and numbers are in `AI-BACKLOG.md` § Task AI 6.
+
 ## Cost and usage
 
 Every call through the seam — chat or embedding, success or failure — lands in
@@ -964,11 +984,9 @@ and which cases regressed. It costs real calls, so it is not part of
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The rest of Task AI 6.** Every other task from AI 0 to AI 20 is built;
-  `docs/ai-security.md` records the AI 19 audit and `docs/ai-operations.md`
-  how to run it all. Of Task AI 6 only the chapter recap was built; the story-level
-  summary, the spoiler-free summary and the map-reduce that a multi-chapter
-  summary needs are not here.
+- **Nothing from Tasks AI 0–20.** All of it is built, including the parts of
+  Task AI 6 that first shipped as the chapter recap alone. `docs/ai-security.md`
+  records the AI 19 audit and `docs/ai-operations.md` how to run it all.
 - **A budget read from the usage table.** Enforcement still counts in Redis
   over a rolling window (`budget.ts`), which is fast and cannot be audited;
   `ai.UsageEvent` is the audit. They agree to within one call per window.

@@ -148,6 +148,10 @@
       "model": "StoryGenre",
       "namespace": "content"
     },
+    "storySummary": {
+      "model": "StorySummary",
+      "namespace": "ai"
+    },
     "storyView": {
       "model": "StoryView",
       "namespace": "engagement"
@@ -1951,6 +1955,153 @@
               },
               "namespaceId": "ai",
               "table": "storyFact"
+            }
+          },
+          "StorySummary": {
+            "fields": {
+              "chapterCount": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "kind": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "promptId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "promptVersion": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "sourceHash": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "storyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "text": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "upToChapter": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "story": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "storyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Story",
+                  "namespace": "content"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "chapterCount": {
+                  "column": "chapterCount"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "kind": {
+                  "column": "kind"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "promptId": {
+                  "column": "promptId"
+                },
+                "promptVersion": {
+                  "column": "promptVersion"
+                },
+                "sourceHash": {
+                  "column": "sourceHash"
+                },
+                "storyId": {
+                  "column": "storyId"
+                },
+                "text": {
+                  "column": "text"
+                },
+                "upToChapter": {
+                  "column": "upToChapter"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "ai",
+              "table": "storySummary"
             }
           },
           "UsageEvent": {
@@ -4800,6 +4951,21 @@
                 },
                 "to": {
                   "model": "StoryFact",
+                  "namespace": "ai"
+                }
+              },
+              "storySummaries": {
+                "cardinality": "1:N",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "storyId"
+                  ]
+                },
+                "to": {
+                  "model": "StorySummary",
                   "namespace": "ai"
                 }
               },
@@ -8147,6 +8313,124 @@
                 ]
               },
               "uniques": []
+            },
+            "storySummary": {
+              "columns": {
+                "chapterCount": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "kind": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "promptId": {
+                  "codecId": "pg/text@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": "summary.story"
+                  },
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "promptVersion": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "sourceHash": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "storyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "text": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "upToChapter": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "storyId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "storySummary"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "story"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "storyId"
+                  ],
+                  "name": "storySummary_storyId_idx_cd452158",
+                  "prefix": "storySummary_storyId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "storyId",
+                    "upToChapter"
+                  ]
+                }
+              ]
             },
             "usageEvent": {
               "columns": {
@@ -11825,10 +12109,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "b14ab879de7df6f1227004c5b4312618a4ab9132ffab232da3fd955fbb3251c2"
+    "storageHash": "5654ec2c5bf2c32761d6123bfc98d2e336984295d3738b44b739bf753169c25f"
   },
   "execution": {
-    "executionHash": "050034e8d2451633c69fb14c8d2c384f810fb242c9db796213c62fc03dddabdf",
+    "executionHash": "06620e7504ae1b114a55b97bd6ede41507cf47aff9beaa6b4eb16c1e919a052a",
     "mutations": {
       "defaults": [
         {
@@ -12159,6 +12443,17 @@
             "column": "id",
             "namespace": "ai",
             "table": "storyFact"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "ai",
+            "table": "storySummary"
           }
         },
         {

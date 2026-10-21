@@ -686,18 +686,51 @@ covering chapters 1–11 does not fit in a local context window, so it needs
 map-reduce over chapter summaries *and* a cache key spanning a range, where
 editing chapter three invalidates every card from four onward.
 
-What is still open, and none of it is started:
+**The rest, built later (after Task AI 20).** The pieces:
 
-- **The story summary** on `StoryDetailPage`, and the map-reduce it requires.
-- **Spoiler-free summaries** and the public `GET` for them.
-- **An author's regenerate action.** Regeneration happens today only by editing
-  the chapter, which changes the hash.
-- **Long chapters are truncated, not map-reduced.** A chapter over
-  `CHAPTER_LIMIT` (24k characters) is summarised from its opening, and the
-  result carries a `truncated` flag saying so rather than hiding it.
+- `services/ai/summaries.ts` and `prompts/summary.ts`.
+- `ai.StorySummary`, migration `20261021T0949_add_ai_story_summaries`.
+- `GET /api/ai/summaries/story/:slugOrId`.
+- `POST /api/ai/summaries/story/:storyId/regenerate` and
+  `POST /api/ai/summaries/chapter/:chapterId/regenerate` (the author's).
+- A `summary.story` background job.
+- `components/ai/StorySummaryCard.tsx`, "The story so far", on
+  `StoryDetailPage`, labelled as AI-generated.
 
-The per-chapter summary table is the input a cumulative recap would reduce
-over, so none of the above is a rewrite of what landed.
+Tests are in `routes/ai-summaries.test.ts`, with the spoiler bound
+mutation-checked. Verified in the dev app as a signed-in reader with no saved
+position: the card said it was writing, the dev server's worker wrote it
+against `gpt-oss-120b`, and the page showed a summary bounded to chapter 1.
+
+How it works:
+
+- **Map-reduce over summaries, never bodies.** The map is the existing
+  per-chapter summary, the same row the recap shows. The reduce turns chapter
+  summaries into one paragraph, in two levels past 12 chapters: runs of 12
+  first, then those runs.
+- **Long chapters are now map-reduced too, not cut.** A chapter over 24k
+  characters is summarised section by section, and the section summaries are
+  combined. It is cut only past eight sections (~190k characters), and
+  `truncated` says so.
+- **Spoiler-free by construction.** The bound is Ask This Book's: the reader's
+  chosen chapter, their reading position, the opening chapter with none, and
+  the whole story for its author. The model is given chapter summaries up to
+  that bound and nothing else. The test asserts that no call ever contained a
+  later chapter.
+- **Cached by input.** A story summary carries a hash of the chapter
+  summaries it was reduced from and the prompt versions. An edit to chapter 3
+  rewrites chapter 3's summary and invalidates every bound from 3 on, and
+  nothing else. A stale summary is not shown.
+- **Off the request path.** A read never calls a model. A missing summary is
+  queued, debounced by story and bound, and the card polls. Readers' summaries
+  are the platform's spend: a shared artefact, written once per bound until
+  the text changes. The author's Regenerate runs as the author.
+
+**A fix this surfaced.** The recap's cache hash covered the chapter body only,
+so Task AI 17's prompt-version bump did *not* make stored recaps stale, though
+the Task AI 17 notes below said it did. The hash now folds in the prompt
+versions and section size, so it does. Stored recaps regenerate once on their
+next request.
 
 Two things worth knowing before extending it. Generation is **lazy and behind a
 button** — there is no job runner (Task AI 20), so the first reader who asks
@@ -1817,11 +1850,12 @@ The planted-injection test is mutation-checked: dropping the defang in
 `fenced` fails 21 cases, and moving the agent's input back out of its fence
 fails that one.
 
-**The version bump has a cost, and it is the designed one.** Recap, story
-bible and continuity use the prompt version in their "is this current?" check,
-so every stored recap, chapter reading and check is now stale and regenerates
-on its next request or refresh — a model call per row. That is the recovery
-path the version exists for.
+**The version bump has a cost, and it is the designed one.** Story bible and
+continuity use the prompt version in their "is this current?" check, so every
+stored chapter reading and check is now stale and regenerates on its next
+refresh or save — a model call per row. That is the recovery path the version
+exists for. (Recaps were meant to follow, but their hash covered the chapter
+body alone; that was fixed with the rest of Task AI 6, above.)
 
 **Measured with `ai:eval`, before and after.** Same model, same embedder:
 retrieval unchanged (hit@1 0.78, MRR 0.88), the right chapter cited in every
