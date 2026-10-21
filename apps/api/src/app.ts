@@ -72,7 +72,26 @@ app.use(
   ),
 );
 app.use(express.json({ limit: "256kb" }));
-app.use(pinoHttp({ logger }));
+app.use(
+  pinoHttp({
+    logger,
+    serializers: {
+      /**
+       * An AI request's query string is what a reader typed -- the search box
+       * sends `/api/ai/search?q=...` -- and a request log keeps it for as long
+       * as the logs are kept. The path stays, so a request can still be
+       * traced; the words do not (Task AI 19, `docs/ai-security.md`).
+       */
+      req(req: { url?: string; query?: unknown }) {
+        if (typeof req.url === "string" && req.url.startsWith("/api/ai")) {
+          req.url = req.url.split("?")[0];
+          delete req.query;
+        }
+        return req;
+      },
+    },
+  }),
+);
 
 // Ahead of the routers, so identity is established once and no route can
 // forget to look for it.

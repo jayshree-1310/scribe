@@ -155,6 +155,7 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
       "ai.ts POST /scribble/stream",
       "ai.ts POST /assist",
       "ai.ts POST /assist/stream",
+      "ai.ts POST /generate/${kind}",
       "ai.ts POST /generate/refine",
       "ai.ts POST /explain",
       "ai.ts POST /explain/stream",
@@ -203,7 +204,9 @@ function writeRoutes(): string[] {
     if (!file.endsWith(".ts") || file.endsWith(".test.ts")) continue;
 
     const source = readFileSync(path.join(ROUTES_DIR, file), "utf8");
-    const pattern = /router\.(post|put|patch|delete)\(\s*"([^"]*)"/g;
+    // Template literals too: the generation routes are registered in a loop
+    // as `/generate/${kind}`, and a double-quote-only pattern never saw them.
+    const pattern = /router\.(post|put|patch|delete)\(\s*["`]([^"`]*)["`]/g;
 
     for (const match of source.matchAll(pattern)) {
       found.push(`${file} ${match[1]?.toUpperCase()} ${match[2]}`);

@@ -20,6 +20,7 @@ import {
   requireUserId,
 } from "../middleware/current-user.js";
 import { runAs } from "../services/ai/caller.js";
+import { loadAiConfig } from "../services/ai/config.js";
 import { assertWithinDailyBudget } from "../services/ai/budget.js";
 import { PROMPT_LIMIT, chat, chatStream } from "../services/ai/chat.js";
 import {
@@ -96,6 +97,37 @@ const router = Router();
  */
 router.use((req, _res, next) => {
   runAs(getUserId(req), () => next());
+});
+
+/**
+ * The floor under every AI route (Task AI 19): no route here is unlimited,
+ * including the reads and edits that call no model. Generous -- a reader
+ * browsing their conversations or an author tidying a bible never meets it --
+ * because its job is to stop a loop, not to ration anybody; each feature's own
+ * tighter limit still applies on top. By caller, or by address for an
+ * anonymous request, which `requireUser` then refuses anyway.
+ */
+const BASELINE_WINDOW_SECONDS = 60 * 10;
+
+router.use(async (req, _res, next) => {
+  try {
+    const limit = loadAiConfig().baselineRequestLimit;
+    if (limit <= 0) return next();
+
+    const key = `ai:baseline:${getUserId(req) ?? `ip:${req.ip ?? "unknown"}`}`;
+    const status = await isRateLimited(key, limit);
+    if (status.limited) {
+      throw HttpError.tooManyRequests(
+        "That is a lot of requests to the AI features in a short time. Try again in a few minutes.",
+        status.retryAfter,
+        "ai_requests",
+      );
+    }
+    await recordAttempt(key, BASELINE_WINDOW_SECONDS);
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 /**

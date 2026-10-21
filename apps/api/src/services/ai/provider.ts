@@ -18,6 +18,7 @@
  */
 
 import { HttpError } from "../../lib/http-error.js";
+import { logger } from "../../lib/logger.js";
 import {
   isAiConfigured,
   isAiEmbedConfigured,
@@ -209,6 +210,19 @@ function withPolicy(inner: AiProvider): AiProvider {
     return model && model !== request.model ? { ...request, model } : request;
   };
 
+  /**
+   * The one place prompt and completion text may reach a log, and only behind
+   * `AI_LOG_CONTENT`, which `config.ts` refuses in production. Debug level,
+   * so even a development server set to `info` keeps it out of the stream.
+   */
+  const logContent = (request: AiRequest, text: string): void => {
+    if (!loadAiConfig().logContent) return;
+    logger.debug(
+      { aiContent: { feature: request.feature, system: request.system, messages: request.messages, reply: text } },
+      "AI call content (AI_LOG_CONTENT)",
+    );
+  };
+
   return {
     name: inner.name,
 
@@ -217,6 +231,7 @@ function withPolicy(inner: AiProvider): AiProvider {
       if (userId) await assertWithinDailyBudget(userId);
 
       const completion = await inner.complete(routed(request));
+      logContent(request, completion.text);
       if (userId) {
         await recordTokenUsage(userId, completion.usage.inputTokens + completion.usage.outputTokens);
       }
@@ -227,11 +242,16 @@ function withPolicy(inner: AiProvider): AiProvider {
       const userId = currentUserId();
       if (userId) await assertWithinDailyBudget(userId);
 
+      let text = "";
       for await (const event of inner.stream(routed(request))) {
+        if (event.type === "text") text += event.text;
         // Charged when usage exists, which is the terminal event: a stream
         // the reader abandoned goes uncharged, and was aborted with them.
-        if (event.type === "done" && userId) {
-          await recordTokenUsage(userId, event.usage.inputTokens + event.usage.outputTokens);
+        if (event.type === "done") {
+          logContent(request, text);
+          if (userId) {
+            await recordTokenUsage(userId, event.usage.inputTokens + event.usage.outputTokens);
+          }
         }
         yield event;
       }

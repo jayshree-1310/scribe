@@ -1952,6 +1952,32 @@ from the table.
 
 Not a task you do at the end — a checklist you audit at the end.
 
+**Status: built.** The deliverable is `docs/ai-security.md`: each checklist
+item, what was found, what was fixed, the test that holds it, and the residual
+risks accepted with reasons. Tests in `routes/ai-security.test.ts`, the logging
+and deletion ones mutation-checked.
+
+What the audit found and fixed:
+
+- **Ten AI routes had no rate limit.** These were the reads and the edits
+  that call no model. A baseline limiter on the whole router now covers them
+  (`AI_BASELINE_REQUEST_LIMIT`).
+- **The suspension guard could not see the generation routes**, because they
+  are registered from a template literal.
+- **Every search query was in the request log**, through `pino-http`'s URL.
+  Query strings are now stripped from logged `/api/ai` URLs. Prompt and
+  completion logging is behind `AI_LOG_CONTENT`, forced off in production.
+- **A deleted account's usage rows kept its id, and nothing pruned the
+  table.** `deleteAccount` now deletes them. `ai:prune-usage` enforces a
+  90-day window (`AI_USAGE_RETENTION_DAYS`).
+- **A 429 did not say which limit or how long, except in a header.** Every
+  429 body now carries `retryAfterSeconds`, and the limits touched here name
+  themselves in `details.limit`. An exhausted budget is logged by user id.
+
+The fencing and tool items were already done in Tasks AI 17 and AI 15. They
+are re-tested here at the route level for the two stored paths that had no
+such test: moderation and bible extraction.
+
 **Prompt:**
 
 > Audit every AI path against this list and fix what fails.

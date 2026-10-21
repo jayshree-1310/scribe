@@ -83,3 +83,29 @@ export function logAiUsage(record: AiUsageRecord): void {
 export async function flushUsage(): Promise<void> {
   while (pending.size > 0) await Promise.all([...pending]);
 }
+
+/**
+ * Deletes usage rows older than the retention window, and says how many.
+ *
+ * Retention is a decision rather than an accident (`docs/ai-security.md`):
+ * ninety days is long enough to see a month-on-month trend in the spend view
+ * and short enough that a cost record does not become a history of what one
+ * person did for a year. Run by `pnpm --filter api ai:prune-usage`; Task AI 20
+ * is where it becomes a scheduled job.
+ */
+export async function pruneUsage(days = loadAiConfig().usageRetentionDays): Promise<number> {
+  if (days <= 0) return 0;
+  const [row] = (await db.runtime().query(
+    db.raw.sql`
+      WITH gone AS (
+        DELETE FROM "ai"."usageEvent"
+         WHERE "createdAt" < now() - (${days}::int * interval '1 day')
+         RETURNING 1
+      )
+      SELECT COUNT(*)::int AS "removed" FROM gone
+    `
+      .returnsRow({ removed: "pg/int4@1" })
+      .build(),
+  )) as { removed: number }[];
+  return row?.removed ?? 0;
+}

@@ -73,6 +73,20 @@ export interface AiConfig {
   /** How long a deterministic-enough result is reused; 0 turns the cache off. */
   resultCacheSeconds: number;
   /**
+   * Whether prompts and completions are logged, at debug level (Task AI 19).
+   * Off by default and **always** off when `NODE_ENV=production`, whatever
+   * `AI_LOG_CONTENT` says: they carry unpublished chapters and private
+   * questions, and a production log outlives the request by months.
+   */
+  logContent: boolean;
+  /** Days an `ai.UsageEvent` row is kept before `pruneUsage` removes it. */
+  usageRetentionDays: number;
+  /**
+   * Requests per user per ten minutes across every `/api/ai` route, before
+   * any feature's own limit -- the floor that leaves no AI route unlimited.
+   */
+  baselineRequestLimit: number;
+  /**
    * Whether saving a chapter schedules a continuity check (Task AI 14).
    *
    * An operator switch rather than a per-story setting: a story opts in by
@@ -112,6 +126,8 @@ const DEFAULTS = {
   structuredOutput: true,
   dailyTokenBudget: 200_000,
   resultCacheSeconds: 60 * 60 * 24,
+  usageRetentionDays: 90,
+  baselineRequestLimit: 300,
   continuityChecks: true,
   continuityQuietMs: 60_000,
   continuityMinConfidence: 0.8,
@@ -203,6 +219,11 @@ export function loadAiConfig(): AiConfig {
     usagePersist: readFlag("AI_USAGE_PERSIST", true),
     pricing: readPricing(),
     resultCacheSeconds: readInt("AI_RESULT_CACHE_SECONDS", DEFAULTS.resultCacheSeconds),
+    logContent:
+      process.env["NODE_ENV"] !== "production" &&
+      ["on", "true", "1", "yes"].includes(process.env["AI_LOG_CONTENT"]?.trim().toLowerCase() ?? ""),
+    usageRetentionDays: readInt("AI_USAGE_RETENTION_DAYS", DEFAULTS.usageRetentionDays),
+    baselineRequestLimit: readInt("AI_BASELINE_REQUEST_LIMIT", DEFAULTS.baselineRequestLimit),
     continuityChecks: readFlag("AI_CONTINUITY", DEFAULTS.continuityChecks),
     continuityQuietMs: readInt(
       "AI_CONTINUITY_QUIET_MS",

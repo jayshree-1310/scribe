@@ -29,6 +29,8 @@ export interface ErrorResponseBody {
     code: ErrorCode;
     message: string;
     details?: ErrorDetails;
+    /** On a 429: how long to wait, the same number as `Retry-After`. */
+    retryAfterSeconds?: number;
   };
 }
 
@@ -62,10 +64,21 @@ export class HttpError extends Error {
 
   /**
    * Carries `Retry-After` seconds so the error handler is not the only place
-   * that knows how to answer a throttled caller.
+   * that knows how to answer a throttled caller. `limit` names which ceiling
+   * was hit (`daily_token_budget`, `ai_requests`), so a client -- or a person
+   * reading a log -- can tell "wait a minute" from "come back tomorrow".
    */
-  static tooManyRequests(message: string, retryAfterSeconds: number): HttpError {
-    const error = new HttpError(429, "too_many_requests", message);
+  static tooManyRequests(
+    message: string,
+    retryAfterSeconds: number,
+    limit?: string,
+  ): HttpError {
+    const error = new HttpError(
+      429,
+      "too_many_requests",
+      message,
+      limit ? { limit } : undefined,
+    );
     error.retryAfterSeconds = retryAfterSeconds;
     return error;
   }
@@ -121,6 +134,9 @@ export class HttpError extends Error {
         code: this.code,
         message: this.message,
         ...(this.details ? { details: this.details } : {}),
+        ...(this.retryAfterSeconds !== undefined
+          ? { retryAfterSeconds: this.retryAfterSeconds }
+          : {}),
       },
     };
   }

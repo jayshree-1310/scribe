@@ -59,11 +59,17 @@ export async function assertWithinDailyBudget(userId: string): Promise<void> {
   const status = await isRateLimited(dailyBudgetKey(userId), dailyTokenBudget);
   if (!status.limited) return;
 
+  // The detection half of abuse handling: a caller burning their allowance in
+  // a loop shows up here, by id, once per refused call -- never with what
+  // they asked. The spend view's heaviest callers is the other half.
+  logger.warn({ ai: { userId, limit: "daily_token_budget" } }, "AI budget exhausted");
+
   throw HttpError.tooManyRequests(
     "You have used today's AI allowance. It resets within a day.",
     // A counter with no TTL would report 0 and promise an immediate retry that
     // would fail; the full window is the honest answer to "how long".
     status.retryAfter > 0 ? status.retryAfter : WINDOW_SECONDS,
+    "daily_token_budget",
   );
 }
 

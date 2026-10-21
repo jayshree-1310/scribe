@@ -533,6 +533,18 @@ export async function deleteAccount(
     }
 
     /**
+     * The AI cost records made on this person's behalf. They hold no text,
+     * but a row per question with a timestamp is still a history of what one
+     * person did, and it goes with them. One statement rather than the ORM's
+     * one-row-per-call delete: an active reader has thousands. Conversations,
+     * recaps, story-bible rows and continuity checks need no line here --
+     * they cascade from the account or from the stories removed above.
+     */
+    await tx.query(
+      db.raw.sql`DELETE FROM "ai"."usageEvent" WHERE "userId" = ${userId}`.affectedCount().build(),
+    );
+
+    /**
      * What this person left on other people's work.
      *
      * Likes first, in two directions, and both before the comments below.

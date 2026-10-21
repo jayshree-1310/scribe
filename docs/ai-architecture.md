@@ -959,14 +959,16 @@ and which cases regressed. It costs real calls, so it is not part of
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The remaining features.** Tasks AI 19 onward. Of Task AI 6 only the chapter recap was built; the story-level
+- **The remaining features.** Task AI 20. `docs/ai-security.md` records the
+  Task AI 19 audit. Of Task AI 6 only the chapter recap was built; the story-level
   summary, the spoiler-free summary and the map-reduce that a multi-chapter
   summary needs are not here.
 - **A budget read from the usage table.** Enforcement still counts in Redis
   over a rolling window (`budget.ts`), which is fast and cannot be audited;
   `ai.UsageEvent` is the audit. They agree to within one call per window.
-- **Retention of usage rows.** Nothing prunes `ai.UsageEvent` yet, and an
-  account's rows keep its id after the account is deleted. Task AI 19.
+- **Scheduled pruning.** `ai:prune-usage` removes usage rows past
+  `AI_USAGE_RETENTION_DAYS` when it is run; nothing runs it on a schedule yet
+  (Task AI 20). Retention as a whole is decided in `docs/ai-security.md`.
 - **Answer regeneration.** A conversation turn cannot be re-asked or
   edited, and the summary is never rebuilt from scratch, so an early
   summarisation mistake persists for the life of the conversation.
