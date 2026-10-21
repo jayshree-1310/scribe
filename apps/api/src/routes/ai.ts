@@ -20,6 +20,17 @@ import {
   requireUserId,
 } from "../middleware/current-user.js";
 import { runAs } from "../services/ai/caller.js";
+import { aiHealth } from "../services/ai/health.js";
+import { BIBLE_READ_JOB } from "../services/ai/job-schedule.js";
+import { disabledFeatures, setFeature } from "../services/ai/switches.js";
+import { assertStoryOwned } from "../services/authoring.js";
+import {
+  deadJobs,
+  enqueue,
+  getJob,
+  queueCounts,
+  retryDeadJob,
+} from "../lib/jobs.js";
 import { loadAiConfig } from "../services/ai/config.js";
 import { assertWithinDailyBudget } from "../services/ai/budget.js";
 import { PROMPT_LIMIT, chat, chatStream } from "../services/ai/chat.js";
@@ -96,7 +107,9 @@ const router = Router();
  * nobody and is then refused by it.
  */
 router.use((req, _res, next) => {
-  runAs(getUserId(req), () => next());
+  // pino-http's request id, so the request's log line and every provider
+  // call and job it causes share one id (`docs/ai-operations.md`).
+  runAs(getUserId(req), () => next(), req.id === undefined ? null : String(req.id));
 });
 
 /**
@@ -1348,8 +1361,78 @@ router.post("/bible/:storyId/refresh", requireUser, async (req, res, next) => {
       abortOnDisconnect(res).signal,
     );
 
-
     res.json({ processed: result.processed, bible: result.bible });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * Reads the whole story into its bible in the background (Task AI 20), for an
+ * author who would rather not keep the page open while twenty chapters are
+ * read. Answers 202 with a job to poll at `GET /jobs/:id`. Charged against the
+ * same limit as a refresh, and debounced by story: asking twice while the
+ * first is waiting is the same job.
+ */
+router.post("/bible/:storyId/read", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const { storyId } = parseOrThrow(storyIdParams, req.params);
+    await assertStoryOwned(userId, storyId);
+
+    const key = `ai:bible:${userId}`;
+    const status = await isRateLimited(key, BIBLE_REFRESH_LIMIT);
+    if (status.limited) {
+      throw HttpError.tooManyRequests(
+        "You have refreshed the story bible a lot in a short time. Try again shortly.",
+        status.retryAfter,
+      );
+    }
+    await assertWithinDailyBudget(userId);
+    if (!loadAiConfig().jobs) {
+      throw HttpError.unavailable("Background reading is switched off on this server. Use Refresh instead.");
+    }
+    await recordAttempt(key, BIBLE_REFRESH_WINDOW_SECONDS);
+
+    const jobId = await enqueue(BIBLE_READ_JOB, { storyId }, {
+      userId,
+      requestId: req.id === undefined ? null : String(req.id),
+      dedupeKey: `bible:${storyId}`,
+    });
+    res.status(202).json({ jobId });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/* Jobs ------------------------------------------------------------------- */
+
+const jobIdParams = z.object({ id: z.uuid("That job could not be found.") });
+
+/**
+ * A background job's status, for the person who caused it and nobody else --
+ * another user's job is a 404, as another user's conversation is. What it
+ * returns is the status, the attempt count, a stable error code and the
+ * handler's small result; never the payload.
+ */
+router.get("/jobs/:id", requireUser, async (req, res, next) => {
+  try {
+    const userId = requireUserId(res);
+    const { id } = parseOrThrow(jobIdParams, req.params);
+    const job = await getJob(id);
+    if (!job || job.userId !== userId) throw HttpError.notFound("That job could not be found.");
+
+    res.json({
+      id: job.id,
+      type: job.type,
+      status: job.status,
+      attempts: job.attempts,
+      maxAttempts: job.maxAttempts,
+      error: job.error,
+      result: job.result,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+    });
   } catch (error) {
     next(error);
   }
@@ -1567,6 +1650,61 @@ router.get("/admin/spend", requireUser, async (req, res, next) => {
     await assertAdmin(requireUserId(res));
     const { days } = parseOrThrow(spendSchema, req.query);
     res.json(await spendReport(days as SpendWindow));
+  } catch (error) {
+    next(error);
+  }
+});
+
+/* Administration: operations --------------------------------------------- */
+
+/**
+ * What to look at when AI misbehaves (`docs/ai-operations.md`): provider
+ * health, the queue, the dead letters, and which features are switched off.
+ */
+router.get("/admin/ops", requireUser, async (_req, res, next) => {
+  try {
+    await assertAdmin(requireUserId(res));
+    const [queue, dead, off] = await Promise.all([queueCounts(), deadJobs(20), disabledFeatures()]);
+    res.json({
+      health: aiHealth(),
+      queue,
+      dead: dead.map((job) => ({
+        id: job.id,
+        type: job.type,
+        attempts: job.attempts,
+        error: job.error,
+        updatedAt: job.updatedAt,
+      })),
+      switchedOff: off,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/admin/jobs/:id/retry", requireUser, async (req, res, next) => {
+  try {
+    await assertAdmin(requireUserId(res));
+    const { id } = parseOrThrow(jobIdParams, req.params);
+    if (!(await retryDeadJob(id))) throw HttpError.notFound("No dead job has that id.");
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+const switchSchema = z.object({
+  /** A feature id or prefix, as on `AiRequest.feature`: `assist`, `ask.book`. */
+  feature: z.string().trim().regex(/^[a-z][a-z0-9_.-]{0,59}$/, "Name a feature, like assist or ask.book."),
+  enabled: z.boolean(),
+});
+
+/** The kill switch: off within ten seconds, on as fast, no deploy. */
+router.put("/admin/switches", requireUser, async (req, res, next) => {
+  try {
+    await assertAdmin(requireUserId(res));
+    const { feature, enabled } = parseOrThrow(switchSchema, req.body);
+    res.json({ switchedOff: await setFeature(feature, enabled) });
   } catch (error) {
     next(error);
   }

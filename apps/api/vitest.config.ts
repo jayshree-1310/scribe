@@ -27,6 +27,9 @@ export default defineConfig({
       // Suites explain the same passage over and over, and each expects a
       // model call; the cost suite turns the result cache on for itself.
       AI_RESULT_CACHE_SECONDS: "0",
+      // Publishing a fixture chapter queues its embedding; with no worker in
+      // the suite those jobs would only pile up. The jobs suite turns it on.
+      AI_JOBS: "off",
     },
   },
 });

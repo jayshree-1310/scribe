@@ -20,16 +20,29 @@ import { AsyncLocalStorage } from "node:async_hooks";
 export interface AiCaller {
   /** Null for the platform's own work. */
   userId: string | null;
+  /**
+   * The HTTP request (pino-http's id) or job this work belongs to, so every
+   * log line a user action causes -- the request, each provider call, a job
+   * it queued -- can be found by one id (Task AI 20).
+   */
+  requestId: string | null;
 }
 
 const storage = new AsyncLocalStorage<AiCaller>();
 
 /** Runs `fn`, and every model call it makes, as `userId`. */
-export function runAs<T>(userId: string | null, fn: () => T): T {
-  return storage.run({ userId }, fn);
+export function runAs<T>(userId: string | null, fn: () => T, requestId?: string | null): T {
+  // A nested `runAs` keeps the enclosing request id unless it names its own.
+  const inherited = storage.getStore()?.requestId ?? null;
+  return storage.run({ userId, requestId: requestId ?? inherited }, fn);
 }
 
 /** The caller of the current model call, or null outside any request. */
 export function currentUserId(): string | null {
   return storage.getStore()?.userId ?? null;
+}
+
+/** The request or job id the current work belongs to, if any. */
+export function currentRequestId(): string | null {
+  return storage.getStore()?.requestId ?? null;
 }

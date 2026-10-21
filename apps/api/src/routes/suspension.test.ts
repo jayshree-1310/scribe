@@ -145,6 +145,8 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
       "challenges.ts PATCH /:id",
       "moderation.ts POST /moderation/reports/:id/resolve",
       "moderation.ts POST /moderation/users/:id/reinstate",
+      "ai.ts POST /admin/jobs/:id/retry",
+      "ai.ts PUT /admin/switches",
     ].map((route) => [route, "administrators only; `assertSuspendable` refuses to suspend one"]),
 
     // Generation for the caller alone; nothing it returns is published by it.
@@ -187,6 +189,7 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
      */
     ...[
       "ai.ts POST /bible/:storyId/refresh",
+      "ai.ts POST /bible/:storyId/read",
       "ai.ts POST /bible/:storyId/facts",
       "ai.ts PATCH /bible/facts/:factId",
       "ai.ts DELETE /bible/facts/:factId",

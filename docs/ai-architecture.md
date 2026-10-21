@@ -105,6 +105,11 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/prompts/registry.ts` | Every prompt by id; `resolvePrompt(id, version)` turns a stored row's pair into its definition and says whether it is current. |
 | `services/ai/prompts/repair.ts` | The structured-output repair turn, moved out of `structured.ts`. |
 | `services/ai/prompts/prompts.test.ts` | Snapshots of every rendered prompt (`__snapshots__/`), a planted injection in every input of every message builder, registry completeness, and a scan for prompt text outside `prompts/`. |
+| `lib/jobs.ts` | Task AI 20: the Redis job queue — debounce keys, retries on a doubling delay, dead letters, start-up recovery, the in-process worker. Generic; knows nothing about AI. |
+| `services/ai/jobs.ts` | The three AI job types (`embed.chapter`, `bible.read`, `usage.prune`), each idempotent. Registered by the process that runs the worker. |
+| `services/ai/job-schedule.ts` | Queueing AI work from outside `services/ai/` — imported by `authoring.ts`, so it imports nothing that imports authoring. |
+| `services/ai/health.ts` | Provider and embedder health for `/health`, fed by usage records: `ok`, `degraded` or `unknown`, never a failed health check. |
+| `services/ai/switches.ts` | Per-feature kill switches in Redis, checked by `withPolicy`; off within ten seconds, no deploy. |
 | `services/ai/caller.ts` | Task AI 18: whose behalf a model call is made on, in an `AsyncLocalStorage` set by the AI router; `runAs` for background work done for someone, `null` for the platform's own. |
 | `services/ai/spend.ts` | The admin spend report: one `GROUPING SETS` scan of `ai.UsageEvent` for the total, by feature, by model and by caller. |
 | `services/ai/result-cache.ts` | Results reused by a hash of everything they depend on (prompt id and version, model, input). Redis, best effort; used by explain. |
@@ -959,16 +964,18 @@ and which cases regressed. It costs real calls, so it is not part of
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The remaining features.** Task AI 20. `docs/ai-security.md` records the
-  Task AI 19 audit. Of Task AI 6 only the chapter recap was built; the story-level
+- **The rest of Task AI 6.** Every other task from AI 0 to AI 20 is built;
+  `docs/ai-security.md` records the AI 19 audit and `docs/ai-operations.md`
+  how to run it all. Of Task AI 6 only the chapter recap was built; the story-level
   summary, the spoiler-free summary and the map-reduce that a multi-chapter
   summary needs are not here.
 - **A budget read from the usage table.** Enforcement still counts in Redis
   over a rolling window (`budget.ts`), which is fast and cannot be audited;
   `ai.UsageEvent` is the audit. They agree to within one call per window.
-- **Scheduled pruning.** `ai:prune-usage` removes usage rows past
-  `AI_USAGE_RETENTION_DAYS` when it is run; nothing runs it on a schedule yet
-  (Task AI 20). Retention as a whole is decided in `docs/ai-security.md`.
+- **Continuity checks on the queue.** They still run on an in-memory timer
+  (`continuity-queue.ts`), so a restart drops pending ones; the next save or
+  **Check now** recovers them. Everything else slow is a job
+  (`docs/ai-operations.md`).
 - **Answer regeneration.** A conversation turn cannot be re-asked or
   edited, and the summary is never rebuilt from scratch, so an early
   summarisation mistake persists for the life of the conversation.

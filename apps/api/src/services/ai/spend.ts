@@ -26,6 +26,9 @@ export interface SpendLine {
   outputTokens: number;
   cachedTokens: number;
   avgDurationMs: number;
+  /** Latency percentiles: the tail is where a slow provider shows first. */
+  p50DurationMs: number;
+  p95DurationMs: number;
   /** Null when no prices are configured. */
   costUsd: number | null;
 }
@@ -49,6 +52,8 @@ interface Row {
   outputTokens: number;
   cachedTokens: number;
   avgDurationMs: number;
+  p50DurationMs: number;
+  p95DurationMs: number;
 }
 
 interface GroupedRow extends Row {
@@ -75,8 +80,19 @@ function line(row: Row | undefined): SpendLine {
         outputTokens: row.outputTokens,
         cachedTokens: row.cachedTokens,
         avgDurationMs: row.avgDurationMs,
+        p50DurationMs: row.p50DurationMs,
+        p95DurationMs: row.p95DurationMs,
       }
-    : { calls: 0, errors: 0, inputTokens: 0, outputTokens: 0, cachedTokens: 0, avgDurationMs: 0 };
+    : {
+        calls: 0,
+        errors: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        cachedTokens: 0,
+        avgDurationMs: 0,
+        p50DurationMs: 0,
+        p95DurationMs: 0,
+      };
   return {
     ...base,
     costUsd: pricing
@@ -110,7 +126,11 @@ export async function spendReport(days: SpendWindow): Promise<SpendReport> {
              COALESCE(SUM(e."inputTokens"), 0)::int              AS "inputTokens",
              COALESCE(SUM(e."outputTokens"), 0)::int             AS "outputTokens",
              COALESCE(SUM(e."cachedTokens"), 0)::int             AS "cachedTokens",
-             COALESCE(ROUND(AVG(e."durationMs")), 0)::int        AS "avgDurationMs"
+             COALESCE(ROUND(AVG(e."durationMs")), 0)::int        AS "avgDurationMs",
+             COALESCE(ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY e."durationMs")), 0)::int
+                                                                 AS "p50DurationMs",
+             COALESCE(ROUND(percentile_cont(0.95) WITHIN GROUP (ORDER BY e."durationMs")), 0)::int
+                                                                 AS "p95DurationMs"
         FROM "ai"."usageEvent" AS e
         LEFT JOIN "auth"."user" AS u ON u."id" = e."userId"
        WHERE e."createdAt" >= now() - (${days}::int * interval '1 day')
@@ -132,6 +152,8 @@ export async function spendReport(days: SpendWindow): Promise<SpendReport> {
         outputTokens: "pg/int4@1",
         cachedTokens: "pg/int4@1",
         avgDurationMs: "pg/int4@1",
+        p50DurationMs: "pg/int4@1",
+        p95DurationMs: "pg/int4@1",
       })
       .build(),
   )) as GroupedRow[];

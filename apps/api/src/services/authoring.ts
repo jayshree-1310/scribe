@@ -22,6 +22,7 @@ import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
 import { deleteAll } from "../prisma/delete-all.js";
 import { scheduleContinuityCheck } from "./ai/continuity-queue.js";
+import { scheduleChapterEmbedding } from "./ai/job-schedule.js";
 import { discardUpload } from "./uploads.js";
 import { evaluateBadges } from "./gamification.js";
 import { notify } from "./notifications.js";
@@ -640,6 +641,14 @@ export async function publishStory(
     notify({ event: "story-listed", actorId: userId, storyId });
   }
 
+  // Listing makes every published chapter searchable, so each is queued for
+  // embedding. Unchanged windows cost nothing: the handler skips them.
+  const chapters = await db.orm.content.Chapter.select("id")
+    .where((chapter) => chapter.storyId.eq(storyId))
+    .where((chapter) => chapter.publishedAt.isNotNull())
+    .all();
+  for (const chapter of chapters) void scheduleChapterEmbedding(chapter.id, 0);
+
   return getStory(storyId, userId);
 }
 
@@ -691,6 +700,10 @@ export async function publishChapter(
   // autosave: words written is re-counted by the next publish either way, and
   // eleven aggregates per keystroke is not a trade worth making.
   evaluateBadges(userId);
+
+  // Into the search index, off the request path (`ai/jobs.ts`). The handler
+  // embeds only if the story is listed, so a chapter of a draft waits.
+  void scheduleChapterEmbedding(chapterId, 0);
 
   return loadChapter(chapterId);
 }
@@ -882,7 +895,12 @@ export async function updateChapter(
   // After the commit, and only when the prose moved: a retitled chapter says
   // nothing new. Returns at once -- the check runs a quiet minute later, if
   // the story has a bible to check against. See `ai/continuity-queue.ts`.
-  if (patch.content !== undefined) scheduleContinuityCheck(chapterId);
+  if (patch.content !== undefined) {
+    scheduleContinuityCheck(chapterId);
+    // A published chapter's index entry is now stale. Debounced by chapter, so
+    // an editing session is one embedding; an unpublished one is skipped.
+    void scheduleChapterEmbedding(chapterId);
+  }
 
   return loadChapter(chapterId);
 }

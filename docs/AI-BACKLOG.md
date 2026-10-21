@@ -2018,6 +2018,54 @@ such test: moderation and bible extraction.
 
 ## Task AI 20 — Production AI infrastructure
 
+**Status: built.** The pieces:
+
+- `lib/jobs.ts`: a Redis queue with debounce keys, retries on a doubling
+  delay, a dead-letter list and recovery at start-up.
+- `services/ai/jobs.ts`: three job types — `embed.chapter`, `bible.read` and
+  `usage.prune` — queued from outside by `job-schedule.ts`.
+- The worker runs in-process, started by `server.ts` when `AI_JOBS=on`.
+- `services/ai/health.ts`: a `degraded` signal in `/health`, fed by usage
+  records rather than probes.
+- `services/ai/switches.ts`: per-feature kill switches in Redis.
+- Request ids carried from the request to every provider call and job.
+- p50/p95 latency in the spend view.
+- Routes: `POST /bible/:storyId/read`, `GET /jobs/:id`, `GET /admin/ops`,
+  `POST /admin/jobs/:id/retry` and `PUT /admin/switches`.
+- `pnpm --filter api ai:ops`.
+- The deliverable, `docs/ai-operations.md`.
+
+Tests are in `routes/ai-ops.test.ts`, with the retry and kill-switch paths
+mutation-checked. Verified in the running dev server: the worker starts with
+the API, and the daily prune ran once and set its once-a-day marker.
+
+Four things worth knowing before building on it.
+
+**Publishing now embeds.** Until this task nothing embedded a chapter except
+the backfill script, so a story published today was invisible to search by
+meaning until somebody ran it. Publishing a chapter or a story now queues an
+embedding. Editing a published chapter does too, debounced to one per
+editing session. The handler applies the backfill's rule: published chapters
+of listed stories only.
+
+**One worker, in the API process, on purpose.** The deployment is one small
+instance, and a second service would be a second bill for work that takes
+seconds. Claiming is atomic, so a second instance could share the queue.
+Start-up recovery assumes one worker, and `docs/ai-operations.md` says so.
+
+**The queue is namespaced.** `AI_JOBS_QUEUE` sets the prefix. The first test
+run made the reason concrete: the dev server's worker shares the suite's
+Redis, and would have taken — and dead-lettered — the suite's jobs.
+
+**`/health` cannot be failed by AI.** It reports the provider as `degraded`
+from the last call within five minutes, at no cost, and its own `status`
+stays `ok`. The degradation table in `docs/ai-operations.md` names, for each
+feature, what a person sees and the test that holds it.
+
+Not moved onto the queue: the continuity check. It is already off the request
+path (`continuity-queue.ts`), a timer per chapter, and a restart drops pending
+checks, which the next save or **Check now** recovers.
+
 **Prompt:**
 
 > Move the expensive work off the request path and make the system observable.

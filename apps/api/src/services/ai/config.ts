@@ -87,6 +87,12 @@ export interface AiConfig {
    */
   baselineRequestLimit: number;
   /**
+   * Whether background AI work is queued and the in-process worker runs
+   * (`lib/jobs.ts`, Task AI 20). On by default; the test suite turns it off so
+   * a chapter published by a fixture is not queued for a worker nobody runs.
+   */
+  jobs: boolean;
+  /**
    * Whether saving a chapter schedules a continuity check (Task AI 14).
    *
    * An operator switch rather than a per-story setting: a story opts in by
@@ -224,6 +230,7 @@ export function loadAiConfig(): AiConfig {
       ["on", "true", "1", "yes"].includes(process.env["AI_LOG_CONTENT"]?.trim().toLowerCase() ?? ""),
     usageRetentionDays: readInt("AI_USAGE_RETENTION_DAYS", DEFAULTS.usageRetentionDays),
     baselineRequestLimit: readInt("AI_BASELINE_REQUEST_LIMIT", DEFAULTS.baselineRequestLimit),
+    jobs: readFlag("AI_JOBS", true),
     continuityChecks: readFlag("AI_CONTINUITY", DEFAULTS.continuityChecks),
     continuityQuietMs: readInt(
       "AI_CONTINUITY_QUIET_MS",

@@ -22,7 +22,8 @@
 
 import { logger } from "../../lib/logger.js";
 import { db } from "../../prisma/db.js";
-import { currentUserId } from "./caller.js";
+import { currentRequestId, currentUserId } from "./caller.js";
+import { recordOutcome } from "./health.js";
 import { loadAiConfig } from "./config.js";
 import type { AiUsageRecord, AiUsageSink } from "./types.js";
 
@@ -73,7 +74,12 @@ export function setAiUsageSink(next: AiUsageSink | null): void {
 export function logAiUsage(record: AiUsageRecord): void {
   // A failure to record must never fail the request that generated it.
   try {
-    sink({ ...record, userId: record.userId === undefined ? currentUserId() : record.userId });
+    recordOutcome(record);
+    sink({
+      ...record,
+      userId: record.userId === undefined ? currentUserId() : record.userId,
+      requestId: record.requestId === undefined ? currentRequestId() : record.requestId,
+    });
   } catch (error) {
     logger.warn({ err: error }, "AI usage sink threw");
   }

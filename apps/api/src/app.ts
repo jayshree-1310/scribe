@@ -35,6 +35,7 @@ import uploadsRouter from "./routes/uploads.js";
 import usersRouter from "./routes/users.js";
 import { UPLOAD_ROOT, UPLOAD_URL_PREFIX, describeStorage } from "./lib/storage.js";
 import { describeAiConfig } from "./services/ai/config.js";
+import { aiHealth } from "./services/ai/health.js";
 
 const app = express();
 
@@ -105,7 +106,12 @@ app.get("/health", (_req, res) => {
     // key, no URL; see `describeAiConfig`. Present so a deployment that is
     // still defaulting to the local provider can be spotted in one request
     // rather than inferred from a 503 that every AI failure shares.
-    ai: describeAiConfig(),
+    //
+    // `status` beside it is the provider's health from recent calls -- `ok`,
+    // `degraded` or `unknown` -- and never moves the top-level `status`: AI
+    // being down must not take an app that works without it out of rotation
+    // (Task AI 20, `docs/ai-operations.md`).
+    ai: { ...describeAiConfig(), status: aiHealth() },
     // Likewise for uploads: an object store and this instance's own disk are
     // indistinguishable from outside until a file vanishes on the next deploy.
     storage: describeStorage(),

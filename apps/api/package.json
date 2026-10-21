@@ -19,7 +19,8 @@
     "moderation:pending": "tsx src/scripts/moderate-pending.ts",
     "admin:grant": "tsx src/scripts/grant-admin.ts",
     "ai:eval": "tsx src/ai-eval/run.ts",
-    "ai:prune-usage": "tsx src/scripts/prune-ai-usage.ts"
+    "ai:prune-usage": "tsx src/scripts/prune-ai-usage.ts",
+    "ai:ops": "tsx src/scripts/ai-ops.ts"
   },
   "keywords": [],
   "author": "",

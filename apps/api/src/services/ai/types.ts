@@ -218,6 +218,8 @@ export interface AiUsageRecord extends AiUsage {
    * own work.
    */
   userId?: string | null;
+  /** The request or job it belongs to, from `caller.ts`; logged, not stored. */
+  requestId?: string | null;
   outcome: "ok" | "error";
   /** The failure's stable code, never a provider message. */
   errorCode?: string;

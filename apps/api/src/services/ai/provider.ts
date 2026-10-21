@@ -35,6 +35,7 @@ import {
 import { assertWithinDailyBudget, recordTokenUsage } from "./budget.js";
 import { currentUserId } from "./caller.js";
 import { withStructured } from "./structured.js";
+import { assertFeatureOn } from "./switches.js";
 import type { AiClient, AiEmbedder, AiProvider, AiRequest } from "./types.js";
 import { logAiUsage } from "./usage.js";
 
@@ -227,6 +228,7 @@ function withPolicy(inner: AiProvider): AiProvider {
     name: inner.name,
 
     async complete(request) {
+      await assertFeatureOn(request.feature);
       const userId = currentUserId();
       if (userId) await assertWithinDailyBudget(userId);
 
@@ -239,6 +241,7 @@ function withPolicy(inner: AiProvider): AiProvider {
     },
 
     async *stream(request) {
+      await assertFeatureOn(request.feature);
       const userId = currentUserId();
       if (userId) await assertWithinDailyBudget(userId);
 

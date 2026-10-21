@@ -1033,6 +1033,8 @@ export interface SpendLine {
   /** Input tokens the provider served from its prompt cache, when it says. */
   cachedTokens: number
   avgDurationMs: number
+  p50DurationMs: number
+  p95DurationMs: number
   /** Null unless the server has prices configured. */
   costUsd: number | null
 }

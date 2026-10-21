@@ -65,7 +65,7 @@ function SpendTable<T extends SpendLine>({
             <th scope="col">Tokens in</th>
             <th scope="col">Tokens out</th>
             <th scope="col">Cached</th>
-            <th scope="col">Avg time</th>
+            <th scope="col">p50 / p95</th>
             {priced ? <th scope="col">Cost</th> : null}
           </tr>
         </thead>
@@ -78,7 +78,9 @@ function SpendTable<T extends SpendLine>({
               <td>{number.format(row.inputTokens)}</td>
               <td>{number.format(row.outputTokens)}</td>
               <td>{row.cachedTokens > 0 ? number.format(row.cachedTokens) : '—'}</td>
-              <td>{number.format(row.avgDurationMs)} ms</td>
+              <td>
+                {number.format(row.p50DurationMs)} / {number.format(row.p95DurationMs)} ms
+              </td>
               {priced ? <td>{usd(row.costUsd)}</td> : null}
             </tr>
           ))}
