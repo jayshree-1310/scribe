@@ -38,6 +38,7 @@ import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
 import { BadgesPage } from './pages/BadgesPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { ModerationQueuePage } from './pages/ModerationQueuePage'
+import { AiSpendPage } from './pages/AiSpendPage'
 import { ChannelsPage } from './pages/ChannelsPage'
 import { ChannelDetailPage } from './pages/ChannelDetailPage'
 import { ProfilePage } from './pages/ProfilePage'
@@ -177,6 +178,7 @@ const router = createBrowserRouter(
             arrives by typing the URL, and every request it makes is checked
             again by `assertAdmin`. */}
         <Route path="/moderation" element={<ModerationQueuePage />} />
+        <Route path="/admin/ai-spend" element={<AiSpendPage />} />
 
         {/*
           A workbench for building AI features, not a feature: mounted in

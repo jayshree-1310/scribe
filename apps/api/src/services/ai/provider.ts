@@ -31,6 +31,8 @@ import {
   createOpenAiCompatibleEmbedder,
   createOpenAiCompatibleProvider,
 } from "./openai-compatible.js";
+import { assertWithinDailyBudget, recordTokenUsage } from "./budget.js";
+import { currentUserId } from "./caller.js";
 import { withStructured } from "./structured.js";
 import type { AiClient, AiEmbedder, AiProvider, AiRequest } from "./types.js";
 import { logAiUsage } from "./usage.js";
@@ -92,6 +94,7 @@ function wrap(inner: AiProvider, config: AiConfig): AiProvider {
           logAiUsage({
             ...result.usage,
             feature: request.feature,
+            kind: "chat",
             outcome: "ok",
           });
           return result;
@@ -113,6 +116,7 @@ function wrap(inner: AiProvider, config: AiConfig): AiProvider {
             outputTokens: 0,
             durationMs: Date.now() - startedAt,
             feature: request.feature,
+            kind: "chat",
             outcome: "error",
             errorCode:
               error instanceof HttpError ? error.code : "internal_error",
@@ -139,6 +143,7 @@ function wrap(inner: AiProvider, config: AiConfig): AiProvider {
             logAiUsage({
               ...event.usage,
               feature: request.feature,
+            kind: "chat",
               outcome: "ok",
             });
           }
@@ -152,6 +157,7 @@ function wrap(inner: AiProvider, config: AiConfig): AiProvider {
           outputTokens: 0,
           durationMs: Date.now() - startedAt,
           feature: request.feature,
+            kind: "chat",
           outcome: "error",
           errorCode: error instanceof HttpError ? error.code : "internal_error",
         });
@@ -161,16 +167,89 @@ function wrap(inner: AiProvider, config: AiConfig): AiProvider {
   };
 }
 
+/* Policy: budget and routing ------------------------------------------- */
+
 /**
- * Retry and usage first, structured output on top.
+ * The model for a request: the caller's own choice, else the longest
+ * `AI_FEATURE_MODELS` prefix of its feature, else the configured default.
+ */
+export function modelFor(request: AiRequest, featureModels: Record<string, string>): string | undefined {
+  if (request.model) return request.model;
+  let best: string | undefined;
+  let length = -1;
+  for (const [prefix, model] of Object.entries(featureModels)) {
+    const matches = request.feature === prefix || request.feature.startsWith(`${prefix}.`);
+    if (matches && prefix.length > length) {
+      best = model;
+      length = prefix.length;
+    }
+  }
+  return best;
+}
+
+/**
+ * The per-user budget and per-feature routing, around every call (Task AI 18).
  *
- * The order is the point: `completeStructured` may make two calls, and each
+ * **Refused before the call.** A caller over today's allowance gets a 429
+ * before a token is spent -- every feature, not only the routes that
+ * remembered to check, because the check is here rather than in them. Who the
+ * caller is comes from `caller.ts`; the platform's own work (moderation,
+ * scripts) runs as nobody and is never refused for somebody else's spend.
+ *
+ * **Charged after it**, with what the provider reported, which is the only
+ * number that is not a guess. See `budget.ts` on why that makes it a budget
+ * and not a hard stop.
+ *
+ * Applied to the test fake too (see `setAiProvider`), so a suite can assert
+ * that an over-budget call never reached the model.
+ */
+function withPolicy(inner: AiProvider): AiProvider {
+  const routed = (request: AiRequest): AiRequest => {
+    const model = modelFor(request, loadAiConfig().featureModels);
+    return model && model !== request.model ? { ...request, model } : request;
+  };
+
+  return {
+    name: inner.name,
+
+    async complete(request) {
+      const userId = currentUserId();
+      if (userId) await assertWithinDailyBudget(userId);
+
+      const completion = await inner.complete(routed(request));
+      if (userId) {
+        await recordTokenUsage(userId, completion.usage.inputTokens + completion.usage.outputTokens);
+      }
+      return completion;
+    },
+
+    async *stream(request) {
+      const userId = currentUserId();
+      if (userId) await assertWithinDailyBudget(userId);
+
+      for await (const event of inner.stream(routed(request))) {
+        // Charged when usage exists, which is the terminal event: a stream
+        // the reader abandoned goes uncharged, and was aborted with them.
+        if (event.type === "done" && userId) {
+          await recordTokenUsage(userId, event.usage.inputTokens + event.usage.outputTokens);
+        }
+        yield event;
+      }
+    },
+  };
+}
+
+/**
+ * Retry and usage innermost, then budget and routing, structured output on top.
+ *
+ * The order is the point: the budget is checked once per call that will
+ * actually be made, before its retries, and charged with what it cost. `completeStructured` may make two calls, and each
  * one gets its own retries and its own usage record. Wrapped the other way
  * round, a repaired reply would cost two calls and log one, which is exactly
  * the number you would want when asking why the bill moved.
  */
 function client(inner: AiProvider, config: AiConfig): AiClient {
-  return withStructured(wrap(inner, config), {
+  return withStructured(withPolicy(wrap(inner, config)), {
     structuredOutput: config.structuredOutput,
   });
 }
@@ -204,7 +283,8 @@ export function aiProvider(): AiClient {
 /**
  * Test seam: install a fake, then `resetAiProvider()` in teardown.
  *
- * The fake is given `completeStructured` but **not** retries or usage logging:
+ * The fake is given `completeStructured` and the budget-and-routing policy but
+ * **not** retries or usage logging:
  * a test that scripts one failure expects one failure, and a test that asserts
  * on `fake.calls` is counting the calls its feature made. The structured path
  * is different -- it is the behaviour under test in `structured.test.ts`, and
@@ -219,7 +299,7 @@ export function setAiProvider(provider: AiProvider | null): void {
   const config = loadAiConfig();
   cached = {
     config,
-    provider: withStructured(provider, {
+    provider: withStructured(withPolicy(provider), {
       structuredOutput: config.structuredOutput,
     }),
   };
@@ -273,6 +353,7 @@ function wrapEmbedder(inner: AiEmbedder, config: AiEmbedConfig): AiEmbedder {
           logAiUsage({
             ...result.usage,
             feature: request.feature,
+            kind: "embed",
             outcome: "ok",
           });
           return result;
@@ -294,6 +375,7 @@ function wrapEmbedder(inner: AiEmbedder, config: AiEmbedConfig): AiEmbedder {
             outputTokens: 0,
             durationMs: Date.now() - startedAt,
             feature: request.feature,
+            kind: "embed",
             outcome: "error",
             errorCode:
               error instanceof HttpError ? error.code : "internal_error",

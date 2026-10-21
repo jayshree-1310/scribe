@@ -40,11 +40,14 @@ import { HttpError } from "../../lib/http-error.js";
 import { findVisibleChapterText } from "../stories.js";
 import {
   EXPLAIN_MODES,
+  EXPLAIN_PROMPT,
   EXPLAIN_SYSTEM_PROMPT,
   explainMessage,
   type ExplainMode,
 } from "./prompts/explain.js";
-import { aiProvider } from "./provider.js";
+import { loadAiConfig } from "./config.js";
+import { aiProvider, modelFor } from "./provider.js";
+import { readResult, resultKey, storeResult } from "./result-cache.js";
 import type { AiRequest } from "./types.js";
 
 export { EXPLAIN_MODES };
@@ -208,21 +211,50 @@ export interface Explanation {
   tokensUsed: number;
 }
 
+/**
+ * The cache key for one explanation: everything the reply depends on.
+ *
+ * Explain is the clearest case for `result-cache.ts`: its input is text the
+ * reader can already see, so two readers highlighting the same sentence in
+ * the same mode are asking the same question, and the second is served the
+ * first answer for nothing. The key is computed *after* `resolveSelection`,
+ * so a passage the caller may not read never reaches it.
+ */
+function cacheKeyFor(request: AiRequest, mode: ExplainMode, context: ExplainContext): string {
+  const config = loadAiConfig();
+  return resultKey([
+    EXPLAIN_PROMPT.id,
+    EXPLAIN_PROMPT.version,
+    modelFor(request, config.featureModels) ?? config.model,
+    mode,
+    context.passage,
+    context.before,
+    context.after,
+  ]);
+}
+
 export async function explain(
   userId: string,
   input: ExplainInput,
   signal?: AbortSignal,
 ): Promise<Explanation> {
   const context = await resolveSelection(userId, input);
+  const request = requestFor(input.mode, context, signal);
+  const key = cacheKeyFor(request, input.mode, context);
 
-  const completion = await aiProvider().complete(
-    requestFor(input.mode, context, signal),
-  );
+  const cached = await readResult(key);
+  if (cached !== null) {
+    return { mode: input.mode, passage: context.passage, text: cached, tokensUsed: 0 };
+  }
+
+  const completion = await aiProvider().complete(request);
+  const text = completion.text.trim();
+  await storeResult(key, text);
 
   return {
     mode: input.mode,
     passage: context.passage,
-    text: completion.text.trim(),
+    text,
     tokensUsed:
       completion.usage.inputTokens + completion.usage.outputTokens,
   };
@@ -256,13 +288,27 @@ export async function* explainStream(
   signal?: AbortSignal,
 ): AsyncGenerator<ExplainEvent> {
   const context = await resolveSelection(userId, input);
+  const request = requestFor(input.mode, context, signal);
+  const key = cacheKeyFor(request, input.mode, context);
 
-  for await (const event of aiProvider().stream(
-    requestFor(input.mode, context, signal),
-  )) {
+  // A hit is one delta and a free `done`: there is nothing to stream, and the
+  // client renders a single delta exactly as it renders many.
+  const cached = await readResult(key);
+  if (cached !== null) {
+    yield { type: "text", text: cached };
+    yield { type: "done", tokensUsed: 0 };
+    return;
+  }
+
+  let text = "";
+  for await (const event of aiProvider().stream(request)) {
     if (event.type === "text") {
+      text += event.text;
       yield { type: "text", text: event.text };
     } else {
+      // Stored only once the reply is complete: an abandoned stream never
+      // becomes the answer the next reader gets.
+      await storeResult(key, text.trim());
       yield {
         type: "done",
         tokensUsed: event.usage.inputTokens + event.usage.outputTokens,

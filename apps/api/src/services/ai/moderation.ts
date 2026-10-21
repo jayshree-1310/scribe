@@ -72,6 +72,7 @@ import {
   type ReportTarget,
 } from "../moderation.js";
 import { loadAiModerationConfig, type AiModerationConfig } from "./config.js";
+import { runAs } from "./caller.js";
 import {
   MODERATION_PROMPT,
   MODERATION_PROMPT_VERSION,
@@ -426,7 +427,9 @@ export async function moderateContent(
 
   let classified: Awaited<ReturnType<typeof classify>>;
   try {
-    classified = await classify(target.body, config);
+    // As the platform, never as the commenter: checking a comment is not
+    // their spend, and an over-budget member must still be moderated.
+    classified = await runAs(null, () => classify(target.body, config));
   } catch (error) {
     // Anything the provider seam raises is "the model could not be asked".
     // Anything else is a bug in this file and should look like one.

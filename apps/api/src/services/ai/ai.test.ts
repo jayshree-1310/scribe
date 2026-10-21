@@ -279,7 +279,7 @@ describe("Ollama provider", () => {
       messages: [],
     })) {
       if (event.type === "text") text.push(event.text);
-      else usage = { ...event.usage, feature: "chat", outcome: "ok" };
+      else usage = { ...event.usage, feature: "chat", kind: "chat", outcome: "ok" };
     }
 
     expect(text.join("")).toBe("Once upon a time");

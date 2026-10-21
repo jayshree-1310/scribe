@@ -1871,6 +1871,49 @@ history line, run `ai:eval`.
 
 ## Task AI 18 — Cost and performance
 
+**Status: built.** `services/ai/caller.ts` (whose behalf a call is made on),
+`withPolicy` in `provider.ts` (budget and per-feature routing around every
+call), `usage.ts` persisting to `ai.UsageEvent` (migration
+`20261016T0953_add_ai_usage_events`), `result-cache.ts` used by explain,
+`spend.ts` behind `GET /api/ai/admin/spend`, and an **AI spend** page under
+Administration (`pages/AiSpendPage.tsx`). Tests in `routes/ai-cost.test.ts`.
+Verified against the running dev API: two `/api/ai/chat` calls landed as rows
+attributed to the caller, and the spend page rendered them at desktop and
+phone width.
+
+Four things worth knowing before building on it.
+
+**The budget moved from the routes into the seam.** It used to be checked by
+the routes that remembered — chat and the reader features — while Scribble,
+the assistant, generation and the agent were limited by request count only.
+`withPolicy` now checks before and charges after every call made on a
+person's behalf, and the routes' own `recordTokenUsage` calls are gone so
+nothing is charged twice. Mutation-checked: removing the check fails the test
+that sends an over-budget assistant request and asserts the model was never
+called.
+
+**Who pays is an `AsyncLocalStorage`, not a parameter.** Threading a user id
+through twenty features would have meant twenty chances to forget. The AI
+router runs each request as its caller; the continuity check a save schedules
+runs as the story's author (`runAs`), a minute after the request has gone; and
+moderation runs as nobody, because checking a comment is not the commenter's
+spend and an over-budget member must still be moderated.
+
+**Prompt caching is ready and unreported.** `cachedInputTokens` is read from
+`prompt_tokens_details.cached_tokens`, and every system prompt opens with the
+same base so a prefix cache can hit. Groq returns no such field for
+`gpt-oss-120b` — the same 1,155-token prompt sent twice reported nothing — so
+the column reads 0 on this deployment.
+
+**Levers not pulled, on purpose.** `AI_FEATURE_MODELS` is empty: no feature
+was moved to a cheaper model without an `ai:eval` run saying it holds up.
+Batching is not implemented: embedding runs on the free local embedder, and
+extraction is driven a few chapters at a time by the author.
+
+Still open: no pruning of `ai.UsageEvent`, and a deleted account's rows keep
+its id (both Task AI 19); the budget is enforced from Redis rather than read
+from the table.
+
 **Prompt:**
 
 > Make AI spend visible, then bounded.

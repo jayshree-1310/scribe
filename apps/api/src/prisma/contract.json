@@ -152,6 +152,10 @@
       "model": "StoryView",
       "namespace": "engagement"
     },
+    "usageEvent": {
+      "model": "UsageEvent",
+      "namespace": "ai"
+    },
     "user": {
       "model": "User",
       "namespace": "auth"
@@ -1947,6 +1951,147 @@
               },
               "namespaceId": "ai",
               "table": "storyFact"
+            }
+          },
+          "UsageEvent": {
+            "fields": {
+              "cachedTokens": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "durationMs": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "errorCode": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "feature": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "inputTokens": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "kind": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "outcome": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "outputTokens": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "provider": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "cachedTokens": {
+                  "column": "cachedTokens"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "durationMs": {
+                  "column": "durationMs"
+                },
+                "errorCode": {
+                  "column": "errorCode"
+                },
+                "feature": {
+                  "column": "feature"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "inputTokens": {
+                  "column": "inputTokens"
+                },
+                "kind": {
+                  "column": "kind"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "outcome": {
+                  "column": "outcome"
+                },
+                "outputTokens": {
+                  "column": "outputTokens"
+                },
+                "provider": {
+                  "column": "provider"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "ai",
+              "table": "usageEvent"
             }
           }
         }
@@ -8002,6 +8147,122 @@
                 ]
               },
               "uniques": []
+            },
+            "usageEvent": {
+              "columns": {
+                "cachedTokens": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "durationMs": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "errorCode": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "feature": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "inputTokens": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "kind": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "outcome": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "outputTokens": {
+                  "codecId": "pg/int4@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": 0
+                  },
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "provider": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "userId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "createdAt",
+                    "feature"
+                  ],
+                  "name": "usageEvent_createdAt_feature_idx_8158c4b2",
+                  "prefix": "usageEvent_createdAt_feature_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId",
+                    "createdAt"
+                  ],
+                  "name": "usageEvent_userId_createdAt_idx_f726f04a",
+                  "prefix": "usageEvent_userId_createdAt_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
             }
           }
         },
@@ -11564,10 +11825,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "635824784b98792ea123199a1c0fc7c01fa647c37584c288704e0d342507d931"
+    "storageHash": "b14ab879de7df6f1227004c5b4312618a4ab9132ffab232da3fd955fbb3251c2"
   },
   "execution": {
-    "executionHash": "e8f10f7994f9924e80d74777ccb6ae789bf0509d2e3a57563d42908184c44051",
+    "executionHash": "050034e8d2451633c69fb14c8d2c384f810fb242c9db796213c62fc03dddabdf",
     "mutations": {
       "defaults": [
         {
@@ -11909,6 +12170,17 @@
             "column": "id",
             "namespace": "engagement",
             "table": "storyView"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "ai",
+            "table": "usageEvent"
           }
         },
         {

@@ -28,6 +28,7 @@
  */
 
 import { flushModeration } from "./ai/moderation.js";
+import { flushUsage } from "./ai/usage.js";
 import { flushAnalytics } from "./analytics.js";
 import { flushBadges } from "./gamification.js";
 import { flushNotifications } from "./notifications.js";
@@ -45,7 +46,9 @@ export async function drainDeferredWrites(): Promise<void> {
    * Second band: writers the first band feeds. A badge landing above issues a
    * notification, so this cannot start until that has settled -- and because
    * `flushNotifications` loops until its pending set is empty, work issued
-   * while it runs is caught too.
+   * while it runs is caught too. AI usage rows belong here as well:
+   * moderation, above, calls the model, and each call issues a row as it
+   * lands.
    */
-  await flushNotifications();
+  await Promise.all([flushNotifications(), flushUsage()]);
 }

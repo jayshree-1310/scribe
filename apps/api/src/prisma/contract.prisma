@@ -1752,4 +1752,39 @@ namespace ai {
 
     @@id([decisionId, category])
   }
+
+  /// One model or embedding call: what it cost and how it went (Task AI 18).
+  ///
+  /// Written by the usage sink for every call through the provider seam,
+  /// success or failure, and never with any prompt or completion text -- see
+  /// `services/ai/usage.ts`. `userId` is the caller the request ran as, and
+  /// null for work the platform did on its own behalf (moderation, the eval,
+  /// scripts). No foreign key: the row is a cost record, and it must be
+  /// writable from a fire-and-forget path without a lookup.
+  model UsageEvent {
+    id           String   @id @default(uuid())
+    userId       String?
+    /// The calling feature, as on `AiRequest.feature`: `ask.book`, `assist.tone`.
+    feature      String
+    /// `chat` or `embed`.
+    kind         String
+    provider     String
+    model        String
+    inputTokens  Int      @default(0)
+    outputTokens Int      @default(0)
+    /// Input tokens the provider served from its prompt cache. 0 when it
+    /// reports none, which is not the same as reporting zero.
+    cachedTokens Int      @default(0)
+    durationMs   Int      @default(0)
+    /// `ok` or `error`.
+    outcome      String
+    /// The failure's stable code, never a provider message.
+    errorCode    String?
+    createdAt    DateTime @default(now())
+
+    /// Spend by feature over a window: the admin view.
+    @@index([createdAt, feature])
+    /// One person's spend over a window.
+    @@index([userId, createdAt])
+  }
 }

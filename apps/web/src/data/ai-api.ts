@@ -1021,3 +1021,38 @@ export async function searchStories(
     ...(signal ? { signal } : {}),
   })
 }
+
+/* Administration: spend --------------------------------------------------- */
+
+/** One row of the spend view; see `services/ai/spend.ts`. */
+export interface SpendLine {
+  calls: number
+  errors: number
+  inputTokens: number
+  outputTokens: number
+  /** Input tokens the provider served from its prompt cache, when it says. */
+  cachedTokens: number
+  avgDurationMs: number
+  /** Null unless the server has prices configured. */
+  costUsd: number | null
+}
+
+export type SpendWindow = 1 | 7 | 30
+
+export interface SpendReport {
+  days: SpendWindow
+  priced: boolean
+  total: SpendLine
+  platform: SpendLine
+  byFeature: (SpendLine & { feature: string; kind: string })[]
+  byModel: (SpendLine & { model: string; provider: string })[]
+  topCallers: (SpendLine & { userId: string; username: string | null })[]
+}
+
+/** Administrators only; anybody else gets a 403. */
+export async function getSpend(days: SpendWindow): Promise<SpendReport> {
+  return request<SpendReport>('/ai/admin/spend', {
+    headers: readerHeaders(),
+    query: { days: String(days) },
+  })
+}

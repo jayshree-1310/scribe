@@ -21,6 +21,12 @@ export default defineConfig({
       // Likewise for the continuity check a chapter save schedules: the
       // authoring suites save chapters constantly. Its own suite turns it on.
       AI_CONTINUITY: "off",
+      // Usage rows for every wrapped call would pile up in the dev database
+      // with no fixture user to sweep them; the usage suite turns it on.
+      AI_USAGE_PERSIST: "off",
+      // Suites explain the same passage over and over, and each expects a
+      // model call; the cost suite turns the result cache on for itself.
+      AI_RESULT_CACHE_SECONDS: "0",
     },
   },
 });

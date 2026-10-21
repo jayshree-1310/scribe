@@ -1,5 +1,9 @@
 /**
- * The per-user token budget `config.ts` has always read and nothing enforced.
+ * The per-user token budget.
+ *
+ * Called by `withPolicy` in `provider.ts` around every model call made on a
+ * person's behalf (see `caller.ts`), so every feature is budgeted whether or
+ * not its route remembered to check.
  *
  * A request limit and a token budget answer different questions. Twenty
  * requests is twenty requests whether each one was a sentence or a chapter,
@@ -18,9 +22,8 @@
  *   until it has been generated, so a caller just under the ceiling can cross
  *   it by one request's worth. The ceiling is a budget, not a hard stop.
  * - **It lives in Redis, so it is per-window rather than per-day and it is not
- *   auditable.** Persisted usage, spend by feature and an admin view are Task
- *   AI 18; this is the check that makes `AI_DAILY_TOKEN_BUDGET` mean
- *   something in the meantime.
+ *   auditable.** The audit is `ai.UsageEvent` (`usage.ts`), which the admin
+ *   spend view reads; the two agree to within one call per window.
  */
 
 import { HttpError } from "../../lib/http-error.js";

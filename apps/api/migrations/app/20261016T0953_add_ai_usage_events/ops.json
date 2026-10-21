@@ -1,0 +1,119 @@
+[
+  {
+    "id": "table.usageEvent",
+    "label": "Create table \"usageEvent\"",
+    "summary": "Creates table \"usageEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "usageEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"usageEvent\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"usageEvent\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"usageEvent\"",
+        "sql": "CREATE TABLE \"ai\".\"usageEvent\" (\n  \"cachedTokens\" int4 DEFAULT 0 NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"durationMs\" int4 DEFAULT 0 NOT NULL,\n  \"errorCode\" text,\n  \"feature\" text NOT NULL,\n  \"id\" text NOT NULL,\n  \"inputTokens\" int4 DEFAULT 0 NOT NULL,\n  \"kind\" text NOT NULL,\n  \"model\" text NOT NULL,\n  \"outcome\" text NOT NULL,\n  \"outputTokens\" int4 DEFAULT 0 NOT NULL,\n  \"provider\" text NOT NULL,\n  \"userId\" text,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"usageEvent\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"usageEvent\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.usageEvent.usageEvent_createdAt_feature_idx_8158c4b2",
+    "label": "Create index \"usageEvent_createdAt_feature_idx_8158c4b2\" on \"usageEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "usageEvent_createdAt_feature_idx_8158c4b2",
+        "table": "usageEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"usageEvent_createdAt_feature_idx_8158c4b2\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"usageEvent_createdAt_feature_idx_8158c4b2\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"usageEvent_createdAt_feature_idx_8158c4b2\"",
+        "sql": "CREATE INDEX \"usageEvent_createdAt_feature_idx_8158c4b2\" ON \"ai\".\"usageEvent\" (\"createdAt\", \"feature\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"usageEvent_createdAt_feature_idx_8158c4b2\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"usageEvent_createdAt_feature_idx_8158c4b2\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.usageEvent.usageEvent_userId_createdAt_idx_f726f04a",
+    "label": "Create index \"usageEvent_userId_createdAt_idx_f726f04a\" on \"usageEvent\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "index",
+        "name": "usageEvent_userId_createdAt_idx_f726f04a",
+        "table": "usageEvent"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"usageEvent_userId_createdAt_idx_f726f04a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"usageEvent_userId_createdAt_idx_f726f04a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"usageEvent_userId_createdAt_idx_f726f04a\"",
+        "sql": "CREATE INDEX \"usageEvent_userId_createdAt_idx_f726f04a\" ON \"ai\".\"usageEvent\" (\"userId\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"usageEvent_userId_createdAt_idx_f726f04a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"usageEvent_userId_createdAt_idx_f726f04a\""
+        ]
+      }
+    ]
+  }
+]

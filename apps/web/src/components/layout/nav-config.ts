@@ -32,7 +32,10 @@ export interface NavSection {
 export const ADMIN_NAV: NavSection = {
   id: 'admin',
   label: 'Administration',
-  items: [{ to: '/moderation', label: 'Moderation', icon: 'shield' }],
+  items: [
+    { to: '/moderation', label: 'Moderation', icon: 'shield' },
+    { to: '/admin/ai-spend', label: 'AI spend', icon: 'trend' },
+  ],
 }
 
 export const READER_NAV: NavSection[] = [

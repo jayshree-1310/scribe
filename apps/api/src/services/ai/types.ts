@@ -126,6 +126,11 @@ export interface AiUsage {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  /**
+   * Of `inputTokens`, how many the provider served from its prompt cache.
+   * Absent when the provider does not say -- not the same as zero.
+   */
+  cachedInputTokens?: number;
   durationMs: number;
 }
 
@@ -198,13 +203,21 @@ export interface AiClient extends AiProvider {
 }
 
 /**
- * Where a usage record goes. Defaults to the log; Task AI 18 swaps in a sink
- * that also persists, without touching a single feature.
+ * Where a usage record goes. The default logs it and writes an
+ * `ai.UsageEvent` row (`usage.ts`); a test can swap in its own.
  */
 export type AiUsageSink = (record: AiUsageRecord) => void;
 
 export interface AiUsageRecord extends AiUsage {
   feature: string;
+  /** `chat` for completions, `embed` for embeddings. */
+  kind: "chat" | "embed";
+  /**
+   * Whose behalf the call was made on, filled from `caller.ts` by
+   * `logAiUsage` when the caller of it does not say. Null for the platform's
+   * own work.
+   */
+  userId?: string | null;
   outcome: "ok" | "error";
   /** The failure's stable code, never a provider message. */
   errorCode?: string;

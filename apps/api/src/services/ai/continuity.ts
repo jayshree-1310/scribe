@@ -53,7 +53,8 @@ import {
   type BibleFact,
   type FactOrigin,
 } from "./bible-facts.js";
-import { assertWithinDailyBudget, recordTokenUsage } from "./budget.js";
+import { assertWithinDailyBudget } from "./budget.js";
+import { runAs } from "./caller.js";
 import { loadAiConfig } from "./config.js";
 import {
   CONTINUITY_PROMPT,
@@ -544,10 +545,10 @@ export async function runScheduledCheck(chapterId: string): Promise<void> {
     throw error;
   }
 
-  const result = await checkChapter(chapterId);
+  // As the author, so the provider policy charges their allowance: the
+  // request that scheduled this has been gone for a minute.
+  const result = await runAs(story.authorId, () => checkChapter(chapterId));
   if (!result) return;
-
-  await recordTokenUsage(story.authorId, result.tokensUsed);
 
   if (result.outcome === "failed") {
     logger.warn({ chapterId }, "continuity: check could not run");

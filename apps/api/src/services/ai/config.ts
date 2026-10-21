@@ -53,8 +53,25 @@ export interface AiConfig {
    * needs a deploy to find that out.
    */
   structuredOutput: boolean;
-  /** Per-user daily ceiling, enforced by the routes. 0 disables the check. */
+  /**
+   * Per-user daily ceiling, checked before every model call made on a
+   * person's behalf (`provider.ts`, `withPolicy`). 0 disables the check.
+   */
   dailyTokenBudget: number;
+  /**
+   * A model per feature, from `AI_FEATURE_MODELS` (`bible.extract=<model>,
+   * moderation=<model>`). Matched on the longest feature prefix, and only
+   * when the caller did not name a model itself. Empty by default: a route
+   * is moved to a cheaper model after `ai:eval` says it can be, never on a
+   * guess.
+   */
+  featureModels: Record<string, string>;
+  /** Whether usage is written to `ai.UsageEvent` as well as logged. */
+  usagePersist: boolean;
+  /** USD per million tokens, for the spend view. Null when not configured. */
+  pricing: { inputPerMTok: number; outputPerMTok: number } | null;
+  /** How long a deterministic-enough result is reused; 0 turns the cache off. */
+  resultCacheSeconds: number;
   /**
    * Whether saving a chapter schedules a continuity check (Task AI 14).
    *
@@ -94,6 +111,7 @@ const DEFAULTS = {
   maxRetries: 1,
   structuredOutput: true,
   dailyTokenBudget: 200_000,
+  resultCacheSeconds: 60 * 60 * 24,
   continuityChecks: true,
   continuityQuietMs: 60_000,
   continuityMinConfidence: 0.8,
@@ -135,6 +153,25 @@ function readProvider(): AiProviderName {
   return AI_PROVIDERS.find((name) => name === raw) ?? DEFAULTS.provider;
 }
 
+/** `feature=model,feature=model`, tolerant of spaces; malformed pairs are dropped. */
+function readFeatureModels(): Record<string, string> {
+  const entries = (process.env["AI_FEATURE_MODELS"] ?? "")
+    .split(",")
+    .map((pair) => pair.split("=").map((part) => part.trim()))
+    .filter((pair): pair is [string, string] => pair.length === 2 && pair[0] !== "" && pair[1] !== "");
+  return Object.fromEntries(entries);
+}
+
+/** Both prices or neither: a cost computed from one is a wrong number. */
+function readPricing(): AiConfig["pricing"] {
+  const input = Number(process.env["AI_INPUT_USD_PER_MTOK"]);
+  const output = Number(process.env["AI_OUTPUT_USD_PER_MTOK"]);
+  const set = (name: string) => (process.env[name]?.trim() ?? "") !== "";
+  if (!set("AI_INPUT_USD_PER_MTOK") || !set("AI_OUTPUT_USD_PER_MTOK")) return null;
+  if (!Number.isFinite(input) || !Number.isFinite(output) || input < 0 || output < 0) return null;
+  return { inputPerMTok: input, outputPerMTok: output };
+}
+
 export function loadAiConfig(): AiConfig {
   const provider = readProvider();
   const model = process.env["AI_MODEL"]?.trim() || DEFAULTS.model;
@@ -162,6 +199,10 @@ export function loadAiConfig(): AiConfig {
       "AI_DAILY_TOKEN_BUDGET",
       DEFAULTS.dailyTokenBudget,
     ),
+    featureModels: readFeatureModels(),
+    usagePersist: readFlag("AI_USAGE_PERSIST", true),
+    pricing: readPricing(),
+    resultCacheSeconds: readInt("AI_RESULT_CACHE_SECONDS", DEFAULTS.resultCacheSeconds),
     continuityChecks: readFlag("AI_CONTINUITY", DEFAULTS.continuityChecks),
     continuityQuietMs: readInt(
       "AI_CONTINUITY_QUIET_MS",

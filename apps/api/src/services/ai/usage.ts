@@ -1,38 +1,85 @@
 /**
- * Where AI usage records go.
+ * Where AI usage records go: the log, and `ai.UsageEvent` (Task AI 18).
  *
- * Logging is deliberately the only sink today: a table nobody reads is worse
- * than a log line, and Task AI 18 is where per-user budgets and spend
- * reporting justify persisting these. Swapping the sink is one call to
- * `setAiUsageSink` -- no feature changes.
+ * Every call through the provider seam lands here once -- success or failure,
+ * chat or embedding -- from the wrappers in `provider.ts`. The record names
+ * the feature, the model, the token counts the provider reported (cached
+ * input tokens included, when it reports them), the duration and the outcome,
+ * and the caller it ran as, from `caller.ts`.
  *
  * What is *not* recorded, ever: prompts, completions, or any part of either.
  * A prompt can contain a person's unpublished chapter and a completion can
- * contain their private question, and log streams outlive the requests that
- * wrote them.
+ * contain their private question, and log streams and tables outlive the
+ * requests that wrote them.
+ *
+ * The row is written fire-and-forget: a failure to record must never fail,
+ * or slow, the request that generated it. `flushUsage` settles pending writes
+ * for shutdown, account deletion and the tests; it is in the second band of
+ * `drainDeferredWrites`, because moderation -- in the first -- calls the model.
+ * `AI_USAGE_PERSIST=off` keeps the log line and skips the row; the test
+ * suite runs that way, and the suites that assert on rows turn it on.
  */
 
 import { logger } from "../../lib/logger.js";
+import { db } from "../../prisma/db.js";
+import { currentUserId } from "./caller.js";
+import { loadAiConfig } from "./config.js";
 import type { AiUsageRecord, AiUsageSink } from "./types.js";
 
-const logSink: AiUsageSink = (record) => {
+const pending = new Set<Promise<void>>();
+
+function persist(record: AiUsageRecord): void {
+  if (!loadAiConfig().usagePersist) return;
+
+  const write = db.orm.ai.UsageEvent.create({
+    userId: record.userId ?? null,
+    feature: record.feature.slice(0, 120),
+    kind: record.kind,
+    provider: record.provider,
+    model: record.model.slice(0, 200),
+    inputTokens: record.inputTokens,
+    outputTokens: record.outputTokens,
+    cachedTokens: record.cachedInputTokens ?? 0,
+    durationMs: Math.round(record.durationMs),
+    outcome: record.outcome,
+    errorCode: record.errorCode ?? null,
+  })
+    .then(() => undefined)
+    .catch((error: unknown) => {
+      logger.warn({ err: error }, "AI usage row not written");
+    })
+    .finally(() => {
+      pending.delete(write);
+    });
+
+  pending.add(write);
+}
+
+const defaultSink: AiUsageSink = (record) => {
   const line = { ai: record };
 
   if (record.outcome === "error") logger.warn(line, "AI call failed");
   else logger.info(line, "AI call");
+
+  persist(record);
 };
 
-let sink: AiUsageSink = logSink;
+let sink: AiUsageSink = defaultSink;
 
 export function setAiUsageSink(next: AiUsageSink | null): void {
-  sink = next ?? logSink;
+  sink = next ?? defaultSink;
 }
 
 export function logAiUsage(record: AiUsageRecord): void {
   // A failure to record must never fail the request that generated it.
   try {
-    sink(record);
+    sink({ ...record, userId: record.userId === undefined ? currentUserId() : record.userId });
   } catch (error) {
     logger.warn({ err: error }, "AI usage sink threw");
   }
+}
+
+/** Settles every usage row issued so far, including ones issued while waiting. */
+export async function flushUsage(): Promise<void> {
+  while (pending.size > 0) await Promise.all([...pending]);
 }

@@ -14,7 +14,8 @@
  *   --fail-on-regression   exit 1 when any case regressed (for CI with a key)
  *
  * Pricing is opt-in, because a number made up here would be worse than none:
- * set `AI_EVAL_INPUT_USD_PER_MTOK` and `AI_EVAL_OUTPUT_USD_PER_MTOK` to the
+ * set `AI_EVAL_INPUT_USD_PER_MTOK` and `AI_EVAL_OUTPUT_USD_PER_MTOK` (or the
+ * server's `AI_INPUT_USD_PER_MTOK` / `AI_OUTPUT_USD_PER_MTOK`) to the
  * provider's published prices and cost per case is reported in dollars.
  */
 
@@ -26,6 +27,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { redis } from "../lib/redis.js";
 import { db } from "../prisma/db.js";
+import { loadAiConfig } from "../services/ai/config.js";
 import { compareRuns, formatComparison } from "./compare.js";
 import { DATASET, type EvalCase } from "./dataset.js";
 import { runEval, type EvalRun, type Pricing } from "./runner.js";
@@ -37,13 +39,18 @@ function argument(name: string): string | undefined {
   return index === -1 ? undefined : process.argv[index + 1];
 }
 
+/** The eval's own prices, else the server's (`AI_*_USD_PER_MTOK`), else none. */
 function pricingFromEnv(): Pricing | null {
   const input = Number(process.env["AI_EVAL_INPUT_USD_PER_MTOK"]);
   const output = Number(process.env["AI_EVAL_OUTPUT_USD_PER_MTOK"]);
-  if (!Number.isFinite(input) || !Number.isFinite(output) || process.env["AI_EVAL_INPUT_USD_PER_MTOK"] === undefined) {
-    return null;
+  if (
+    process.env["AI_EVAL_INPUT_USD_PER_MTOK"] !== undefined &&
+    Number.isFinite(input) &&
+    Number.isFinite(output)
+  ) {
+    return { inputPerMTok: input, outputPerMTok: output };
   }
-  return { inputPerMTok: input, outputPerMTok: output };
+  return loadAiConfig().pricing;
 }
 
 /** The newest result file, by name -- names are ISO timestamps. */

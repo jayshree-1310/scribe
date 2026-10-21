@@ -61,8 +61,8 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/config.ts` | Reads `AI_*` from the environment. Never throws at import; `isAiConfigured()` reports a missing credential. |
 | `services/ai/ollama.ts` | The default implementation: plain HTTP to a local Ollama server, no SDK, no key. Maps transport and protocol failures onto `HttpError`. |
 | `services/ai/provider.ts` | Constructs the provider (once), wraps it with retry and usage policy, and hands it out via `aiProvider()`. The only place a client is built. `aiEmbedder()` is the same for embeddings, and a second accessor because it is a second service. |
-| `services/ai/usage.ts` | Where usage records go. Logs today; Task AI 18 swaps the sink for one that also persists. |
-| `services/ai/budget.ts` | The per-user token ceiling `config.ts` reads. Checked before a call, charged after one. Not a second limiter: the read side *is* `isRateLimited`. |
+| `services/ai/usage.ts` | Where usage records go: the log, and an `ai.UsageEvent` row per call (never text), fire-and-forget and settled by `drainDeferredWrites`. |
+| `services/ai/budget.ts` | The per-user token ceiling, checked before and charged after every call by `withPolicy` in `provider.ts`. Not a second limiter: the read side *is* `isRateLimited`. |
 | `services/ai/chat.ts` | Task AI 1's feature: a prompt in, a reply out, streamed or not. The only AI call with nothing around it, which is what makes it the thing to test a provider with. |
 | `services/ai/prompts/chat.ts` | The one prompt that says what Scribe is. Its load-bearing rule is the one forbidding catalogue facts: chat has no retrieval to be right from. |
 | `services/ai/json-schema.ts` | Derives the JSON schema sent to a provider from a zod schema, pruned to the keyword subset every provider accepts. |
@@ -105,6 +105,9 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/prompts/registry.ts` | Every prompt by id; `resolvePrompt(id, version)` turns a stored row's pair into its definition and says whether it is current. |
 | `services/ai/prompts/repair.ts` | The structured-output repair turn, moved out of `structured.ts`. |
 | `services/ai/prompts/prompts.test.ts` | Snapshots of every rendered prompt (`__snapshots__/`), a planted injection in every input of every message builder, registry completeness, and a scan for prompt text outside `prompts/`. |
+| `services/ai/caller.ts` | Task AI 18: whose behalf a model call is made on, in an `AsyncLocalStorage` set by the AI router; `runAs` for background work done for someone, `null` for the platform's own. |
+| `services/ai/spend.ts` | The admin spend report: one `GROUPING SETS` scan of `ai.UsageEvent` for the total, by feature, by model and by caller. |
+| `services/ai/result-cache.ts` | Results reused by a hash of everything they depend on (prompt id and version, model, input). Redis, best effort; used by explain. |
 | `services/ai/tools.ts` | Task AI 15: the five tools — a zod schema and a plain function over an existing service each — and `runTool`, which validates arguments and turns every failure into a result. |
 | `services/ai/agent.ts` | The tool loop: model call, run what it chose, feed results back, until it answers or a cap (tool calls, model calls, tokens) forces the last call. |
 | `services/ai/prompts/agent.ts` | The assistant's rules, the fences around tool results and the user's message, and the wrap-up line for a capped last call. |
@@ -292,30 +295,28 @@ one field whose value multiplies the bill.
 
 ### Two limits, not one
 
-Every AI route is rate-limited per user, and `/api/ai/chat` is additionally
-charged against a token budget. They answer different questions, which is why
-both exist: twenty requests is twenty requests whether each one was a sentence
-or a chapter, so `lib/rate-limit.ts` caps how *often* somebody can ask and
-`services/ai/budget.ts` caps how much they can spend doing it.
+Every AI route is rate-limited per user, and every model call made on a
+person's behalf is charged against a daily token budget. They answer different
+questions, which is why both exist: twenty requests is twenty requests whether
+each one was a sentence or a chapter, so `lib/rate-limit.ts` caps how *often*
+somebody can ask and `services/ai/budget.ts` caps how much they can spend
+doing it.
 
-The budget is checked before the call and charged after it, because what a
-completion costs is not known until it has been generated — so it is a budget
-rather than a hard stop, and a caller just under the ceiling can cross it by one
-request's worth. Neither refusal counts as an attempt: a caller who was turned
-away did not get to ask, and charging them for it would extend their own
-lockout. A stream is charged even when the reader has already closed the tab,
-because the tokens were generated either way.
+Since Task AI 18 the budget lives in the provider seam, not in the routes:
+`withPolicy` in `provider.ts` checks it before every call and charges what the
+provider reported after it, for every feature, so a route cannot forget.
+Whose budget comes from `services/ai/caller.ts` — an `AsyncLocalStorage` the
+AI router sets per request — and work the platform does for itself
+(moderation, scripts, the eval) runs as nobody and is never refused. The
+routes that checked it themselves still do, before recording a rate-limit
+attempt, so a refused caller is not also charged an attempt.
 
-`AI_DAILY_TOKEN_BUDGET=0` disables it. Persisted usage, spend by feature, an
-admin view and the same check on every other feature are Task AI 18; this is
-what makes the setting mean something in the meantime.
-
-The reader features — recap, explain and ask — are charged against it as well,
-and they are the reason it stopped being enough to charge `/api/ai/chat` alone. Everything else here is
-reachable by an *author*, working on their own story — a bounded population
-doing bounded work. `/api/ai/explain` is reachable by every signed-in reader on
-every published chapter, which makes it the widest-open AI surface in the app
-and the first one where request-rate alone would not describe the spend.
+It is checked before the call and charged after it, because what a completion
+costs is not known until it has been generated — so it is a budget rather than
+a hard stop, and a caller just under the ceiling can cross it by one call's
+worth. A stream is charged on its terminal event, so a stream the reader
+abandoned goes uncharged; the disconnect aborted the call with them, and the
+rate limit caps doing that on purpose. `AI_DAILY_TOKEN_BUDGET=0` disables it.
 
 ### Generated content is cached by what it was generated from
 
@@ -789,6 +790,44 @@ The page is then chosen from a pool four pages deep by
 `services/recommendation-diversity.ts`: two stories per author, half the page
 per genre, with held-back stories filling any room left.
 
+## Cost and usage
+
+Every call through the seam — chat or embedding, success or failure — lands in
+`logAiUsage`, which logs it and writes an `ai.UsageEvent` row: feature, kind,
+provider, model, input, output and cached-input tokens, duration, outcome,
+error code and the caller from `caller.ts`. Never prompt or completion text;
+the table has no column to hold it. The write is fire-and-forget and settled by
+`drainDeferredWrites` (second band, after moderation, which calls the model).
+`AI_USAGE_PERSIST=off` keeps the log line and skips the row; the test suite
+runs that way and `ai-cost.test.ts` turns it on.
+
+The levers, cheapest first:
+
+- **Prompt caching** is automatic on the providers that do it, and is a prefix
+  match — which is why every system prompt opens with the same `SCRIBE_BASE`.
+  `cachedInputTokens` is read from `prompt_tokens_details.cached_tokens`.
+  Groq does not report that field for `gpt-oss-120b` (checked with the same
+  1,155-token prompt sent twice), so the column reads 0 there; that is the
+  provider not reporting, not a volatile prefix.
+- **Results cached by input hash.** Recaps, bible readings, continuity checks
+  and embeddings already were. `result-cache.ts` adds explain: the key is the
+  prompt id and version, the routed model, the mode and the passage with its
+  context, computed after the visibility check. A hit makes no call and is
+  charged nothing. `AI_RESULT_CACHE_SECONDS` (default a day, 0 off).
+- **Right-sizing the model** is `AI_FEATURE_MODELS=feature=model,…`, longest
+  feature prefix wins, applied only when the caller named no model. Empty by
+  default: move a feature after `ai:eval` says the cheaper model holds up.
+- **Batching** is not done. The offline work here is embedding, which runs on
+  the local embedder for free, and extraction, which the author drives a few
+  chapters at a time; neither is worth a provider batch API's file-upload
+  round trip yet.
+
+`GET /api/ai/admin/spend?days=1|7|30` (administrators) and the **AI spend**
+page under Administration show it by feature, model and heaviest caller, with
+the platform's own spend separately. Dollars appear only when
+`AI_INPUT_USD_PER_MTOK` and `AI_OUTPUT_USD_PER_MTOK` are set to the provider's
+published prices; there is no built-in price table.
+
 ## Prompts
 
 Every prompt module defines its prompt with `definePrompt` and builds its
@@ -920,16 +959,14 @@ and which cases regressed. It costs real calls, so it is not part of
   saying why: an abstraction over two implementations written before either is
   exercised is a guess. The seam is shaped and the second file is small when
   there is a key to test it with.
-- **The remaining features.** Tasks AI 18 onward. Of Task AI 6 only the chapter recap was built; the story-level
+- **The remaining features.** Tasks AI 19 onward. Of Task AI 6 only the chapter recap was built; the story-level
   summary, the spoiler-free summary and the map-reduce that a multi-chapter
   summary needs are not here.
-- **Persisted usage, and budgets everywhere else.** The sink still only logs,
-  and the table is Task AI 18. `services/ai/budget.ts` enforces
-  `AI_DAILY_TOKEN_BUDGET` on `/api/ai/chat` and on the reader features
-  (`/api/ai/recap`, `/api/ai/explain`, `/api/ai/ask` and conversation turns,
-  which every signed-in reader can reach rather than only authors); Scribble, the assistant and generation
-  are still rate-limited by *request* only, which caps the blast radius but
-  not the spend.
+- **A budget read from the usage table.** Enforcement still counts in Redis
+  over a rolling window (`budget.ts`), which is fast and cannot be audited;
+  `ai.UsageEvent` is the audit. They agree to within one call per window.
+- **Retention of usage rows.** Nothing prunes `ai.UsageEvent` yet, and an
+  account's rows keep its id after the account is deleted. Task AI 19.
 - **Answer regeneration.** A conversation turn cannot be re-asked or
   edited, and the summary is never rebuilt from scratch, so an early
   summarisation mistake persists for the life of the conversation.

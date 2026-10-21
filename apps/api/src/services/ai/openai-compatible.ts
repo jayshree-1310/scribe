@@ -50,7 +50,11 @@ interface ChatChoice {
 
 interface ChatResponse {
   choices?: ChatChoice[];
-  usage?: { prompt_tokens?: number; completion_tokens?: number };
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    prompt_tokens_details?: { cached_tokens?: number };
+  };
   error?: { message?: string };
 }
 
@@ -64,6 +68,12 @@ function toUsage(
     model,
     inputTokens: body.usage?.prompt_tokens ?? 0,
     outputTokens: body.usage?.completion_tokens ?? 0,
+    // Prompt caching is automatic on the providers that do it -- a prefix
+    // match, which is why every system prompt opens with the same base --
+    // and this is the only evidence it happened.
+    ...(body.usage?.prompt_tokens_details?.cached_tokens !== undefined
+      ? { cachedInputTokens: body.usage.prompt_tokens_details.cached_tokens }
+      : {}),
     durationMs: Date.now() - startedAt,
   };
 }

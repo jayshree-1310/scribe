@@ -14,11 +14,13 @@ import { z } from "zod";
 import { HttpError } from "../lib/http-error.js";
 import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
 import { parseOrThrow } from "../lib/validate.js";
-import { requireUser, requireUserId } from "../middleware/current-user.js";
 import {
-  assertWithinDailyBudget,
-  recordTokenUsage,
-} from "../services/ai/budget.js";
+  getUserId,
+  requireUser,
+  requireUserId,
+} from "../middleware/current-user.js";
+import { runAs } from "../services/ai/caller.js";
+import { assertWithinDailyBudget } from "../services/ai/budget.js";
 import { PROMPT_LIMIT, chat, chatStream } from "../services/ai/chat.js";
 import {
   GENERATION_KINDS,
@@ -78,11 +80,23 @@ import {
   getChapterContinuity,
 } from "../services/ai/continuity.js";
 import { MESSAGE_LIMIT, runAgent } from "../services/ai/agent.js";
+import { SPEND_WINDOWS, spendReport, type SpendWindow } from "../services/ai/spend.js";
+import { assertAdmin } from "../services/roles.js";
 import { FACT_KINDS } from "../services/ai/schemas.js";
 import { MAX_PAGE_SIZE } from "../services/stories.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
+
+/**
+ * Every model call a request makes runs as its caller (`services/ai/caller.ts`),
+ * which is what the provider's budget check and the usage rows read. Before
+ * `requireUser`, which each route still applies: an anonymous request runs as
+ * nobody and is then refused by it.
+ */
+router.use((req, _res, next) => {
+  runAs(getUserId(req), () => next());
+});
 
 /**
  * Deliberately tighter than the auth limiter's: a model call occupies a CPU
@@ -236,10 +250,6 @@ router.post("/chat", requireUser, async (req, res, next) => {
     await chargeChat(userId);
 
     const reply = await chat(prompt, abortOnDisconnect(res).signal);
-    // After the fact, necessarily: what a completion costs is not known until
-    // it exists. See `services/ai/budget.ts` on why that is a budget rather
-    // than a hard stop.
-    await recordTokenUsage(userId, reply.usage.totalTokens);
 
     res.json(reply);
   } catch (error) {
@@ -273,14 +283,6 @@ router.post("/chat/stream", requireUser, async (req, res, next) => {
     const disconnect = abortOnDisconnect(res);
 
     for await (const event of chatStream(prompt, disconnect.signal)) {
-      if (event.type === "done") {
-        // The terminal event is the only place usage exists, so a stream the
-        // reader abandoned goes uncharged. That is tolerable rather than
-        // ideal: the disconnect aborted the provider call with it, so there is
-        // little left to have charged for, and the request limit above still
-        // caps how often somebody can do it on purpose.
-        await recordTokenUsage(userId, event.usage.totalTokens);
-      }
       if (!writeEvent(res, event)) break;
     }
 
@@ -770,9 +772,6 @@ router.post(
         abortOnDisconnect(res).signal,
       );
 
-      // Zero on a cache hit, so a reader served from the table is charged
-      // nothing -- see `RecapGeneration`.
-      await recordTokenUsage(userId, result.tokensUsed);
 
       res.json({ available: result.available, recap: result.recap });
     } catch (error) {
@@ -854,7 +853,6 @@ router.post("/explain", requireUser, async (req, res, next) => {
       input,
       abortOnDisconnect(res).signal,
     );
-    await recordTokenUsage(userId, result.tokensUsed);
 
     res.json({
       mode: result.mode,
@@ -881,13 +879,6 @@ router.post("/explain/stream", requireUser, async (req, res, next) => {
       input,
       disconnect.signal,
     )) {
-      if (event.type === "done") {
-        // The terminal event is the only place usage exists, so a reader who
-        // navigated away goes uncharged -- the disconnect aborted the call
-        // with them, and the request limit above still caps deliberate abuse.
-        // Same trade as `/chat/stream`.
-        await recordTokenUsage(userId, event.tokensUsed);
-      }
       if (!writeEvent(res, event)) break;
     }
 
@@ -975,8 +966,6 @@ router.post("/ask", requireUser, async (req, res, next) => {
     await chargeAsk(userId);
 
     const result = await askBook(userId, input, abortOnDisconnect(res).signal);
-    // Zero when the story did not cover the question: no model was asked.
-    await recordTokenUsage(userId, result.tokensUsed);
 
     res.json({
       answer: result.answer,
@@ -1000,11 +989,6 @@ router.post("/ask/stream", requireUser, async (req, res, next) => {
     const disconnect = abortOnDisconnect(res);
 
     for await (const event of askBookStream(userId, input, disconnect.signal)) {
-      if (event.type === "done") {
-        // Same trade as `/explain/stream`: an abandoned stream goes uncharged,
-        // and the request limit above caps doing that on purpose.
-        await recordTokenUsage(userId, event.tokensUsed);
-      }
       if (!writeEvent(res, event)) break;
     }
 
@@ -1137,9 +1121,6 @@ router.post("/conversations/:id/messages", requireUser, async (req, res, next) =
       { content: body.content, upToChapter: body.upToChapter ?? null },
       disconnect.signal,
     )) {
-      if (event.type === "done") {
-        await recordTokenUsage(userId, event.tokensUsed);
-      }
       if (!writeEvent(res, event)) break;
     }
 
@@ -1335,8 +1316,6 @@ router.post("/bible/:storyId/refresh", requireUser, async (req, res, next) => {
       abortOnDisconnect(res).signal,
     );
 
-    // Zero when every chapter asked about was already current.
-    await recordTokenUsage(userId, result.tokensUsed);
 
     res.json({ processed: result.processed, bible: result.bible });
   } catch (error) {
@@ -1453,7 +1432,6 @@ router.post(
         abortOnDisconnect(res).signal,
       );
 
-      await recordTokenUsage(userId, result.tokensUsed);
 
       res.json(result.continuity);
     } catch (error) {
@@ -1530,9 +1508,33 @@ router.post("/agent", requireUser, async (req, res, next) => {
       { userId, signal: abortOnDisconnect(res).signal },
     );
 
-    await recordTokenUsage(userId, result.tokensUsed);
 
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/* Administration: spend -------------------------------------------------- */
+
+const spendSchema = z.object({
+  days: z.coerce
+    .number()
+    .refine((value): value is SpendWindow => (SPEND_WINDOWS as readonly number[]).includes(value), {
+      message: `Choose one of ${SPEND_WINDOWS.join(", ")} days.`,
+    })
+    .default(7),
+});
+
+/**
+ * AI spend by feature, model and caller, for administrators. Not rate-limited
+ * for the reason the other reads here are not: it calls no model.
+ */
+router.get("/admin/spend", requireUser, async (req, res, next) => {
+  try {
+    await assertAdmin(requireUserId(res));
+    const { days } = parseOrThrow(spendSchema, req.query);
+    res.json(await spendReport(days as SpendWindow));
   } catch (error) {
     next(error);
   }
