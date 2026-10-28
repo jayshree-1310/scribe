@@ -33,7 +33,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'5654ec2c5bf2c32761d6123bfc98d2e336984295d3738b44b739bf753169c25f'>;
+  StorageHashBase<'c4c461506692484099836f39eaf626650fd2b2da0d5681cb0367cdd730447bb4'>;
 export type ExecutionHash =
   ExecutionHashBase<'06620e7504ae1b114a55b97bd6ede41507cf47aff9beaa6b4eb16c1e919a052a'>;
 export type ProfileHash =
@@ -406,6 +406,13 @@ export type FieldOutputTypes = {
       readonly promptId: CodecTypes['pg/text@1']['output'];
       readonly promptVersion: CodecTypes['pg/int4@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    };
+    readonly StoryVector: {
+      readonly storyId: CodecTypes['pg/text@1']['output'];
+      readonly model: CodecTypes['pg/text@1']['output'];
+      readonly dimensions: CodecTypes['pg/int4@1']['output'];
+      readonly passages: CodecTypes['pg/int4@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
     readonly UsageEvent: {
@@ -903,6 +910,13 @@ export type FieldInputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
+    readonly StoryVector: {
+      readonly storyId: CodecTypes['pg/text@1']['input'];
+      readonly model: CodecTypes['pg/text@1']['input'];
+      readonly dimensions: CodecTypes['pg/int4@1']['input'];
+      readonly passages: CodecTypes['pg/int4@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+    };
     readonly UsageEvent: {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly userId: CodecTypes['pg/text@1']['input'] | null;
@@ -1398,6 +1412,13 @@ export type StorageColumnTypes = {
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly upToChapter: CodecTypes['pg/int4@1']['output'];
     };
+    readonly storyVector: {
+      readonly dimensions: CodecTypes['pg/int4@1']['output'];
+      readonly model: CodecTypes['pg/text@1']['output'];
+      readonly passages: CodecTypes['pg/int4@1']['output'];
+      readonly storyId: CodecTypes['pg/text@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    };
     readonly usageEvent: {
       readonly cachedTokens: CodecTypes['pg/int4@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
@@ -1892,6 +1913,13 @@ export type StorageColumnInputTypes = {
       readonly text: CodecTypes['pg/text@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly upToChapter: CodecTypes['pg/int4@1']['input'];
+    };
+    readonly storyVector: {
+      readonly dimensions: CodecTypes['pg/int4@1']['input'];
+      readonly model: CodecTypes['pg/text@1']['input'];
+      readonly passages: CodecTypes['pg/int4@1']['input'];
+      readonly storyId: CodecTypes['pg/text@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
     readonly usageEvent: {
       readonly cachedTokens: CodecTypes['pg/int4@1']['input'];
@@ -3513,6 +3541,53 @@ type ContractBase = Omit<
                   readonly source: {
                     readonly namespaceId: 'ai' & NamespaceId;
                     readonly tableName: 'storySummary';
+                    readonly columns: readonly ['storyId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'content' & NamespaceId;
+                    readonly tableName: 'story';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
+            readonly storyVector: {
+              columns: {
+                readonly storyId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly model: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly dimensions: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly passages: {
+                  readonly nativeType: 'int4';
+                  readonly codecId: 'pg/int4@1';
+                  readonly nullable: false;
+                };
+                readonly updatedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+              };
+              primaryKey: { readonly columns: readonly ['storyId'] };
+              uniques: readonly [];
+              indexes: readonly [];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'ai' & NamespaceId;
+                    readonly tableName: 'storyVector';
                     readonly columns: readonly ['storyId'];
                   };
                   readonly target: {
@@ -6377,6 +6452,7 @@ type ContractBase = Omit<
       readonly namespace: 'ai' & NamespaceId;
       readonly model: 'ChapterChunk';
     };
+    readonly storyVector: { readonly namespace: 'ai' & NamespaceId; readonly model: 'StoryVector' };
     readonly conversation: {
       readonly namespace: 'ai' & NamespaceId;
       readonly model: 'Conversation';
@@ -7582,6 +7658,57 @@ type ContractBase = Omit<
                 readonly promptId: { readonly column: 'promptId' };
                 readonly promptVersion: { readonly column: 'promptVersion' };
                 readonly createdAt: { readonly column: 'createdAt' };
+                readonly updatedAt: { readonly column: 'updatedAt' };
+              };
+            };
+          };
+          readonly StoryVector: {
+            readonly fields: {
+              readonly storyId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly model: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly dimensions: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly passages: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
+              };
+              readonly updatedAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+            };
+            readonly relations: {
+              readonly story: {
+                readonly to: {
+                  readonly namespace: 'content' & NamespaceId;
+                  readonly model: 'Story';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['storyId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'storyVector';
+              readonly namespaceId: 'ai';
+              readonly fields: {
+                readonly storyId: { readonly column: 'storyId' };
+                readonly model: { readonly column: 'model' };
+                readonly dimensions: { readonly column: 'dimensions' };
+                readonly passages: { readonly column: 'passages' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
               };
             };
@@ -9488,6 +9615,17 @@ type ContractBase = Omit<
                   readonly model: 'StorySummary';
                 };
                 readonly cardinality: '1:N';
+                readonly on: {
+                  readonly localFields: readonly ['id'];
+                  readonly targetFields: readonly ['storyId'];
+                };
+              };
+              readonly storyVector: {
+                readonly to: {
+                  readonly namespace: 'ai' & NamespaceId;
+                  readonly model: 'StoryVector';
+                };
+                readonly cardinality: '1:1';
                 readonly on: {
                   readonly localFields: readonly ['id'];
                   readonly targetFields: readonly ['storyId'];

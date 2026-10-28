@@ -481,6 +481,8 @@ namespace content {
     continuityDismissals ai.ContinuityDismissal[]
     /// Generated summaries of the story, whole or up to a chapter.
     storySummaries       ai.StorySummary[]
+    /// The average of its published passages; see `ai.StoryVector`.
+    storyVector          ai.StoryVector?
   }
 
   model Chapter {
@@ -1376,6 +1378,35 @@ namespace ai {
     /// Retrieval filters by story; the backfill and reuse path looks up by hash.
     @@index([storyId])
     @@index([chapterId, contentHash])
+  }
+
+  /// One story as one point in embedding space: the average of its published
+  /// passages, for the recommender's `similar` term.
+  ///
+  /// Derived, and written by the pass that writes the passages
+  /// (`refreshStoryVector` in `services/ai/embeddings.ts`): after a chapter is
+  /// embedded, unpublished or deleted. Before this table the recommender
+  /// averaged every candidate's passages on every request -- fine at a few
+  /// hundred rows, and the one part of its statement that grew with the
+  /// corpus rather than with the reader.
+  ///
+  /// Like `ChapterChunk`, the vector itself is added by the migration with raw
+  /// SQL and read and written only through `embeddings.ts`'s raw-SQL lane, for
+  /// the reason given there. `model` and `dimensions` say which space it is
+  /// in, so a model change makes the row incomparable rather than wrong.
+  ///
+  /// No row means no published passage in that space, and the story scores
+  /// zero on the term -- what it scored before, when its average was null.
+  model StoryVector {
+    storyId    String   @id
+    /// The embedding model of the passages it averages.
+    model      String
+    dimensions Int
+    /// How many passages it is the average of. Never zero: that is no row.
+    passages   Int
+    updatedAt  DateTime @default(now())
+
+    story content.Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
   }
 
   /// One reader's Ask This Book conversation about one story.

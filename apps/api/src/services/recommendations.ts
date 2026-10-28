@@ -304,14 +304,13 @@ interface RankedRow {
  *   [-1, 1] and a reader with four hundred shelved books does not score
  *   differently from one with four. Floored at 1 so it can never divide by
  *   zero or amplify a single row into certainty.
- * - `passage` — the stored vectors that may be compared: the configured
- *   model and width only, because a vector from another model is a point in
- *   another space, and published chapters only, so a chapter embedded and then
- *   unpublished stops shaping anybody's shelf. Not materialised, so it is a
- *   filter the two reads below share rather than a copy of the table.
+ * - `vector` — each story's stored vector (`ai.storyVector`): the average of
+ *   its published passages, kept current by the embedding pass and by every
+ *   chapter publish, unpublish and delete. The configured model and width
+ *   only, because a vector from another model is a point in another space.
  * - `anchor` — the stories the reader liked (their signal weights sum above
- *   zero) that are still listed and have vectors, each as the average of its
- *   passages, most recently touched first, at most `MAX_ANCHORS`. Disliked
+ *   zero) that are still listed and have vectors, most recently touched
+ *   first, at most `MAX_ANCHORS`. Disliked
  *   stories are not anchors: this term only ever adds, because "unlike a
  *   story you rated badly" is not something a card can say.
  * - `candidate` — listed Scribe stories the reader has not met and did not
@@ -320,14 +319,14 @@ interface RankedRow {
  * - `measured` — each candidate's raw inputs, including its word count from a
  *   lateral over published chapters. One lateral per candidate row, which is
  *   the shape `services/analytics.ts` uses and for the same reason: the
- *   alternative multiplies rows against the genre join. Two more laterals
- *   average the candidate's own passages and find the one anchor nearest that
- *   average -- cosine, the distance the vectors were trained for. The nearest
+ *   alternative multiplies rows against the genre join. The candidate's own
+ *   vector is joined, and a lateral finds the one anchor nearest it --
+ *   cosine, the distance the vectors were trained for. The nearest
  *   anchor rather than the reader's average taste, for two reasons: a reader
  *   who likes both heist novels and pastoral romance has no meaningful
  *   midpoint, and "similar to this one book" is a reason a card can give.
- *   Two guards there: a candidate is only averaged when there is an anchor
- *   to compare it with, and a `NaN` similarity is read as zero -- pgvector
+ *   Two guards there: a candidate's vector is only joined when there is an
+ *   anchor to compare it with, and a `NaN` similarity is read as zero -- pgvector
  *   answers `NaN` for a zero vector, and `NaN` sorts above every number, so
  *   unguarded an empty vector would score full marks.
  * - `weighted` — the eight terms. Similarity is scaled across the band
@@ -338,11 +337,9 @@ interface RankedRow {
  * The whole thing is one statement, so the database sees one plan and this
  * process never holds more than the rows it asked for.
  *
- * What will not scale as written: every candidate's vector is averaged from
- * its passages on every request. That is a few hundred rows today. When it is
- * not, the fix is a stored vector per story, written by the same pass that
- * embeds its chapters -- the statement keeps its shape and `passage` becomes a
- * table.
+ * Story vectors are stored rather than averaged here: averaging every
+ * candidate's passages on every request was the one part of this statement
+ * that grew with the corpus rather than with the reader.
  */
 async function rankStories(
   userId: string,
@@ -393,14 +390,11 @@ async function rankStories(
     "scale" AS (
       SELECT GREATEST(COALESCE(MAX(ABS("weight")), 1.0), 1.0) AS "max" FROM "taste"
     ),
-    "passage" AS NOT MATERIALIZED (
-      SELECT pc."storyId", pc."embedding"
-        FROM "ai"."chapterChunk" AS pc
-        JOIN "content"."chapter" AS pch ON pch."id" = pc."chapterId"
-       WHERE pc."model" = ${model}
-         AND pc."dimensions" = ${dimensions}
-         AND pc."embedding" IS NOT NULL
-         AND pch."publishedAt" IS NOT NULL
+    "vector" AS NOT MATERIALIZED (
+      SELECT sv."storyId", sv."embedding"
+        FROM "ai"."storyVector" AS sv
+       WHERE sv."model" = ${model}
+         AND sv."dimensions" = ${dimensions}
     ),
     "liked" AS (
       SELECT sig."storyId", MIN(sig."via") AS "via", MAX(sig."at") AS "at"
@@ -409,15 +403,11 @@ async function rankStories(
       HAVING SUM(sig."weight") > 0
     ),
     "anchor" AS (
-      SELECT l."storyId", l."via", ls."title", av."vector"
+      SELECT l."storyId", l."via", ls."title", av."embedding" AS "vector"
         FROM "liked" AS l
         JOIN "content"."story" AS ls
           ON ls."id" = l."storyId" AND ls."listedAt" IS NOT NULL
-        JOIN LATERAL (
-              SELECT AVG(p."embedding") AS "vector"
-                FROM "passage" AS p
-               WHERE p."storyId" = l."storyId"
-             ) AS av ON av."vector" IS NOT NULL
+        JOIN "vector" AS av ON av."storyId" = l."storyId"
        ORDER BY l."at" DESC, l."storyId" DESC
        LIMIT ${MAX_ANCHORS}
     ),
@@ -468,9 +458,9 @@ async function rankStories(
                  AND ch."publishedAt" IS NOT NULL
              ) AS w ON TRUE
         LEFT JOIN LATERAL (
-              SELECT AVG(p."embedding") AS "vector"
-                FROM "passage" AS p
-               WHERE p."storyId" = c."id"
+              SELECT v."embedding" AS "vector"
+                FROM "vector" AS v
+               WHERE v."storyId" = c."id"
                  AND EXISTS (SELECT 1 FROM "anchor")
              ) AS cv ON TRUE
         LEFT JOIN LATERAL (

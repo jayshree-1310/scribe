@@ -152,6 +152,10 @@
       "model": "StorySummary",
       "namespace": "ai"
     },
+    "storyVector": {
+      "model": "StoryVector",
+      "namespace": "ai"
+    },
     "storyView": {
       "model": "StoryView",
       "namespace": "engagement"
@@ -2102,6 +2106,83 @@
               },
               "namespaceId": "ai",
               "table": "storySummary"
+            }
+          },
+          "StoryVector": {
+            "fields": {
+              "dimensions": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "model": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "passages": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "storyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "story": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "storyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Story",
+                  "namespace": "content"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "dimensions": {
+                  "column": "dimensions"
+                },
+                "model": {
+                  "column": "model"
+                },
+                "passages": {
+                  "column": "passages"
+                },
+                "storyId": {
+                  "column": "storyId"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "ai",
+              "table": "storyVector"
             }
           },
           "UsageEvent": {
@@ -4966,6 +5047,21 @@
                 },
                 "to": {
                   "model": "StorySummary",
+                  "namespace": "ai"
+                }
+              },
+              "storyVector": {
+                "cardinality": "1:1",
+                "on": {
+                  "localFields": [
+                    "id"
+                  ],
+                  "targetFields": [
+                    "storyId"
+                  ]
+                },
+                "to": {
+                  "model": "StoryVector",
                   "namespace": "ai"
                 }
               },
@@ -8431,6 +8527,65 @@
                   ]
                 }
               ]
+            },
+            "storyVector": {
+              "columns": {
+                "dimensions": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "model": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "passages": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "storyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "storyId"
+                    ],
+                    "namespaceId": "ai",
+                    "tableName": "storyVector"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "story"
+                  }
+                }
+              ],
+              "indexes": [],
+              "primaryKey": {
+                "columns": [
+                  "storyId"
+                ]
+              },
+              "uniques": []
             },
             "usageEvent": {
               "columns": {
@@ -12109,7 +12264,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "5654ec2c5bf2c32761d6123bfc98d2e336984295d3738b44b739bf753169c25f"
+    "storageHash": "c4c461506692484099836f39eaf626650fd2b2da0d5681cb0367cdd730447bb4"
   },
   "execution": {
     "executionHash": "06620e7504ae1b114a55b97bd6ede41507cf47aff9beaa6b4eb16c1e919a052a",

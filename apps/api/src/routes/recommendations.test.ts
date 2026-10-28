@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { db } from "../prisma/db.js";
 import { embedChapter } from "../services/ai/embeddings.js";
 import { resetAiEmbedder, setAiEmbedder } from "../services/ai/provider.js";
 import { fakeAiEmbedder } from "../services/ai/testing.js";
@@ -115,6 +116,9 @@ let moneyReader: string;
 let seaBook: string;
 let moneyBook: string;
 let seaStory: { id: string; slug: string };
+/** Its one chapter, and its author: what unpublishing it takes. */
+let seaChapter: string;
+let seaAuthorId: string;
 let moneyStory: { id: string; slug: string };
 let hiddenSeaStory: { id: string; slug: string };
 
@@ -206,7 +210,8 @@ beforeAll(async () => {
     title: "Salt And Signal",
     authorId: seaAuthor,
   });
-  await chapterOf(seaStory.id, 1, "The harbour emptied with the tide.");
+  seaChapter = await chapterOf(seaStory.id, 1, "The harbour emptied with the tide.");
+  seaAuthorId = seaAuthor;
 
   moneyStory = await api.createStory({
     title: "Double Entry",
@@ -501,6 +506,40 @@ describe.skipIf(!available)("content similarity", () => {
     const list = await recommend(seaReader);
 
     expect(positionOf(list, seaBook)).toBe(-1);
+  });
+
+  it("follows a chapter being unpublished and published again", async () => {
+    const vectorOf = () =>
+      db.orm.ai.StoryVector.select("passages", "model")
+        .where((row) => row.storyId.eq(seaStory.id))
+        .first();
+
+    const stored = await vectorOf();
+    expect(stored).toMatchObject({ model: "fake-recommend" });
+    expect(stored?.passages).toBeGreaterThan(0);
+
+    // Its only published chapter goes: no published passage, no vector, and
+    // nothing left to resemble the reader's shelf with.
+    const publish = (action: "publish" | "unpublish") =>
+      api.request(`/api/author/chapters/${seaChapter}/${action}`, {
+        method: "POST",
+        as: seaAuthorId,
+      });
+
+    try {
+      expect((await publish("unpublish")).status).toBe(200);
+      expect(await vectorOf()).toBeNull();
+      expect(itemOf(await recommend(seaReader), seaStory.id)?.reason ?? "").not.toMatch(
+        /^Similar to/,
+      );
+    } finally {
+      // Back again, from the windows still stored -- no embedding needed. In
+      // a finally, so a failure above cannot leave the fixture unpublished
+      // for every test after this one.
+      expect((await publish("publish")).status).toBe(200);
+    }
+    expect((await vectorOf())?.passages).toBe(stored?.passages);
+    expect(itemOf(await recommend(seaReader), seaStory.id)?.reason).toMatch(/^Similar to/);
   });
 
   it("ignores vectors written by a model it is not configured with", async () => {

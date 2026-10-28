@@ -22,7 +22,9 @@ import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
 import { deleteAll } from "../prisma/delete-all.js";
 import { scheduleContinuityCheck } from "./ai/continuity-queue.js";
+import { refreshStoryVector } from "./ai/embeddings.js";
 import { scheduleChapterEmbedding } from "./ai/job-schedule.js";
+import { logger } from "../lib/logger.js";
 import { discardUpload } from "./uploads.js";
 import { evaluateBadges } from "./gamification.js";
 import { notify } from "./notifications.js";
@@ -671,13 +673,27 @@ export async function unpublishStory(
   return getStory(storyId, userId);
 }
 
+/**
+ * Re-averages a story's vector for the recommender after a chapter changes
+ * which passages count (`refreshStoryVector`). A stale vector skews a ranking
+ * a little; failing the publish that made it stale would be worse, so a
+ * failure is logged and the next embedding corrects it.
+ */
+async function refreshVectorQuietly(storyId: string): Promise<void> {
+  try {
+    await refreshStoryVector(storyId);
+  } catch (error) {
+    logger.warn({ err: error, storyId }, "story vector not refreshed");
+  }
+}
+
 export async function publishChapter(
   userId: string,
   chapterId: string,
 ): Promise<AuthoredChapter> {
   const timestamp = now();
 
-  await db.transaction(async (tx) => {
+  const storyId = await db.transaction(async (tx) => {
     const { chapter } = await ownedChapter(tx, chapterId, userId);
 
     if (chapter.content.trim().length === 0) {
@@ -694,6 +710,7 @@ export async function publishChapter(
     }
 
     await touchStory(tx, chapter.storyId, timestamp);
+    return chapter.storyId;
   });
 
   // Chapters published. Not on `updateChapter`, which is called on every
@@ -704,6 +721,8 @@ export async function publishChapter(
   // Into the search index, off the request path (`ai/jobs.ts`). The handler
   // embeds only if the story is listed, so a chapter of a draft waits.
   void scheduleChapterEmbedding(chapterId, 0);
+  // Windows stored before an earlier unpublish count again at once.
+  await refreshVectorQuietly(storyId);
 
   return loadChapter(chapterId);
 }
@@ -714,7 +733,7 @@ export async function unpublishChapter(
 ): Promise<AuthoredChapter> {
   const timestamp = now();
 
-  await db.transaction(async (tx) => {
+  const storyId = await db.transaction(async (tx) => {
     const { chapter } = await ownedChapter(tx, chapterId, userId);
 
     await tx.orm.content.Chapter.where((row) => row.id.eq(chapterId)).update({
@@ -723,7 +742,11 @@ export async function unpublishChapter(
     });
 
     await touchStory(tx, chapter.storyId, timestamp);
+    return chapter.storyId;
   });
+
+  // Its passages stay stored, but stop shaping anybody's recommendations.
+  await refreshVectorQuietly(storyId);
 
   return loadChapter(chapterId);
 }
@@ -967,6 +990,8 @@ export async function deleteChapter(
   });
 
   await discardUploads(media);
+  // Its passages went with it (the foreign key cascades).
+  await refreshVectorQuietly(storyId);
 
   return listMyChapters(userId, storyId);
 }

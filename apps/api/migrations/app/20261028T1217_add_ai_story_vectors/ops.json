@@ -1,0 +1,120 @@
+[
+  {
+    "id": "table.storyVector",
+    "label": "Create table \"storyVector\"",
+    "summary": "Creates table \"storyVector\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "table",
+        "name": "storyVector"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"storyVector\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"storyVector\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"storyVector\"",
+        "sql": "CREATE TABLE \"ai\".\"storyVector\" (\n  \"dimensions\" int4 NOT NULL,\n  \"model\" text NOT NULL,\n  \"passages\" int4 NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"storyId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"storyVector\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"ai\".\"storyVector\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.storyVector.embedding",
+    "label": "Add column \"embedding\" vector(768) to \"storyVector\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Add column \"embedding\" to \"ai\".\"storyVector\"",
+        "sql": "ALTER TABLE \"ai\".\"storyVector\" ADD COLUMN \"embedding\" vector(768) NOT NULL"
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "foreignKey.storyVector.storyVector_storyId_fkey",
+    "label": "Add foreign key \"storyVector_storyId_fkey\" on \"storyVector\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "foreignKey",
+        "name": "storyVector_storyId_fkey",
+        "table": "storyVector"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"storyVector_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyVector_storyId_fkey",
+          "ai",
+          "\"ai\".\"storyVector\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"storyVector_storyId_fkey\"",
+        "sql": "ALTER TABLE \"ai\".\"storyVector\"\nADD CONSTRAINT \"storyVector_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"storyVector_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "storyVector_storyId_fkey",
+          "ai",
+          "\"ai\".\"storyVector\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data.ai.storyVector.backfill",
+    "label": "Average each story's published passages into ai.storyVector",
+    "operationClass": "data",
+    "target": {
+      "id": "ai.storyVector",
+      "details": {
+        "schema": "ai",
+        "name": "storyVector",
+        "objectType": "table"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "One averaged vector per story, from its published passages",
+        "sql": "INSERT INTO \"ai\".\"storyVector\"\n                    (\"storyId\", \"model\", \"dimensions\", \"passages\", \"embedding\")\n                  SELECT DISTINCT ON (pc.\"storyId\")\n                         pc.\"storyId\", pc.\"model\", pc.\"dimensions\",\n                         COUNT(*)::int, AVG(pc.\"embedding\")\n                    FROM \"ai\".\"chapterChunk\" AS pc\n                    JOIN \"content\".\"chapter\" AS ch ON ch.\"id\" = pc.\"chapterId\"\n                   WHERE pc.\"embedding\" IS NOT NULL\n                     AND ch.\"publishedAt\" IS NOT NULL\n                   GROUP BY pc.\"storyId\", pc.\"model\", pc.\"dimensions\"\n                   ORDER BY pc.\"storyId\", COUNT(*) DESC, pc.\"model\""
+      }
+    ],
+    "postcheck": []
+  }
+]

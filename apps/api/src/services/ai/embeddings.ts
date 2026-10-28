@@ -258,6 +258,17 @@ export async function embedChapter(
   chapter: { id: string; storyId: string; content: string },
   signal?: AbortSignal,
 ): Promise<ChapterEmbedding> {
+  const result = await embedChapterWindows(chapter, signal);
+  // Every path, unchanged included: publishing a chapter whose windows were
+  // already stored changes which of them the story's average counts.
+  await refreshStoryVector(chapter.storyId);
+  return result;
+}
+
+async function embedChapterWindows(
+  chapter: { id: string; storyId: string; content: string },
+  signal?: AbortSignal,
+): Promise<ChapterEmbedding> {
   const embedder = aiEmbedder();
   const chunks = chunkChapter(chapter.content);
   const stored = await storedChunks(chapter.id);
@@ -412,6 +423,62 @@ export function embeddingSpace(): EmbeddingSpace | null {
     if (error instanceof HttpError && error.status === 503) return null;
     throw error;
   }
+}
+
+/* Story vectors ---------------------------------------------------------- */
+
+/**
+ * Re-averages one story's published passages into `ai.storyVector`, or
+ * removes its row when it has none in the configured space.
+ *
+ * Called wherever the average can change: after a chapter's windows are
+ * written (`embedChapter`), and when a chapter is published, unpublished or
+ * deleted (`services/authoring.ts`). One statement, so a reader never sees a
+ * story with its old row deleted and its new one not yet written. The
+ * recommender reads these rows instead of averaging every candidate's
+ * passages on every request.
+ *
+ * Does nothing without an embedder: no configured space means there is
+ * nothing to compare with, and the rows already stored say which space
+ * they are in.
+ */
+export async function refreshStoryVector(storyId: string): Promise<void> {
+  const space = embeddingSpace();
+  if (space === null) return;
+
+  const plan = db.raw.sql`
+    WITH "average" AS (
+      SELECT COUNT(*)::int AS "passages", AVG(pc."embedding") AS "vector"
+        FROM "ai"."chapterChunk" AS pc
+        JOIN "content"."chapter" AS ch ON ch."id" = pc."chapterId"
+       WHERE pc."storyId" = ${storyId}
+         AND pc."model" = ${space.model}
+         AND pc."dimensions" = ${space.dimensions}
+         AND pc."embedding" IS NOT NULL
+         AND ch."publishedAt" IS NOT NULL
+    ),
+    "gone" AS (
+      DELETE FROM "ai"."storyVector"
+       WHERE "storyId" = ${storyId}
+         AND (SELECT "passages" FROM "average") = 0
+    )
+    INSERT INTO "ai"."storyVector"
+      ("storyId", "model", "dimensions", "passages", "embedding", "updatedAt")
+    SELECT ${storyId}, ${space.model}, ${space.dimensions},
+           a."passages", a."vector", now()
+      FROM "average" AS a
+     WHERE a."passages" > 0
+    ON CONFLICT ("storyId") DO UPDATE
+       SET "model" = EXCLUDED."model",
+           "dimensions" = EXCLUDED."dimensions",
+           "passages" = EXCLUDED."passages",
+           "embedding" = EXCLUDED."embedding",
+           "updatedAt" = EXCLUDED."updatedAt"
+  `
+    .affectedCount()
+    .build();
+
+  await db.runtime().query(plan);
 }
 
 /* Inspection ------------------------------------------------------------- */

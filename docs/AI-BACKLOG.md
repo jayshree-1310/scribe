@@ -1323,10 +1323,20 @@ the one part of the feature not in SQL: a greedy pass depends on what was
 already picked, and it is a pure function so the caps are tested without a
 database.
 
-Still open: every candidate's vector is re-averaged on every request, which is
-a few hundred rows today — the fix is a stored vector per story written by the
-embedding pass; and Scribble's retrieval stage could now call this scorer
-instead of `listBooks`, as the note above says.
+~~Still open: every candidate's vector is re-averaged on every request.~~
+Stored now: `ai.StoryVector`, one row per story (migration
+`20261028T1217_add_ai_story_vectors`, which also fills it from the passages
+already stored). `refreshStoryVector` re-averages a story in one statement
+after `embedChapter` — on every path, unchanged included, because publishing
+changes which windows count — and after a chapter is published, unpublished
+or deleted; a failure there is logged, never fails the write. The ranking
+statement joins the rows instead of averaging passages. Tests in
+`recommendations.test.ts` › *follows a chapter being unpublished and
+published again* (the unpublish refresh mutation-checked); the existing
+similarity tests pass unchanged on stored vectors.
+
+Still open: Scribble's retrieval stage could now call this scorer instead of
+`listBooks`, as the note above says.
 
 **Prompt:**
 

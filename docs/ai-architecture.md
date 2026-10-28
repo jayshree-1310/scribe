@@ -782,8 +782,10 @@ fence. The check is switched off for the test suite in `vitest.config.ts`.
 ## Recommendations
 
 `GET /api/recommendations` is not an AI route and calls no model. Its scorer
-(`services/recommendations.ts`) gained one term, `similar`, that reads the
-chunk table: a story's vector is the average of its published passages, a
+(`services/recommendations.ts`) gained one term, `similar`, that reads
+`ai.storyVector`: one row per story, the average of its published passages,
+written by `refreshStoryVector` after a chapter is embedded and whenever one
+is published, unpublished or deleted (so nothing is averaged per request). A
 candidate is compared with the nearest story the reader liked, and the cosine
 similarity is scaled across `AI_RECOMMEND_MIN_SIMILARITY` –
 `AI_RECOMMEND_FULL_SIMILARITY` (0.70 – 0.85 for `nomic-embed-text`; whole
@@ -791,7 +793,9 @@ stories sit far closer together than a query and a passage, so the band is
 narrow and high). It is arithmetic on stored rows inside the one ranking
 statement, so it costs no tokens and has no outage path; `embeddingSpace()`
 names the model whose rows are comparable, and rows from any other model are
-ignored. Unpublished chapters are excluded from the average.
+ignored. Unpublished chapters are excluded from the average. The migration
+that added the table (`20261028T1217_add_ai_story_vectors`) filled it from
+the passages already stored.
 
 The page is then chosen from a pool four pages deep by
 `services/recommendation-diversity.ts`: two stories per author, half the page
