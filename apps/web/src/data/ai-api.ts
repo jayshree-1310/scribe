@@ -927,6 +927,37 @@ export interface AgentAnswer {
   tokensUsed: number
 }
 
+/** One earlier question and its answer, oldest first: the assistant's memory. */
+export interface AgentExchange {
+  question: string
+  answer: string
+}
+
+/**
+ * What the server accepts as memory, mirroring `HISTORY_LIMIT` and
+ * `HISTORY_ANSWER_LIMIT` in `services/ai/agent.ts`.
+ */
+export const AGENT_HISTORY_LIMIT = 6
+export const AGENT_HISTORY_ANSWER_LIMIT = 2_000
+
+/**
+ * The streamed assistant: each lookup as it starts and as it finishes, then
+ * the answer whole. Mirrors `AgentEvent` in `services/ai/agent.ts`.
+ */
+export type AgentEvent =
+  | { type: 'lookup'; tool: string }
+  | { type: 'step'; step: AgentStep }
+  | ({ type: 'done' } & AgentAnswer)
+
+export async function* streamAgent(
+  message: string,
+  storyId: string | null,
+  history: AgentExchange[],
+  signal?: AbortSignal,
+): AsyncGenerator<AgentEvent> {
+  yield* streamRequest<AgentEvent>('/ai/agent/stream', { message, storyId, history }, signal)
+}
+
 export async function askAgent(
   message: string,
   storyId: string | null,

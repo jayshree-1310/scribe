@@ -9,7 +9,7 @@
  * service, answer. The model work lives in `services/ai/`.
  */
 
-import { Router, type Response } from "express";
+import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { HttpError } from "../lib/http-error.js";
 import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
@@ -91,7 +91,13 @@ import {
   dismissFinding,
   getChapterContinuity,
 } from "../services/ai/continuity.js";
-import { MESSAGE_LIMIT, runAgent } from "../services/ai/agent.js";
+import {
+  HISTORY_ANSWER_LIMIT,
+  HISTORY_LIMIT,
+  MESSAGE_LIMIT,
+  agentEvents,
+  runAgent,
+} from "../services/ai/agent.js";
 import { getStorySummary, regenerateStorySummaries } from "../services/ai/summaries.js";
 import { ensureChapterSummary } from "../services/ai/recap.js";
 import { db } from "../prisma/db.js";
@@ -1684,40 +1690,87 @@ const agentSchema = z.object({
     ),
   /** The story on screen, if any. Authorised by each tool that uses it. */
   storyId: z.string().trim().min(1).max(200).nullish(),
+  /**
+   * The conversation so far, oldest first, as the client holds it. Context
+   * for a follow-up, never a source, and never a way to widen what a tool
+   * returns: the tools run as the session's user whatever this says.
+   */
+  history: z
+    .array(
+      z.object({
+        question: z.string().trim().min(1).max(MESSAGE_LIMIT),
+        answer: z.string().trim().min(1).max(HISTORY_ANSWER_LIMIT),
+      }),
+    )
+    .max(HISTORY_LIMIT, `Send at most ${HISTORY_LIMIT} earlier exchanges.`)
+    .default([]),
 });
 
 /**
- * Ask the assistant, which decides for itself what to look up.
- *
- * Not streamed: what takes the time is the lookups between model calls, and
- * the answer arrives in one piece at the end of them. The trace of what was
- * looked up is returned beside it so nothing about the answer is a black box.
+ * Everything both agent routes check before the loop starts: the caller, the
+ * body, the request limit and the day's budget. Charged here, before the
+ * first model call, because one request is several of them.
+ */
+async function startAgent(req: Request, res: Response) {
+  const userId = requireUserId(res);
+  const body = parseOrThrow(agentSchema, req.body);
+
+  const key = `ai:agent:${userId}`;
+  const status = await isRateLimited(key, AGENT_LIMIT);
+  if (status.limited) {
+    throw HttpError.tooManyRequests(
+      "You have asked the assistant a lot in a short time. Try again shortly.",
+      status.retryAfter,
+    );
+  }
+  await assertWithinDailyBudget(userId);
+  await recordAttempt(key, AGENT_WINDOW_SECONDS);
+
+  return {
+    input: { message: body.message, storyKey: body.storyId ?? null, history: body.history },
+    // The identity every tool runs as. From the session, never the body.
+    context: { userId, signal: abortOnDisconnect(res).signal },
+  };
+}
+
+/**
+ * Ask the assistant, which decides for itself what to look up, and get the
+ * answer in one piece. The trace of what was looked up is returned beside it
+ * so nothing about the answer is a black box.
  */
 router.post("/agent", requireUser, async (req, res, next) => {
   try {
-    const userId = requireUserId(res);
-    const body = parseOrThrow(agentSchema, req.body);
-
-    const key = `ai:agent:${userId}`;
-    const status = await isRateLimited(key, AGENT_LIMIT);
-    if (status.limited) {
-      throw HttpError.tooManyRequests(
-        "You have asked the assistant a lot in a short time. Try again shortly.",
-        status.retryAfter,
-      );
-    }
-    await assertWithinDailyBudget(userId);
-    await recordAttempt(key, AGENT_WINDOW_SECONDS);
-
-    const result = await runAgent(
-      { message: body.message, storyKey: body.storyId ?? null },
-      // The identity every tool runs as. From the session, never the body.
-      { userId, signal: abortOnDisconnect(res).signal },
-    );
-
-
-    res.json(result);
+    const { input, context } = await startAgent(req, res);
+    res.json(await runAgent(input, context));
   } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * The same, streamed as progress: each lookup as it starts (`lookup`) and as
+ * it finishes (`step`), then the answer (`done`). What takes the time is the
+ * lookups between model calls, so that is what is worth showing; the answer
+ * still arrives whole.
+ */
+router.post("/agent/stream", requireUser, async (req, res, next) => {
+  try {
+    const { input, context } = await startAgent(req, res);
+    for await (const event of agentEvents(input, context)) {
+      if (!writeEvent(res, event)) break;
+    }
+    if (!res.writableEnded) res.end();
+  } catch (error) {
+    if (
+      reportStreamFailure(
+        res,
+        error,
+        "The assistant could not answer just now.",
+        "agent stream failed",
+      )
+    ) {
+      return;
+    }
     next(error);
   }
 });

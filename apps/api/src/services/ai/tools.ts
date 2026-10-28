@@ -34,6 +34,7 @@
 import { z, type ZodType } from "zod";
 import { HttpError } from "../../lib/http-error.js";
 import { logger } from "../../lib/logger.js";
+import { listMyChapters } from "../authoring.js";
 import { getStory, listChapters, type Story } from "../stories.js";
 import {
   QUESTION_LIMIT,
@@ -44,6 +45,7 @@ import {
 import { normalise } from "./bible-facts.js";
 import { getChapterContinuity } from "./continuity.js";
 import { jsonSchemaFor } from "./json-schema.js";
+import { literalSearch } from "./literal-search.js";
 import { QUERY_LIMIT, search } from "./search.js";
 import { getBible } from "./story-bible.js";
 import type { AiToolCall, AiToolDefinition } from "./types.js";
@@ -77,6 +79,9 @@ function defineTool<Args>(tool: AgentTool<Args>): AgentTool<Args> {
  * This Book's whole passage block.
  */
 export const RESULT_LIMIT = 6000;
+
+/** Passages one `search_chapters` call returns, whichever way they were found. */
+const PASSAGE_LIMIT = 6;
 
 /** A story by slug or id, as every story route accepts. */
 const storyKey = z
@@ -149,6 +154,7 @@ const searchChapters = defineTool({
   description:
     "Search the text of one story's chapters for passages relevant to a question. " +
     "Only searches chapters the reader has reached, so it cannot spoil later ones. " +
+    "For the user's own story it also searches every chapter, drafts included, for the question's words. " +
     "Returns up to six passages in reading order, or none when nothing is relevant.",
   schema: z.object({
     storyId: storyKey,
@@ -171,16 +177,45 @@ const searchChapters = defineTool({
       "agent.tool.search_chapters",
     );
 
+    const found = passages.map((passage) => ({
+      chapterNumber: passage.chapterNumber,
+      chapterTitle: passage.chapterTitle,
+      text: clip(readableQuote(passage.text), 900) ?? "",
+    }));
+
+    /**
+     * The author's drafts, by their words. Drafts are never embedded (see
+     * `literal-search.ts`), so for the one person who may read them the
+     * search by meaning above sees only what is published. `listMyChapters`
+     * is the editor's own read and re-checks ownership; nothing it returns
+     * reaches anyone but the author.
+     */
+    if (setting.scope.basis === "author") {
+      const chapters = await listMyChapters(context.userId, setting.story.id);
+      const byWords = literalSearch(
+        chapters.map((chapter) => ({
+          chapterNumber: chapter.number,
+          chapterTitle: chapter.title,
+          content: readableQuote(chapter.content),
+        })),
+        args.query,
+        PASSAGE_LIMIT,
+      );
+      for (const hit of byWords) {
+        if (found.length >= PASSAGE_LIMIT) break;
+        const text = clip(hit.text, 900) ?? "";
+        if (found.some((passage) => passage.text.includes(text.slice(0, 120)))) continue;
+        found.push({ chapterNumber: hit.chapterNumber, chapterTitle: hit.chapterTitle, text });
+      }
+      found.sort((a, b) => a.chapterNumber - b.chapterNumber);
+    }
+
     return {
       story: setting.story.title,
       // Which chapters were searched, so the model can say so rather than
       // implying the story is silent on something it simply has not reached.
       searchedUpToChapter: setting.scope.upToChapter,
-      passages: passages.map((passage) => ({
-        chapterNumber: passage.chapterNumber,
-        chapterTitle: passage.chapterTitle,
-        text: clip(readableQuote(passage.text), 900),
-      })),
+      passages: found,
     };
   },
 });

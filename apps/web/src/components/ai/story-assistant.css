@@ -1,0 +1,130 @@
+/**
+ * "Ask about this story", in the editor's side column.
+ *
+ * Built from the continuity panel's vocabulary -- same muted surface, same
+ * badge -- so the editor's AI surfaces read as one family. The column is
+ * narrow, so the conversation scrolls inside the card rather than pushing the
+ * chapter list off the screen.
+ */
+
+.story-assistant {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.story-assistant__intro {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.story-assistant__list {
+  display: grid;
+  gap: var(--space-3);
+  /* The side column is sticky, so the question box has to stay on screen
+     beside the chapter list on a short laptop display too. */
+  max-height: min(28rem, 45vh);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.story-assistant__exchange {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.story-assistant__question {
+  justify-self: end;
+  max-width: 90%;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-2, var(--surface));
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.story-assistant__steps {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.story-assistant__steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  overflow-wrap: anywhere;
+}
+
+.story-assistant__steps li > svg {
+  flex: none;
+  margin-top: 0.15em;
+  color: var(--brand);
+}
+
+.story-assistant__steps li.is-unavailable > svg {
+  color: var(--text-muted);
+}
+
+.story-assistant__looking {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.story-assistant__answer {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.story-assistant__answer p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/** The same badge the assistant and continuity panels wear. */
+.story-assistant__badge {
+  justify-self: start;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.story-assistant__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--danger, var(--text));
+  font-size: var(--text-sm);
+}
+
+.story-assistant__form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.story-assistant__form > :first-child {
+  flex: 1;
+  min-width: 0;
+}

@@ -42,6 +42,7 @@ import { AssistPanel, type AssistRequest } from '../../components/ai/AssistPanel
 import { ASSIST_MENU } from '../../components/ai/assist-actions'
 import type { AssistAction } from '../../data/ai-api'
 import { ContinuityPanel } from '../../components/ai/ContinuityPanel'
+import { StoryAssistant } from '../../components/ai/StoryAssistant'
 import { countWords, renderChapter } from '../../lib/chapter-markdown'
 import '../pages.css'
 import './author.css'
@@ -1395,6 +1396,13 @@ export function StoryEditorPage() {
               ))}
             </ol>
           </Card>
+
+          {/*
+            Once the story exists on the server: its tools look the story up
+            by id, and a story that has never been saved has nothing to find.
+            Keyed so another story starts a fresh conversation.
+          */}
+          {storyId !== null ? <StoryAssistant key={storyId} storyId={storyId} /> : null}
         </aside>
       </div>
 

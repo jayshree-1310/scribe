@@ -176,7 +176,11 @@ function userMessages(text: (field: string) => string): Record<string, string> {
       claims: [fact({ subject: text("claim.subject"), quote: text("claim.quote") })],
       established: [fact({ value: text("fact.value"), quote: text("fact.quote") })],
     }),
-    agent: agentMessage({ message: text("agent.message"), storyKey: text("agent.storyKey") }),
+    agent: agentMessage({
+      message: text("agent.message"),
+      storyKey: text("agent.storyKey"),
+      history: [{ question: text("agent.question"), answer: text("agent.answer") }],
+    }),
     "agent.result": toolResultMessage(JSON.stringify({ title: text("tool.result") })),
     "eval.judge": judgeMessage({
       question: text("judge.question"),

@@ -1672,7 +1672,9 @@ two unknowns at once.
 `services/ai/agent.ts` (the loop), `prompts/agent.ts`; tool calling added to
 the seam (`AiRequest.tools` / `toolChoice`, `AiCompletion.toolCalls`, tool-call
 and tool-result messages) and to both providers and the fake;
-`POST /api/ai/agent`; an **Agent (tools)** mode on `/ai-lab` showing the trace.
+`POST /api/ai/agent` and its streamed twin `/agent/stream`; **Ask about this
+story** in the story editor (`components/ai/StoryAssistant.tsx`); an **Agent
+(tools)** mode on `/ai-lab` showing the raw trace.
 Tests in `routes/ai-agent.test.ts` and `services/ai/tools.test.ts`. Verified
 against `gpt-oss-120b` on Groq: "find me a story about time travel and tell me
 who the main character is" made one `search_stories` call and answered from
@@ -1706,9 +1708,23 @@ anything, or pick its identity (undeclared argument keys are stripped).
 name, outcome, code and duration; arguments and results, which carry the
 user's question and other members' writing, go only to the caller.
 
-Still open: no streaming (progress shows only when the request finishes), no
-conversation memory across requests, and the assistant is reachable only from
-the dev-only AI lab — no product surface yet.
+~~Still open: no streaming, no conversation memory across requests, and no
+product surface.~~ All three closed. `/agent/stream` sends each lookup as it
+starts and finishes, then the answer. Up to six earlier exchanges travel with
+each request as fenced context (prompt version 3), never as a source and
+never stored. And the surface is **Ask about this story** in the story editor,
+for authors — the people the bible and continuity tools answer. Building it
+surfaced a real gap: drafts are never embedded, so `search_chapters` could not
+see an author's own unpublished chapters; for the author it now also matches
+the question's words against every chapter (`literal-search.ts`). Verified in
+the dev app against `gpt-oss-120b`: "what colour are her eyes?" after a
+question about Mira searched the chapters and answered from an unpublished
+draft. Tests in `ai-agent.test.ts` › *memory*, *streamed* and *an author's
+drafts*, the author-only guard mutation-checked.
+
+Still open: the conversation lives in the editor session only, not across
+devices; and Ask This Book's author scope note says "drafts included" while
+its retrieval, being embedding-only, does not reach drafts.
 
 **Prompt:**
 

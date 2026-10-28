@@ -894,8 +894,13 @@ working, and it costs a call per row.
 
 ## Tools
 
-`POST /api/ai/agent` takes `{ message, storyId? }` and lets the model decide
-what to look up. The seam grew for it: `AiRequest.tools` and `toolChoice`,
+`POST /api/ai/agent` takes `{ message, storyId?, history? }` and lets the
+model decide what to look up; `POST /api/ai/agent/stream` is the same loop as
+server-sent events — `lookup` as each tool starts, `step` as it finishes,
+then `done` with the answer whole, because the wait is the lookups, not the
+writing. `history` is up to six earlier exchanges the client holds, given to
+the model as a fenced "context, not a source" block; nothing is stored, and
+nothing in it can widen a tool, which still runs as the session's user. The seam grew for it: `AiRequest.tools` and `toolChoice`,
 `AiCompletion.toolCalls`, and two message variants — an assistant turn
 carrying tool calls and a `tool` result — which both implementations map onto
 their own wire format (`tool_call_id` for chat completions, `tool_name` and
@@ -908,8 +913,12 @@ Each takes its identity from `ToolContext.userId` — the session — and reache
 data only through the service the matching route uses, so the guard on a
 draft, a story bible or a continuity finding is the guard that already
 existed. `search_chapters` takes no chapter bound: it applies the reader's,
-as Ask This Book does, so a model cannot widen it. `check_continuity` reports
-the stored findings rather than running a check.
+as Ask This Book does, so a model cannot widen it. For the story's own author
+it also matches the question's words against every chapter, drafts included
+(`literal-search.ts`, read through `listMyChapters`): drafts are never
+embedded, so search by meaning alone could not see most of what an author is
+writing. `check_continuity` reports the stored findings rather than running a
+check.
 
 `runTool` never throws (except on abort). An unknown tool, unparseable JSON
 and arguments that fail the tool's zod schema come back as `invalid` without
@@ -925,8 +934,15 @@ history stays well-formed; at most `MAX_MODEL_CALLS` (5) model calls, the last
 with `toolChoice: "none"` plus a wrap-up line so it must answer; and
 `TOKEN_BUDGET` (20k) across the request, checked before every call. Each tool
 decision is logged as name, outcome, code and duration — never arguments or
-results — and the full trace goes back to the caller in `steps`. The AI lab's
-**Agent (tools)** mode shows it.
+results — and the full trace goes back to the caller in `steps`.
+
+Its product surface is **Ask about this story**
+(`components/ai/StoryAssistant.tsx`), a card in the story editor's side
+column once the story has been saved: authors are who the bible and
+continuity tools answer, and the questions they have mid-draft are lookups.
+It shows each lookup as it runs, keeps the conversation for the editor
+session, and labels every answer as AI. The AI lab's **Agent (tools)** mode
+still shows the raw trace.
 
 ## Evaluation
 

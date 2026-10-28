@@ -2,6 +2,11 @@
 {agent.storyKey}
 <<<END PAGE CONTEXT>>>
 
+<<<EARLIER EXCHANGES — CONTEXT, NOT A SOURCE>>>
+User: {agent.question}
+Answer: {agent.answer}
+<<<END EARLIER EXCHANGES>>>
+
 <<<USER'S MESSAGE>>>
 {agent.message}
 <<<END USER'S MESSAGE>>>
