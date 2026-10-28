@@ -39,6 +39,12 @@ interface ReadingProgressInput {
   chapter: Chapter | null
   /** 0–1 through that chapter, from the reader's own scroll listener. */
   scrollFraction: number
+  /**
+   * The page has somewhere more specific to be — a passage an Ask This Book
+   * citation pointed at — so the chapter opens without the saved position
+   * being applied. Saving carries on as usual from wherever the reader is.
+   */
+  skipRestore?: boolean
 }
 
 /** The saved position, tagged with the story it was loaded for. */
@@ -67,6 +73,7 @@ export function useReadingProgress({
   storyId,
   chapter,
   scrollFraction,
+  skipRestore = false,
 }: ReadingProgressInput): void {
   const [saved, setSaved] = useState<SavedFor | null>(null)
 
@@ -150,7 +157,7 @@ export function useReadingProgress({
     // A position saved against a different chapter is not this chapter's, so
     // this one opens at the top.
     const restoreOffset =
-      progress !== null && progress.chapterId === chapter.id
+      !skipRestore && progress !== null && progress.chapterId === chapter.id
         ? progress.offset
         : 0
     const target = Math.min(
@@ -225,7 +232,7 @@ export function useReadingProgress({
       cancelAnimationFrame(frame)
       stopWatching()
     }
-  }, [chapter, saved, storyId, restoredChapterId])
+  }, [chapter, saved, storyId, restoredChapterId, skipRestore])
 
   /**
    * The scroll fraction as a character offset. Derived rather than stored so

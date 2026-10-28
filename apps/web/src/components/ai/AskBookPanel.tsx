@@ -579,6 +579,8 @@ function AnswerTurn({ turn, idBase, storySlug, onCite, scopeText }: AnswerTurnPr
               <Link
                 className="ask__citation"
                 to={`/read/${storySlug}/${citation.chapterNumber}`}
+                // The reader finds this passage, scrolls to it and marks it.
+                state={{ cite: citation.quote }}
                 onClick={onCite}
               >
                 <span className="ask__citation-marker">{citation.marker}</span>

@@ -224,6 +224,23 @@
   text-indent: 1.4em;
 }
 
+/* A passage an Ask This Book citation pointed at, marked for a moment
+   (`CITED_HIGHLIGHT_MS` in ReaderPage). Spread past the text with a shadow of
+   the same colour so the mark has room to breathe without moving a line. */
+.reader__prose .is-cited {
+  background-color: var(--read-brand-soft);
+  box-shadow: 0 0 0 0.35em var(--read-brand-soft);
+  border-radius: var(--radius-sm);
+}
+
+.reader__prose p,
+.reader__prose li,
+.reader__prose :is(h1, h2, h3, h4, h5, h6) {
+  transition:
+    background-color var(--dur-slow) ease,
+    box-shadow var(--dur-slow) ease;
+}
+
 .reader__prose > p:first-child::first-letter {
   float: left;
   margin: 0.05em 0.08em 0 0;

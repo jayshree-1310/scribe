@@ -1081,10 +1081,18 @@ closing marker appears once, and the request shape matches an ordinary
 chapter's. Mutation-checked: dropping the story and chapter filters from both
 the SQL and the code fails seven tests.
 
-Still open: a citation opens its chapter
-but does not scroll to or highlight the passage; and the panel on the story
-page cannot know the saved position client-side, so its range opens on "Where
-I've read to" and the server's `scope` names the chapter afterwards.
+~~Still open: a citation opens its chapter but does not scroll to or
+highlight the passage.~~ It does now: the link carries its quote in router
+state, and the reader finds it (`lib/find-passage.ts` — six-word runs of the
+quote, one contiguous stretch of paragraphs so a repeated phrase cannot mark
+half a chapter), centres it, marks it for four seconds, and skips the saved
+position restore for that navigation (`skipRestore` in `useReadingProgress`).
+Verified in the dev app: a citation into chapter 2 scrolled 945px to the
+passage. No frontend test harness exists to hold it.
+
+Still open: the panel on the story page cannot know the saved position
+client-side, so its range opens on "Where I've read to" and the server's
+`scope` names the chapter afterwards.
 
 **Prompt:**
 

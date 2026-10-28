@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { useReadingProgress } from '../hooks/useReadingProgress'
 import { cn } from '../lib/cn'
@@ -17,6 +17,7 @@ import {
 import { useTheme } from '../lib/theme'
 import { formatCount, formatRelative } from '../lib/format'
 import { renderChapter } from '../lib/chapter-markdown'
+import { findPassage } from '../lib/find-passage'
 import * as stories from '../data/stories-api'
 import * as engagement from '../data/engagement-api'
 import { readingMinutes, storyAuthorName } from '../types/stories'
@@ -41,6 +42,9 @@ import { Switch } from '../components/ui/Checkbox'
 import { ErrorState } from '../components/ui/States'
 import { Dialog } from '../components/ui/Dialog'
 import './reader.css'
+
+/** How long a cited passage stays marked: long enough to find, then out of the way. */
+const CITED_HIGHLIGHT_MS = 4000
 
 export function ReaderPage() {
   const { slug = '', chapter: chapterParam = '1' } = useParams()
@@ -74,13 +78,24 @@ export function ReaderPage() {
   const [progress, setProgress] = useState(0)
 
   /**
+   * The passage an Ask This Book citation pointed at, if that is how the
+   * reader got here. Router state rather than the URL: it belongs to the one
+   * navigation, and a chapter link someone copies should not carry it.
+   */
+  const location = useLocation()
+  const cited = (location.state as { cite?: unknown } | null)?.cite
+  const citedQuote = typeof cited === 'string' && cited.trim() !== '' ? cited : null
+
+  /**
    * Restores the reader's place when a chapter opens and saves it as they
-   * scroll, off the same `progress` fraction the bar above is drawn from.
+   * scroll, off the same `progress` fraction the bar above is drawn from. A
+   * citation is somewhere more specific to be, so it wins over the restore.
    */
   useReadingProgress({
     storyId,
     chapter: chapter.data ?? null,
     scrollFraction: progress,
+    skipRestore: citedQuote !== null,
   })
 
   const [focusMode, setFocusMode] = useState(false)
@@ -174,6 +189,68 @@ export function ReaderPage() {
    * a passage, and neither is one made in the footer.
    */
   const proseRef = useRef<HTMLDivElement | null>(null)
+
+  /**
+   * Takes the reader to a cited passage and marks it for a moment.
+   *
+   * After two frames, so the chapter's paragraphs are laid out; and again
+   * while late media grows the page, for the reason the restore re-applies
+   * (`useReadingProgress`), standing down as soon as the reader scrolls
+   * themselves. Keyed on the navigation as well as the chapter, so following a
+   * second citation into the chapter already open moves the page again.
+   * Nothing found means nothing happens: the reader is at the right chapter.
+   */
+  const citedChapterId = chapter.data?.id ?? null
+  useEffect(() => {
+    const prose = proseRef.current
+    if (citedQuote === null || citedChapterId === null || prose === null) return
+
+    let marked: HTMLElement[] = []
+    let observer: ResizeObserver | null = null
+    let settle: ReturnType<typeof setTimeout> | undefined
+    let fade: ReturnType<typeof setTimeout> | undefined
+    let placedAt = 0
+
+    const place = () => {
+      const first = marked[0]
+      if (!first) return
+      first.scrollIntoView({ block: 'center' })
+      placedAt = window.scrollY
+    }
+
+    const frame = requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        marked = findPassage(prose, citedQuote)
+        if (marked.length === 0) return
+
+        for (const block of marked) block.classList.add('is-cited')
+        place()
+        fade = setTimeout(() => {
+          for (const block of marked) block.classList.remove('is-cited')
+        }, CITED_HIGHLIGHT_MS)
+
+        if (typeof ResizeObserver !== 'undefined') {
+          observer = new ResizeObserver(() => {
+            if (Math.abs(window.scrollY - placedAt) > 48) {
+              observer?.disconnect()
+              return
+            }
+            place()
+          })
+          observer.observe(prose)
+          settle = setTimeout(() => observer?.disconnect(), 1500)
+        }
+      }),
+    )
+
+    return () => {
+      cancelAnimationFrame(frame)
+      observer?.disconnect()
+      clearTimeout(settle)
+      clearTimeout(fade)
+      for (const block of marked) block.classList.remove('is-cited')
+    }
+  }, [citedQuote, citedChapterId, location.key])
 
   const [selection, setSelection] = useState<ChapterSelection | null>(null)
   const [anchorPoint, setAnchorPoint] = useState({ top: 0, left: 0 })
