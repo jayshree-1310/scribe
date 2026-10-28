@@ -381,7 +381,11 @@ export function ReaderPage() {
               Renders nothing when there is no previous chapter they can open,
               and never calls a model until they ask it to.
             */}
-            <RecapCard storyKey={slug} chapterNumber={current.number} />
+            <RecapCard
+              key={`${slug}:${current.number}`}
+              storyKey={slug}
+              chapterNumber={current.number}
+            />
 
             <p className="reader__eyebrow">
               Chapter {current.number}

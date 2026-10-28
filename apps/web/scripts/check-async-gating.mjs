@@ -48,14 +48,6 @@ const ALLOWED = new Map([
       'and the page has nothing to tell a signed-out visitor about a failed ' +
       'request for ornament.',
   ],
-  [
-    'IdeaStudioPage.tsx:stories',
-    'KNOWN GAP, not an exemption: this is a story picker, the same shape as ' +
-      'the challenge entry dialog Task 17 fixed, and an empty one can submit ' +
-      'an empty id. Parked rather than fixed because the file is being ' +
-      'written by the in-flight GenAI work and editing it here would conflict. ' +
-      'Remove this entry when that lands.',
-  ],
 ])
 
 function walk(dir) {

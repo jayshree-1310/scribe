@@ -357,6 +357,49 @@ describe.skipIf(!available)("a comment over the reject threshold", () => {
   });
 });
 
+describe.skipIf(!available)("beyond comments", () => {
+  it("checks a club discussion, and hides one over the reject threshold", async () => {
+    const club = await api.createClub({ name: "Checked Club", creatorId: commenter });
+    reply = scores({ spam: 0.97 });
+
+    const response = await api.request<{ discussion: { id: string } }>(
+      `/api/clubs/${club.id}/discussions`,
+      { method: "POST", as: commenter, body: { body: "CHEAP FOLLOWERS, club edition" } },
+    );
+    expect(response.status).toBe(201);
+    const id = response.body.discussion.id;
+    posted.push(id);
+    await drainDeferredWrites();
+
+    const [report] = await reportsOn(id, "OPEN");
+    expect(report?.targetType).toBe("CLUB_DISCUSSION");
+    expect(report?.target?.hidden).toBe(true);
+    expect(report?.automated?.outcome).toBe("REJECT");
+  });
+
+  it("checks a channel post, and leaves a clean one alone", async () => {
+    const channel = await api.createChannel({ name: "Checked Channel", authorId: writer });
+
+    const response = await api.request<{ post: { id: string } }>(
+      `/api/channels/${channel.id}/posts`,
+      {
+        method: "POST",
+        as: writer,
+        body: { title: "Chapter four is up", content: "Thank you for reading." },
+      },
+    );
+    expect(response.status).toBe(201);
+    const id = response.body.post.id;
+    posted.push(id);
+    await drainDeferredWrites();
+
+    const [decision, ...rest] = await decisionsFor(id);
+    expect(rest).toHaveLength(0);
+    expect(decision?.outcome).toBe("ALLOW");
+    expect(await reportsOn(id)).toHaveLength(0);
+  });
+});
+
 describe.skipIf(!available)("categories with their own rule", () => {
   it("hides sexual content involving minors as soon as it is worth a look", async () => {
     reply = scores({ sexual_minors: 0.55 });

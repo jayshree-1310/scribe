@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../lib/auth'
@@ -102,8 +102,7 @@ export function OnboardingPage() {
    * and seeding them on every render would fight the reader's own clicks.
    */
   const [adopted, setAdopted] = useState(false)
-  useEffect(() => {
-    if (adopted || saved.status !== 'ready' || !saved.data) return
+  if (!adopted && saved.status === 'ready' && saved.data) {
     setGenreIds(saved.data.genreIds)
     setLength(saved.data.contentLength)
     /**
@@ -118,7 +117,7 @@ export function OnboardingPage() {
      */
     setStep(Math.min(saved.data.onboardingStep, STEPS.length - 1))
     setAdopted(true)
-  }, [adopted, saved.status, saved.data])
+  }
 
   const toggle = (list: string[], id: string) =>
     list.includes(id) ? list.filter((item) => item !== id) : [...list, id]

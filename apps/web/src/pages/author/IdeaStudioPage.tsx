@@ -286,9 +286,22 @@ export function IdeaStudioPage() {
     }
   }
 
+  /**
+   * The empty option is always valid — it means no story — so loading and
+   * failure keep it but say so, and lock the picker rather than offer a list
+   * that only looks like the author has no stories.
+   */
   const storyOptions = [
-    { value: '', label: 'Not about an existing story' },
-    ...(stories.data ?? []).map((story) => ({
+    {
+      value: '',
+      label:
+        stories.status === 'loading'
+          ? 'Loading your stories…'
+          : stories.status === 'error'
+            ? 'Your stories could not be loaded'
+            : 'Not about an existing story',
+    },
+    ...(stories.status === 'ready' ? stories.data ?? [] : []).map((story) => ({
       value: story.id,
       label: story.title,
     })),
@@ -335,6 +348,7 @@ export function IdeaStudioPage() {
               value={storyId}
               options={storyOptions}
               onChange={setStoryId}
+              disabled={stories.status !== 'ready'}
             />
             <Select
               label="Alternatives"

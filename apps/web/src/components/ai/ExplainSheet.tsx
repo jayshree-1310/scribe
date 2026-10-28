@@ -78,17 +78,16 @@ export function ExplainSheet({
   /** The one scroll region; reset to the top when a new mode is asked for. */
   const bodyRef = useRef<HTMLDivElement | null>(null)
 
-  const run = useCallback(
+  /**
+   * Streams one answer into state that is already clear. Split from `run` so
+   * the ask on open starts from the initial state rather than resetting it
+   * from an effect.
+   */
+  const stream = useCallback(
     async (chosen: ExplainMode) => {
       pending.current?.abort()
       const controller = new AbortController()
       pending.current = controller
-
-      setMode(chosen)
-      setAnswer('')
-      setError(null)
-      setStatus('streaming')
-      if (bodyRef.current) bodyRef.current.scrollTop = 0
 
       try {
         for await (const event of streamExplain(
@@ -118,6 +117,19 @@ export function ExplainSheet({
     [chapterId, selection.start, selection.end],
   )
 
+  /** Asks in another mode, from a tab: clears the last answer first. */
+  const run = useCallback(
+    (chosen: ExplainMode) => {
+      setMode(chosen)
+      setAnswer('')
+      setError(null)
+      setStatus('streaming')
+      if (bodyRef.current) bodyRef.current.scrollTop = 0
+      void stream(chosen)
+    },
+    [stream],
+  )
+
   /**
    * Runs the default ask once, on open.
    *
@@ -127,7 +139,10 @@ export function ExplainSheet({
    * a mounted sheet.
    */
   useEffect(() => {
-    void run('explain')
+    // Every setState in `stream` comes after its first await; the rule cannot
+    // see an await, so it reads them as synchronous.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void stream('explain')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -190,7 +205,7 @@ export function ExplainSheet({
                 }`}
                 title={option.hint}
                 disabled={status === 'streaming'}
-                onClick={() => void run(option.mode)}
+                onClick={() => run(option.mode)}
               >
                 {option.label}
               </button>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   DEFAULT_READER_PREFERENCES,
@@ -35,9 +35,9 @@ function readStored(): { preferences: ReaderPreferences; migrated: boolean } {
 }
 
 export function ReaderPrefsProvider({ children }: { children: ReactNode }) {
-  const initial = useRef(readStored())
+  const [initial] = useState(readStored)
   const [preferences, setPreferences] = useState<ReaderPreferences>(
-    initial.current.preferences,
+    initial.preferences,
   )
 
   const persist = useCallback((next: ReaderPreferences) => {
@@ -65,8 +65,8 @@ export function ReaderPrefsProvider({ children }: { children: ReactNode }) {
    * later deliberate choice of Sepia stick.
    */
   useEffect(() => {
-    if (initial.current.migrated) persist(initial.current.preferences)
-  }, [persist])
+    if (initial.migrated) persist(initial.preferences)
+  }, [initial, persist])
 
   const update = useCallback(
     (patch: Partial<ReaderPreferences>) => {

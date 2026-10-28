@@ -1,5 +1,8 @@
 /**
- * The automated content check: every new comment, scored after it is posted.
+ * The automated content check: every new comment, club discussion and
+ * channel post, scored after it is posted. The path is the same for all
+ * three -- `createDiscussion` and `createPost` make the same call -- and is
+ * written below for a comment.
  *
  * ## The path one comment takes
  *
@@ -524,33 +527,47 @@ export interface PendingSweep {
 }
 
 /**
- * Checks comments that have no verdict yet: posted while the model was down,
- * or before this feature existed.
+ * Checks comments, club discussions and channel posts that have no verdict
+ * yet: posted while the model was down, or before this feature reached them.
  *
- * Oldest first and bounded, so it can be run repeatedly. Stops at the first
- * `UNCHECKED` -- if the model is still unreachable, the next four hundred
- * calls will say the same thing more slowly. There is no job runner (Task AI
- * 20), so `pnpm moderation:pending` is what calls this.
+ * Oldest first across all three and bounded, so it can be run repeatedly.
+ * Stops at the first `UNCHECKED` -- if the model is still unreachable, the
+ * next four hundred calls will say the same thing more slowly.
+ * `pnpm moderation:pending` is what calls this.
  */
 export async function moderatePending(limit: number): Promise<PendingSweep> {
   const plan = db.raw.sql`
-    SELECT c."id"
-      FROM "engagement"."comment" AS c
-     WHERE c."hiddenAt" IS NULL
-       AND NOT EXISTS (
-         SELECT 1
-           FROM "ai"."moderationDecision" AS d
-          WHERE d."targetType" = 'COMMENT'
-            AND d."targetId" = c."id"
-            AND d."outcome" <> 'UNCHECKED'
-       )
-     ORDER BY c."createdAt", c."id"
+    SELECT t."targetType", t."id"
+      FROM (
+        SELECT 'COMMENT'::text AS "targetType", c."id", c."createdAt" AS "at"
+          FROM "engagement"."comment" AS c
+         WHERE c."hiddenAt" IS NULL
+        UNION ALL
+        SELECT 'CLUB_DISCUSSION'::text, d."id", d."createdAt"
+          FROM "clubs"."clubDiscussion" AS d
+         WHERE d."hiddenAt" IS NULL
+        UNION ALL
+        SELECT 'CHANNEL_POST'::text, p."id", p."postedAt"
+          FROM "channels"."channelPost" AS p
+         WHERE p."hiddenAt" IS NULL
+      ) AS t
+     WHERE NOT EXISTS (
+       SELECT 1
+         FROM "ai"."moderationDecision" AS m
+        WHERE m."targetType" = t."targetType"
+          AND m."targetId" = t."id"
+          AND m."outcome" <> 'UNCHECKED'
+     )
+     ORDER BY t."at", t."id"
      LIMIT ${limit}
   `
-    .returnsRow({ id: "pg/text@1" })
+    .returnsRow({ targetType: "pg/text@1", id: "pg/text@1" })
     .build();
 
-  const rows = (await db.runtime().query(plan)) as { id: string }[];
+  const rows = (await db.runtime().query(plan)) as {
+    targetType: ReportTarget;
+    id: string;
+  }[];
   const sweep: PendingSweep = {
     examined: 0,
     allowed: 0,
@@ -560,7 +577,7 @@ export async function moderatePending(limit: number): Promise<PendingSweep> {
   };
 
   for (const row of rows) {
-    const result = await moderateContent("COMMENT", row.id);
+    const result = await moderateContent(row.targetType, row.id);
     if (!result) continue;
 
     sweep.examined += 1;

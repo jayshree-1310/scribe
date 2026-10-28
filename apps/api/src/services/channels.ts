@@ -17,6 +17,7 @@ import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
 import { notify } from "./notifications.js";
+import { moderate } from "./ai/moderation.js";
 import { assertNotSuspended } from "./roles.js";
 import { toIso } from "./stories.js";
 
@@ -652,6 +653,10 @@ export async function createPost(
    * post look like it failed, because it did not.
    */
   notify({ event: "channel-post", actorId: userId, postId });
+
+  // The automated content check, after the commit and unawaited, exactly as
+  // for a comment. See `services/ai/moderation.ts`.
+  moderate("CHANNEL_POST", postId);
 
   return toPost(row);
 }

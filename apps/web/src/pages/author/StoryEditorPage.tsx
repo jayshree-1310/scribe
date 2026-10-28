@@ -38,11 +38,8 @@ import { InlineNotice } from '../../components/ui/States'
 import { Skeleton } from '../../components/ui/Skeleton'
 import { ErrorState } from '../../components/ui/States'
 import { CoverField } from '../../components/story/CoverField'
-import {
-  ASSIST_MENU,
-  AssistPanel,
-  type AssistRequest,
-} from '../../components/ai/AssistPanel'
+import { AssistPanel, type AssistRequest } from '../../components/ai/AssistPanel'
+import { ASSIST_MENU } from '../../components/ai/assist-actions'
 import type { AssistAction } from '../../data/ai-api'
 import { ContinuityPanel } from '../../components/ai/ContinuityPanel'
 import { countWords, renderChapter } from '../../lib/chapter-markdown'
@@ -219,8 +216,10 @@ export function StoryEditorPage() {
    * a suggestion is not applied until `acceptAssist`.
    */
   const [assisting, setAssisting] = useState<
-    (AssistRequest & { start: number; end: number; replaced: string }) | null
+    (AssistRequest & { id: number; start: number; end: number; replaced: string }) | null
   >(null)
+  /** Keys the panel, so every ask — even the same action twice — starts fresh. */
+  const assistCount = useRef(0)
 
   const bodyRef = useRef<HTMLTextAreaElement>(null)
   const mediaInputRef = useRef<HTMLInputElement>(null)
@@ -518,7 +517,9 @@ export function StoryEditorPage() {
       return
     }
 
+    assistCount.current += 1
     setAssisting({
+      id: assistCount.current,
       action,
       original,
       // For `continue` the lookback is the passage, so the context before it
@@ -1134,6 +1135,7 @@ export function StoryEditorPage() {
             */}
             {assisting ? (
               <AssistPanel
+                key={assisting.id}
                 request={assisting}
                 onAccept={acceptAssist}
                 onClose={() => setAssisting(null)}

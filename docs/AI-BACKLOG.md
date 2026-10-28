@@ -361,10 +361,10 @@ services and both list routes. Verified end to end against `llama3.2:3b`:
 cards at 5.5s, full reply at 97s — which is the whole argument for streaming
 the retrieval result before the model has written anything.
 
-Still open: no conversation memory, so a follow-up ("something shorter?")
-does not resolve against the previous answer — that is Task AI 10. The daily
-token budget is enforced on `/api/ai/chat` only (Task AI 1); extending it here
-and everywhere else is Task AI 18.
+~~Still open: no conversation memory, and the daily budget on `/api/ai/chat`
+only.~~ Both closed: a follow-up is classified as `refine` and inherits the
+previous turn's filters (`mergeContext`), and since Task AI 18 the budget is
+checked around every provider call, Scribble's included.
 
 The first task a user can see the point of, and deliberately placed before the
 embedding work: it needs no vectors, no pgvector, no chunking. Everything it
@@ -670,7 +670,8 @@ assistant learns what is inside them.
 
 ## Task AI 6 — Summarization
 
-**Status: the chapter recap is built; the rest is not.** `services/ai/recap.ts`,
+**Status: built.** The chapter recap first, the rest after Task AI 20 (below).
+`services/ai/recap.ts`,
 `services/ai/prompts/recap.ts`, the `ai` namespace in `contract.prisma` with
 `ai.ChapterSummary` plus its migration, `GET`/`POST /api/ai/recap/:slugOrId/:chapterNumber`,
 `components/ai/RecapCard.tsx` on `ReaderPage`, tests in `routes/ai-reader.test.ts`.
@@ -732,14 +733,13 @@ the Task AI 17 notes below said it did. The hash now folds in the prompt
 versions and section size, so it does. Stored recaps regenerate once on their
 next request.
 
-Two things worth knowing before extending it. Generation is **lazy and behind a
-button** — there is no job runner (Task AI 20), so the first reader who asks
-pays for it and everybody after them gets a cache hit; a reader working
-straight through a serial never triggers a model call at all. And the daily
-token budget is now enforced **here and on `/api/ai/explain`** as well as on
-`/api/ai/chat`, because a feature every reader can reach is the first one where
-request-rate alone stops describing the spend. Extending that to Scribble, the
-assistant and generation is still Task AI 18.
+Two things worth knowing before extending it. The recap's generation is
+**lazy and behind a button**, so the first reader who asks pays for it and
+everybody after them gets a cache hit; a reader working straight through a
+serial never triggers a model call at all. The story summary, by contrast, is
+a `summary.story` job (above). And the daily token budget, first enforced here
+because a feature every reader can reach is where request-rate alone stops
+describing the spend, has applied to every provider call since Task AI 18.
 
 **Prompt:**
 
@@ -1415,9 +1415,11 @@ a comment would call whatever model `.env` points at. The moderation suite
 turns it on for itself behind the fake. Its automated reports and decisions
 have no user for the harness's per-user sweep to find, so it deletes its own.
 
-Still open: only comments are checked — club discussions and channel posts go
-through the same `moderateContent(type, id)` and are one line each to wire.
-The thresholds (0.5 and 0.9) are starting points, not measurements; nothing
+~~Still open: only comments are checked.~~ Club discussions and channel posts
+are checked too: `createDiscussion` and `createPost` make the same
+`moderate(type, id)` call, `moderation:pending` sweeps all three, and
+`ai-moderation.test.ts` › *beyond comments* holds both (mutation-checked).
+Still open: the thresholds (0.5 and 0.9) are starting points, not measurements; nothing
 in the dev corpus is abusive, and Task AI 16 is where they get evidence. The
 check is not charged to anybody's daily token budget, deliberately — a reader
 must not be able to exhaust their way out of being moderated — so its spend
@@ -1944,9 +1946,10 @@ was moved to a cheaper model without an `ai:eval` run saying it holds up.
 Batching is not implemented: embedding runs on the free local embedder, and
 extraction is driven a few chapters at a time by the author.
 
-Still open: no pruning of `ai.UsageEvent`, and a deleted account's rows keep
-its id (both Task AI 19); the budget is enforced from Redis rather than read
-from the table.
+~~Still open: no pruning of `ai.UsageEvent`, and a deleted account's rows
+keep its id.~~ Both fixed in Task AI 19 (`ai:prune-usage`, the `usage.prune`
+job, and `deleteAccount`). Still open: the budget is enforced from Redis
+rather than read from the table.
 
 **Prompt:**
 

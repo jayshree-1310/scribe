@@ -24,6 +24,7 @@ import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
 import { evaluateBadges } from "./gamification.js";
 import { notify } from "./notifications.js";
+import { moderate } from "./ai/moderation.js";
 import { assertNotSuspended } from "./roles.js";
 import { getStoriesByIds, toIso, type Story } from "./stories.js";
 
@@ -1152,6 +1153,10 @@ export async function createDiscussion(
   // `services/notifications.ts` decides which from the row, so this call does
   // not have to know that a club's audience and a reply's are different.
   notify({ event: "club-discussion", actorId: userId, discussionId: discussion.id });
+
+  // The automated content check, after the commit and unawaited, exactly as
+  // for a comment. See `services/ai/moderation.ts`.
+  moderate("CLUB_DISCUSSION", discussion.id);
 
   return discussion;
 }

@@ -47,7 +47,11 @@ export function RecapCard({ storyKey, chapterNumber }: RecapCardProps) {
   const pending = useRef<AbortController | null>(null)
 
   /**
-   * The stored recap, if there is one. Runs on every chapter change.
+   * The stored recap, if there is one.
+   *
+   * The caller keys this card on the chapter, so every chapter starts from a
+   * fresh card with nothing open and nothing generating, and leaving one
+   * aborts a generate still in flight for it.
    *
    * A failure here is swallowed deliberately: this is an optional extra above
    * a chapter that loads perfectly well without it, and an error banner for a
@@ -57,11 +61,6 @@ export function RecapCard({ storyKey, chapterNumber }: RecapCardProps) {
    */
   useEffect(() => {
     const controller = new AbortController()
-
-    setOpen(false)
-    setError(null)
-    setRecap(null)
-    setAvailable(false)
 
     void getRecap(storyKey, chapterNumber, controller.signal)
       .then((status) => {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { cn } from '../../lib/cn'
 import { formatCount } from '../../lib/format'
 import { useToast } from '../../lib/toast'
@@ -65,18 +65,24 @@ export function LikeButton({
 }: LikeButtonProps) {
   const { showToast } = useToast()
 
-  /** Null until the reader presses it; the server's numbers until then. */
-  const [override, setOverride] = useState<LikeSummary | null>(null)
-  const [pending, setPending] = useState(false)
-
   /**
-   * A fresh read from the server wins over whatever this component last
-   * wrote. Only a reload of the list moves these props, and when one happens
-   * the list is more current than an override from before it.
+   * Null until the reader presses it; the server's numbers until then.
+   *
+   * Remembers which server read it was made against, because a fresh read
+   * wins over whatever this component last wrote. Only a reload of the list
+   * moves these props, and when one happens the list is more current than an
+   * override from before it.
    */
-  useEffect(() => {
-    setOverride(null)
-  }, [subjectId, likeCount, likedByMe])
+  const serverKey = `${subjectId}:${likeCount}:${likedByMe}`
+  const [written, setWritten] = useState<{ key: string; summary: LikeSummary } | null>(
+    null,
+  )
+  const override = written?.key === serverKey ? written.summary : null
+  const setOverride = useCallback(
+    (summary: LikeSummary) => setWritten({ key: serverKey, summary }),
+    [serverKey],
+  )
+  const [pending, setPending] = useState(false)
 
   const count = override?.count ?? likeCount
   const liked = override?.liked ?? likedByMe
@@ -113,7 +119,7 @@ export function LikeButton({
     } finally {
       setPending(false)
     }
-  }, [count, liked, noun, pending, showToast, subject, subjectId])
+  }, [count, liked, noun, pending, setOverride, showToast, subject, subjectId])
 
   return (
     <button

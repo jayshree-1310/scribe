@@ -1019,8 +1019,9 @@ With the container running, nothing else is required: the defaults in
 `config.ts` describe exactly this setup. See `AI-BACKLOG.md` § *Running it for
 free* for model choices and what is worse locally.
 
-The embedding table starts empty and nothing fills it automatically — there is
-no job runner (Task AI 20) and nothing embeds on publish:
+Publishing a chapter or story queues an `embed.chapter` job (Task AI 20), so
+new work is embedded as it goes live. What predates that — the seeded corpus,
+or a fresh database — is filled by the backfill:
 
 ```bash
 pnpm --filter api seed:embeddings

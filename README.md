@@ -37,9 +37,9 @@ idle, so the first request after a quiet spell takes a while to answer.
 | Moderation — reporting, the queue, hiding content, suspensions            | **Real API**                         |
 | Onboarding, genre preferences & ranked recommendations                    | **Real API**                         |
 | Scribble — the GenAI discovery concierge, JSON and streaming              | **Real API**                         |
-| The rest of the GenAI roadmap (AI 3 – AI 20)                              | Not built — see `docs/AI-BACKLOG.md` |
+| The rest of the GenAI roadmap (AI 3 – AI 20)                              | **Real API** — see `docs/AI-BACKLOG.md` |
 
-Every row above the last one is served by the API.
+Every row above is served by the API.
 
 **"Real API" is a claim about the mechanism, not about the content.** The mock
 layer that is gone was a fake _transport_: fixtures held in the browser, handed
@@ -1339,17 +1339,19 @@ The web app has no test suite yet.
 - [x] AI 0 — provider seam, config, retry/usage policy, fake provider
 - [x] AI 1.5 — Scribble, the discovery concierge
 - [x] AI 2 — streaming (SSE), landed with Scribble
-- [ ] Conversation memory, so a follow-up resolves against the last answer
-      (AI 10)
-- [ ] Enforcing the per-user daily token budget, which is read but not yet
-      applied (AI 18)
+- [x] AI 3 – AI 6.5 — writing assistant, structured outputs, generation,
+      summaries and recaps, explain this passage
+- [x] AI 9 – AI 10 — Ask This Book and the conversational assistant, with
+      memory
+- [x] AI 18 — the per-user daily token budget, on every provider call
 - [x] AI 7 — embeddings: chunked, hashed, and never embedded twice
 - [x] AI 8 — semantic and hybrid search, "Search by meaning" on Discover
 - [x] AI 11 — a content-similarity term and diversity caps in the recommender
 - [x] AI 12 — automated moderation of new comments, into the existing queue
 - [x] AI 13 — a story bible read from the author's chapters, with evidence
 - [x] AI 14 — a continuity checker that warns, never blocks, and can be dismissed
-- [ ] The rest — tool calling, evaluation, prompt management, cost, hardening
+- [x] AI 15 – AI 20 — tool calling, evaluation, prompt management, cost,
+      security hardening, and the job queue and ops tooling
 
 ### Phase 7 — Production Readiness
 

@@ -122,7 +122,7 @@ usable: reading, writing, publishing, comments, clubs, search. What changes:
 | Chapter recap | The "Previously" card is absent (a failed load is silent); pressing "Recap" shows an error | `RecapCard.tsx` |
 | Writing assistant, explain, Ask This Book, Scribble, the agent, generation | The panel shows the server's message in place of an answer; nothing else on the page changes | each route returns 503 with a message; the panels render it |
 | Search | Falls back to keyword search and says so: "Searching by meaning is unavailable right now, so these match on title and author only." | `ai-search.test.ts` |
-| Comment moderation | The comment posts; the check is recorded as `UNCHECKED`, and `moderation:pending` re-checks it later | `ai-moderation.test.ts` |
+| Comment, club discussion and channel post moderation | The post goes up; the check is recorded as `UNCHECKED`, and `moderation:pending` re-checks it later | `ai-moderation.test.ts` |
 | Continuity check | The chapter saves (200); the check is recorded as failed and the previous findings stand | `ai-continuity.test.ts` |
 | Story bible | Refresh reports the failure; facts already read stay | `ai-bible.test.ts` |
 | "The story so far" | The card says it is being written, then "No summary yet" if the job keeps failing; a failed load hides the card. The job retries, then dead-letters | `StorySummaryCard.tsx`; `ai-summaries.test.ts` |

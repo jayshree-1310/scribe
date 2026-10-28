@@ -4,6 +4,7 @@ import { ApiError } from '../../lib/api-client'
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { TextField } from '../ui/TextField'
+import { ASSIST_LABELS } from './assist-actions'
 import './assist.css'
 
 /**
@@ -36,23 +37,6 @@ export interface AssistRequest {
   chapterId: string | null
 }
 
-const LABELS: Record<AssistAction, string> = {
-  improve: 'Improve',
-  rewrite: 'Rewrite',
-  grammar: 'Fix grammar',
-  tone: 'Change tone',
-  shorten: 'Shorten',
-  expand: 'Expand',
-  alternatives: 'Alternatives',
-  continue: 'Continue',
-}
-
-export const ASSIST_MENU: ReadonlyArray<{ action: AssistAction; label: string }> =
-  (Object.keys(LABELS) as AssistAction[]).map((action) => ({
-    action,
-    label: LABELS[action],
-  }))
-
 interface AssistPanelProps {
   request: AssistRequest
   /** Replaces the passage with `text`. The editor decides how. */
@@ -75,16 +59,16 @@ export function AssistPanel({ request, onAccept, onClose }: AssistPanelProps) {
   /** Abandons an in-flight suggestion when a second one is asked for. */
   const pending = useRef<AbortController | null>(null)
 
-  const run = useCallback(
+  /**
+   * Streams one suggestion into state that is already clear. Split from `run`
+   * so the first ask, on mount, starts from the initial state rather than
+   * resetting it from an effect.
+   */
+  const stream = useCallback(
     async (targetTone: string | null) => {
       pending.current?.abort()
       const controller = new AbortController()
       pending.current = controller
-
-      setSuggestion('')
-      setError(null)
-      setFacts(0)
-      setStatus('streaming')
 
       const payload: AssistPayload = {
         action: request.action,
@@ -122,10 +106,30 @@ export function AssistPanel({ request, onAccept, onClose }: AssistPanelProps) {
     [request],
   )
 
+  /** Asks again, from a click: clears the last answer first. */
+  const run = useCallback(
+    (targetTone: string | null) => {
+      setSuggestion('')
+      setError(null)
+      setFacts(0)
+      setStatus('streaming')
+      void stream(targetTone)
+    },
+    [stream],
+  )
+
+  /**
+   * Runs the first ask on mount. The editor keys this panel on the request,
+   * so a new request is a fresh panel — including a switch to `tone`, which
+   * has to start back at `asking`.
+   */
   useEffect(() => {
-    if (request.action !== 'tone') void run(null)
+    // Every setState in `stream` comes after its first await; the rule cannot
+    // see an await, so it reads them as synchronous.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (request.action !== 'tone') void stream(null)
     return () => pending.current?.abort()
-  }, [request, run])
+  }, [request, stream])
 
   const streaming = status === 'streaming'
 
@@ -133,7 +137,7 @@ export function AssistPanel({ request, onAccept, onClose }: AssistPanelProps) {
     <section className="assist" aria-label="Writing assistant">
       <header className="assist__head">
         <Icon name="sparkle" className="assist__mark" size="1rem" />
-        <h3 className="assist__title">{LABELS[request.action]}</h3>
+        <h3 className="assist__title">{ASSIST_LABELS[request.action]}</h3>
         <span className="assist__badge">AI suggestion</span>
         <Button
           variant="ghost"
@@ -150,7 +154,7 @@ export function AssistPanel({ request, onAccept, onClose }: AssistPanelProps) {
           className="assist__tone"
           onSubmit={(event) => {
             event.preventDefault()
-            if (tone.trim().length > 0) void run(tone.trim())
+            if (tone.trim().length > 0) run(tone.trim())
           }}
         >
           <TextField
@@ -206,7 +210,7 @@ export function AssistPanel({ request, onAccept, onClose }: AssistPanelProps) {
               variant="ghost"
               size="sm"
               loading={streaming}
-              onClick={() => void run(request.action === 'tone' ? tone.trim() : null)}
+              onClick={() => run(request.action === 'tone' ? tone.trim() : null)}
             >
               Regenerate
             </Button>

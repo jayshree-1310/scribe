@@ -20,11 +20,12 @@ import './ai-spend.css'
  * page says so rather than inventing a rate.
  */
 
+/** `SegmentedControl` speaks strings; the window is a number on the wire. */
 const WINDOWS = [
-  { value: 1, label: 'Today' },
-  { value: 7, label: '7 days' },
-  { value: 30, label: '30 days' },
-] as const satisfies ReadonlyArray<{ value: SpendWindow; label: string }>
+  { value: '1', label: 'Today' },
+  { value: '7', label: '7 days' },
+  { value: '30', label: '30 days' },
+] as const satisfies ReadonlyArray<{ value: `${SpendWindow}`; label: string }>
 
 const number = new Intl.NumberFormat()
 const tokens = (line: SpendLine) => line.inputTokens + line.outputTokens
@@ -124,8 +125,8 @@ export function AiSpendPage() {
         </div>
         <SegmentedControl
           items={WINDOWS}
-          value={days}
-          onChange={(next) => setDays(next)}
+          value={`${days}` as const}
+          onChange={(next) => setDays(Number(next) as SpendWindow)}
           label="Window"
           size="sm"
         />

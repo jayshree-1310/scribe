@@ -239,8 +239,9 @@ category: a comment that has drifted looks exactly like one that has not.
       are *right*, only that somebody looked.
       It found four the reading audit had missed on its first run, which is the
       point. Two were real (the reader's chapter picker, fixed; the Idea Studio
-      story picker, parked because that file belongs to in-flight GenAI work),
-      and two are genuinely fine and now say why in `ALLOWED`. § Retiring the
+      story picker, parked while the GenAI work owned that file and fixed once
+      it landed — it now says when it is loading or failed and locks until it
+      has the list), and two are genuinely fine and now say why in `ALLOWED`. § Retiring the
       mock layer
 
 #### Check in a browser — may need no work at all
