@@ -27,7 +27,10 @@ type TextAreaProps = CommonProps &
   }
 
 export function TextField(props: InputProps | TextAreaProps) {
-  const { label, error, hint, counterMax, hideLabel, startIcon, value, ...rest } = props
+  // `multiline` picks the element and is not an attribute of either: left in
+  // `rest`, React writes `multiline="true"` onto the textarea and warns.
+  const { label, error, hint, counterMax, hideLabel, startIcon, value, multiline, ...rest } =
+    props
   const generatedId = useId()
   const id = rest.id ?? generatedId
   const hintId = `${id}-hint`
@@ -62,7 +65,7 @@ export function TextField(props: InputProps | TextAreaProps) {
 
       <div className={cn('field__wrap', Boolean(startIcon) && 'has-start-icon')}>
         {startIcon ? <span className="field__icon">{startIcon}</span> : null}
-        {props.multiline ? (
+        {multiline ? (
           <textarea
             {...(rest as Omit<TextAreaProps, keyof CommonProps | 'multiline'>)}
             {...shared}
