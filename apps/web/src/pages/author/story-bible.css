@@ -131,6 +131,14 @@
   overflow-wrap: anywhere;
 }
 
+/* The other names this person's facts were filed under. */
+.bible__aliases {
+  margin: calc(var(--space-1) * -1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
 .bible__fact-list {
   display: grid;
   gap: var(--space-3);

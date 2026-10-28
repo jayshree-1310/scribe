@@ -1566,11 +1566,23 @@ Still open, and seen in the real run. The model worked a bible fact into a
 continuation it was only meant to stay consistent with — the lamp burning
 whale oil, from chapter one, in a chapter that had replaced the lamp — which
 is both a prompt it did not obey and a bible that was out of date about a
-change the chapter itself had made. "Mira" and "Mira Desai" stayed two
-subjects despite the known-names list; selection and the continuity checker
-treat them as one (`shareSubject`), but the panel groups by exact name. The
-bible is refreshed only when the author asks. And `kind` is the model's call:
-it filed the lamp's fuel as an event.
+change the chapter itself had made. And `kind` is the model's call: it filed
+the lamp's fuel as an event.
+
+~~"Mira" and "Mira Desai" stayed two subjects in the panel, and the bible is
+refreshed only when the author asks.~~ Both closed. The panel groups through
+`lib/bible-groups.ts`: a name joins a person's fuller name when every word of
+it is in that name, exactly one such name exists (two Desais leave "Desai"
+alone), the fuller name is a person, and the shorter one is not a place —
+stricter than `shareSubject`, which would merge siblings by surname. The
+stored facts are untouched; the heading says "Also called Mira". And saving
+chapter text now queues a background re-read (`scheduleBibleRefresh`, three
+quiet minutes, its own dedupe key so it never delays the Read button) that
+runs only for a story whose author has already built a bible, and skips
+rather than dead-letters when the author is out of allowance. Tests in
+`ai-ops.test.ts` › *keeping a story bible current* (the no-bible guard
+mutation-checked); the grouping was checked case by case and in the dev
+app.
 
 **Prompt:**
 

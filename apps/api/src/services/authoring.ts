@@ -23,7 +23,7 @@ import { uniqueSlug } from "../lib/slug.js";
 import { deleteAll } from "../prisma/delete-all.js";
 import { scheduleContinuityCheck } from "./ai/continuity-queue.js";
 import { refreshStoryVector } from "./ai/embeddings.js";
-import { scheduleChapterEmbedding } from "./ai/job-schedule.js";
+import { scheduleBibleRefresh, scheduleChapterEmbedding } from "./ai/job-schedule.js";
 import { logger } from "../lib/logger.js";
 import { discardUpload } from "./uploads.js";
 import { evaluateBadges } from "./gamification.js";
@@ -897,7 +897,7 @@ export async function updateChapter(
 ): Promise<AuthoredChapter> {
   const timestamp = now();
 
-  await db.transaction(async (tx) => {
+  const storyId = await db.transaction(async (tx) => {
     const { chapter } = await ownedChapter(tx, chapterId, userId);
 
     const changes: Record<string, unknown> = { updatedAt: timestamp };
@@ -913,6 +913,7 @@ export async function updateChapter(
     );
 
     await touchStory(tx, chapter.storyId, timestamp);
+    return chapter.storyId;
   });
 
   // After the commit, and only when the prose moved: a retitled chapter says
@@ -923,6 +924,8 @@ export async function updateChapter(
     // A published chapter's index entry is now stale. Debounced by chapter, so
     // an editing session is one embedding; an unpublished one is skipped.
     void scheduleChapterEmbedding(chapterId);
+    // And the story bible, if the author has one, learns what changed.
+    void scheduleBibleRefresh(storyId, userId);
   }
 
   return loadChapter(chapterId);

@@ -26,6 +26,40 @@ export const SUMMARY_STORY_JOB = "summary.story";
  */
 export const EMBED_QUIET_MS = 60_000;
 
+/**
+ * How long after the last save a story's bible is read again. Longer than
+ * the continuity check's quiet minute, so a check compares the new chapter
+ * with what the bible said before it, and the bible then learns the change.
+ */
+export const BIBLE_QUIET_MS = 3 * 60_000;
+
+/**
+ * Queues (or pushes back) a re-read of a story's bible, as its author, after
+ * they have stopped writing for a while.
+ *
+ * Only a bible the author has already built is kept current: the handler
+ * skips a story with none, because reading every chapter of every story on
+ * save would spend authors' allowances on something they never asked for.
+ * Its own dedupe key, apart from the author's Read button, so an autosave
+ * can never push an explicit request later.
+ */
+export async function scheduleBibleRefresh(
+  storyId: string,
+  userId: string,
+  delayMs = BIBLE_QUIET_MS,
+): Promise<void> {
+  if (!loadAiConfig().jobs) return;
+  try {
+    await enqueue(
+      BIBLE_READ_JOB,
+      { storyId, auto: true },
+      { userId, delayMs, dedupeKey: `bible-auto:${storyId}` },
+    );
+  } catch (error) {
+    logger.warn({ err: error, storyId }, "bible refresh not queued");
+  }
+}
+
 /** Queues (or pushes back) the embedding of one chapter. */
 export async function scheduleChapterEmbedding(chapterId: string, delayMs = EMBED_QUIET_MS): Promise<void> {
   if (!loadAiConfig().jobs) return;

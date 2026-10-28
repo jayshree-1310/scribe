@@ -258,6 +258,49 @@ describe.skipIf(!available)("job status", () => {
   });
 });
 
+describe.skipIf(!available)("keeping a story bible current", () => {
+  /** Edits a chapter the way the editor's autosave does. */
+  const save = (chapterId: string, content: string) =>
+    api.request(`/api/author/chapters/${chapterId}`, {
+      method: "PATCH",
+      as: author,
+      body: { content },
+    });
+
+  it("re-reads an edited chapter of a story whose author built a bible", async () => {
+    const story = await api.createStory({ title: "Kept Bible", authorId: author });
+    const chapter = await api.createChapter({ storyId: story.id, number: 1, content: "Kit wore a red coat." });
+
+    // The author builds it once, by hand.
+    fake = fakeAiProvider([JSON.stringify({ facts: [] })]);
+    setAiProvider(fake);
+    expect((await api.request(`/api/ai/bible/${story.id}/refresh`, { method: "POST", as: author })).status).toBe(200);
+
+    // Then only writes: the save queues the read, which runs after a quiet spell.
+    fake = fakeAiProvider([JSON.stringify({ facts: [] })]);
+    setAiProvider(fake);
+    expect((await save(chapter, "Kit wore a blue coat now, and kept it.")).status).toBe(200);
+    expect(fake.calls).toHaveLength(0);
+
+    await makeDue();
+    await drainJobs();
+
+    expect(fake.calls).toHaveLength(1);
+    expect(String(fake.calls[0]?.messages[0]?.content)).toContain("blue coat");
+  });
+
+  it("leaves a story with no bible alone, and charges its author nothing", async () => {
+    const story = await api.createStory({ title: "No Bible", authorId: author });
+    const chapter = await api.createChapter({ storyId: story.id, number: 1, content: "Kit wore a red coat." });
+
+    expect((await save(chapter, "Kit wore a green coat.")).status).toBe(200);
+    await makeDue();
+    await drainJobs();
+
+    expect(fake.calls).toHaveLength(0);
+  });
+});
+
 describe.skipIf(!available)("degradation", () => {
   it("keeps /health green with the provider down, and says it is degraded", async () => {
     const failing = fakeAiProvider(["ok"]);

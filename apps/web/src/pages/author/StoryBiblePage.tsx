@@ -14,6 +14,7 @@ import { Skeleton } from '../../components/ui/Skeleton'
 import { SegmentedControl } from '../../components/ui/Tabs'
 import { TextField } from '../../components/ui/TextField'
 import { EmptyState, ErrorState } from '../../components/ui/States'
+import { groupBySubject } from '../../lib/bible-groups'
 import '../pages.css'
 import './author.css'
 import './story-bible.css'
@@ -224,18 +225,12 @@ export function StoryBiblePage() {
 
   /* Grouping ------------------------------------------------------------ */
 
-  const groups = useMemo(() => {
-    const bySubject = new Map<string, aiApi.StoryFact[]>()
-
-    for (const fact of bible?.facts ?? []) {
-      if (filter !== 'all' && fact.kind !== filter) continue
-      const group = bySubject.get(fact.subject) ?? []
-      group.push(fact)
-      bySubject.set(fact.subject, group)
-    }
-
-    return [...bySubject.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-  }, [bible, filter])
+  // One person under one heading, whichever of their names a chapter used.
+  const groups = useMemo(
+    () =>
+      groupBySubject(bible?.facts ?? [], (fact) => filter === 'all' || fact.kind === filter),
+    [bible, filter],
+  )
 
   /* Render -------------------------------------------------------------- */
 
@@ -387,9 +382,12 @@ export function StoryBiblePage() {
           />
         ) : (
           <div className="bible__groups">
-            {groups.map(([subject, facts]) => (
-              <Card key={subject} as="section" className="bible__group">
-                <h3 className="bible__subject">{subject}</h3>
+            {groups.map(({ name, aliases, facts }) => (
+              <Card key={name} as="section" className="bible__group">
+                <h3 className="bible__subject">{name}</h3>
+                {aliases.length > 0 ? (
+                  <p className="bible__aliases">Also called {aliases.join(', ')}</p>
+                ) : null}
                 <ul className="bible__fact-list">
                   {facts.map((fact) => (
                     <li key={fact.id} className="bible__fact">

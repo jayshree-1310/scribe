@@ -28,7 +28,7 @@ import { runAs } from "./caller.js";
 import { embedChapter } from "./embeddings.js";
 import { BIBLE_READ_JOB, EMBED_CHAPTER_JOB, SUMMARY_STORY_JOB, USAGE_PRUNE_JOB } from "./job-schedule.js";
 import { generateStorySummary } from "./summaries.js";
-import { refreshBible } from "./story-bible.js";
+import { hasBible, refreshBible } from "./story-bible.js";
 import { pruneUsage } from "./usage.js";
 
 /** Chapters per `refreshBible` call: the same batch the bible page asks for. */
@@ -68,14 +68,29 @@ export function registerAiJobs(): void {
       const storyId = String(payload["storyId"] ?? "");
       if (!job.userId) throw HttpError.forbidden("A bible reading needs the author who asked for it.");
       const userId = job.userId;
+      // Queued by a save rather than by the author (`scheduleBibleRefresh`).
+      const auto = payload["auto"] === true;
+
+      // Kept current only once the author has built it.
+      if (auto && !(await hasBible(storyId))) return { skipped: "no-bible" };
 
       let processed = 0;
       let pending = 0;
-      for (let batch = 0; batch < BIBLE_MAX_BATCHES && !signal.aborted; batch += 1) {
-        const result = await runAs(userId, () => refreshBible(userId, storyId, BIBLE_BATCH, signal), job.requestId);
-        processed += result.processed.filter((item) => !item.unchanged).length;
-        pending = result.bible.pending;
-        if (pending === 0 || result.processed.length === 0) break;
+      try {
+        for (let batch = 0; batch < BIBLE_MAX_BATCHES && !signal.aborted; batch += 1) {
+          const result = await runAs(userId, () => refreshBible(userId, storyId, BIBLE_BATCH, signal), job.requestId);
+          processed += result.processed.filter((item) => !item.unchanged).length;
+          pending = result.bible.pending;
+          if (pending === 0 || result.processed.length === 0) break;
+        }
+      } catch (error) {
+        // An author out of allowance is not a failure to retry and dead-letter
+        // for a read they did not ask for: what was read stays read, and the
+        // next save, or the Read button, picks up the rest.
+        if (auto && error instanceof HttpError && error.status === 429) {
+          return { skipped: "limited", processed, pending };
+        }
+        throw error;
       }
       return { processed, pending };
     },
