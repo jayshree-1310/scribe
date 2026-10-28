@@ -42,6 +42,11 @@ import './ask.css'
  * - **"Not in the story" is a notice, not an AI answer** — because it is not
  *   one: the server declines without asking a model.
  *
+ * **Any turn can be asked again.** Regenerate on the latest answer, Edit on
+ * any question. Both replace that turn and everything after it — on the
+ * server only once the new answer is complete, so a failed or abandoned
+ * attempt puts the old turns back exactly as they were.
+ *
  * The conversation being shown is remembered per story for the browser tab,
  * so closing the reader's sheet to follow a citation and opening it again
  * picks up where it was. Older ones are a picker away; every conversation is
@@ -79,6 +84,8 @@ interface AskBookPanelProps {
 
 interface Turn {
   key: string
+  /** The stored question's id, once the server has one: what Edit and Regenerate name. */
+  questionId: string | null
   question: string
   /** What retrieval searched with, when that was not the question as typed. */
   standalone: string | null
@@ -123,6 +130,7 @@ function turnsOf(conversation: Conversation): Turn[] {
     if (question?.role !== 'user' || answer?.role !== 'assistant') continue
     turns.push({
       key: question.id,
+      questionId: question.id,
       question: question.content,
       standalone: question.standaloneQuestion,
       answer: answer.content,
@@ -165,6 +173,8 @@ export function AskBookPanel({
   const [earlier, setEarlier] = useState<ConversationSummary[]>([])
   const [opening, setOpening] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  /** The question being edited in place, and its draft. */
+  const [editing, setEditing] = useState<{ key: string; text: string } | null>(null)
 
   const pending = useRef<AbortController | null>(null)
   const nextKey = useRef(0)
@@ -229,17 +239,33 @@ export function AskBookPanel({
       return
     }
 
+    setQuestion('')
+    await runTurn(trimmed, null)
+  }
+
+  /**
+   * Asks `content`: appended, or in place of the turn at `replacing.index` and
+   * every turn after it.
+   */
+  async function runTurn(
+    content: string,
+    replacing: { questionId: string; index: number } | null,
+  ) {
     pending.current?.abort()
     const controller = new AbortController()
     pending.current = controller
 
+    // What to put back if a replacement fails: the server kept these.
+    const before = turns
+
     nextKey.current += 1
     const key = `local-${nextKey.current}`
     setTurns((current) => [
-      ...current,
+      ...(replacing ? current.slice(0, replacing.index) : current),
       {
         key,
-        question: trimmed,
+        questionId: null,
+        question: content,
         standalone: null,
         answer: '',
         answerable: true,
@@ -249,9 +275,9 @@ export function AskBookPanel({
         error: null,
       },
     ])
-    setQuestion('')
     setFormError(null)
     setConfirmingDelete(false)
+    setEditing(null)
 
     try {
       let id = conversationId
@@ -264,8 +290,9 @@ export function AskBookPanel({
       for await (const reply of streamConversationMessage(
         id,
         {
-          content: trimmed,
+          content,
           ...(range === AUTO ? {} : { upToChapter: Number(range) }),
+          ...(replacing ? { replaceFrom: replacing.questionId } : {}),
         },
         controller.signal,
       )) {
@@ -273,6 +300,7 @@ export function AskBookPanel({
           patchTurn(key, (turn) => ({ answer: turn.answer + reply.text }))
         } else if (reply.type === 'done') {
           patchTurn(key, () => ({
+            questionId: reply.questionId,
             standalone: reply.standaloneQuestion,
             answerable: reply.answerable,
             citations: reply.citations,
@@ -285,14 +313,34 @@ export function AskBookPanel({
       void refreshEarlier()
     } catch (cause) {
       if (controller.signal.aborted) return
+      if (replacing) {
+        // Nothing was replaced on the server, so the thread goes back to
+        // what it was rather than showing a hole where the old turns were.
+        setTurns(before)
+        setFormError(failureMessage(cause, 'That could not be asked again just now.'))
+        return
+      }
       // Nothing was stored for a failed turn, so the question goes back in
       // the box to be asked again.
       patchTurn(key, () => ({
         status: 'error',
         error: failureMessage(cause, 'That question could not be answered just now.'),
       }))
-      setQuestion(trimmed)
+      setQuestion(content)
     }
+  }
+
+  function regenerate(index: number) {
+    const turn = turns[index]
+    if (!turn?.questionId) return
+    void runTurn(turn.question, { questionId: turn.questionId, index })
+  }
+
+  function saveEdit(index: number) {
+    const turn = turns[index]
+    const text = editing?.text.trim() ?? ''
+    if (!turn?.questionId || text.length < 3) return
+    void runTurn(text, { questionId: turn.questionId, index })
   }
 
   function startNew() {
@@ -300,6 +348,7 @@ export function AskBookPanel({
     setConversationId(null)
     setTurns([])
     setConfirmingDelete(false)
+    setEditing(null)
     remember(storyId, null)
   }
 
@@ -431,6 +480,58 @@ export function AskBookPanel({
                 idBase={`${idBase}-${turn.key}`}
                 storySlug={storySlug}
                 onCite={onCite}
+                questionEditor={
+                  editing?.key === turn.key ? (
+                    <form
+                      className="ask__edit"
+                      onSubmit={(event) => {
+                        event.preventDefault()
+                        saveEdit(index)
+                      }}
+                    >
+                      <TextField
+                        label="Edit your question"
+                        hideLabel
+                        value={editing.text}
+                        maxLength={QUESTION_LIMIT}
+                        autoFocus
+                        onChange={(event) => setEditing({ key: turn.key, text: event.target.value })}
+                      />
+                      <Button type="submit" size="sm" variant="primary" disabled={editing.text.trim().length < 3}>
+                        Ask
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                        Cancel
+                      </Button>
+                    </form>
+                  ) : null
+                }
+                actions={
+                  turn.status === 'done' && turn.questionId && !streaming && editing === null ? (
+                    <div className="ask__actions">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        startIcon={<Icon name="pencil" size="0.9em" />}
+                        onClick={() => setEditing({ key: turn.key, text: turn.question })}
+                      >
+                        Edit question
+                      </Button>
+                      {/* Only a model's answer can come out differently: a
+                          decline or a reply to "thanks" is the app's own text. */}
+                      {index === turns.length - 1 && turn.answerable ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          startIcon={<Icon name="retry" size="0.9em" />}
+                          onClick={() => regenerate(index)}
+                        >
+                          Regenerate
+                        </Button>
+                      ) : null}
+                    </div>
+                  ) : null
+                }
                 scopeText={
                   turn.scope
                     ? scopeNote(turn.scope, titleOf, turn.scope.upToChapter === last?.number)
@@ -502,9 +603,21 @@ interface AnswerTurnProps {
   storySlug: string
   onCite: (() => void) | undefined
   scopeText: string | null
+  /** Shown in place of the question while it is being edited. */
+  questionEditor: React.ReactNode
+  /** Edit and Regenerate, under a finished answer. */
+  actions: React.ReactNode
 }
 
-function AnswerTurn({ turn, idBase, storySlug, onCite, scopeText }: AnswerTurnProps) {
+function AnswerTurn({
+  turn,
+  idBase,
+  storySlug,
+  onCite,
+  scopeText,
+  questionEditor,
+  actions,
+}: AnswerTurnProps) {
   const valid = turn.citations
     ? new Set(turn.citations.map((citation) => citation.marker))
     : null
@@ -518,7 +631,7 @@ function AnswerTurn({ turn, idBase, storySlug, onCite, scopeText }: AnswerTurnPr
 
   return (
     <>
-      <p className="ask__question">{turn.question}</p>
+      {questionEditor ?? <p className="ask__question">{turn.question}</p>}
 
       {turn.status === 'streaming' && turn.answer.length === 0 ? (
         <p className="ask__hint">Looking through the story…</p>
@@ -607,6 +720,8 @@ function AnswerTurn({ turn, idBase, storySlug, onCite, scopeText }: AnswerTurnPr
             : null}
         </p>
       ) : null}
+
+      {actions}
     </>
   )
 }

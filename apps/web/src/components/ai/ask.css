@@ -153,6 +153,26 @@
   color: var(--ask-ink-soft);
 }
 
+/* A question being edited, in the question's own place. */
+.ask__edit {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+
+.ask__edit > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Edit and Regenerate: quiet, under the answer they act on. */
+.ask__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-inline-start: calc(var(--space-2) * -1);
+}
+
 .ask__hint,
 .ask__error {
   margin: 0;

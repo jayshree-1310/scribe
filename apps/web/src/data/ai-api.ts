@@ -847,7 +847,12 @@ export async function deleteConversation(id: string): Promise<void> {
 /** One turn: the answer as it is written, then its citations and rewrite. */
 export function streamConversationMessage(
   conversationId: string,
-  payload: { content: string; upToChapter?: number },
+  payload: {
+    content: string
+    upToChapter?: number
+    /** A question to ask this in place of, with everything after it. */
+    replaceFrom?: string
+  },
   signal?: AbortSignal,
 ): AsyncGenerator<ConversationEvent> {
   return streamRequest<ConversationEvent>(

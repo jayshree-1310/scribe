@@ -23,12 +23,14 @@ import {
   expect,
   it,
 } from "vitest";
+import { HttpError } from "../lib/http-error.js";
 import { connectRedis, redis } from "../lib/redis.js";
 import { db } from "../prisma/db.js";
 import {
   HISTORY_SLOTS,
   RECENT_EXCHANGES,
   FOLD_BATCH,
+  FOLD_CHUNK,
 } from "../services/ai/conversations.js";
 import { embedChapter } from "../services/ai/embeddings.js";
 import {
@@ -175,13 +177,14 @@ async function say(
   content: string,
   as = ownerId,
   upToChapter: number | null = 3,
+  replaceFrom: string | null = null,
 ): Promise<SseResult> {
   const response = await fetch(
     `${api.baseUrl}/api/ai/conversations/${conversationId}/messages`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-scribe-user-id": as },
-      body: JSON.stringify({ content, upToChapter }),
+      body: JSON.stringify({ content, upToChapter, replaceFrom }),
     },
   );
   if (!(response.headers.get("content-type") ?? "").includes("text/event-stream")) {
@@ -213,6 +216,22 @@ async function forgetQueries(...texts: string[]): Promise<void> {
 }
 
 const done = (result: SseResult) => result.events.find((event) => event.type === "done");
+
+/** Asks `content` in place of the question `replaceFrom`, and what followed it. */
+const sayAgain = (conversationId: string, content: string, replaceFrom: string) =>
+  say(conversationId, content, ownerId, 3, replaceFrom);
+
+async function messagesOf(conversationId: string): Promise<{ id: string; ordinal: number; role: string; content: string }[]> {
+  const view = await api.request<any>(`/api/ai/conversations/${conversationId}`, { as: ownerId });
+  expect(view.status).toBe(200);
+  return view.body.messages;
+}
+
+async function memoryOf(conversationId: string) {
+  return db.orm.ai.Conversation.select("title", "summary", "summarizedThrough")
+    .where((conversation) => conversation.id.eq(conversationId))
+    .first();
+}
 
 /** Calls of one feature, in order. */
 const callsOf = (feature: string) =>
@@ -510,6 +529,151 @@ describe.skipIf(!available)("/api/ai/conversations", () => {
         as: ownerId,
       });
       expect(removed.status).toBe(204);
+    });
+  });
+
+  describe("asking again", () => {
+    it("regenerates the last answer in place", async () => {
+      const id = await start();
+      await say(id, "What was the lamp like?");
+      await say(id, "Who knocked on the door?");
+      const [, , question] = await messagesOf(id);
+
+      provider = fakeAiProvider(["A second reading of it [1]."], { respond });
+      setAiProvider(provider);
+      const again = await sayAgain(id, question!.content, question!.id);
+
+      expect(again.status).toBe(200);
+      const messages = await messagesOf(id);
+      expect(messages.map((message) => [message.ordinal, message.role])).toEqual([
+        [1, "user"],
+        [2, "assistant"],
+        [3, "user"],
+        [4, "assistant"],
+      ]);
+      expect(messages[2]?.content).toBe("Who knocked on the door?");
+      expect(messages[3]?.content).toContain("A second reading");
+    });
+
+    it("edits an earlier question, and drops everything that followed it", async () => {
+      const id = await start();
+      await say(id, "What was the lamp like?");
+      await say(id, "Who knocked on the door?");
+      await say(id, "Who was the killer?");
+      const [first] = await messagesOf(id);
+
+      await sayAgain(id, "Was the lamp ever lit?", first!.id);
+
+      const messages = await messagesOf(id);
+      expect(messages).toHaveLength(2);
+      expect(messages[0]?.content).toBe("Was the lamp ever lit?");
+      // The opening question is the title, so editing it renames the conversation.
+      expect((await memoryOf(id))?.title).toBe("Was the lamp ever lit?");
+    });
+
+    it("keeps the old turn when the new answer never completes", async () => {
+      const id = await start();
+      await say(id, "Who knocked on the door?");
+      const before = await messagesOf(id);
+
+      provider.failNext(HttpError.upstream("The model could not complete that request."));
+      const failed = await sayAgain(id, "Who knocked on the door?", before[0]!.id);
+
+      expect(failed.status).not.toBe(200);
+      expect(await messagesOf(id)).toEqual(before);
+    });
+
+    it("rebuilds the summary from scratch when it covered a replaced turn", async () => {
+      const id = await start();
+      for (const question of [
+        "What was the lamp like?",
+        "Who knocked on the door?",
+        "Who was the killer?",
+        "Was the lamp ever lit?",
+        "Did anyone answer the door?",
+        "Why was he the killer?",
+        "Where was the lighthouse?",
+      ]) {
+        await say(id, question);
+      }
+      expect((await memoryOf(id))?.summarizedThrough).toBe(8);
+      const messages = await messagesOf(id);
+
+      // The fourth question (ordinal 7) is inside the summary, which covers
+      // through ordinal 8. Replacing it forgets the summary: three exchanges
+      // remain before it, too few to fold yet.
+      provider.reset();
+      await sayAgain(id, "Was the lamp lit at dusk?", messages[6]!.id);
+
+      expect(await memoryOf(id)).toMatchObject({ summary: "", summarizedThrough: 0 });
+      expect(textOf(callsOf("ask.conversation")[0])).not.toContain("Summary 2:");
+      expect(await messagesOf(id)).toHaveLength(8);
+
+      // The next turn rebuilds it from those exchanges -- from empty, not by
+      // extending what was forgotten.
+      provider.reset();
+      await say(id, "And the door?");
+
+      const [fold] = callsOf("ask.conversation.summary");
+      expect(fold).toBeDefined();
+      expect(textOf(fold)).not.toContain("Summary 2:");
+      expect((await memoryOf(id))?.summarizedThrough).toBe(4);
+    });
+
+    it("rebuilds a long summary in calls of FOLD_CHUNK, not one prompt the size of the conversation", async () => {
+      const id = await start();
+      for (let turn = 1; turn <= 15; turn += 1) {
+        await say(id, `Was the lamp lit on night ${turn}?`);
+      }
+      // Folded every other turn from the fifth: through ordinal 24.
+      expect((await memoryOf(id))?.summarizedThrough).toBe(24);
+      const messages = await messagesOf(id);
+
+      // Replacing the twelfth question (ordinal 23) leaves eleven exchanges,
+      // nine of them to fold from scratch: one call of eight, one of one.
+      provider.reset();
+      await sayAgain(id, "Was the lamp lit at dawn?", messages[22]!.id);
+
+      const folds = callsOf("ask.conversation.summary");
+      expect(folds.map((call) => countReaders(textOf(call)))).toEqual([FOLD_CHUNK, 1]);
+      expect((await memoryOf(id))?.summarizedThrough).toBe(18);
+    });
+
+    it("leaves the summary alone when the replaced turn was not in it", async () => {
+      const id = await start();
+      for (const question of [
+        "What was the lamp like?",
+        "Who knocked on the door?",
+        "Who was the killer?",
+        "Was the lamp ever lit?",
+        "Did anyone answer the door?",
+      ]) {
+        await say(id, question);
+      }
+      const before = await memoryOf(id);
+      // Folded once, before the fifth answer: the first two exchanges.
+      expect(before?.summarizedThrough).toBe(4);
+      const messages = await messagesOf(id);
+
+      provider.reset();
+      await sayAgain(id, "Did anyone open the door?", messages[8]!.id);
+
+      expect(callsOf("ask.conversation.summary")).toHaveLength(0);
+      expect(await memoryOf(id)).toMatchObject({
+        summary: before?.summary,
+        summarizedThrough: 4,
+      });
+    });
+
+    it("only replaces a question in this conversation", async () => {
+      const id = await start();
+      await say(id, "Who knocked on the door?");
+      const [question, answer] = await messagesOf(id);
+      const other = await start();
+
+      expect((await sayAgain(id, "Again?", answer!.id)).status).toBe(404);
+      expect((await sayAgain(other, "Again?", question!.id)).status).toBe(404);
+      expect(await messagesOf(id)).toHaveLength(2);
     });
   });
 

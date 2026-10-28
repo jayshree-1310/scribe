@@ -28,6 +28,16 @@
  * talk), the same retrieval, the same decline-without-a-model, the same
  * citations. A conversation adds memory, not a second way to answer.
  *
+ * **A turn can be asked again.** Regenerating an answer and editing an
+ * earlier question are one operation: `replaceFrom` names a question, the
+ * turn is answered as if the conversation ended just before it, and only once
+ * the new answer is complete are that question and everything after it
+ * replaced, in the transaction that stores the new turn. Abandoning a
+ * regenerate leaves the old answer where it was. When the turns being
+ * replaced had already been folded into the summary, the summary is rebuilt
+ * from scratch over the turns that remain -- which is also the way out of an
+ * early summarisation mistake.
+ *
  * **Conversations are private.** Every read looks the row up by id *and*
  * owner, so another reader's id is a 404, never a 403 that confirms it
  * exists -- and re-checks the story, because a conversation quotes chapters
@@ -38,6 +48,7 @@ import { Temporal } from "temporal-polyfill";
 import { HttpError } from "../../lib/http-error.js";
 import { logger } from "../../lib/logger.js";
 import { db } from "../../prisma/db.js";
+import { deleteAll } from "../../prisma/delete-all.js";
 import { findVisibleChapterIds, findVisibleStoryId, toIso } from "../stories.js";
 import {
   citationsFor,
@@ -89,6 +100,13 @@ export const FOLD_BATCH = 2;
 
 /** About 120 words. The summary is a memory aid, not a transcript. */
 export const SUMMARY_LIMIT = 1200;
+
+/**
+ * Exchanges one summary call folds. A normal turn folds two or three; a
+ * summary rebuilt from scratch may have dozens to fold, and is done in calls
+ * of this many rather than one prompt the size of the conversation.
+ */
+export const FOLD_CHUNK = 8;
 
 /** Exchanges sent back to the answer verbatim: the latest plus up to two relevant ones. */
 export const HISTORY_SLOTS = 3;
@@ -310,8 +328,13 @@ interface Memory {
  * failed answer would pay for it twice.
  *
  * The summary is model output. It is validated here (trimmed, capped, and
- * discarded if empty -- in which case the old one stands and nothing is
+ * discarded if empty -- in which case the old one stands and nothing more is
  * marked as folded) and fenced when it goes back into a prompt.
+ *
+ * Folded `FOLD_CHUNK` exchanges per call, each call extending the last one's
+ * summary, so a summary being rebuilt from scratch costs several small calls
+ * rather than one the size of the conversation. Each is persisted as it lands:
+ * the summary always covers exactly the exchanges up to `summarizedThrough`.
  */
 async function foldIntoSummary(
   conversation: ConversationRow,
@@ -330,38 +353,59 @@ async function foldIntoSummary(
 
   if (pending.length < FOLD_BATCH) return memory;
 
-  const completion = await aiProvider().complete({
-    feature: `${FEATURE}.summary`,
-    system: SUMMARY_SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: summaryMessage({
-          summary: memory.summary,
-          exchanges: pending.map(recalled),
-        }),
-      },
-    ],
-    maxTokens: SUMMARY_MAX_TOKENS,
-    ...(signal ? { signal } : {}),
-  });
-  usage.add(completion.usage);
+  let current: Memory = memory;
+  for (let start = 0; start < pending.length; start += FOLD_CHUNK) {
+    const chunk = pending.slice(start, start + FOLD_CHUNK);
 
-  const text = clampSummary(completion.text);
-  if (text === "") return memory;
+    const completion = await aiProvider().complete({
+      feature: `${FEATURE}.summary`,
+      system: SUMMARY_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: summaryMessage({
+            summary: current.summary,
+            exchanges: chunk.map(recalled),
+          }),
+        },
+      ],
+      maxTokens: SUMMARY_MAX_TOKENS,
+      ...(signal ? { signal } : {}),
+    });
+    usage.add(completion.usage);
 
-  const next = {
-    summary: text,
-    summarizedThrough: pending.at(-1)?.answer.ordinal ?? memory.summarizedThrough,
-  };
+    const text = clampSummary(completion.text);
+    if (text === "") return current;
 
+    current = {
+      summary: text,
+      summarizedThrough: chunk.at(-1)?.answer.ordinal ?? current.summarizedThrough,
+    };
+
+    await db.orm.ai.Conversation.where((row) => row.id.eq(conversation.id)).update({
+      ...current,
+      summaryPromptId: CONVERSATION_SUMMARY_PROMPT.id,
+      summaryPromptVersion: CONVERSATION_SUMMARY_PROMPT.version,
+    });
+  }
+
+  return current;
+}
+
+/**
+ * Forgets a summary that covers turns about to be replaced, so it can be
+ * rebuilt from the turns that remain. Persisted at once, for the reason
+ * folding is: an empty summary covering nothing is true whether or not the
+ * new answer then completes, and the next turn rebuilds it either way.
+ */
+async function forgetSummary(conversation: ConversationRow): Promise<ConversationRow> {
   await db.orm.ai.Conversation.where((row) => row.id.eq(conversation.id)).update({
-    ...next,
-    summaryPromptId: CONVERSATION_SUMMARY_PROMPT.id,
-    summaryPromptVersion: CONVERSATION_SUMMARY_PROMPT.version,
+    summary: "",
+    summarizedThrough: 0,
+    summaryPromptId: null,
+    summaryPromptVersion: null,
   });
-
-  return next;
+  return { ...conversation, summary: "", summarizedThrough: 0 };
 }
 
 /** A summary that respects its own limit, cut at a sentence or a word. */
@@ -786,6 +830,8 @@ function isUniqueViolation(error: unknown): boolean {
 interface Turn {
   conversation: ConversationRow;
   nextOrdinal: number;
+  /** The question this turn replaces, with everything after it; null to append. */
+  replacing: { id: string; ordinal: number } | null;
   question: string;
   standalone: string | null;
   answer: string;
@@ -811,6 +857,27 @@ interface Turn {
 async function saveTurn(turn: Turn): Promise<{ questionId: string; answerId: string }> {
   try {
     return await db.transaction(async (tx) => {
+      const replacing = turn.replacing;
+      if (replacing !== null) {
+        // Still where it was when the turn began: another tab may have
+        // replaced it already, and this would then rewind *their* turn.
+        const still = await tx.orm.ai.ConversationMessage.select("id")
+          .where((message) => message.id.eq(replacing.id))
+          .where((message) => message.ordinal.eq(replacing.ordinal))
+          .first();
+        if (!still) {
+          throw HttpError.conflict(
+            "This conversation changed in another tab. Reopen it and ask again.",
+          );
+        }
+        // Citations go with their answers: that foreign key cascades.
+        await deleteAll(() =>
+          tx.orm.ai.ConversationMessage.where((message) =>
+            message.conversationId.eq(turn.conversation.id),
+          ).where((message) => message.ordinal.gte(replacing.ordinal)),
+        );
+      }
+
       const question = await tx.orm.ai.ConversationMessage.select("id").create({
         conversationId: turn.conversation.id,
         ordinal: turn.nextOrdinal,
@@ -849,7 +916,8 @@ async function saveTurn(turn: Turn): Promise<{ questionId: string; answerId: str
         row.id.eq(turn.conversation.id),
       ).update({
         updatedAt: Temporal.Now.instant(),
-        ...(turn.conversation.title === ""
+        // The opening question is the title, including one asked again.
+        ...(turn.conversation.title === "" || turn.nextOrdinal === 1
           ? { title: turn.question.slice(0, 120) }
           : {}),
       });
@@ -870,6 +938,12 @@ export interface SendMessageInput {
   content: string;
   /** The spoiler bound for this turn, or null for the default. */
   upToChapter: number | null;
+  /**
+   * A question in this conversation to ask this in place of, replacing it and
+   * everything after it once the answer is complete: the same text to
+   * regenerate its answer, new text to edit it. Absent to append.
+   */
+  replaceFrom?: string | null;
 }
 
 export type ConversationEvent =
@@ -909,14 +983,36 @@ export async function* sendMessageStream(
     input.upToChapter,
   );
 
-  const messages = await loadMessages(conversation.id);
+  const all = await loadMessages(conversation.id);
+
+  let replacing: Turn["replacing"] = null;
+  if (input.replaceFrom) {
+    const from = all.find((message) => message.id === input.replaceFrom);
+    if (!from || from.role !== "user") {
+      throw HttpError.notFound("That question is not in this conversation.");
+    }
+    replacing = { id: from.id, ordinal: from.ordinal };
+  }
+
+  // The conversation as this turn sees it: everything before the question it
+  // replaces, if it replaces one.
+  const messages = replacing
+    ? all.filter((message) => message.ordinal < replacing.ordinal)
+    : all;
   if (messages.length >= MAX_MESSAGES) {
     throw HttpError.conflict(
       "This conversation is as long as one can get. Start a new one to keep asking.",
     );
   }
-  const nextOrdinal = (messages.at(-1)?.ordinal ?? 0) + 1;
+  const nextOrdinal = replacing?.ordinal ?? (messages.at(-1)?.ordinal ?? 0) + 1;
   const usage = new UsageTally();
+
+  // A summary covering a turn being replaced would remember an answer the
+  // reader has just thrown away; it is rebuilt from what remains.
+  const remembered =
+    replacing && conversation.summarizedThrough >= replacing.ordinal
+      ? await forgetSummary(conversation)
+      : conversation;
 
   // "Okay thanks" is not a question about the story: answer it as what it
   // is, with no model, no embedding and no retrieval.
@@ -926,6 +1022,7 @@ export async function* sendMessageStream(
     const saved = await saveTurn({
       conversation,
       nextOrdinal,
+      replacing,
       question: input.content,
       standalone: null,
       answer: pleasantry,
@@ -952,7 +1049,7 @@ export async function* sendMessageStream(
     (exchange) => !isPleasantry(exchange),
   );
 
-  const memory = await foldIntoSummary(conversation, exchanges, usage, signal);
+  const memory = await foldIntoSummary(remembered, exchanges, usage, signal);
   const unsummarized = exchanges.filter(
     (exchange) => exchange.answer.ordinal > memory.summarizedThrough,
   );
@@ -976,6 +1073,7 @@ export async function* sendMessageStream(
   const turn: Turn = {
     conversation,
     nextOrdinal,
+    replacing,
     question: input.content,
     standalone,
     answer: "",

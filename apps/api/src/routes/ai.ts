@@ -1088,6 +1088,8 @@ const listConversationsSchema = z.object({
 const sendMessageSchema = z.object({
   content: askBookSchema.shape.question,
   upToChapter: askBookSchema.shape.upToChapter,
+  /** A question to ask this in place of: regenerate its answer, or edit it. */
+  replaceFrom: z.uuid("That question could not be found.").nullish(),
 });
 
 router.post("/conversations", requireUser, async (req, res, next) => {
@@ -1172,7 +1174,11 @@ router.post("/conversations/:id/messages", requireUser, async (req, res, next) =
     for await (const event of sendMessageStream(
       userId,
       id,
-      { content: body.content, upToChapter: body.upToChapter ?? null },
+      {
+        content: body.content,
+        upToChapter: body.upToChapter ?? null,
+        replaceFrom: body.replaceFrom ?? null,
+      },
       disconnect.signal,
     )) {
       if (!writeEvent(res, event)) break;

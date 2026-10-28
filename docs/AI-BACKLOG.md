@@ -1205,10 +1205,24 @@ both halves in one transaction, and `(conversationId, ordinal)` makes a
 double-submitted question collide rather than interleave. A conversation caps
 at 200 messages.
 
-Still open: no "regenerate this answer" or editing an earlier question; the
-summary is never re-folded from scratch, so an early summarisation mistake
-persists; and the reader sheet remembers the open conversation per tab
-(`sessionStorage`), not across devices.
+~~Still open: no "regenerate this answer" or editing an earlier question; the
+summary is never re-folded from scratch.~~ Both closed, as one operation.
+`POST /conversations/:id/messages` takes `replaceFrom` (a question's id): the
+turn is answered as if the conversation ended just before it, and that
+question and everything after it are replaced in the transaction that stores
+the new turn — only once the answer completes, so a failed or abandoned
+attempt changes nothing. When the replaced turns were inside the summary, the
+summary is forgotten and rebuilt from scratch over what remains, `FOLD_CHUNK`
+(8) exchanges per call. The panel offers Edit question on every finished turn
+and Regenerate on the last real answer. Tests in `ai-conversations.test.ts` ›
+*asking again* (the forget and the transactional replace mutation-checked);
+verified in the dev app, including a reload showing the server's thread.
+
+Still open: the reader sheet remembers the open conversation per tab
+(`sessionStorage`), not across devices. And the browser check surfaced a
+retrieval miss worth a look: "Who arrived at the door?" declined on a chapter
+whose cited passage said "Odile arrived at the door at midnight" — the
+question names nobody, so only the similarity floor applied.
 
 **Prompt:**
 
