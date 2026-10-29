@@ -1000,10 +1000,14 @@ and which cases regressed. It costs real calls, so it is not part of
 
 ## What is deliberately missing
 
-- **A hosted provider.** `build()` throws a 503 for `anthropic` with a comment
-  saying why: an abstraction over two implementations written before either is
-  exercised is a guess. The seam is shaped and the second file is small when
-  there is a key to test it with.
+- **An Anthropic provider — not planned.** `build()` throws a 503 for
+  `anthropic`, and that is where it stays: the project has no Anthropic key and
+  is not getting one (decided 2026-10-29). The hosted path is the
+  OpenAI-compatible provider (Groq's free tier in this deployment) and the
+  local one is Ollama. The `anthropic` value is left in `AI_PROVIDERS` so a
+  misconfiguration fails with a clear message rather than as an unknown
+  provider; remove it with its three config tests if that ever stops being
+  worth it.
 - **Nothing from Tasks AI 0–20.** All of it is built, including the parts of
   Task AI 6 that first shipped as the chapter recap alone. `docs/ai-security.md`
   records the AI 19 audit and `docs/ai-operations.md` how to run it all.
