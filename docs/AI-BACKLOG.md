@@ -1670,8 +1670,18 @@ retried on the next save, and the previous findings stay where they were. The
 panel says which state it is in — never checked, out of date, failed, or
 clean — rather than showing an empty list that could mean any of them.
 
-Still open: findings are per chapter, with no story-wide list or count on the
-dashboard; a check compares at most thirty claims with forty established
+~~Still open: findings are per chapter, with no story-wide list or count on
+the dashboard.~~ Closed. `GET /api/ai/continuity/stories/:storyId` counts open
+findings per chapter and says which checks describe an older draft; the
+editor's chapter list marks each chapter with its count. `GET
+/api/ai/continuity/stories` totals each of the author's stories, shown on the
+author dashboard's story rows. Both read stored rows only. And the check now
+runs on the job queue when jobs are on (see Task AI 20). Tests in
+`ai-continuity.test.ts` › *across the whole story* and `ai-ops.test.ts` ›
+*queues a continuity check* (the queue branch mutation-checked); verified in
+the dev app against `gpt-oss-120b` on a planted eye-colour contradiction.
+
+Still open: a check compares at most thirty claims with forty established
 facts, so a very long chapter in a very large cast is checked partly; and the
 0.8 floor is the default, not a measurement — it held on one planted story,
 which is not evidence about a novel. Task AI 16 is where it gets some.
@@ -2159,9 +2169,9 @@ from the last call within five minutes, at no cost, and its own `status`
 stays `ok`. The degradation table in `docs/ai-operations.md` names, for each
 feature, what a person sees and the test that holds it.
 
-Not moved onto the queue: the continuity check. It is already off the request
-path (`continuity-queue.ts`), a timer per chapter, and a restart drops pending
-checks, which the next save or **Check now** recovers.
+~~Not moved onto the queue: the continuity check.~~ Moved since: with jobs on
+it is a `continuity.check` job, delayed by the quiet minute and keyed by
+chapter, so it survives a restart; with jobs off it keeps the in-memory timer.
 
 **Prompt:**
 

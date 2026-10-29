@@ -27,7 +27,7 @@ import {
   flushContinuityChecks,
   isContinuityCheckPending,
 } from "../services/ai/continuity-queue.js";
-import type { ChapterContinuity } from "../services/ai/continuity.js";
+import type { ChapterContinuity, StoryContinuity } from "../services/ai/continuity.js";
 import {
   CONTINUITY_MARKERS,
   CONTINUITY_SYSTEM_PROMPT,
@@ -655,6 +655,61 @@ describe.skipIf(!available)("saving a chapter", () => {
     } finally {
       process.env["AI_CONTINUITY"] = "on";
     }
+  });
+});
+
+describe.skipIf(!available)("across the whole story", () => {
+  it("counts open findings chapter by chapter, and says which checks are out of date", async () => {
+    const story = await contradiction();
+    reports = [EYES];
+    await check(story.second);
+    fake.reset();
+
+    const before = await api.request<StoryContinuity>(
+      `/api/ai/continuity/stories/${story.story.id}`,
+      { as: author },
+    );
+    expect(before.status).toBe(200);
+    expect(before.body).toMatchObject({ enabled: true, total: 1 });
+    expect(before.body.chapters.map((chapter) => [chapter.chapterId, chapter.findings, chapter.stale])).toEqual([
+      [story.first, 0, false],
+      [story.second, 1, false],
+    ]);
+
+    // Edited since it was checked: the count stands, marked as about an older draft.
+    await api.request(`/api/author/chapters/${story.second}`, {
+      method: "PATCH",
+      as: author,
+      body: { content: `${BLUE_TEXT}\nAnd the tide came in.` },
+    });
+    const after = await api.request<StoryContinuity>(
+      `/api/ai/continuity/stories/${story.story.id}`,
+      { as: author },
+    );
+    expect(after.body.chapters[1]).toMatchObject({ findings: 1, stale: true });
+    // A read of stored rows: nothing was asked of a model.
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  it("totals each of the author's stories for the dashboard, and nobody else's", async () => {
+    const story = await contradiction();
+    reports = [EYES];
+    await check(story.second);
+
+    const mine = await api.request<{ stories: { storyId: string; findings: number }[] }>(
+      "/api/ai/continuity/stories",
+      { as: author },
+    );
+    const theirs = await api.request<{ stories: { storyId: string; findings: number }[] }>(
+      "/api/ai/continuity/stories",
+      { as: stranger },
+    );
+
+    expect(mine.body.stories).toContainEqual({ storyId: story.story.id, findings: 1 });
+    expect(theirs.body.stories.some((row) => row.storyId === story.story.id)).toBe(false);
+    expect(
+      (await api.request(`/api/ai/continuity/stories/${story.story.id}`, { as: stranger })).status,
+    ).toBe(403);
   });
 });
 

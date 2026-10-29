@@ -95,7 +95,7 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/bible-facts.ts` | The pure half: what makes two facts the same fact, whether a quote is really in a chapter, which names a passage mentions, the selection budget, and the fingerprint of a contradiction. |
 | `services/ai/prompts/story-bible.ts` | The extraction prompt — mostly exclusions — and the fenced block the assistant is shown. |
 | `services/ai/continuity.ts` | Task AI 14: a chapter's claims against the rest of the bible, four guards against false positives, findings with both pieces of evidence copied onto them, and dismissal by pair of claims. |
-| `services/ai/continuity-queue.ts` | When a check runs: a quiet minute after the last save. In memory, never awaited by a save, and what keeps `authoring.ts` from importing the AI services that import it. |
+| `services/ai/continuity-queue.ts` | When a check runs: a quiet minute after the last save. A `continuity.check` job when jobs are on, an in-memory timer when they are off; never awaited by a save, and what keeps `authoring.ts` from importing the AI services that import it. |
 | `services/ai/prompts/continuity.ts` | The comparison prompt. Spends more words on what is not a contradiction than on what is, and has the model answer by label. |
 | `services/ai/moderation.ts` | Task AI 12: score a new comment per category, turn the scores into allow / review / reject in `decide`, and hand anything that needs a person to `services/moderation.ts`. Fire-and-forget from `createComment`; never fails or slows a post. |
 | `services/ai/prompts/moderation.ts` | The scoring prompt, built from the category list. Asks for numbers, never a verdict, and says in as many words that discussing a story's violence is not violence. |
@@ -1010,13 +1010,6 @@ and which cases regressed. It costs real calls, so it is not part of
 - **A budget read from the usage table.** Enforcement still counts in Redis
   over a rolling window (`budget.ts`), which is fast and cannot be audited;
   `ai.UsageEvent` is the audit. They agree to within one call per window.
-- **Continuity checks on the queue.** They still run on an in-memory timer
-  (`continuity-queue.ts`), so a restart drops pending ones; the next save or
-  **Check now** recovers them. Everything else slow is a job
-  (`docs/ai-operations.md`).
-- **Answer regeneration.** A conversation turn cannot be re-asked or
-  edited, and the summary is never rebuilt from scratch, so an early
-  summarisation mistake persists for the life of the conversation.
 - **A hosted embedder in practice.** `createOpenAiCompatibleEmbedder` exists
   and is untested against a real provider, because the hosted endpoint this
   repo points at serves chat only.

@@ -14,15 +14,20 @@
  * also what keeps `services/authoring.ts` -- the caller -- from importing the
  * AI services that import it back.
  *
- * **In memory, and that is acceptable here.** A restart drops the pending
- * timers, and nothing is lost that matters: a check is "is what is stored
- * still a check of this text?", so the next save, or the author opening the
- * chapter and pressing Check, runs the one that was dropped. A durable queue
- * is Task AI 20.
+ * **On the job queue when there is one.** With `AI_JOBS` on, the check is a
+ * `continuity.check` job delayed by the quiet period and keyed by chapter, so
+ * each save pushes the one waiting job later -- the same debounce, but it
+ * survives a restart and runs wherever the worker does. With jobs off (the
+ * test suite, a server run without the worker) it falls back to an in-memory
+ * timer, where a restart drops what is pending; nothing that matters is lost
+ * either way, because a check is "is what is stored still a check of this
+ * text?", and the next save or the Check button runs the dropped one.
  */
 
+import { enqueue } from "../../lib/jobs.js";
 import { logger } from "../../lib/logger.js";
 import { loadAiConfig } from "./config.js";
+import { CONTINUITY_CHECK_JOB } from "./job-schedule.js";
 
 const timers = new Map<string, NodeJS.Timeout>();
 const running = new Set<Promise<unknown>>();
@@ -54,10 +59,27 @@ export function scheduleContinuityCheck(chapterId: string): void {
   const config = loadAiConfig();
   if (!config.continuityChecks) return;
 
+  if (config.jobs) {
+    void enqueue(
+      CONTINUITY_CHECK_JOB,
+      { chapterId },
+      { delayMs: config.continuityQuietMs, dedupeKey: `continuity:${chapterId}` },
+    ).catch((error: unknown) => {
+      // The queue is Redis; if it is unreachable the timer still checks.
+      logger.warn({ err: error, chapterId }, "continuity: check not queued, timing it here");
+      startTimer(chapterId, config.continuityQuietMs);
+    });
+    return;
+  }
+
+  startTimer(chapterId, config.continuityQuietMs);
+}
+
+function startTimer(chapterId: string, quietMs: number): void {
   const pending = timers.get(chapterId);
   if (pending) clearTimeout(pending);
 
-  const timer = setTimeout(() => run(chapterId), config.continuityQuietMs);
+  const timer = setTimeout(() => run(chapterId), quietMs);
   // A pending check is never a reason to keep the process alive.
   timer.unref();
   timers.set(chapterId, timer);

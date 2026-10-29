@@ -88,8 +88,10 @@ import {
 } from "../services/ai/story-bible.js";
 import {
   checkChapterNow,
+  countOpenFindings,
   dismissFinding,
   getChapterContinuity,
+  getStoryContinuity,
 } from "../services/ai/continuity.js";
 import {
   HISTORY_ANSWER_LIMIT,
@@ -1605,6 +1607,28 @@ const chapterIdParams = z.object({
 
 const findingIdParams = z.object({
   findingId: z.uuid("That finding could not be found."),
+});
+
+/**
+ * Open findings per story, for the author dashboard. Stored rows only, so
+ * no limit beyond the AI baseline.
+ */
+router.get("/continuity/stories", requireUser, async (_req, res, next) => {
+  try {
+    res.json({ stories: await countOpenFindings(requireUserId(res)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Where a story's open findings are, chapter by chapter, for the editor. */
+router.get("/continuity/stories/:storyId", requireUser, async (req, res, next) => {
+  try {
+    const { storyId } = parseOrThrow(storyIdParams, req.params);
+    res.json(await getStoryContinuity(requireUserId(res), storyId));
+  } catch (error) {
+    next(error);
+  }
 });
 
 /**

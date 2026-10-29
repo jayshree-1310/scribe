@@ -672,6 +672,96 @@ export async function getChapterContinuity(
   return continuityOf(await ownedChapter(userId, chapterId));
 }
 
+/* The whole story ---------------------------------------------------------- */
+
+/** One chapter's line in the story-wide view. */
+export interface ChapterContinuityCount {
+  chapterId: string;
+  chapterNumber: number;
+  title: string;
+  /** Open findings: raised and not dismissed. */
+  findings: number;
+  /** True when the chapter has changed since its last check. */
+  stale: boolean;
+}
+
+export interface StoryContinuity {
+  storyId: string;
+  /** False when the story has no bible, or checks are switched off. */
+  enabled: boolean;
+  /** Open findings across every chapter. */
+  total: number;
+  /** Every chapter, in order, so the editor can mark each in its list. */
+  chapters: ChapterContinuityCount[];
+}
+
+/**
+ * Where the open findings are, chapter by chapter, for the editor's chapter
+ * list. Stored rows only: never calls a model.
+ */
+export async function getStoryContinuity(
+  userId: string,
+  storyId: string,
+): Promise<StoryContinuity> {
+  await assertStoryOwned(userId, storyId);
+
+  const [chapters, checks, findings, bible] = await Promise.all([
+    db.orm.content.Chapter.select("id", "chapterNumber", "title", "content")
+      .where((row) => row.storyId.eq(storyId))
+      .orderBy((row) => row.chapterNumber.asc())
+      .all(),
+    db.orm.ai.ContinuityCheck.select("chapterId", "contentHash")
+      .where((row) => row.storyId.eq(storyId))
+      .all(),
+    db.orm.ai.ContinuityFinding.select("chapterId")
+      .where((row) => row.storyId.eq(storyId))
+      .all(),
+    hasBible(storyId),
+  ]);
+
+  const checked = new Map(checks.map((check) => [check.chapterId, check.contentHash]));
+  const counts = new Map<string, number>();
+  for (const finding of findings) {
+    counts.set(finding.chapterId, (counts.get(finding.chapterId) ?? 0) + 1);
+  }
+
+  return {
+    storyId,
+    enabled: bible && loadAiConfig().continuityChecks,
+    total: findings.length,
+    chapters: chapters.map((chapter) => {
+      const hash = checked.get(chapter.id);
+      return {
+        chapterId: chapter.id,
+        chapterNumber: chapter.chapterNumber,
+        title: chapter.title,
+        findings: counts.get(chapter.id) ?? 0,
+        stale: hash !== undefined && hash !== hashOf(chapter.content),
+      };
+    }),
+  };
+}
+
+/**
+ * Open findings per story, for every story of the caller's that has any: the
+ * count on the author dashboard. One grouped query, never a model.
+ */
+export async function countOpenFindings(
+  userId: string,
+): Promise<{ storyId: string; findings: number }[]> {
+  const plan = db.raw.sql`
+    SELECT f."storyId", COUNT(*)::int AS "findings"
+      FROM "ai"."continuityFinding" AS f
+      JOIN "content"."story" AS s ON s."id" = f."storyId"
+     WHERE s."authorId" = ${userId}
+     GROUP BY f."storyId"
+  `
+    .returnsRow({ storyId: "pg/text@1", findings: "pg/int4@1" })
+    .build();
+
+  return (await db.runtime().query(plan)) as { storyId: string; findings: number }[];
+}
+
 /**
  * Checks a chapter now, because its author asked.
  *

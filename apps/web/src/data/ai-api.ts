@@ -600,6 +600,46 @@ export async function checkChapterContinuity(
   )
 }
 
+/** One chapter's line in the story-wide view. Mirrors `services/ai/continuity.ts`. */
+export interface ChapterContinuityCount {
+  chapterId: string
+  chapterNumber: number
+  title: string
+  /** Open findings: raised and not dismissed. */
+  findings: number
+  /** Changed since its last check. */
+  stale: boolean
+}
+
+export interface StoryContinuity {
+  storyId: string
+  enabled: boolean
+  total: number
+  chapters: ChapterContinuityCount[]
+}
+
+/** Where a story's open findings are, chapter by chapter. Never calls a model. */
+export async function getStoryContinuity(
+  storyId: string,
+  signal?: AbortSignal,
+): Promise<StoryContinuity> {
+  return request<StoryContinuity>(`/ai/continuity/stories/${storyId}`, {
+    headers: readerHeaders(),
+    ...(signal ? { signal } : {}),
+  })
+}
+
+/** Open findings per story, for every story of the caller's that has any. */
+export async function countContinuityFindings(
+  signal?: AbortSignal,
+): Promise<{ storyId: string; findings: number }[]> {
+  const body = await request<{ stories: { storyId: string; findings: number }[] }>(
+    '/ai/continuity/stories',
+    { headers: readerHeaders(), ...(signal ? { signal } : {}) },
+  )
+  return body.stories
+}
+
 /** "Not a mistake": this pair of claims is never raised again. */
 export async function dismissContinuityFinding(findingId: string): Promise<void> {
   await request<void>(`/ai/continuity/findings/${findingId}/dismiss`, {

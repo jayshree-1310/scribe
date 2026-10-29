@@ -65,19 +65,20 @@ with body `{ "feature": "assist", "enabled": false }`.
 ## The background queue
 
 `lib/jobs.ts` is a Redis-backed queue. Its worker runs inside the API process
-when `AI_JOBS=on` (the default), started by `server.ts`. There are four job
+when `AI_JOBS=on` (the default), started by `server.ts`. There are five job
 types (`services/ai/jobs.ts`):
 
 | Job | Queued by | What it does |
 | --- | --- | --- |
 | `embed.chapter` | Publishing a chapter or a story; editing a published chapter's text (debounced by chapter, a minute after the last save) | Embeds the chapter for search, if it is published and its story is listed |
-| `bible.read` | `POST /api/ai/bible/:storyId/read` (the author) | Reads every stale chapter into the story bible, as the author, against their budget |
+| `bible.read` | `POST /api/ai/bible/:storyId/read` (the author); saving chapter text, three quiet minutes after the last save, for a story that already has a bible | Reads every stale chapter into the story bible, as the author, against their budget. A save-queued read skips a story with no bible and an author out of allowance |
+| `continuity.check` | Saving chapter text, a quiet minute after the last save (debounced by chapter) | Checks the chapter against the story bible, as the author; skipped for a story with no bible. With `AI_JOBS=off` the same check runs on an in-memory timer instead |
 | `usage.prune` | The worker, once a day | Deletes `ai.UsageEvent` rows past `AI_USAGE_RETENTION_DAYS` |
 | `summary.story` | A reader opening a story whose summary at their chapter is missing or stale; the author's Regenerate | Writes the story-so-far summary up to that chapter, reusing every chapter summary that is still current |
 
 **Retries.** A failing job is retried on a doubling delay (5s, 10s, 20s … at
 most ten minutes), up to its type's attempt limit: 4 for embedding, 3 for a
-bible reading, 2 for the prune. After that it is **dead-lettered**. Every
+bible reading or a summary, 2 for a continuity check or the prune. After that it is **dead-lettered**. Every
 handler is idempotent, so a retry or a recovered job running twice writes
 nothing twice:
 

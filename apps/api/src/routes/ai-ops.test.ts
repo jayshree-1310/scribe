@@ -28,7 +28,8 @@ import { connectRedis, redis } from "../lib/redis.js";
 import { db } from "../prisma/db.js";
 import { loadAiConfig } from "../services/ai/config.js";
 import { resetAiHealth } from "../services/ai/health.js";
-import { EMBED_CHAPTER_JOB } from "../services/ai/job-schedule.js";
+import { isContinuityCheckPending } from "../services/ai/continuity-queue.js";
+import { CONTINUITY_CHECK_JOB, EMBED_CHAPTER_JOB } from "../services/ai/job-schedule.js";
 import { registerAiJobs } from "../services/ai/jobs.js";
 import {
   __wrapForTests,
@@ -287,6 +288,36 @@ describe.skipIf(!available)("keeping a story bible current", () => {
 
     expect(fake.calls).toHaveLength(1);
     expect(String(fake.calls[0]?.messages[0]?.content)).toContain("blue coat");
+  });
+
+  it("queues a continuity check that outlives the process: one job per burst of saves", async () => {
+    const was = process.env["AI_CONTINUITY"];
+    process.env["AI_CONTINUITY"] = "on";
+    try {
+      const story = await api.createStory({ title: "Checked On The Queue", authorId: author });
+      const chapter = await api.createChapter({ storyId: story.id, number: 1, content: "Kit wore a red coat." });
+      fake = fakeAiProvider([JSON.stringify({ facts: [] })]);
+      setAiProvider(fake);
+      await api.request(`/api/ai/bible/${story.id}/refresh`, { method: "POST", as: author });
+
+      await save(chapter, "Kit wore a blue coat.");
+      await save(chapter, "Kit wore a blue coat, and kept it.");
+
+      // Not an in-memory timer a restart would drop...
+      expect(isContinuityCheckPending(chapter)).toBe(false);
+      // ...but one waiting job, pushed back by the second save.
+      const waiting = (
+        await Promise.all((await redis.zRange(`${QUEUE}:delayed`, 0, -1)).map((id) => getJob(id)))
+      ).filter((job) => job?.type === CONTINUITY_CHECK_JOB && job.payload["chapterId"] === chapter);
+      expect(waiting).toHaveLength(1);
+
+      await makeDue();
+      await drainJobs();
+      expect((await getJob(waiting[0]!.id))?.status).toBe("done");
+    } finally {
+      if (was === undefined) delete process.env["AI_CONTINUITY"];
+      else process.env["AI_CONTINUITY"] = was;
+    }
   });
 
   it("leaves a story with no bible alone, and charges its author nothing", async () => {

@@ -3,6 +3,7 @@ import { useAuth } from '../../lib/auth'
 import { formatCount, formatRating, formatRelative } from '../../lib/format'
 import * as analyticsApi from '../../data/analytics-api'
 import * as channelsApi from '../../data/channels-api'
+import { countContinuityFindings } from '../../data/ai-api'
 import { STORY_STATUS_LABELS } from '../../types/stories'
 import type { StoryPerformance } from '../../types/analytics'
 import { LineChart } from '../../components/charts/LineChart'
@@ -61,6 +62,20 @@ export function AuthorDashboardPage() {
   const channels = useAsync(
     () => channelsApi.listChannels({ mine: true, limit: 12 }),
     [],
+  )
+
+  /**
+   * Open continuity warnings per story. An extra on the row: while loading or
+   * on failure a row simply shows none, and the editor holds the detail.
+   */
+  const warnings = useAsync(
+    () => (signedIn ? countContinuityFindings() : Promise.resolve([])),
+    [signedIn],
+  )
+  const warningsByStory = new Map(
+    warnings.status === 'ready' && warnings.data
+      ? warnings.data.map((row) => [row.storyId, row.findings])
+      : [],
   )
 
   const myChannels = channels.data?.items ?? []
@@ -182,6 +197,16 @@ export function AuthorDashboardPage() {
                           {formatRelative(story.updatedAt)}
                         </span>
                       </span>
+                      {(warningsByStory.get(story.id) ?? 0) > 0 ? (
+                        <span
+                          className="story-row__stat story-row__stat--warning"
+                          title="Possible continuity problems — open the story to see them"
+                        >
+                          <Icon name="alert" size="0.9em" />
+                          {warningsByStory.get(story.id)}
+                          <span className="visually-hidden"> continuity warnings</span>
+                        </span>
+                      ) : null}
                       <span className="story-row__stat">
                         <Icon name="eye" size="0.9em" />
                         {formatCount(story.views)}

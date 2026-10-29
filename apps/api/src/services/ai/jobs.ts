@@ -12,6 +12,11 @@
  * - `bible.read` -- `refreshBible` reads only chapters whose stored reading is
  *   stale, so a re-run picks up where the last stopped. Runs as the author who
  *   asked, so it is charged to them and refused when they are over budget.
+ *   Queued by a save too (`auto`), for a story that already has a bible; that
+ *   kind skips a story with none and an author out of allowance.
+ * - `continuity.check` -- `checkChapter` skips a chapter whose stored check
+ *   already covers its text and facts, so a re-run asks no model. Delayed and
+ *   keyed by chapter, so a run of saves is one check.
  * - `usage.prune` -- a `DELETE ... WHERE createdAt < cutoff` is idempotent by
  *   construction. Scheduled once a day by the worker.
  * - `summary.story` -- `generateStorySummary` reuses every chapter summary and
@@ -26,7 +31,14 @@ import { registerJobType } from "../../lib/jobs.js";
 import { db } from "../../prisma/db.js";
 import { runAs } from "./caller.js";
 import { embedChapter } from "./embeddings.js";
-import { BIBLE_READ_JOB, EMBED_CHAPTER_JOB, SUMMARY_STORY_JOB, USAGE_PRUNE_JOB } from "./job-schedule.js";
+import { runScheduledCheck } from "./continuity.js";
+import {
+  BIBLE_READ_JOB,
+  CONTINUITY_CHECK_JOB,
+  EMBED_CHAPTER_JOB,
+  SUMMARY_STORY_JOB,
+  USAGE_PRUNE_JOB,
+} from "./job-schedule.js";
 import { generateStorySummary } from "./summaries.js";
 import { hasBible, refreshBible } from "./story-bible.js";
 import { pruneUsage } from "./usage.js";
@@ -93,6 +105,16 @@ export function registerAiJobs(): void {
         throw error;
       }
       return { processed, pending };
+    },
+  });
+
+  registerJobType(CONTINUITY_CHECK_JOB, {
+    // A model that could not be asked is recorded as a failed check, not
+    // thrown, so a retry here is for the database, not the provider.
+    maxAttempts: 2,
+    async handler(payload) {
+      await runScheduledCheck(String(payload["chapterId"] ?? ""));
+      return {};
     },
   });
 

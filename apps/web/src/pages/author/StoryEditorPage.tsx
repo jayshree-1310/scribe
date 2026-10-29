@@ -40,7 +40,7 @@ import { ErrorState } from '../../components/ui/States'
 import { CoverField } from '../../components/story/CoverField'
 import { AssistPanel, type AssistRequest } from '../../components/ai/AssistPanel'
 import { ASSIST_MENU } from '../../components/ai/assist-actions'
-import type { AssistAction } from '../../data/ai-api'
+import { getStoryContinuity, type AssistAction } from '../../data/ai-api'
 import { ContinuityPanel } from '../../components/ai/ContinuityPanel'
 import { StoryAssistant } from '../../components/ai/StoryAssistant'
 import { countWords, renderChapter } from '../../lib/chapter-markdown'
@@ -226,6 +226,23 @@ export function StoryEditorPage() {
   const mediaInputRef = useRef<HTMLInputElement>(null)
   const chapterListRef = useRef<HTMLOListElement>(null)
   const active = chapters.find((chapter) => chapter.key === activeKey) ?? chapters[0]!
+
+  /**
+   * Open continuity warnings per chapter, for the chapter list. Re-read when
+   * the author moves between chapters rather than on every autosave: a check
+   * lands a quiet minute after the last save, so a read per save would mostly
+   * re-read nothing new. Absent while loading or on failure, which reads as
+   * no marks — the panel under the chapter is the authority.
+   */
+  const continuity = useAsync(
+    () => (storyId ? getStoryContinuity(storyId) : Promise.resolve(null)),
+    [storyId, activeKey],
+  )
+  const warningsByChapter = new Map(
+    continuity.status === 'ready' && continuity.data
+      ? continuity.data.chapters.map((entry) => [entry.chapterId, entry.findings])
+      : [],
+  )
 
   /**
    * The chapter list scrolls once a story runs long, so a chapter picked from
@@ -1318,6 +1335,16 @@ export function StoryEditorPage() {
                     <span className="chapter-manager__title">
                       {chapter.title || 'Untitled'}
                     </span>
+                    {chapter.id && (warningsByChapter.get(chapter.id) ?? 0) > 0 ? (
+                      <span
+                        className="chapter-manager__warnings"
+                        title="Possible continuity problems in this chapter"
+                      >
+                        <Icon name="alert" size="0.8rem" />
+                        {warningsByChapter.get(chapter.id)}
+                        <span className="visually-hidden"> continuity warnings</span>
+                      </span>
+                    ) : null}
                     <StatusBadge tone={chapter.published ? 'success' : 'neutral'}>
                       {chapter.published ? 'Live' : 'Draft'}
                     </StatusBadge>

@@ -18,6 +18,8 @@ export const EMBED_CHAPTER_JOB = "embed.chapter";
 export const BIBLE_READ_JOB = "bible.read";
 export const USAGE_PRUNE_JOB = "usage.prune";
 export const SUMMARY_STORY_JOB = "summary.story";
+/** Queued by `continuity-queue.ts`, which owns the debounce. */
+export const CONTINUITY_CHECK_JOB = "continuity.check";
 
 /**
  * How long after the last save a published chapter is embedded. The editor

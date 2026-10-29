@@ -52,6 +52,12 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Open continuity warnings, in the warning colour the editor marks them with. */
+.story-row__stat--warning {
+  color: var(--warning, var(--brand));
+  font-weight: 600;
+}
+
 .analytics__filters {
   display: flex;
   gap: var(--space-3);
@@ -604,6 +610,18 @@
 .chapter-manager > li.is-active .chapter-manager__num {
   background-color: var(--brand);
   color: var(--brand-fg);
+}
+
+/* Open continuity warnings, from the story-wide count. The warning colour
+   the continuity panel's findings carry, so the two read as one thing. */
+.chapter-manager__warnings {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex: none;
+  color: var(--warning, var(--brand));
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 
 .chapter-manager__title {
