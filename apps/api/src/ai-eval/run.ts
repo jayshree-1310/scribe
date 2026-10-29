@@ -9,7 +9,7 @@
  * Flags:
  *   --no-judge             skip the faithfulness judge (no extra model calls)
  *   --judge-model <id>     grade with a different model than the one graded
- *   --only ask,assist      run only these kinds (ask, assist, extract)
+ *   --only ask,assist      run only these kinds (ask, assist, extract, moderate)
  *   --against <file>       compare with this result instead of the latest
  *   --fail-on-regression   exit 1 when any case regressed (for CI with a key)
  *
@@ -30,7 +30,7 @@ import { db } from "../prisma/db.js";
 import { loadAiConfig } from "../services/ai/config.js";
 import { compareRuns, formatComparison } from "./compare.js";
 import { DATASET, type EvalCase } from "./dataset.js";
-import { runEval, type EvalRun, type Pricing } from "./runner.js";
+import { moderationSweep, runEval, type EvalRun, type Pricing } from "./runner.js";
 
 const RESULTS_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "results");
 
@@ -75,10 +75,31 @@ function summary(run: EvalRun): string {
     `Declines    correct ${show(m.declines.correct)}  (${m.declines.cases} cases)`,
     `Structured  parses first try ${show(m.structured.firstTryParse)}  grounded ${show(m.structured.grounded)}  subject recall ${show(m.structured.subjectRecall)}  (${m.structured.cases} cases)`,
     `Assistant   pass rate ${show(m.assist.passRate)}  (${m.assist.cases} cases)`,
+    `Moderation  routed right ${show(m.moderation.needsPerson)}  exact ${show(m.moderation.exact)}  false flags ${show(m.moderation.falseFlags)}  misses ${show(m.moderation.misses)}  (${m.moderation.cases} cases)`,
     `Cost        ${m.cost.inputTokens} in / ${m.cost.outputTokens} out / ${m.cost.embedTokens} embed tokens` +
       (m.cost.costUsd === null ? ", unpriced" : `, $${m.cost.costUsd.toFixed(4)}`) +
       `; judge ${m.cost.judgeTokens} tokens; latency p50 ${show(m.cost.latencyP50Ms, 0)}ms p95 ${show(m.cost.latencyP95Ms, 0)}ms`,
     ...(m.errors > 0 ? [`Errors      ${m.errors} case(s) failed to complete — see their detail`] : []),
+  ].join("\n");
+}
+
+/**
+ * Every threshold pair, replayed over this run's moderation scores: the
+ * evidence for `AI_MODERATION_REVIEW_THRESHOLD` / `_REJECT_THRESHOLD`.
+ */
+function sweepTable(run: EvalRun): string {
+  const expected = new Map(
+    DATASET.cases.flatMap((item) => (item.kind === "moderate" ? [[item.id, item.expect] as const] : [])),
+  );
+  const rows = moderationSweep(run.cases, expected);
+  const cases = rows[0]?.cases ?? 0;
+  return [
+    `Moderation thresholds over ${cases} scored comments (false flags: clean ones a moderator would see; misses: harmful ones nobody would; over-hidden: hidden although only worth a look)`,
+    "  review  reject  false flags  misses  over-hidden  exact",
+    ...rows.map(
+      (row) =>
+        `  ${row.review.toFixed(2)}    ${row.reject.toFixed(2)}    ${String(row.falseFlags).padStart(5)}       ${String(row.misses).padStart(3)}     ${String(row.overHidden).padStart(5)}      ${row.exact}/${row.cases}`,
+    ),
   ].join("\n");
 }
 
@@ -105,6 +126,7 @@ async function main(): Promise<number> {
   await writeFile(file, `${JSON.stringify(run, null, 2)}\n`);
 
   console.log(`\n${summary(run)}\n\nWrote ${path.relative(process.cwd(), file)}`);
+  if (run.metrics.moderation.cases > 0) console.log(`\n${sweepTable(run)}`);
 
   if (!previousPath) {
     console.log("No previous result to compare with; this run is the baseline.");

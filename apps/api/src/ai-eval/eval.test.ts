@@ -26,7 +26,11 @@ import { databaseAvailable } from "../test/harness.js";
 import { compareRuns, formatComparison } from "./compare.js";
 import type { Dataset } from "./dataset.js";
 import { JUDGE_FEATURE } from "./judge.js";
-import { runEval } from "./runner.js";
+import { moderationSweep, runEval, type CaseResult } from "./runner.js";
+import {
+  MODERATION_CATEGORIES,
+  type ModerationCategoryId,
+} from "../services/ai/moderation.js";
 
 const available = await databaseAvailable();
 
@@ -57,8 +61,17 @@ const DATASET: Dataset = {
     { kind: "ask", id: "off-topic", story: "Eval Fixture Lighthouse", question: "What is the capital of France?", sources: [] },
     { kind: "assist", id: "grammar", action: "grammar", text: "She climb the steps.", keeps: ["steps"] },
     { kind: "extract", id: "extract", story: "Eval Fixture Lighthouse", chapter: 1, subjects: ["Mira"] },
+    { kind: "moderate", id: "mod-clean", text: "Loved the stair scene.", expect: "ALLOW" },
+    { kind: "moderate", id: "mod-spam", text: "BUY CHEAP FOLLOWERS NOW", expect: "REJECT" },
   ],
 };
+
+/** One reply per category, zero unless named. */
+function moderationReply(over: Partial<Record<ModerationCategoryId, number>> = {}): string {
+  return JSON.stringify(
+    Object.fromEntries(MODERATION_CATEGORIES.map((category) => [category.id, over[category.id] ?? 0])),
+  );
+}
 
 const CONCEPTS = { steps: ["steps", "climbed", "climb", "stair"] };
 
@@ -67,6 +80,11 @@ function goodModel(request: AiRequest): string | undefined {
   if (request.feature === JUDGE_FEATURE) return JSON.stringify({ verdict: "supported", unsupported: [] });
   if (request.feature === "ask.book") return "She climbed ninety-two steps [1].";
   if (request.feature === "assist.grammar") return "She climbed the steps.";
+  if (request.feature === "moderation.classify") {
+    return String(request.messages[0]?.content).includes("BUY")
+      ? moderationReply({ spam: 0.97 })
+      : moderationReply();
+  }
   if (request.feature === "bible.extract") {
     return JSON.stringify({
       facts: [
@@ -108,7 +126,7 @@ describe.skipIf(!available)("runEval", () => {
     expect(run.datasetVersion).toBe(99);
     expect(run.judgePromptVersion).toBe(1);
     expect(run.provider).toBe("fake");
-    expect(run.cases.map((item) => item.id)).toEqual(["steps", "off-topic", "grammar", "extract"]);
+    expect(run.cases.map((item) => item.id)).toEqual(["steps", "off-topic", "grammar", "extract", "mod-clean", "mod-spam"]);
     expect(run.metrics.errors).toBe(0);
 
     const steps = run.cases[0]!;
@@ -131,6 +149,10 @@ describe.skipIf(!available)("runEval", () => {
 
     expect(run.cases[2]!.checks).toMatchObject({ nonEmpty: true, noPreamble: true, keepsNames: true, changed: true });
     expect(run.cases[3]!.checks).toEqual({ parsedFirstTry: true, mostlyGrounded: true, foundSubjects: true });
+    // Moderation through the real `decide`, with the raw scores kept.
+    expect(run.cases[4]!.checks).toEqual({ needsPerson: true, exact: true });
+    expect(run.cases[5]!.detail).toMatchObject({ expect: "REJECT", outcome: "REJECT", category: "spam" });
+    expect(run.cases[5]!.scores["score.spam"]).toBe(0.97);
 
     expect(run.metrics).toMatchObject({
       retrieval: { hitAt1: 1, mrr: 1 },
@@ -138,6 +160,7 @@ describe.skipIf(!available)("runEval", () => {
       declines: { correct: 1 },
       structured: { firstTryParse: 1, grounded: 1 },
       assist: { passRate: 1 },
+      moderation: { cases: 2, needsPerson: 1, exact: 1, falseFlags: 0, misses: 0 },
     });
 
     // The corpus is gone again.
@@ -212,5 +235,56 @@ describe.skipIf(!available)("runEval", () => {
 
     expect(run.cases[0]).toMatchObject({ checks: { completed: false }, error: "internal_error" });
     expect(run.metrics.errors).toBe(1);
+  });
+});
+
+describe("moderationSweep", () => {
+  /** A finished moderate case with these scores. */
+  const scored = (id: string, over: Partial<Record<ModerationCategoryId, number>>): CaseResult => ({
+    id,
+    kind: "moderate",
+    checks: {},
+    scores: Object.fromEntries(
+      MODERATION_CATEGORIES.map((category) => [`score.${category.id}`, over[category.id] ?? 0]),
+    ),
+    detail: {},
+    latencyMs: 0,
+    usage: { calls: 1, inputTokens: 0, outputTokens: 0, embedTokens: 0 },
+    costUsd: null,
+  });
+
+  const cases = [
+    scored("clean-but-violent", { graphic_violence: 0.45 }),
+    scored("rude", { harassment: 0.62 }),
+    scored("spam", { spam: 0.92 }),
+    scored("self-harm", { self_harm: 0.99 }),
+  ];
+  const expected = new Map([
+    ["clean-but-violent", "ALLOW"],
+    ["rude", "REVIEW"],
+    ["spam", "REJECT"],
+    ["self-harm", "REVIEW"],
+  ] as const);
+
+  it("replays each pair of thresholds through decide", () => {
+    const rows = moderationSweep(cases, expected, [0.4, 0.5, 0.7], [0.9, 0.95]);
+    const at = (review: number, reject: number) =>
+      rows.find((row) => row.review === review && row.reject === reject)!;
+
+    // Too low: the fiction discussion reaches a moderator.
+    expect(at(0.4, 0.9)).toMatchObject({ falseFlags: 1, misses: 0, exact: 3 });
+    expect(at(0.5, 0.9)).toMatchObject({ falseFlags: 0, misses: 0, overHidden: 0, exact: 4 });
+    // Too high: the rude comment goes unseen, and spam is only queued.
+    expect(at(0.7, 0.95)).toMatchObject({ falseFlags: 0, misses: 1, exact: 2 });
+    // Self-harm is never hidden, however sure.
+    expect(rows.every((row) => row.overHidden === 0)).toBe(true);
+  });
+
+  it("skips a reject bar under the review bar, and cases that did not finish", () => {
+    const unfinished = { ...scored("broken", {}), scores: {} };
+    const rows = moderationSweep([...cases, unfinished], expected, [0.9], [0.8, 0.95]);
+
+    expect(rows.map((row) => [row.review, row.reject])).toEqual([[0.9, 0.95]]);
+    expect(rows[0]!.cases).toBe(4);
   });
 });

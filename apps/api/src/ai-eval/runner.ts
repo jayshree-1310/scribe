@@ -26,7 +26,15 @@ import {
 } from "../services/ai/ask-book.js";
 import { assist } from "../services/ai/assist.js";
 import { sectionsOf } from "../services/ai/bible-facts.js";
-import { loadAiConfig } from "../services/ai/config.js";
+import { loadAiConfig, loadAiModerationConfig } from "../services/ai/config.js";
+import {
+  MODERATION_CATEGORIES,
+  classify,
+  decide,
+  type ModerationScores,
+  type ModerationVerdict,
+} from "../services/ai/moderation.js";
+import { MODERATION_PROMPT_VERSION } from "../services/ai/prompts/moderation.js";
 import { ASK_BOOK_PROMPT_VERSION } from "../services/ai/prompts/ask-book.js";
 import { JUDGE_PROMPT_VERSION } from "../services/ai/prompts/eval-judge.js";
 import { BIBLE_PROMPT_VERSION } from "../services/ai/prompts/story-bible.js";
@@ -41,7 +49,7 @@ import { extractionRequest } from "../services/ai/story-bible.js";
 import type { AiEmbedder, AiProvider, AiUsage } from "../services/ai/types.js";
 import type { RawStory } from "../data/seed-stories.js";
 import { loadCorpus, storyOf, unloadCorpus, type Corpus } from "./corpus.js";
-import type { AskCase, AssistCase, Dataset, EvalCase, ExtractCase } from "./dataset.js";
+import type { AskCase, AssistCase, Dataset, EvalCase, ExtractCase, ModerateCase } from "./dataset.js";
 import {
   changed,
   citesSource,
@@ -103,6 +111,18 @@ export interface EvalMetrics {
   declines: { cases: number; correct: number | null };
   structured: { cases: number; firstTryParse: number | null; grounded: number | null; subjectRecall: number | null };
   assist: { cases: number; passRate: number | null };
+  /**
+   * At the configured thresholds. `needsPerson` is the share routed correctly
+   * (to a person, or left alone); `falseFlags` the share of clean comments
+   * that reached a moderator; `misses` the share of harmful ones that did not.
+   */
+  moderation: {
+    cases: number;
+    needsPerson: number | null;
+    exact: number | null;
+    falseFlags: number | null;
+    misses: number | null;
+  };
   cost: {
     inputTokens: number;
     outputTokens: number;
@@ -369,6 +389,92 @@ async function runExtract(item: ExtractCase, corpus: Corpus): Promise<Graded> {
   };
 }
 
+const SCORE_PREFIX = "score.";
+
+/**
+ * One comment through the real classifier and the real `decide`, at the
+ * configured thresholds. The raw scores go on the result so
+ * `moderationSweep` can replay other thresholds without another call.
+ */
+async function runModerate(item: ModerateCase): Promise<Graded> {
+  const config = loadAiModerationConfig();
+  const { scores } = await classify(item.text, config);
+  const ruling = decide(scores, config);
+
+  return {
+    checks: {
+      needsPerson: (ruling.outcome !== "ALLOW") === (item.expect !== "ALLOW"),
+      exact: ruling.outcome === item.expect,
+    },
+    scores: Object.fromEntries(
+      MODERATION_CATEGORIES.map((category) => [`${SCORE_PREFIX}${category.id}`, scores[category.id]]),
+    ),
+    detail: {
+      expect: item.expect,
+      outcome: ruling.outcome,
+      category: ruling.category?.id ?? null,
+      thresholds: { review: config.reviewThreshold, reject: config.rejectThreshold },
+    },
+  };
+}
+
+/** The scores a moderate case recorded, or null for one that did not finish. */
+function moderationScoresOf(item: CaseResult): ModerationScores | null {
+  const entries = MODERATION_CATEGORIES.map(
+    (category) => [category.id, item.scores[`${SCORE_PREFIX}${category.id}`]] as const,
+  );
+  if (entries.some(([, score]) => score === undefined)) return null;
+  return Object.fromEntries(entries) as ModerationScores;
+}
+
+export interface SweepRow {
+  review: number;
+  reject: number;
+  /** Clean comments that would have reached a moderator. */
+  falseFlags: number;
+  /** Harmful comments that would not have. */
+  misses: number;
+  /** Comments that would have been hidden although clean or only worth a look. */
+  overHidden: number;
+  exact: number;
+  cases: number;
+}
+
+/**
+ * What each pair of thresholds would have decided, replayed over one run's
+ * stored scores through the same `decide` the service uses. Pure: this is how
+ * the thresholds get evidence without a model call per pair.
+ */
+export function moderationSweep(
+  cases: readonly CaseResult[],
+  expected: ReadonlyMap<string, ModerationVerdict>,
+  reviews: readonly number[] = [0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+  rejects: readonly number[] = [0.8, 0.85, 0.9, 0.95],
+): SweepRow[] {
+  const scored = cases.flatMap((item) => {
+    const scores = item.kind === "moderate" ? moderationScoresOf(item) : null;
+    const expect = expected.get(item.id);
+    return scores && expect ? [{ scores, expect }] : [];
+  });
+
+  const rows: SweepRow[] = [];
+  for (const review of reviews) {
+    for (const reject of rejects) {
+      if (reject < review) continue;
+      const row: SweepRow = { review, reject, falseFlags: 0, misses: 0, overHidden: 0, exact: 0, cases: scored.length };
+      for (const { scores, expect } of scored) {
+        const outcome = decide(scores, { reviewThreshold: review, rejectThreshold: reject }).outcome;
+        if (expect === "ALLOW" && outcome !== "ALLOW") row.falseFlags += 1;
+        if (expect !== "ALLOW" && outcome === "ALLOW") row.misses += 1;
+        if (expect !== "REJECT" && outcome === "REJECT") row.overHidden += 1;
+        if (outcome === expect) row.exact += 1;
+      }
+      rows.push(row);
+    }
+  }
+  return rows;
+}
+
 /* Aggregation ------------------------------------------------------------ */
 
 export function summarise(cases: CaseResult[], judgeTokens: number, pricing: Pricing | null): EvalMetrics {
@@ -377,6 +483,10 @@ export function summarise(cases: CaseResult[], judgeTokens: number, pricing: Pri
   const declines = asks.filter((item) => "declined" in item.checks || "refused" in item.checks);
   const extracts = cases.filter((item) => item.kind === "extract");
   const assists = cases.filter((item) => item.kind === "assist");
+  const moderated = cases.filter((item) => item.kind === "moderate" && item.error === undefined);
+  const expectOf = (item: CaseResult) => item.detail["expect"] as ModerationVerdict | undefined;
+  const clean = moderated.filter((item) => expectOf(item) === "ALLOW");
+  const harmful = moderated.filter((item) => expectOf(item) !== "ALLOW");
   const succeeded = cases.filter((item) => item.error === undefined);
 
   const sum = (pick: (usage: CaseUsage) => number) =>
@@ -426,6 +536,13 @@ export function summarise(cases: CaseResult[], judgeTokens: number, pricing: Pri
       cases: assists.length,
       passRate: rate(assists.map((item) => (item.error ? false : Object.values(item.checks).every(Boolean)))),
     },
+    moderation: {
+      cases: moderated.length,
+      needsPerson: rate(moderated.map((item) => item.checks["needsPerson"])),
+      exact: rate(moderated.map((item) => item.checks["exact"])),
+      falseFlags: rate(clean.map((item) => !item.checks["needsPerson"])),
+      misses: rate(harmful.map((item) => !item.checks["needsPerson"])),
+    },
     cost: {
       inputTokens: totals.inputTokens,
       outputTokens: totals.outputTokens,
@@ -472,7 +589,9 @@ export async function runEval(options: RunOptions): Promise<EvalRun> {
           ? runAsk(item, current, options)
           : item.kind === "assist"
             ? runAssist(item, current)
-            : runExtract(item, current);
+            : item.kind === "moderate"
+              ? runModerate(item)
+              : runExtract(item, current);
 
       try {
         for (let retry = 0; ; retry += 1) {
@@ -542,7 +661,11 @@ export async function runEval(options: RunOptions): Promise<EvalRun> {
     provider: providerName,
     model: config.model,
     embedModel,
-    prompts: { askBook: ASK_BOOK_PROMPT_VERSION, storyBible: BIBLE_PROMPT_VERSION },
+    prompts: {
+      askBook: ASK_BOOK_PROMPT_VERSION,
+      storyBible: BIBLE_PROMPT_VERSION,
+      moderation: MODERATION_PROMPT_VERSION,
+    },
     pricing,
     metrics: summarise(cases, judgeTokens, pricing),
     cases,

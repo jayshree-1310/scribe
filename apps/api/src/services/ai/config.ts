@@ -486,9 +486,18 @@ export function isAiEmbedConfigured(
  *   Deliberately high: a false positive here silences somebody who did nothing
  *   wrong until a person undoes it.
  *
- * The defaults are starting points, not measurements -- nothing in the dev
- * corpus is abusive, so there was nothing to measure against. Task AI 16 is
- * where they get evidence.
+ * Measured once (`pnpm ai:eval --only moderate`, 16 labelled comments,
+ * `gpt-oss-120b`, 2026-10-29): the model scores in coarse steps -- 0 or 0.2
+ * for every clean comment, including violence discussed as fiction, grief
+ * and harsh criticism; 0.9 or 1 for every harmful one. So any review bar from
+ * 0.3 to 0.8 routed all sixteen right, and 0.5 sits in the middle of that
+ * gap. The reject bar cannot be tuned into a severity line on this model: it
+ * gave "follow for follow" the same 0.9 as sales spam and "stop writing" the
+ * same 0.9 as a threat. At 0.9 everything flagged is hidden pending review;
+ * at 0.95 only the 1.0s are, and a threat stays up until a moderator acts.
+ * 0.9 is kept, because a hidden report is still left open for a person.
+ * Sixteen synthetic comments on one model is a floor, not a calibration:
+ * re-run the sweep on a model change.
  *
  * `model` lets this run on a smaller model than chat does. It is one call per
  * comment on every comment, which makes it the highest-volume feature here

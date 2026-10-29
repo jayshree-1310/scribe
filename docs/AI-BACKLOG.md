@@ -1456,8 +1456,18 @@ have no user for the harness's per-user sweep to find, so it deletes its own.
 are checked too: `createDiscussion` and `createPost` make the same
 `moderate(type, id)` call, `moderation:pending` sweeps all three, and
 `ai-moderation.test.ts` › *beyond comments* holds both (mutation-checked).
-Still open: the thresholds (0.5 and 0.9) are starting points, not measurements; nothing
-in the dev corpus is abusive, and Task AI 16 is where they get evidence. The
+~~Still open: the thresholds (0.5 and 0.9) are starting points, not
+measurements.~~ Measured: the evaluation has a `moderate` kind (16 labelled
+comments, heavy on hard clean cases) and `pnpm ai:eval --only moderate`
+prints a sweep of every threshold pair replayed over one run's stored scores
+(`moderationSweep`). On `gpt-oss-120b` every review bar from 0.3 to 0.8
+routed all sixteen right — clean comments scored 0–0.2, harmful ones 0.9–1 —
+so 0.5 stands. The reject bar does not separate severity on this model (a
+follow-for-follow plea and a threat both scored 0.9): at 0.9 everything
+flagged is hidden pending review, at 0.95 only the 1.0s are. 0.9 is kept;
+the reasoning is in `config.ts`. Still thin evidence — sixteen synthetic
+comments, one model, nothing for `sexual_minors` — and worth re-running on a
+model change. The
 check is not charged to anybody's daily token budget, deliberately — a reader
 must not be able to exhaust their way out of being moderated — so its spend
 is bounded by the comment rate limit and `AI_MODERATION_MODEL` until Task AI

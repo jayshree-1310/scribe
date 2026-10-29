@@ -42,6 +42,9 @@ const METRICS: MetricSpec[] = [
   { name: "extraction grounded", pick: (m) => m.structured.grounded, better: "higher", ratio: true },
   { name: "extraction subject recall", pick: (m) => m.structured.subjectRecall, better: "higher", ratio: true },
   { name: "assistant pass rate", pick: (m) => m.assist.passRate, better: "higher", ratio: true },
+  { name: "moderation routed right", pick: (m) => m.moderation?.needsPerson ?? null, better: "higher", ratio: true },
+  { name: "moderation false flags", pick: (m) => m.moderation?.falseFlags ?? null, better: "lower", ratio: true },
+  { name: "moderation misses", pick: (m) => m.moderation?.misses ?? null, better: "lower", ratio: true },
   { name: "latency p50 (ms)", pick: (m) => m.cost.latencyP50Ms, better: "lower", ratio: false },
   { name: "output tokens", pick: (m) => m.cost.outputTokens, better: "lower", ratio: false },
 ];

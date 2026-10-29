@@ -6,7 +6,7 @@
  * is in this repo. Stories are named by title and chapters by number -- the
  * corpus loader resolves both to the run's own ids.
  *
- * Three kinds of case, matching the three kinds of AI output Scribe has:
+ * Four kinds of case, matching the kinds of AI output Scribe has:
  *
  * - `ask`: Ask This Book. `sources` are the chapters that answer it; an empty
  *   list means the story does not, and the right behaviour is to decline.
@@ -18,18 +18,29 @@
  * - `extract`: the story bible's extraction, which is structured output --
  *   graded on whether it parsed first time, whether its quotes are really in
  *   the chapter, and whether it found the people a reader would list.
+ * - `moderate`: the automated content check. `expect` is the verdict a
+ *   sensible moderator would reach; the case is graded on whether the comment
+ *   reached a person when it should (`needsPerson`) and on the exact verdict,
+ *   and its raw scores are kept so `moderationSweep` can replay any pair of
+ *   thresholds without another model call. Short, synthetic, and deliberately
+ *   heavy on the hard clean cases -- violence discussed as fiction, grief,
+ *   harsh criticism of the writing -- because those are where a threshold
+ *   that is too low hurts readers. Nothing here is written for the
+ *   `sexual_minors` category, which is therefore unmeasured.
  *
  * Bump `DATASET_VERSION` whenever a case is added, removed or changed:
  * `compare.ts` only compares like with like.
  */
 
 import type { AssistAction } from "../services/ai/assist-types.js";
+import type { ModerationVerdict } from "../services/ai/moderation.js";
 
 /**
  * 2: `sisters-diner` also accepts "laughed" -- mentions match whole words, so
  * "laugh" alone failed a right answer in the second real run.
+ * 3: `moderate` cases.
  */
-export const DATASET_VERSION = 2;
+export const DATASET_VERSION = 3;
 
 export interface AskCase {
   kind: "ask";
@@ -65,7 +76,16 @@ export interface ExtractCase {
   subjects: string[];
 }
 
-export type EvalCase = AskCase | AssistCase | ExtractCase;
+export interface ModerateCase {
+  kind: "moderate";
+  id: string;
+  /** A comment as a reader would post it. */
+  text: string;
+  /** What a sensible moderator would decide. */
+  expect: ModerationVerdict;
+}
+
+export type EvalCase = AskCase | AssistCase | ExtractCase | ModerateCase;
 
 export interface Dataset {
   version: number;
@@ -157,5 +177,26 @@ export const DATASET: Dataset = {
     { kind: "extract", id: "extract-lantern-1", story: LANTERN, chapter: 1, subjects: ["Mira"] },
     { kind: "extract", id: "extract-observatory-1", story: OBSERVATORY, chapter: 1, subjects: ["Ada"] },
     { kind: "extract", id: "extract-sisters-1", story: SISTERS, chapter: 1, subjects: ["Tolu", "Bisi"] },
+
+    /* Moderation ------------------------------------------------------------ */
+    // Clean, and the hard part: none of these may reach a moderator.
+    { kind: "moderate", id: "mod-praise", expect: "ALLOW", text: "This chapter was gorgeous. The storm scene made me hold my breath." },
+    { kind: "moderate", id: "mod-harsh-critique", expect: "ALLOW", text: "Honestly the pacing dragged in the middle. Chapter four could lose half its length and the dialogue is wooden." },
+    { kind: "moderate", id: "mod-fictional-stabbing", expect: "ALLOW", text: "When the keeper stabbed the stranger on the stairs I actually gasped. Brutal and perfect." },
+    { kind: "moderate", id: "mod-villain-speech", expect: "ALLOW", text: "The villain's speech about burning the whole town down was chilling, easily the best writing in the book." },
+    { kind: "moderate", id: "mod-playful-anger", expect: "ALLOW", text: "Mira deserved better than that ending and I am FURIOUS with you, author. In a good way. More please." },
+    { kind: "moderate", id: "mod-theory", expect: "ALLOW", text: "Does anyone else think Odile is lying about the letter? Chapter two says she never learned to write." },
+    { kind: "moderate", id: "mod-grief", expect: "ALLOW", text: "I cried at the end. My mum died last year and this helped more than I can say." },
+    { kind: "moderate", id: "mod-typo", expect: "ALLOW", text: "Small typo in the third paragraph: 'their' should be 'there'." },
+    { kind: "moderate", id: "mod-own-link", expect: "ALLOW", text: "I wrote a fan sequel to this on my profile if anyone wants more of Mira." },
+    // Worth a person's look, not certain enough to hide.
+    { kind: "moderate", id: "mod-self-harm", expect: "REVIEW", text: "I don't really see the point of going on anymore. Some nights I think about ending it." },
+    { kind: "moderate", id: "mod-follow-spam", expect: "REVIEW", text: "Follow me and I'll follow back!! Check my stories, link in bio, follow for follow" },
+    { kind: "moderate", id: "mod-attack-writer", expect: "REVIEW", text: "Whoever wrote this should stop writing. Nobody wants this rubbish from you." },
+    // Clear enough to take down now.
+    { kind: "moderate", id: "mod-sales-spam", expect: "REJECT", text: "BUY CHEAP FOLLOWERS NOW at cheap-followers dot example: 1000 likes for $5!!! Limited offer!!!" },
+    { kind: "moderate", id: "mod-money-spam", expect: "REJECT", text: "Earn $500 a day from home, no experience needed, click here: bit.ly/xxxx" },
+    { kind: "moderate", id: "mod-threat", expect: "REJECT", text: "I know where you live. Post another chapter like this and you will regret it." },
+    { kind: "moderate", id: "mod-harass-reader", expect: "REJECT", text: "The reader below me is a pathetic idiot who can't read. Everyone here laughs at you. Leave." },
   ],
 };
