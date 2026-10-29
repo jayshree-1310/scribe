@@ -832,10 +832,15 @@ highlight clear of itself when the selection sits low in the viewport, which is
 the one case where a bottom sheet would still cover the thing being asked
 about.
 
-Still open: selections spanning emphasis *inside* a word (`un**bel**ievable`)
-are not locatable and silently offer no button. Threading source offsets
-through `lib/chapter-markdown.tsx` would fix it properly and is the right move
-if the renderer grows.
+~~Still open: selections spanning emphasis *inside* a word
+(`un**bel**ievable`) are not locatable and silently offer no button.~~ Fixed in
+`lib/chapter-selection.ts`: each selected word lets emphasis markers sit
+between any two of its characters, so the whole word, or a selection starting
+or ending inside the emphasis, is placed. Checked case by case and in the dev
+app, where the old locator showed no button for the same selection. Threading
+source offsets through `lib/chapter-markdown.tsx` is still the right move if
+the renderer grows: a highlight across a removed media token still cannot be
+placed.
 
 Learn: the same primitive serving two audiences, authorisation as the thing
 that changes rather than the prompt, and why an endpoint's *input shape* is a

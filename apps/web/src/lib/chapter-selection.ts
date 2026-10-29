@@ -24,14 +24,24 @@
  * - **Emphasis markers are invisible to the reader.** Selecting "the lamp
  *   cold" over source that reads "the **lamp** cold" must still find it.
  *
- * Both are handled by matching word-by-word with the separators left loose. It
- * cannot handle emphasis *inside* a word (`un**bel**ievable`), which is rare
- * enough to be worth failing on visibly.
+ * Both are handled by matching with the markers left loose: whitespace and
+ * markers between words, and markers between any two characters of a word,
+ * so emphasis *inside* a word (`un**bel**ievable`) is found too — and so is
+ * a selection that starts or ends inside one.
  */
 
 /** Characters that mean something to a regular expression. */
 function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * One selected word as a pattern that lets emphasis markers sit between any
+ * two of its characters. Code points, not UTF-16 units, so a character outside
+ * the basic plane is never split into halves with a marker between them.
+ */
+function wordPattern(word: string): string {
+  return [...word].map(escapeRegex).join('[*_]*')
 }
 
 /**
@@ -55,9 +65,9 @@ export function locateInSource(
   /**
    * Word, then any run of whitespace and emphasis markers, then the next word.
    * `[\s*_]+` is what absorbs both a collapsed newline and the asterisks the
-   * reader never saw.
+   * reader never saw; `wordPattern` does the same inside a word.
    */
-  const pattern = new RegExp(words.map(escapeRegex).join('[\\s*_]+'), 'g')
+  const pattern = new RegExp(words.map(wordPattern).join('[\\s*_]+'), 'gu')
 
   let best: { start: number; end: number } | null = null
   let bestDistance = Number.POSITIVE_INFINITY
