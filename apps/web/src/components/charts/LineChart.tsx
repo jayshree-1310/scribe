@@ -45,8 +45,14 @@ export function LineChart({
   const plotWidth = Math.max(0, width - PADDING.left - PADDING.right)
   const plotHeight = height - PADDING.top - PADDING.bottom
 
-  const max = niceCeiling(
-    data.reduce((peak, point) => Math.max(peak, point.views, point.reads), 0),
+  /**
+   * At least 4, so the five gridlines are five distinct whole numbers. A new
+   * story's series is all zeros, and a ceiling of 0 divided every point by
+   * zero and gave every gridline the same value (and the same React key).
+   */
+  const max = Math.max(
+    niceCeiling(data.reduce((peak, point) => Math.max(peak, point.views, point.reads), 0)),
+    4,
   )
 
   const x = (index: number) =>
