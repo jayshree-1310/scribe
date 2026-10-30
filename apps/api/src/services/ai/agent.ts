@@ -43,6 +43,12 @@
  * model as fenced context, never as a source; see `prompts/agent.ts`. Nothing
  * is stored, and nothing in the history can widen what a tool returns,
  * because every tool still runs as the session's user.
+ *
+ * **Proposals are data, not a paused run (Task AI 21).** On the author's own
+ * story the model is also offered `propose_edit`, and what it proposes comes
+ * back on `done` beside the answer. Accepting one happens in the editor and
+ * never returns here, so there is no run to suspend and resume -- the hard
+ * part of human-in-the-loop, avoided rather than solved.
  */
 
 import { logger } from "../../lib/logger.js";
@@ -55,9 +61,12 @@ import {
 } from "./prompts/agent.js";
 import { aiProvider } from "./provider.js";
 import {
+  editingFor,
   RESULT_LIMIT,
   runTool,
   toolDefinitions,
+  toolsFor,
+  type EditProposal,
   type ToolContext,
   type ToolOutcome,
 } from "./tools.js";
@@ -107,7 +116,7 @@ export const HISTORY_LIMIT = 6;
 /** Characters of one earlier answer. Answers are a few sentences by prompt. */
 export const HISTORY_ANSWER_LIMIT = 2_000;
 
-export type { AgentExchange };
+export type { AgentExchange, EditProposal };
 
 export interface AgentInput {
   message: string;
@@ -141,6 +150,8 @@ export type AgentStop =
 
 export interface AgentAnswer {
   answer: string;
+  /** Edits for the author to accept or reject; empty unless it is their story. */
+  proposals: EditProposal[];
   steps: AgentStep[];
   stoppedBy: AgentStop;
   modelCalls: number;
@@ -203,7 +214,11 @@ export async function* agentEvents(
   context: ToolContext,
 ): AsyncGenerator<AgentEvent> {
   const provider = aiProvider();
-  const tools = toolDefinitions();
+  // Resolved once, from the session's user: whether this request may propose
+  // edits, and to which story. Nothing the model or the history says changes it.
+  const editing = await editingFor(input.storyKey, context.userId);
+  const toolContext: ToolContext = editing ? { ...context, editing } : context;
+  const tools = toolDefinitions(toolsFor(toolContext));
 
   const messages: AiMessage[] = [
     { role: "user", content: agentMessage(input) },
@@ -220,7 +235,15 @@ export async function* agentEvents(
       { agent: { modelCalls, toolCalls, tokensUsed, stoppedBy } },
       "agent request",
     );
-    return { type: "done", answer, steps, stoppedBy, modelCalls, tokensUsed };
+    return {
+      type: "done",
+      answer,
+      proposals: editing?.proposals ?? [],
+      steps,
+      stoppedBy,
+      modelCalls,
+      tokensUsed,
+    };
   };
 
   for (;;) {
@@ -280,7 +303,7 @@ export async function* agentEvents(
 
       toolCalls += 1;
       yield { type: "lookup", tool: call.name };
-      const run = await runTool(call, context);
+      const run = await runTool(call, toolContext);
 
       logger.info(
         {

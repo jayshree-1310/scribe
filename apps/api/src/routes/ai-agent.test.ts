@@ -8,7 +8,8 @@
  * it refused -- never the model's prose. The four the task names: a tool
  * choice is executed with validated arguments; an out-of-scope story is
  * refused by the tool, not the prompt; the call cap stops a loop; a failing
- * tool is reported and recovered from.
+ * tool is reported and recovered from. And for Task AI 21: a proposed edit
+ * comes back as data and changes no chapter.
  */
 
 /** See `ai.test.ts`: `lib/redis.ts` reads `REDIS_URL` at module scope. */
@@ -25,6 +26,7 @@ import {
 } from "vitest";
 import { HttpError } from "../lib/http-error.js";
 import { connectRedis, redis } from "../lib/redis.js";
+import { db } from "../prisma/db.js";
 import {
   HISTORY_ANSWER_LIMIT,
   HISTORY_LIMIT,
@@ -54,7 +56,7 @@ import {
   type FakeAiProvider,
   type FakeReply,
 } from "../services/ai/testing.js";
-import { AGENT_TOOLS } from "../services/ai/tools.js";
+import { AGENT_TOOLS, MAX_PROPOSALS, runTool } from "../services/ai/tools.js";
 import type { AiToolResultMessage } from "../services/ai/types.js";
 import { TestApi, databaseAvailable } from "../test/harness.js";
 
@@ -254,7 +256,7 @@ describe.skipIf(!available)("POST /api/ai/agent", () => {
     });
   });
 
-  it("offers every tool, under the constant system prompt, with the message fenced", async () => {
+  it("offers every read-only tool, under the constant system prompt, with the message fenced", async () => {
     script("Nothing to look up.");
     const response = await ask(readerId, {
       message: "What can you do?",
@@ -271,8 +273,11 @@ describe.skipIf(!available)("POST /api/ai/agent", () => {
 
     const sent = provider.calls[0]!;
     expect(sent.system).toBe(AGENT_SYSTEM_PROMPT);
+    // Everything but `propose_edit`: the story on screen is not the reader's.
     expect(sent.tools?.map((tool) => tool.name).sort()).toEqual(
-      AGENT_TOOLS.map((tool) => tool.name).sort(),
+      AGENT_TOOLS.map((tool) => tool.name)
+        .filter((name) => name !== "propose_edit")
+        .sort(),
     );
     // Every tool's parameters are a JSON schema object derived from zod.
     for (const tool of sent.tools ?? []) {
@@ -647,6 +652,180 @@ describe.skipIf(!available)("POST /api/ai/agent", () => {
 
       expect(signedOut).toMatchObject({ status: 401, streamed: false });
       expect(failed).toMatchObject({ status: 502, streamed: false });
+    });
+  });
+
+  describe("proposed edits", () => {
+    const GREEN = "Mira's eyes were green as bottle glass.";
+    const TWICE = "The tide came in.";
+    const OTHERS = [
+      "Gulls argued on the roof.",
+      "Rope creaked at the mooring.",
+      "Lamps were lit along the quay.",
+    ];
+    const GREY = "In the fog, Mira's eyes were grey.";
+    let moorings: { id: string; slug: string };
+    let chapterIds: string[];
+
+    beforeAll(async () => {
+      moorings = await api.createStory({ title: "Moorings", authorId });
+      chapterIds = [
+        await api.createChapter({
+          storyId: moorings.id,
+          number: 1,
+          title: "Quay",
+          content: [GREEN, TWICE, TWICE, ...OTHERS].join(" "),
+          published: true,
+        }),
+        await api.createChapter({
+          storyId: moorings.id,
+          number: 2,
+          title: "Fog",
+          content: GREY,
+          published: false,
+        }),
+      ];
+    });
+
+    const propose = (args: Record<string, unknown>): Record<string, unknown> => ({
+      chapterNumber: 1,
+      quote: GREEN,
+      replacement: "Mira's eyes were grey as harbour fog.",
+      reason: "Chapter 2 says her eyes are grey.",
+      ...args,
+    });
+
+    /** Every chapter of the story as stored, to show a run wrote nothing. */
+    const rows = () =>
+      db.orm.content.Chapter.select("id", "content", "updatedAt", "publishedAt")
+        .where((row) => row.storyId.eq(moorings.id))
+        .orderBy((row) => row.chapterNumber.asc())
+        .all();
+
+    it("offers propose_edit only on the caller's own story", async () => {
+      script("Hello.", "Hello.", "Hello.");
+      await ask(authorId, { message: "Fix her eyes.", storyId: moorings.slug });
+      await ask(authorId, { message: "Fix her eyes." });
+      await ask(readerId, { message: "Fix her eyes.", storyId: moorings.slug });
+
+      const offered = provider.calls.map((sent) =>
+        (sent.tools ?? []).some((tool) => tool.name === "propose_edit"),
+      );
+      expect(offered).toEqual([true, false, false]);
+    });
+
+    it("returns a proposal on the author's own chapter as data, and changes no chapter", async () => {
+      const before = await rows();
+      script(
+        call("propose_edit", propose({})),
+        call("propose_edit", propose({ chapterNumber: 2, quote: GREY, replacement: "In the fog, Mira's eyes were green." })),
+        "I proposed two changes for you to accept or reject.",
+      );
+
+      const response = await ask(authorId, { message: "Make her eyes consistent.", storyId: moorings.slug });
+
+      expect(response.status).toBe(200);
+      expect(response.body.steps.map((step) => [step.tool, step.outcome])).toEqual([
+        ["propose_edit", "ok"],
+        ["propose_edit", "ok"],
+      ]);
+      // The draft chapter counts: it is the author's own text.
+      expect(response.body.proposals).toEqual([
+        {
+          id: expect.any(String),
+          chapterId: chapterIds[0],
+          chapterNumber: 1,
+          quote: GREEN,
+          replacement: "Mira's eyes were grey as harbour fog.",
+          reason: "Chapter 2 says her eyes are grey.",
+        },
+        expect.objectContaining({ chapterId: chapterIds[1], chapterNumber: 2, quote: GREY }),
+      ]);
+      // The model is told it was recorded, by id, and nothing more.
+      const [first] = resultsSent(1);
+      expect(JSON.parse(first!.content.split("\n").slice(1, -1).join("\n"))).toEqual({
+        accepted: true,
+        proposalId: response.body.proposals[0]!.id,
+      });
+
+      expect(await rows()).toEqual(before);
+    });
+
+    it("refuses a quote that is absent, or that occurs more than once", async () => {
+      script(
+        call("propose_edit", propose({ quote: "Her eyes were violet." })),
+        call("propose_edit", propose({ quote: TWICE })),
+        call("propose_edit", propose({ replacement: GREEN })),
+        "I could not find a single place to change.",
+      );
+
+      const response = await ask(authorId, { message: "Fix the tide.", storyId: moorings.id });
+
+      expect(response.body.steps.map((step) => [step.outcome, step.code])).toEqual([
+        ["refused", "validation_error"],
+        ["refused", "validation_error"],
+        ["refused", "validation_error"],
+      ]);
+      expect(resultsSent(1)[0]?.content).toContain("does not appear");
+      expect(resultsSent(2)[1]?.content).toContain("more than once");
+      expect(response.body.proposals).toEqual([]);
+    });
+
+    it("cannot be called on another author's story, even by name", async () => {
+      const before = await rows();
+      script(call("propose_edit", propose({})), "I can't change that story.");
+
+      const response = await ask(readerId, { message: "Fix her eyes.", storyId: moorings.slug });
+
+      expect(response.body.steps[0]).toMatchObject({ outcome: "invalid", code: "unknown_tool" });
+      expect(response.body.proposals).toEqual([]);
+      expect(await rows()).toEqual(before);
+    });
+
+    it("is refused by the tool's own read when the context names a story that is not the caller's", async () => {
+      // A context no request can build -- `editingFor` would not -- to show
+      // the tool does not take the context's word for ownership.
+      const run = await runTool(
+        { id: "c1", name: "propose_edit", arguments: JSON.stringify(propose({})) },
+        { userId: readerId, editing: { storyId: moorings.id, proposals: [] } },
+      );
+
+      expect(run).toMatchObject({ outcome: "refused", code: "forbidden" });
+      expect(JSON.stringify(run.result)).not.toContain("bottle glass");
+    });
+
+    it("caps proposals per request, and counts them as lookups", async () => {
+      const quotes = [GREEN, ...OTHERS];
+      script(
+        {
+          toolCalls: quotes.map((quote) => ({
+            name: "propose_edit",
+            arguments: JSON.stringify(propose({ quote, replacement: `${quote} Again.` })),
+          })),
+        },
+        "Proposed what I could.",
+      );
+
+      const response = await ask(authorId, { message: "Rewrite everything.", storyId: moorings.id });
+
+      expect(quotes.length).toBeGreaterThan(MAX_PROPOSALS);
+      expect(response.body.proposals).toHaveLength(MAX_PROPOSALS);
+      expect(response.body.steps.map((step) => step.outcome)).toEqual([
+        ...Array(MAX_PROPOSALS).fill("ok"),
+        "refused",
+      ]);
+      expect(resultsSent(1)[MAX_PROPOSALS]?.content).toContain(`Only ${MAX_PROPOSALS} edits`);
+    });
+
+    it("streams the proposals on done", async () => {
+      script(call("propose_edit", propose({})), "Proposed.");
+
+      const { events } = await askStreamed(authorId, { message: "Fix her eyes.", storyId: moorings.slug });
+
+      expect(events.map((event) => event["type"])).toEqual(["lookup", "step", "done"]);
+      expect(events[2]?.["proposals"]).toEqual([
+        expect.objectContaining({ chapterId: chapterIds[0], quote: GREEN }),
+      ]);
     });
   });
 

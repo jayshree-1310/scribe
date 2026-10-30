@@ -40,9 +40,9 @@ import { ErrorState } from '../../components/ui/States'
 import { CoverField } from '../../components/story/CoverField'
 import { AssistPanel, type AssistRequest } from '../../components/ai/AssistPanel'
 import { ASSIST_MENU } from '../../components/ai/assist-actions'
-import { getStoryContinuity, type AssistAction } from '../../data/ai-api'
+import { getStoryContinuity, type AssistAction, type EditProposal } from '../../data/ai-api'
 import { ContinuityPanel } from '../../components/ai/ContinuityPanel'
-import { StoryAssistant } from '../../components/ai/StoryAssistant'
+import { StoryAssistant, type ProposalOutcome } from '../../components/ai/StoryAssistant'
 import { countWords, renderChapter } from '../../lib/chapter-markdown'
 import '../pages.css'
 import './author.css'
@@ -593,6 +593,35 @@ export function StoryEditorPage() {
       bodyRef.current?.focus()
       bodyRef.current?.setSelectionRange(caret, caret)
     })
+  }
+
+  /**
+   * Applies an edit the assistant proposed and the author accepted, through
+   * `patchChapter` like `acceptAssist`.
+   *
+   * Anchored by the quote, not by offsets, and checked against `active.body`
+   * — the buffer, which is the truth. The server found the quote exactly once
+   * in the saved chapter, but the author may have typed since, or have unsaved
+   * changes the server never saw; so it is found again here, and replaced only
+   * if it still occurs exactly once.
+   */
+  function applyProposal(proposal: EditProposal): ProposalOutcome {
+    if (active.id !== proposal.chapterId) return 'other-chapter'
+
+    const value = active.body
+    const at = value.indexOf(proposal.quote)
+    // `at + 1`, as on the server: an overlapping second match is still two places.
+    if (at === -1 || value.indexOf(proposal.quote, at + 1) !== -1) return 'changed'
+
+    const next = value.slice(0, at) + proposal.replacement + value.slice(at + proposal.quote.length)
+    const caret = at + proposal.replacement.length
+    patchChapter(active.key, { body: next })
+
+    requestAnimationFrame(() => {
+      bodyRef.current?.focus()
+      bodyRef.current?.setSelectionRange(caret, caret)
+    })
+    return 'applied'
   }
 
   /**
@@ -1429,7 +1458,7 @@ export function StoryEditorPage() {
             by id, and a story that has never been saved has nothing to find.
             Keyed so another story starts a fresh conversation.
           */}
-          {storyId !== null ? <StoryAssistant key={storyId} storyId={storyId} /> : null}
+          {storyId !== null ? <StoryAssistant key={storyId} storyId={storyId} onApply={applyProposal} /> : null}
         </aside>
       </div>
 

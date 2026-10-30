@@ -7,9 +7,10 @@
 
 import { describe, expect, it } from "vitest";
 import { loadAiConfig, type AiConfig } from "./config.js";
+import { SELECTION_LIMIT } from "./assist.js";
 import { createOllamaProvider, type FetchLike } from "./ollama.js";
 import { createOpenAiCompatibleProvider } from "./openai-compatible.js";
-import { AGENT_TOOLS, toolDefinitions } from "./tools.js";
+import { AGENT_TOOLS, toolDefinitions, toolsFor } from "./tools.js";
 import type { AiRequest } from "./types.js";
 
 const config = (provider: "openai" | "ollama"): AiConfig => ({
@@ -185,5 +186,30 @@ describe("toolDefinitions", () => {
       properties: { storyId: { type: "string" }, query: { type: "string" } },
       required: ["storyId", "query"],
     });
+  });
+});
+
+describe("toolsFor", () => {
+  const names = (context: Parameters<typeof toolsFor>[0]) =>
+    toolsFor(context).map((tool) => tool.name);
+
+  it("offers propose_edit only with an editing context, and every other tool always", () => {
+    const reading = names({ userId: "u1" });
+    const editing = names({ userId: "u1", editing: { storyId: "s1", proposals: [] } });
+
+    expect(reading).not.toContain("propose_edit");
+    expect(editing).toEqual(AGENT_TOOLS.map((tool) => tool.name));
+    expect(editing.filter((name) => name !== "propose_edit")).toEqual(reading);
+  });
+
+  it("bounds a proposal's text when it is parsed, not only when it is shown", () => {
+    const schema = AGENT_TOOLS.find((tool) => tool.name === "propose_edit")!.schema;
+    const proposal = { chapterNumber: 1, quote: "a", replacement: "b", reason: "Why." };
+
+    expect(schema.safeParse(proposal).success).toBe(true);
+    expect(schema.safeParse({ ...proposal, quote: "x".repeat(SELECTION_LIMIT + 1) }).success).toBe(false);
+    expect(schema.safeParse({ ...proposal, replacement: "x".repeat(SELECTION_LIMIT + 1) }).success).toBe(false);
+    expect(schema.safeParse({ ...proposal, reason: "x".repeat(301) }).success).toBe(false);
+    expect(schema.safeParse({ ...proposal, quote: "" }).success).toBe(false);
   });
 });

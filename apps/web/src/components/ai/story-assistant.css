@@ -33,6 +33,8 @@
 .story-assistant__exchange {
   display: grid;
   gap: var(--space-2);
+  /* So a proposal's columns can respond to the card, not the viewport. */
+  container-type: inline-size;
 }
 
 .story-assistant__question {
@@ -127,4 +129,27 @@
 .story-assistant__form > :first-child {
   flex: 1;
   min-width: 0;
+}
+
+/**
+ * A proposed edit, in the writing assistant's own panel (`assist.css`). Its
+ * two columns sit side by side only when the card has room for them: in the
+ * editor's 21rem side column each would be a dozen characters wide, so they
+ * stack there, original first, as `assist.css` does on a narrow screen.
+ */
+.story-assistant__proposal {
+  margin-bottom: 0;
+}
+
+@container (max-width: 32rem) {
+  .story-assistant__proposal .assist__columns {
+    grid-template-columns: 1fr;
+  }
+
+  .story-assistant__proposal .assist__column--suggestion {
+    padding-left: 0;
+    padding-top: var(--space-3);
+    border-left: none;
+    border-top: 2px solid var(--brand);
+  }
 }

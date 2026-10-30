@@ -29,12 +29,20 @@
  * (`search_chapters` takes no chapter limit -- it uses the reader's own, as Ask
  * This Book does), run a fresh continuity check (that is a model call; the
  * tool reports the stored findings), or write anything.
+ *
+ * `propose_edit` (Task AI 21) is the one that looks like an exception and is
+ * not. A proposal is *output*: the tool checks it and records it for the
+ * answer, and the author applies it in the editor or does not. Nothing here
+ * writes a chapter, so "the model cannot write" stays a property of the code
+ * rather than an instruction in the prompt -- which matters most at the point
+ * the model starts suggesting writes.
  */
 
+import { randomUUID } from "node:crypto";
 import { z, type ZodType } from "zod";
 import { HttpError } from "../../lib/http-error.js";
 import { logger } from "../../lib/logger.js";
-import { listMyChapters } from "../authoring.js";
+import { assertStoryOwned, listMyChapters } from "../authoring.js";
 import { getStory, listChapters, type Story } from "../stories.js";
 import {
   QUESTION_LIMIT,
@@ -42,6 +50,7 @@ import {
   resolveAskSetting,
   retrievePassages,
 } from "./ask-book.js";
+import { SELECTION_LIMIT } from "./assist.js";
 import { normalise } from "./bible-facts.js";
 import { getChapterContinuity } from "./continuity.js";
 import { jsonSchemaFor } from "./json-schema.js";
@@ -54,6 +63,29 @@ import type { AiToolCall, AiToolDefinition } from "./types.js";
 export interface ToolContext {
   userId: string;
   signal?: AbortSignal;
+  /**
+   * Present only when the story on screen is the caller's own: see
+   * `editingFor`. Its absence is what keeps `propose_edit` from being offered.
+   */
+  editing?: EditingContext;
+}
+
+/** An edit the assistant proposed and the author has not yet decided on. */
+export interface EditProposal {
+  id: string;
+  chapterId: string;
+  chapterNumber: number;
+  /** The author's text, exactly, occurring once in the chapter when proposed. */
+  quote: string;
+  replacement: string;
+  reason: string;
+}
+
+export interface EditingContext {
+  /** The one story `propose_edit` may anchor to. Never an argument. */
+  storyId: string;
+  /** What `propose_edit` accepted in this request, in order. */
+  proposals: EditProposal[];
 }
 
 export interface AgentTool<Args> {
@@ -61,6 +93,8 @@ export interface AgentTool<Args> {
   /** What the model reads when choosing. Says what the tool will refuse, too. */
   description: string;
   schema: ZodType<Args>;
+  /** Whether this request is shown the tool at all. Absent means always. */
+  offered?(context: ToolContext): boolean;
   /** Returns something JSON-serialisable. Throws `HttpError` to refuse. */
   run(args: Args, context: ToolContext): Promise<unknown>;
 }
@@ -341,6 +375,123 @@ const continuity = defineTool({
   },
 });
 
+/**
+ * Proposals one request may carry. Three is a handful of fixes the author can
+ * weigh one at a time; more reads as a rewrite, which is the writing
+ * assistant's job, on a selection the author chose.
+ */
+export const MAX_PROPOSALS = 3;
+
+/** How often `quote` occurs in `text`, counted only as far as two: all an anchor needs. */
+function occurrences(text: string, quote: string): number {
+  let count = 0;
+  // Overlapping matches count: "aa" in "aaa" is two places, so ambiguous.
+  for (let at = text.indexOf(quote); at !== -1 && count < 2; at = text.indexOf(quote, at + 1)) {
+    count += 1;
+  }
+  return count;
+}
+
+const proposeEdit = defineTool({
+  name: "propose_edit",
+  description:
+    "Propose replacing one passage of a chapter in the user's own story, the one on screen. " +
+    "Use it whenever the author asks for something in their story to be fixed, changed or rewritten. " +
+    "Nothing changes: the author sees the proposal beside their text and accepts or rejects it. " +
+    "quote must be copied exactly from the chapter, character for character, and occur in it exactly once -- quote enough of the sentence to make it unique. " +
+    `At most ${MAX_PROPOSALS} proposals per request.`,
+  schema: z.object({
+    chapterNumber: z.number().int().min(1).max(100000),
+    // Not trimmed: the quote is matched exactly, and so is what replaces it.
+    quote: z
+      .string()
+      .min(1)
+      .max(SELECTION_LIMIT)
+      .describe("The author's text to replace, exactly as it appears in the chapter."),
+    replacement: z
+      .string()
+      .max(SELECTION_LIMIT)
+      .describe("The text to put in its place."),
+    reason: z
+      .string()
+      .trim()
+      .min(1)
+      .max(300)
+      .describe("One sentence telling the author why."),
+  }),
+  offered: (context) => context.editing !== undefined,
+  async run(args, context) {
+    const editing = context.editing;
+    // `runTool` does not run a tool that was not offered; this is the backstop.
+    if (!editing) {
+      throw HttpError.forbidden("Edits can only be proposed for your own story, open in the editor.");
+    }
+    if (editing.proposals.length >= MAX_PROPOSALS) {
+      throw HttpError.conflict(
+        `Only ${MAX_PROPOSALS} edits can be proposed at once. Tell the author about the rest instead.`,
+      );
+    }
+    if (args.quote === args.replacement) {
+      throw HttpError.badRequest("That replacement is the same as the quote, so it changes nothing.");
+    }
+
+    // The editor's read, drafts included. It re-checks ownership itself, so a
+    // story that changed hands since the request began is refused here too.
+    const chapter = (await listMyChapters(context.userId, editing.storyId)).find(
+      (row) => row.number === args.chapterNumber,
+    );
+    if (!chapter) throw HttpError.notFound("That chapter could not be found.");
+
+    // Anchored by content, not offsets: the author may be typing, and the
+    // editor finds the quote again in its own buffer before applying it.
+    const found = occurrences(chapter.content, args.quote);
+    if (found === 0) {
+      throw HttpError.badRequest(
+        `That quote does not appear in chapter ${chapter.number}. Copy it exactly from the chapter's text.`,
+      );
+    }
+    if (found > 1) {
+      throw HttpError.badRequest(
+        `That quote appears more than once in chapter ${chapter.number}. Quote more of the sentence so it is unique.`,
+      );
+    }
+
+    const proposal: EditProposal = {
+      id: randomUUID(),
+      chapterId: chapter.id,
+      chapterNumber: chapter.number,
+      quote: args.quote,
+      replacement: args.replacement,
+      reason: args.reason,
+    };
+    editing.proposals.push(proposal);
+
+    return { accepted: true, proposalId: proposal.id };
+  },
+});
+
+/**
+ * The editing context for a request, when the story on screen is the
+ * caller's own. Anything else -- no story, another author's, a catalogue
+ * edition, a key that names nothing -- is `undefined`, and the request is
+ * never shown `propose_edit`.
+ */
+export async function editingFor(
+  storyKey: string | null,
+  userId: string,
+): Promise<EditingContext | undefined> {
+  if (storyKey === null) return undefined;
+  try {
+    // The page context may be a slug; ownership is checked on the id.
+    const story = await getStory(storyKey, userId);
+    await assertStoryOwned(userId, story.id);
+    return { storyId: story.id, proposals: [] };
+  } catch (error) {
+    if (error instanceof HttpError && error.status < 500) return undefined;
+    throw error;
+  }
+}
+
 /* Registry --------------------------------------------------------------- */
 
 // `AgentTool<any>`: the registry holds tools of different argument types, and
@@ -352,9 +503,13 @@ export const AGENT_TOOLS: readonly AgentTool<any>[] = [
   storySummary,
   characterFacts,
   continuity,
+  proposeEdit,
 ];
 
-const byName = new Map(AGENT_TOOLS.map((tool) => [tool.name, tool]));
+/** The tools this request may see and call. */
+export function toolsFor(context: ToolContext): readonly AgentTool<any>[] {
+  return AGENT_TOOLS.filter((tool) => tool.offered?.(context) ?? true);
+}
 
 /** The tools as the provider is told about them. Derived, never hand-written. */
 export function toolDefinitions(
@@ -415,13 +570,16 @@ export async function runTool(
     durationMs: Date.now() - startedAt,
   });
 
-  const tool = byName.get(call.name);
+  // A tool this request was not offered does not exist for it, so a model
+  // cannot reach `propose_edit` by naming it on someone else's story.
+  const offered = toolsFor(context);
+  const tool = offered.find((candidate) => candidate.name === call.name);
   if (!tool) {
     return done({
       outcome: "invalid",
       arguments: rawArguments(call.arguments),
       result: {
-        error: `There is no tool called "${call.name.slice(0, 60)}". Use one of: ${AGENT_TOOLS.map((t) => t.name).join(", ")}.`,
+        error: `There is no tool called "${call.name.slice(0, 60)}". Use one of: ${offered.map((t) => t.name).join(", ")}.`,
       },
       code: "unknown_tool",
     });

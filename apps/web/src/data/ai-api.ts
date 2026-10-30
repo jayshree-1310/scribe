@@ -963,9 +963,26 @@ export interface AgentStep {
   durationMs: number
 }
 
+/**
+ * An edit the assistant proposed to the author's own chapter. Nothing has been
+ * changed: the editor applies it only if the author accepts, and only if
+ * `quote` still occurs exactly once in what they have open.
+ */
+export interface EditProposal {
+  id: string
+  chapterId: string
+  chapterNumber: number
+  quote: string
+  /** Generated. Empty when the proposal is to remove the quote. */
+  replacement: string
+  reason: string
+}
+
 export interface AgentAnswer {
   /** Generated, from what the tools returned. */
   answer: string
+  /** Always empty unless the story asked about is the caller's own. */
+  proposals: EditProposal[]
   steps: AgentStep[]
   stoppedBy: 'answered' | 'tool_limit' | 'model_call_limit' | 'token_budget'
   modelCalls: number

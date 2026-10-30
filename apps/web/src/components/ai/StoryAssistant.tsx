@@ -6,6 +6,7 @@ import { Card } from '../ui/Card'
 import { Icon } from '../ui/Icon'
 import { Spinner } from '../ui/Spinner'
 import { TextField } from '../ui/TextField'
+import './assist.css'
 import './story-assistant.css'
 
 /**
@@ -29,6 +30,10 @@ import './story-assistant.css'
  *   as a source, and its tools run as the author whatever they say.
  * - **It is labelled.** An answer is the model's reading of the author's own
  *   material, and says so.
+ * - **It proposes; the author decides.** An answer may carry edits to the
+ *   author's chapters. Each is shown beside the text it would replace, and
+ *   nothing changes until the author accepts it — which the editor does
+ *   against its own buffer, not the server's copy, through `onApply`.
  *
  * The caller keys this on the story, so another story starts a fresh
  * conversation.
@@ -39,6 +44,7 @@ interface Exchange {
   /** Null until `done` arrives. */
   answer: string | null
   steps: aiApi.AgentStep[]
+  proposals: aiApi.EditProposal[]
   /** The lookup running now, between its `lookup` and `step` events. */
   looking: string | null
   error: string | null
@@ -50,6 +56,7 @@ const LOOKUP_LABELS: Record<string, string> = {
   get_story_summary: 'Reading the story details',
   get_character_facts: 'Checking the story bible',
   check_continuity: 'Checking continuity',
+  propose_edit: 'Proposing an edit',
 }
 
 const STEP_LABELS: Record<string, string> = {
@@ -58,6 +65,7 @@ const STEP_LABELS: Record<string, string> = {
   get_story_summary: 'Read the story details',
   get_character_facts: 'Checked the story bible',
   check_continuity: 'Checked continuity',
+  propose_edit: 'Proposed an edit',
 }
 
 /** What the model asked for, in a few words, for the trace. */
@@ -94,12 +102,92 @@ function historyOf(exchanges: Exchange[]): aiApi.AgentExchange[] {
     }))
 }
 
-interface StoryAssistantProps {
-  storyId: string
+/**
+ * What became of an accepted proposal in the editor:
+ * - `applied`: the quote was replaced in the open chapter.
+ * - `other-chapter`: it is for a chapter that is not open; nothing changed.
+ * - `changed`: the quote is no longer in the chapter exactly once; nothing changed.
+ */
+export type ProposalOutcome = 'applied' | 'other-chapter' | 'changed'
+
+type Decision =
+  | { status: 'pending'; note: string | null }
+  | { status: 'applied' | 'rejected' }
+
+const PENDING: Decision = { status: 'pending', note: null }
+
+interface ProposalCardProps {
+  proposal: aiApi.EditProposal
+  decision: Decision
+  onAccept: () => void
+  onReject: () => void
 }
 
-export function StoryAssistant({ storyId }: StoryAssistantProps) {
+/** One proposed edit, in the writing assistant's two columns. */
+function ProposalCard({ proposal, decision, onAccept, onReject }: ProposalCardProps) {
+  return (
+    <section
+      className="assist story-assistant__proposal"
+      aria-label={`Proposed edit to chapter ${proposal.chapterNumber}`}
+    >
+      <header className="assist__head">
+        <Icon name="sparkle" className="assist__mark" size="1rem" />
+        <h3 className="assist__title">Chapter {proposal.chapterNumber}</h3>
+        <span className="assist__badge">AI suggestion</span>
+      </header>
+
+      <div className="assist__columns">
+        <div className="assist__column">
+          <h4 className="assist__column-head">Your text</h4>
+          <p className="assist__text">{proposal.quote}</p>
+        </div>
+        <div className="assist__column assist__column--suggestion">
+          <h4 className="assist__column-head">Suggestion</h4>
+          <p className="assist__text">{proposal.replacement || '(remove this passage)'}</p>
+        </div>
+      </div>
+
+      <p className="assist__note">{proposal.reason}</p>
+
+      {decision.status === 'pending' ? (
+        <div className="assist__actions">
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onAccept}
+            startIcon={<Icon name="check" size="0.9em" />}
+          >
+            Accept
+          </Button>
+          <Button size="sm" onClick={onReject}>
+            Reject
+          </Button>
+          {decision.note ? (
+            <p className="assist__note" role="status">
+              {decision.note}
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <p className="assist__note" role="status">
+          {decision.status === 'applied'
+            ? 'Applied to your chapter.'
+            : 'Rejected. Your text is unchanged.'}
+        </p>
+      )}
+    </section>
+  )
+}
+
+interface StoryAssistantProps {
+  storyId: string
+  /** Applies an accepted proposal to the editor's buffer, if it can. */
+  onApply: (proposal: aiApi.EditProposal) => ProposalOutcome
+}
+
+export function StoryAssistant({ storyId, onApply }: StoryAssistantProps) {
   const [exchanges, setExchanges] = useState<Exchange[]>([])
+  const [decisions, setDecisions] = useState<Record<string, Decision>>({})
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -130,7 +218,7 @@ export function StoryAssistant({ storyId }: StoryAssistantProps) {
     const history = historyOf(exchanges)
     setExchanges((current) => [
       ...current,
-      { question, answer: null, steps: [], looking: null, error: null },
+      { question, answer: null, steps: [], proposals: [], looking: null, error: null },
     ])
     setDraft('')
     setBusy(true)
@@ -153,6 +241,7 @@ export function StoryAssistant({ storyId }: StoryAssistantProps) {
             looking: null,
             answer: update.answer,
             steps: update.steps,
+            proposals: update.proposals,
           }))
         }
       }
@@ -179,7 +268,29 @@ export function StoryAssistant({ storyId }: StoryAssistantProps) {
   function clear() {
     pending.current?.abort()
     setExchanges([])
+    setDecisions({})
     setBusy(false)
+  }
+
+  function decide(id: string, decision: Decision) {
+    setDecisions((current) => ({ ...current, [id]: decision }))
+  }
+
+  function accept(proposal: aiApi.EditProposal) {
+    const outcome = onApply(proposal)
+    if (outcome === 'applied') {
+      decide(proposal.id, { status: 'applied' })
+    } else if (outcome === 'other-chapter') {
+      decide(proposal.id, {
+        status: 'pending',
+        note: `Open chapter ${proposal.chapterNumber} to apply this.`,
+      })
+    } else {
+      decide(proposal.id, {
+        status: 'pending',
+        note: 'That passage has changed since this was proposed, so nothing was replaced.',
+      })
+    }
   }
 
   // Keeps the newest exchange in view as its lookups and answer arrive.
@@ -249,6 +360,16 @@ export function StoryAssistant({ storyId }: StoryAssistantProps) {
                   <p>{exchange.answer}</p>
                 </div>
               ) : null}
+
+              {exchange.proposals.map((proposal) => (
+                <ProposalCard
+                  key={proposal.id}
+                  proposal={proposal}
+                  decision={decisions[proposal.id] ?? PENDING}
+                  onAccept={() => accept(proposal)}
+                  onReject={() => decide(proposal.id, { status: 'rejected' })}
+                />
+              ))}
 
               {exchange.error ? (
                 <p className="story-assistant__error" role="alert">

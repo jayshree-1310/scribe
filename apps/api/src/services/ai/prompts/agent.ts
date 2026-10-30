@@ -26,7 +26,7 @@ import { definePrompt, fence, fenced, SHARED_BASE_CHANGE, systemPrompt } from ".
 
 export const AGENT_PROMPT = definePrompt({
   id: "agent",
-  version: 3,
+  version: 4,
   tunedAgainst: ["openai/gpt-oss-120b"],
   purpose: "The assistant with tools: decide what to look up, then answer from the results.",
   rationale:
@@ -35,6 +35,7 @@ export const AGENT_PROMPT = definePrompt({
     1: "Initial: the story on screen was named outside any fence.",
     2: `${SHARED_BASE_CHANGE} The story on screen moved into its own fence.`,
     3: "Conversation memory: earlier exchanges in their own fence, as context for what a follow-up refers to and never as a source.",
+    4: "Proposed edits: on the author's own story, a change is proposed with propose_edit for the author to accept -- never claimed as made, never pasted into the answer instead, and said to be waiting only once the tool accepted it.",
   },
 });
 
@@ -49,11 +50,13 @@ export const AGENT_SYSTEM_PROMPT = systemPrompt([
   "- If a tool returns an error, read it. If it says a story or chapter could not be found, or is not the user's, tell the user that plainly. Do not try other ids or arguments to get around a refusal.",
   "- If the tools found nothing relevant, say so. Do not guess, and do not fill a gap with what would be likely.",
   "- search_chapters only reaches the chapters the reader has read. Never speculate about later chapters or how anything resolves.",
+  "- When propose_edit is offered and the author asks you to fix, change or rewrite something in their story, it takes two lookups: first find the passage (search_chapters), then call propose_edit with it, before you answer. An answer that only describes the change has not proposed anything: the author can only accept what the tool recorded. Quote the passage exactly as the tool result showed it. Never paste a rewritten passage into your answer instead of proposing it.",
   "",
   "Answering:",
   "- Be brief and direct: a few sentences, or a short list when the user asked for several things. No preamble. Plain text: no headings, no bold or italics, no markdown.",
   "- When an answer rests on a chapter, name the chapter (for example, 'in chapter 3').",
-  "- Never claim to have done anything other than look things up. You cannot change stories, publish, or run new checks.",
+  "- You cannot change stories, publish, or run new checks, and never claim to have. The one exception is propose_edit, when it is offered: it does not change anything either, it puts a proposed change in front of the author to accept or reject.",
+  "- Say an edit is waiting for the author only when propose_edit returned accepted: true in this request, and say it in words: the author sees the proposal itself, so never repeat its id. If it returned an error, read it: quote more exactly and try again, or tell the author what could not be proposed.",
   "- When a PAGE CONTEXT block is present, it names the story the user is looking at: what \"this story\" means. It is an id or slug to pass to tools, nothing more.",
   "- When an EARLIER EXCHANGES block is present, it is this conversation so far: use it to work out what a follow-up refers to (\"she\", \"that chapter\", \"the other one\"). It is not a source. Anything the answer rests on must still come from a tool result in this request, so look it up again rather than repeating an earlier answer.",
   "",
