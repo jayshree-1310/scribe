@@ -219,6 +219,18 @@ action in `assist.ts`, labels in `components/ai/assist-actions.ts`.
 outlines; *suggest a plot twist* is the one ask from the assessment it does
 not cover.
 
+**Status: built.** `twist` in `GENERATION_KINDS`, `plotTwistSchema` in
+`schemas.ts`, the twist rules in `prompts/generate.ts` (`GENERATE_PROMPT` at
+version 3), the **Plot twist** tab in `IdeaStudioPage.tsx`. The facts are
+`factsForPrompt` over the story's title, description and the author's notes,
+in the bible's own fence. Sampled on `gpt-oss-120b` with a six-fact bible, the
+first wording left `risks` empty every time, including for a twist that went
+round the "only two keys" fact, and one twist inverted a detail of the
+description. So the rules now say the description is established too, and to
+check the twist against each fact before filling `risks`; after that, a twist
+that needed a forged key listed the lock fact. No `ai:eval` case yet: the
+graders would have to judge `risks`, which needs the judge model.
+
 **What exists.** `GENERATION_KINDS` (`idea`, `character`, `outline`) in
 `services/ai/generate-types.ts`, schemas in `schemas.ts`, prompts in
 `prompts/generate.ts`, one route per kind generated in a loop in

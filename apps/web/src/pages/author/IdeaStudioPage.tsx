@@ -18,7 +18,9 @@ import './author.css'
 import './idea-studio.css'
 
 /**
- * The brainstorming surface: premises, characters and chapter outlines.
+ * The brainstorming surface: premises, characters, chapter outlines and plot
+ * twists. A twist is always for one of the author's own stories: the server
+ * grounds it in that story's bible, and refuses one without a story.
  *
  * Everything on this page was written by a model and none of it is saved.
  * That is the design, not an omission — the author decides what becomes a
@@ -36,12 +38,14 @@ const KINDS: ReadonlyArray<{ value: Kind; label: string }> = [
   { value: 'idea', label: 'Story idea' },
   { value: 'character', label: 'Character' },
   { value: 'outline', label: 'Chapter outline' },
+  { value: 'twist', label: 'Plot twist' },
 ]
 
 const PLACEHOLDER: Record<Kind, string> = {
   idea: 'A lighthouse keeper starts receiving letters she has not sent…',
   character: 'The rival mapmaker who trained alongside my protagonist…',
   outline: 'The chapter where she finally answers one of the letters…',
+  twist: 'Something about the harbourmaster nobody has questioned yet…',
 }
 
 const COUNTS = [
@@ -60,9 +64,14 @@ function isCharacter(
   return 'motivations' in value
 }
 
+function isTwist(value: aiApi.GeneratedValue): value is aiApi.PlotTwist {
+  return 'payoff' in value
+}
+
 /** The heading each card shows, whichever shape it holds. */
 function titleOf(value: aiApi.GeneratedValue): string {
-  return 'title' in value ? value.title : value.name
+  if ('title' in value) return value.title
+  return 'name' in value ? value.name : value.twist
 }
 
 /* Rendering one generated object ----------------------------------------- */
@@ -126,6 +135,16 @@ function GeneratedBody({ value }: { value: aiApi.GeneratedValue }) {
             (relation) => `${relation.name} — ${relation.relationship}`,
           )}
         />
+      </dl>
+    )
+  }
+
+  if (isTwist(value)) {
+    return (
+      <dl className="generated__body">
+        <List label="Plant first" items={value.setup} />
+        <Detail label="Payoff">{value.payoff}</Detail>
+        <List label="Risks" items={value.risks} />
       </dl>
     )
   }
@@ -286,10 +305,14 @@ export function IdeaStudioPage() {
     }
   }
 
+  /** A twist is a twist in something: the server refuses one without a story. */
+  const needsStory = kind === 'twist' && storyId === ''
+
   /**
    * The empty option is always valid — it means no story — so loading and
    * failure keep it but say so, and lock the picker rather than offer a list
-   * that only looks like the author has no stories.
+   * that only looks like the author has no stories. For a twist it is the
+   * prompt to choose one.
    */
   const storyOptions = [
     {
@@ -299,7 +322,9 @@ export function IdeaStudioPage() {
           ? 'Loading your stories…'
           : stories.status === 'error'
             ? 'Your stories could not be loaded'
-            : 'Not about an existing story',
+            : kind === 'twist'
+              ? 'Choose one of your stories'
+              : 'Not about an existing story',
     },
     ...(stories.status === 'ready' ? stories.data ?? [] : []).map((story) => ({
       value: story.id,
@@ -313,8 +338,8 @@ export function IdeaStudioPage() {
         <div>
           <h1 className="page-head__title">Idea studio</h1>
           <p className="page-head__sub">
-            Premises, characters and chapter outlines to argue with. Nothing
-            here is saved until you start a story from it.
+            Premises, characters, chapter outlines and plot twists to argue
+            with. Nothing here is saved until you start a story from it.
           </p>
         </div>
       </header>
@@ -344,7 +369,7 @@ export function IdeaStudioPage() {
               onChange={(event) => setTheme(event.target.value)}
             />
             <Select
-              label="For one of your stories"
+              label={kind === 'twist' ? 'For which story' : 'For one of your stories'}
               value={storyId}
               options={storyOptions}
               onChange={setStoryId}
@@ -366,7 +391,11 @@ export function IdeaStudioPage() {
             maxLength={400}
             counterMax={400}
             placeholder={PLACEHOLDER[kind]}
-            hint="Every field is optional. “Surprise me” is a valid brief."
+            hint={
+              kind === 'twist'
+                ? 'Everything but the story is optional.'
+                : 'Every field is optional. “Surprise me” is a valid brief.'
+            }
             onChange={(event) => setPremise(event.target.value)}
           />
 
@@ -375,13 +404,15 @@ export function IdeaStudioPage() {
               type="submit"
               variant="primary"
               loading={generating}
+              disabled={needsStory}
               startIcon={<Icon name="sparkle" size="1em" />}
             >
               {generating ? 'Writing…' : 'Generate'}
             </Button>
             <p className="idea-form__note">
-              Each alternative is a separate request, and a local model can take
-              most of a minute over one.
+              {needsStory
+                ? 'Choose the story the twist is for. It is checked against the facts in that story’s bible.'
+                : 'Each alternative is a separate request, and a local model can take most of a minute over one.'}
             </p>
           </div>
 

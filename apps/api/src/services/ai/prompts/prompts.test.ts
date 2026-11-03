@@ -147,6 +147,19 @@ function userMessages(text: (field: string) => string): Record<string, string> {
       },
       "outline",
     ),
+    "generate.brief.twist": briefMessage(
+      { genre: null, theme: null, premise: text("seed.premise"), storyId: "s1" },
+      {
+        id: "s1",
+        title: text("story.title"),
+        description: text("story.description"),
+        kidsAppropriate: false,
+        genres: [],
+        chapters: [{ number: 1, title: text("story.chapter") }],
+      },
+      "twist",
+      [fact({ subject: text("bible.subject"), value: text("bible.value") })],
+    ),
     "generate.avoid": avoidMessage([text("avoid.previous")]),
     "generate.refine": refineMessage(text("refine.instruction")),
     "scribble.intent": intentMessage(text("scribble.message"), {
@@ -231,6 +244,7 @@ const SYSTEM_PROMPTS: Record<string, string> = {
   "generate.idea": generateSystemPrompt("idea"),
   "generate.character": generateSystemPrompt("character"),
   "generate.outline": generateSystemPrompt("outline"),
+  "generate.twist": generateSystemPrompt("twist"),
   "generate.refine": refineSystemPrompt("idea"),
   "scribble.intent": intentSystemPrompt(GENRES),
   "scribble.narration": NARRATION_SYSTEM_PROMPT,

@@ -1,6 +1,6 @@
 /**
- * Brainstorming: premises, characters and chapter outlines, as validated
- * objects rather than prose.
+ * Brainstorming: premises, characters, chapter outlines and plot twists, as
+ * validated objects rather than prose.
  *
  * Every call goes through `completeStructured` (Task AI 4), so what a caller
  * gets is a value of a known shape or an error -- never a paragraph the client
@@ -25,6 +25,7 @@ import type { ZodType } from "zod";
 import { HttpError } from "../../lib/http-error.js";
 import { connectRedis, redis } from "../../lib/redis.js";
 import { getStoryContext, type StoryContext } from "../authoring.js";
+import type { BibleFact } from "./bible-facts.js";
 import {
   avoidMessage,
   briefMessage,
@@ -36,8 +37,10 @@ import { aiProvider } from "./provider.js";
 import {
   chapterOutlineSchema,
   characterProfileSchema,
+  plotTwistSchema,
   storyIdeaSchema,
 } from "./schemas.js";
+import { factsForPrompt } from "./story-bible.js";
 import type { AiMessage } from "./types.js";
 import {
   GENERATION_KINDS,
@@ -86,6 +89,7 @@ const TOKEN_BUDGET: Record<GenerationKind, number> = {
   idea: 1200,
   character: 1400,
   outline: 1800,
+  twist: 1400,
 };
 
 function schemaFor(kind: GenerationKind): ZodType<GeneratedValue> {
@@ -96,12 +100,33 @@ function schemaFor(kind: GenerationKind): ZodType<GeneratedValue> {
       return characterProfileSchema;
     case "outline":
       return chapterOutlineSchema;
+    case "twist":
+      return plotTwistSchema;
   }
 }
 
 /** What the next alternative is told to avoid repeating. */
 function labelOf(value: GeneratedValue): string {
-  return "title" in value ? value.title : value.name;
+  if ("title" in value) return value.title;
+  return "name" in value ? value.name : value.twist;
+}
+
+/**
+ * What a twist is grounded in besides the brief: the story bible's facts most
+ * relevant to the story's own description and the author's notes, within the
+ * writing assistant's budget (`selectFacts`). Facts, never chapter bodies --
+ * a twist has to fit what the story has established, and the bible is that,
+ * already distilled. No chapter is given, so "recent" means the latest ones.
+ */
+async function twistFacts(
+  story: StoryContext,
+  seed: GenerationSeed,
+  signal?: AbortSignal,
+): Promise<BibleFact[]> {
+  const text = [story.title, story.description, seed.theme, seed.premise]
+    .filter((part): part is string => Boolean(part))
+    .join("\n");
+  return factsForPrompt(story.id, text, null, signal);
 }
 
 /* Sessions --------------------------------------------------------------- */
@@ -199,15 +224,21 @@ export async function generate(
   count: number,
   signal?: AbortSignal,
 ): Promise<GenerationResult> {
+  if (kind === "twist" && !seed.storyId) {
+    throw HttpError.badRequest("Choose one of your stories to suggest a twist for.");
+  }
+
   // Asserts ownership; a story id belonging to someone else never reaches a
   // prompt. See `getStoryContext`.
   const story: StoryContext | null = seed.storyId
     ? await getStoryContext(userId, seed.storyId)
     : null;
 
+  const facts = kind === "twist" && story ? await twistFacts(story, seed, signal) : [];
+
   const schema = schemaFor(kind);
   const system = generateSystemPrompt(kind);
-  const brief = briefMessage(seed, story, kind);
+  const brief = briefMessage(seed, story, kind, facts);
   const wanted = Math.min(Math.max(1, count), MAX_VARIANTS);
 
   const variants: StoredVariant[] = [];

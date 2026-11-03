@@ -19,8 +19,20 @@ import {
   it,
 } from "vitest";
 import { connectRedis, redis } from "../lib/redis.js";
-import { resetAiProvider, setAiProvider } from "../services/ai/provider.js";
-import { fakeAiProvider, type FakeAiProvider } from "../services/ai/testing.js";
+import { BIBLE_FACT_LIMIT } from "../services/ai/bible-facts.js";
+import {
+  resetAiEmbedder,
+  resetAiProvider,
+  setAiEmbedder,
+  setAiProvider,
+} from "../services/ai/provider.js";
+import { BIBLE_MARKERS } from "../services/ai/prompts/story-bible.js";
+import { addFact } from "../services/ai/story-bible.js";
+import {
+  fakeAiEmbedder,
+  fakeAiProvider,
+  type FakeAiProvider,
+} from "../services/ai/testing.js";
 import { TestApi, databaseAvailable } from "../test/harness.js";
 
 const api = new TestApi();
@@ -66,6 +78,14 @@ const outline = (title: string): string =>
     endingHook: "The next letter arrives before hers has been sent.",
   });
 
+const twist = (turn: string): string =>
+  JSON.stringify({
+    twist: turn,
+    setup: ["Chapter 1: Maren burns one letter without reading it."],
+    payoff: "Chapter 6, when the burned letter's words turn up in her own hand.",
+    risks: ["Contradicts that Maren cannot write, if the author keeps that fact."],
+  });
+
 beforeAll(async () => {
   if (!available) return;
   await api.start();
@@ -92,6 +112,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (!available) return;
+  resetAiEmbedder();
   await api.stop();
 });
 
@@ -275,6 +296,146 @@ describe.skipIf(!available)("generation seeded with a story", () => {
 
     expect(response.status).toBe(404);
     expect(fake.calls).toHaveLength(0);
+  });
+});
+
+/* Plot twists ------------------------------------------------------------ */
+
+describe.skipIf(!available)("POST /api/ai/generate/twist", () => {
+  /** A story with a bible far larger than one prompt's budget. */
+  let bible: { id: string; slug: string };
+
+  beforeAll(async () => {
+    if (!available) return;
+    // `factsForPrompt` embeds the brief to rank facts; never the real model.
+    setAiEmbedder(fakeAiEmbedder(768, { model: "fake-twist" }));
+
+    bible = await api.createStory({
+      title: "The Salt Ledger",
+      authorId,
+      description: "Maren keeps the harbour ledger, and someone is changing it.",
+      listed: false,
+    });
+    await api.createChapter({
+      storyId: bible.id,
+      number: 1,
+      title: "Low tide",
+      content: "Chapter prose that must never reach a twist prompt.",
+    });
+    for (let index = 0; index < BIBLE_FACT_LIMIT + 14; index += 1) {
+      await addFact(authorId, bible.id, {
+        kind: "character",
+        subject: index % 2 === 0 ? "Maren" : `Sailor ${index}`,
+        attribute: `detail ${index}`,
+        value: `established detail number ${index}`,
+        related: null,
+        chapterId: null,
+      });
+    }
+  });
+
+  const ask = (as: string, seed: Record<string, unknown>, count = 1) =>
+    api.request("/api/ai/generate/twist", { method: "POST", as, body: { seed, count } });
+
+  it("requires a story, before any model call", async () => {
+    scripted([twist("Never suggested.")]);
+
+    const response = await ask(authorId, { premise: "Something shocking." });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toContain("Choose one of your stories");
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  it("refuses a story the caller does not own, before any model call", async () => {
+    scripted([twist("Never suggested.")]);
+
+    const response = await ask(strangerId, { storyId: bible.id });
+
+    expect(response.status).toBe(403);
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  it("is grounded in the premise and a bounded selection of facts, never chapter bodies", async () => {
+    scripted([twist("The ledger is changed by Maren herself, in her sleep.")]);
+
+    const response = await ask(authorId, { storyId: bible.id });
+
+    expect(response.status).toBe(200);
+    expect(response.body.kind).toBe("twist");
+    expect(response.body.variants[0].twist).toContain("in her sleep");
+
+    const call = fake.calls[0];
+    expect(call?.feature).toBe("generate.twist");
+    expect(call?.format?.name).toBe("generate_twist");
+    expect(call?.system).toContain("name that fact in risks");
+
+    const brief = call?.messages[0]?.content ?? "";
+    expect(brief).toContain("someone is changing it");
+    expect(brief).toContain("1. Low tide");
+    expect(brief).not.toContain("must never reach a twist prompt");
+
+    // The facts travel in their own fence, and within the assistant's budget
+    // however large the bible is.
+    const open = brief.indexOf(BIBLE_MARKERS.open);
+    const close = brief.indexOf(BIBLE_MARKERS.close);
+    expect(open).toBeGreaterThan(-1);
+    const lines = brief.slice(open, close).split("\n").filter((line) => line.startsWith("- "));
+    expect(lines.length).toBeGreaterThan(0);
+    expect(lines.length).toBeLessThanOrEqual(BIBLE_FACT_LIMIT);
+    expect(lines.some((line) => line.includes("Maren"))).toBe(true);
+  });
+
+  it("sends no bible block for a story without one", async () => {
+    scripted([twist("The letters were never posted at all.")]);
+
+    await ask(authorId, { storyId: story.id });
+
+    const brief = fake.calls[0]?.messages[0]?.content ?? "";
+    expect(brief).toContain("The Long Winter Light");
+    expect(brief).not.toContain(BIBLE_MARKERS.open);
+  });
+
+  it("generates alternatives one at a time, each told what came before", async () => {
+    scripted([twist("Maren is the forger."), twist("The harbourmaster is Maren's father.")]);
+
+    const response = await ask(authorId, { storyId: bible.id }, 2);
+
+    expect(response.body.variants).toHaveLength(2);
+    expect(fake.calls[1]?.messages[0]?.content).toContain("Maren is the forger.");
+  });
+
+  it("repairs an invalid reply once, then gives up", async () => {
+    const missingSetup = JSON.stringify({ twist: "Half a twist.", payoff: "Somewhere.", risks: [] });
+
+    scripted([missingSetup, twist("Whole now.")]);
+    const repaired = await ask(authorId, { storyId: bible.id });
+    expect(repaired.status).toBe(200);
+    expect(repaired.body.variants[0].twist).toBe("Whole now.");
+    expect(fake.calls).toHaveLength(2);
+
+    scripted([missingSetup, missingSetup, twist("Too late.")]);
+    const failed = await ask(authorId, { storyId: bible.id });
+    expect(failed.status).toBe(502);
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it("can be refined, as a twist", async () => {
+    const provider = scripted([twist("Maren is the forger."), twist("Maren's sister is the forger.")]);
+    const { body } = await ask(authorId, { storyId: bible.id });
+
+    const response = await api.request("/api/ai/generate/refine", {
+      method: "POST",
+      as: authorId,
+      body: { sessionId: body.sessionId, index: 0, instruction: "Not Maren: someone close to her." },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body.kind).toBe("twist");
+    expect(response.body.value.twist).toBe("Maren's sister is the forger.");
+    expect(provider.calls[1]?.feature).toBe("generate.refine.twist");
+    // The brief it replays still carries the facts it was grounded in.
+    expect(provider.calls[1]?.messages[0]?.content).toContain(BIBLE_MARKERS.open);
   });
 });
 

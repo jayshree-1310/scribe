@@ -9,10 +9,11 @@
 import type {
   ChapterOutline,
   CharacterProfile,
+  PlotTwist,
   StoryIdea,
 } from "./schemas.js";
 
-export const GENERATION_KINDS = ["idea", "character", "outline"] as const;
+export const GENERATION_KINDS = ["idea", "character", "outline", "twist"] as const;
 
 export type GenerationKind = (typeof GENERATION_KINDS)[number];
 
@@ -27,12 +28,13 @@ export interface GenerationSeed {
   premise: string | null;
   /**
    * One of the caller's own stories, for material that has to fit work already
-   * written. Ownership is asserted when it is resolved, not here.
+   * written. Ownership is asserted when it is resolved, not here. Required for
+   * a twist, which is a twist *in* something.
    */
   storyId: string | null;
 }
 
-export type GeneratedValue = StoryIdea | CharacterProfile | ChapterOutline;
+export type GeneratedValue = StoryIdea | CharacterProfile | ChapterOutline | PlotTwist;
 
 export interface GenerationResult {
   /**

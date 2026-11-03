@@ -130,6 +130,37 @@ export const chapterOutlineSchema = z.object({
 
 export type ChapterOutline = z.infer<typeof chapterOutlineSchema>;
 
+/* Plot twist ------------------------------------------------------------- */
+
+/**
+ * A twist for a story that already exists (Task AI 23), as notes the author
+ * can check against what they have written: the turn itself, what must be
+ * planted for it to be fair, where it lands, and what it would break.
+ *
+ * `risks` may be empty, and is where a contradiction with the story bible
+ * goes: a twist that breaks an established fact is said to, not suppressed,
+ * because the author may want to change the fact.
+ */
+export const plotTwistSchema = z.object({
+  twist: sentence.describe("What is revealed or turns out differently, in one or two sentences."),
+  setup: z
+    .array(sentence)
+    .min(1)
+    .max(MAX_LIST_ITEMS)
+    .describe(
+      "What earlier chapters must already have planted for the twist to feel fair, naming the chapter where one fits.",
+    ),
+  payoff: paragraph.describe("Where it lands -- which chapter or scene -- and what it changes afterwards."),
+  risks: z
+    .array(sentence)
+    .max(MAX_LIST_ITEMS)
+    .describe(
+      "Each established fact this would contradict, named, and anything else it puts at risk. Empty only if nothing does.",
+    ),
+});
+
+export type PlotTwist = z.infer<typeof plotTwistSchema>;
+
 /* Conversation: the standalone question ---------------------------------- */
 
 /**

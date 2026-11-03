@@ -241,7 +241,7 @@ export async function* streamScribble(
 
 /* Generation ------------------------------------------------------------- */
 
-export type GenerationKind = 'idea' | 'character' | 'outline'
+export type GenerationKind = 'idea' | 'character' | 'outline' | 'twist'
 
 export interface StoryIdea {
   title: string
@@ -272,13 +272,21 @@ export interface ChapterOutline {
   endingHook: string
 }
 
-export type GeneratedValue = StoryIdea | CharacterProfile | ChapterOutline
+/** A twist for one of the author's own stories. `risks` may be empty. */
+export interface PlotTwist {
+  twist: string
+  setup: string[]
+  payoff: string
+  risks: string[]
+}
+
+export type GeneratedValue = StoryIdea | CharacterProfile | ChapterOutline | PlotTwist
 
 export interface GenerationSeed {
   genre?: string | null
   theme?: string | null
   premise?: string | null
-  /** One of the caller's own stories; the API asserts ownership. */
+  /** One of the caller's own stories; the API asserts ownership. Required for a twist. */
   storyId?: string | null
 }
 

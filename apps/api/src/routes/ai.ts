@@ -675,10 +675,10 @@ async function chargeGeneration(userId: string): Promise<void> {
 }
 
 /**
- * One handler for the three kinds.
+ * One handler for every kind.
  *
  * They differ only in which schema the model is constrained to, and that lives
- * in the service. Three copies of this body would be three places to forget
+ * in the service. A copy of this body per kind would be a place per kind to forget
  * the rate limit.
  */
 for (const kind of GENERATION_KINDS) {

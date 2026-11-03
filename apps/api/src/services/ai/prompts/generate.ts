@@ -1,5 +1,6 @@
 /**
- * The brainstorming prompts: one premise, one character, one chapter outline.
+ * The brainstorming prompts: one premise, one character, one chapter outline,
+ * one plot twist.
  *
  * Deliberately short, because the *shape* is not described here. Every field
  * and every per-field instruction lives on the zod schema in `schemas.ts` and
@@ -15,25 +16,28 @@
  */
 
 import type { StoryContext } from "../../authoring.js";
+import type { BibleFact } from "../bible-facts.js";
 import type { GenerationKind, GenerationSeed } from "../generate-types.js";
 import { definePrompt, fence, fenced, SHARED_BASE_CHANGE, systemPrompt } from "./base.js";
+import { bibleBlock } from "./story-bible.js";
 
 export const GENERATE_PROMPT = definePrompt({
   id: "generate",
-  version: 2,
-  tunedAgainst: ["llama3.2:3b"],
-  purpose: "Invent a story premise, a character or a chapter outline as a validated object, from an author's brief.",
+  version: 3,
+  tunedAgainst: ["llama3.2:3b", "openai/gpt-oss-120b (twist, sampled live, 2026-11-03)"],
+  purpose: "Invent a story premise, a character, a chapter outline or a plot twist as a validated object, from an author's brief.",
   rationale:
     "The shape lives on the zod schema, so this says only what to invent and what never to do: original material (a famous plot paraphrased is a legal problem, not a starting point), specific rather than generic, notes for the author rather than a pitch.",
   history: {
     1: "Initial.",
     2: `${SHARED_BASE_CHANGE} The brief's values are now defanged, and earlier alternatives sit in their own fence.`,
+    3: "A fourth kind, twist, for an existing story, given its story-bible facts in their own fence. The shared opening line names plot twists; the other kinds' rules are unchanged.",
   },
 });
 
 export const GENERATE_REFINE_PROMPT = definePrompt({
   id: "generate.refine",
-  version: 2,
+  version: 3,
   tunedAgainst: ["llama3.2:3b"],
   purpose: "Revise one generated object as the author asked, keeping everything they did not ask to change.",
   rationale:
@@ -41,11 +45,12 @@ export const GENERATE_REFINE_PROMPT = definePrompt({
   history: {
     1: "Initial: the author's instruction was sent as a bare user turn.",
     2: `${SHARED_BASE_CHANGE} The author's instruction now travels in its own fence.`,
+    3: "The shared opening line names plot twists, the fourth kind.",
   },
 });
 
 /**
- * The standing rules, shared by all three kinds and by refinement.
+ * The standing rules, shared by every kind and by refinement.
  *
  * The originality rule earns its place: asked for "a fantasy idea" with no
  * brief, a small model reaches for the most famous thing in its training data,
@@ -53,7 +58,7 @@ export const GENERATE_REFINE_PROMPT = definePrompt({
  * handed a legal problem rather than a starting point.
  */
 const BASE = [
-  "You invent raw material for authors writing serial fiction: premises, characters and chapter outlines.",
+  "You invent raw material for authors writing serial fiction: premises, characters, chapter outlines and plot twists.",
   "You reply with a JSON object in the requested shape, and nothing else.",
   "",
   "Rules:",
@@ -78,6 +83,13 @@ const KIND_RULES: Record<GenerationKind, string[]> = {
     "You are outlining ONE chapter: what happens in it, scene by scene.",
     "A chapter is a unit of a serial. It moves one thing and ends somewhere a reader wants to continue from.",
     "Do not outline the whole story. If the brief describes a long arc, take the next step of it only.",
+  ],
+  twist: [
+    "You are suggesting ONE plot twist for the author's existing story: something that is revealed or turns out differently from what readers have been led to expect.",
+    "It must be caused or hidden by the characters, not a coincidence, and it must be possible to plant fairly in chapters that are already written or are next.",
+    "What the story has established is its description and, when a STORY BIBLE block is present, every fact in it. Build on them, and keep the details they state exactly: who did what, and to whom.",
+    "Before answering, check the twist against the description and each fact, one by one. Every one it contradicts, bends or depends on being misread goes in risks, named: a hidden way round something a fact says, such as a lock or a death, counts. Do not drop the twist or pretend the fact is not there; the author decides.",
+    "Do not resolve the whole story, and do not invent events in chapters the author has written beyond what their titles and the facts say.",
   ],
 };
 
@@ -149,11 +161,15 @@ function storyLines(story: StoryContext): string[] {
  * Fenced and labelled even when every field is empty: the fence is what the
  * system prompt refers to, and a block that appears only sometimes teaches the
  * model nothing about where data ends and instructions begin.
+ *
+ * `facts` are the story bible's, for a twist; empty for every other kind, and
+ * for a story with no bible, so those briefs are what they always were.
  */
 export function briefMessage(
   seed: GenerationSeed,
   story: StoryContext | null,
   kind: GenerationKind,
+  facts: BibleFact[] = [],
 ): string {
   const lines = [
     `genre: ${seed.genre ?? "the author did not say"}`,
@@ -163,13 +179,15 @@ export function briefMessage(
 
   if (story) lines.push("", ...storyLines(story));
 
-  return [fenced(BRIEF, lines.join("\n")), "", ASK[kind]].join("\n");
+  const bible = bibleBlock(facts);
+  return [fenced(BRIEF, lines.join("\n")), ...(bible ? ["", bible] : []), "", ASK[kind]].join("\n");
 }
 
 const ASK: Record<GenerationKind, string> = {
   idea: "Invent one story idea from that brief.",
   character: "Invent one character from that brief.",
   outline: "Outline one chapter from that brief.",
+  twist: "Suggest one plot twist for that story.",
 };
 
 /**
