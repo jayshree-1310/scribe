@@ -156,7 +156,7 @@ describe.skipIf(!available)("POST /api/ai/assist", () => {
   it("sends each action its own instruction", async () => {
     const seen = new Map<string, string>();
 
-    for (const action of ["improve", "grammar", "shorten", "continue"]) {
+    for (const action of ["improve", "dialogue", "pacing", "grammar", "shorten", "continue"]) {
       const provider = scripted("Rewritten.");
       await api.request("/api/ai/assist", {
         method: "POST",
@@ -169,11 +169,13 @@ describe.skipIf(!available)("POST /api/ai/assist", () => {
       resetAiProvider();
     }
 
-    // Four actions, four different prompts — not one template with the action
+    // Six actions, six different prompts — not one template with the action
     // name substituted into it.
-    expect(new Set(seen.values()).size).toBe(4);
+    expect(new Set(seen.values()).size).toBe(6);
     expect(seen.get("grammar")).toContain("Correct only the grammar");
     expect(seen.get("continue")).toContain("Continue the passage");
+    expect(seen.get("dialogue")).toContain("Tighten the spoken lines");
+    expect(seen.get("pacing")).toContain("Adjust the rhythm");
   });
 
   it("asks which tone before spending a call on a guess", async () => {

@@ -58,6 +58,8 @@ export const CONTEXT_LIMIT = 1200;
 /** Longer replies for the actions that are meant to produce them. */
 const TOKEN_BUDGET: Record<AssistAction, number> = {
   improve: 1200,
+  dialogue: 1200,
+  pacing: 1200,
   rewrite: 1200,
   grammar: 1200,
   tone: 1200,

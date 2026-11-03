@@ -7,7 +7,7 @@
  * second and push back as fast. So the switches live in Redis: a set of
  * feature prefixes that are off, read by `withPolicy` before every model call.
  *
- * A prefix, like `AI_FEATURE_MODELS`: `assist` turns off all eight assistant
+ * A prefix, like `AI_FEATURE_MODELS`: `assist` turns off all ten assistant
  * actions, `assist.continue` only one. A switched-off feature answers 503 with
  * a message saying so, which every AI panel already renders as "unavailable".
  *

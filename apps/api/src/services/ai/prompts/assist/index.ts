@@ -19,14 +19,15 @@ import { ACTION_INSTRUCTIONS } from "./actions.js";
 
 export const ASSIST_PROMPT = definePrompt({
   id: "assist",
-  version: 2,
-  tunedAgainst: ["openai/gpt-oss-120b (ai:eval, 2026-10-16)"],
-  purpose: "Eight transformations of an author's selected passage: improve, rewrite, grammar, tone, shorten, expand, alternatives, continue.",
+  version: 3,
+  tunedAgainst: ["openai/gpt-oss-120b (ai:eval, 2026-10-30)"],
+  purpose: "Ten transformations of an author's selected passage: improve, dialogue, pacing, rewrite, grammar, tone, shorten, expand, alternatives, continue.",
   rationale:
     "Every action is a transformation of text that exists, never a contribution to the story: preserve the voice, never invent plot, return prose alone. The per-action instruction carries the constraint that stops the model's default (longer, blander, a new metaphor).",
   history: {
     1: "Initial.",
     2: `${SHARED_BASE_CHANGE} The target tone moved out of the instruction line into its own fence; the passage and context are now defanged.`,
+    3: "Two new actions, dialogue and pacing. The system prompt and the other instructions are unchanged.",
   },
 });
 

@@ -39,8 +39,9 @@ import type { ModerationVerdict } from "../services/ai/moderation.js";
  * 2: `sisters-diner` also accepts "laughed" -- mentions match whole words, so
  * "laugh" alone failed a right answer in the second real run.
  * 3: `moderate` cases.
+ * 4: `assist-dialogue` and `assist-pacing`.
  */
-export const DATASET_VERSION = 3;
+export const DATASET_VERSION = 4;
 
 export interface AskCase {
   kind: "ask";
@@ -171,6 +172,20 @@ export const DATASET: Dataset = {
       action: "continue",
       text: "On Monday the bell rang at dawn and did not stop, and by noon everyone in Hollowmere had stopped meeting each other's eyes. Cass went to the tower.",
       keeps: [],
+    },
+    {
+      kind: "assist",
+      id: "assist-dialogue",
+      action: "dialogue",
+      text: '"As you know, Tolu," Bisi said explainingly, "our mother left the diner to both of us when she died three years ago." "I know that, Bisi," Tolu said sadly. "And I know that you want to sell it," she added.',
+      keeps: ["Tolu", "Bisi", "diner"],
+    },
+    {
+      kind: "assist",
+      id: "assist-pacing",
+      action: "pacing",
+      text: "Cass went up the stairs and then she went along the corridor and then she came to the door and she opened it and the room was empty and the bell rope had been cut.",
+      keeps: ["Cass", "rope"],
     },
 
     /* Extraction ------------------------------------------------------------ */

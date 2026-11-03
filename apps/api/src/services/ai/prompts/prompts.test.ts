@@ -121,6 +121,20 @@ function userMessages(text: (field: string) => string): Record<string, string> {
       bibleBlock([fact({ subject: text("bible.subject"), value: text("bible.value") })]),
     ),
     "assist.continue": assistMessage("continue", null, text("assist.passage"), "", ""),
+    "assist.dialogue": assistMessage(
+      "dialogue",
+      null,
+      text("assist.passage"),
+      text("assist.before"),
+      text("assist.after"),
+    ),
+    "assist.pacing": assistMessage(
+      "pacing",
+      null,
+      text("assist.passage"),
+      text("assist.before"),
+      text("assist.after"),
+    ),
     "generate.brief": briefMessage(
       { genre: text("seed.genre"), theme: text("seed.theme"), premise: text("seed.premise"), storyId: null },
       {

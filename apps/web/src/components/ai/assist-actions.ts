@@ -7,6 +7,8 @@ import type { AssistAction } from '../../data/ai-api'
  */
 export const ASSIST_LABELS: Record<AssistAction, string> = {
   improve: 'Improve',
+  dialogue: 'Improve dialogue',
+  pacing: 'Improve pacing',
   rewrite: 'Rewrite',
   grammar: 'Fix grammar',
   tone: 'Change tone',

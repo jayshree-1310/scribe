@@ -344,7 +344,7 @@ async function runAssist(item: AssistCase, corpus: Corpus): Promise<Graded> {
     keepsNames: keepsAll(text, item.keeps),
   };
   if (item.action === "shorten") checks["shorter"] = text.length <= item.text.length * 0.85;
-  if (item.action === "grammar" || item.action === "tone") checks["changed"] = changed(text, item.text);
+  if (["grammar", "tone", "dialogue", "pacing"].includes(item.action)) checks["changed"] = changed(text, item.text);
   if (item.action === "continue") checks["continues"] = continuesWithoutRepeating(text, item.text);
 
   return { checks, scores: {}, detail: { reply: clip(text) } };

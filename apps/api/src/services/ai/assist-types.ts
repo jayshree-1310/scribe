@@ -8,6 +8,8 @@
 
 export const ASSIST_ACTIONS = [
   "improve",
+  "dialogue",
+  "pacing",
   "rewrite",
   "grammar",
   "tone",

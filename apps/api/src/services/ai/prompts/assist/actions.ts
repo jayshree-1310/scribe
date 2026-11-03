@@ -16,6 +16,12 @@ export const ACTION_INSTRUCTIONS: Record<AssistAction, string> = {
   improve:
     "Rewrite the passage below so it reads better: clearer, sharper, better rhythm. Change as little as possible to achieve that, and do not make it longer.",
 
+  dialogue:
+    "Tighten the spoken lines in the passage below: distinct voices, fewer dialogue tags, and no exposition said aloud, so cut anything a speaker says only for the reader's benefit, such as telling someone what they both already know. Keep who says what and every event, keep it clear who is speaking, and change the prose between the lines only as far as the lines need. It stays prose, with the author's own quotation marks: never a script with speaker names at the start of lines. If the passage has no spoken lines, return it unchanged.",
+
+  pacing:
+    "Adjust the rhythm of the passage below: vary the sentence length, cut what stalls, slow what is rushed. Keep every event, name and piece of information, and add none.",
+
   rewrite:
     "Rewrite the passage below from scratch, saying the same things in a different way. Same events, same information, same length within a sentence or two.",
 

@@ -42,7 +42,7 @@ shell with the same environment as the API.
 ## Turning a feature off without a deploy
 
 ```bash
-pnpm --filter api ai:ops off assist         # all eight assistant actions
+pnpm --filter api ai:ops off assist         # all ten assistant actions
 pnpm --filter api ai:ops off assist.continue # just one
 pnpm --filter api ai:ops on assist
 ```

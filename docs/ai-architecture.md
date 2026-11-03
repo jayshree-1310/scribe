@@ -68,7 +68,7 @@ design. A model call is the least interesting part of an AI feature.
 | `services/ai/json-schema.ts` | Derives the JSON schema sent to a provider from a zod schema, pruned to the keyword subset every provider accepts. |
 | `services/ai/structured.ts` | `completeStructured`: constrain, validate, repair once, then fail. Written over whichever provider is configured, so no implementation implements it. |
 | `services/ai/schemas.ts` | The shapes generative features ask for — story idea, character profile, chapter outline. Zod only; the wire schema is derived. |
-| `services/ai/assist.ts` | Task AI 3's feature: eight transformations of a selected passage. Owns the context window and the reply cleanup, and deliberately cannot write to a chapter. |
+| `services/ai/assist.ts` | Task AI 3's feature: ten transformations of a selected passage. Owns the context window and the reply cleanup, and deliberately cannot write to a chapter. |
 | `services/ai/assist-types.ts` | The action enum and the input shape, split out so `prompts/assist/` can name an action without an import cycle. |
 | `services/ai/prompts/assist/` | One system prompt, one instruction per action. The instructions are data, rendered and snapshot-tested one by one, and versioned with `ASSIST_PROMPT`. |
 | `services/ai/generate.ts` | Task AI 5's feature: premises, characters and chapter outlines as validated objects, with the refinement conversation held server-side in Redis. |

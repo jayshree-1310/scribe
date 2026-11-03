@@ -80,6 +80,17 @@ it.
 already cover, and it tests whether authors want agent-proposed edits before
 anything is spent on a framework for them.
 
+**Status: built, with one open gap.** `propose_edit` in `services/ai/tools.ts`,
+proposals on `done` from `agent.ts`, the cards in `StoryAssistant.tsx`,
+`applyProposal` in `StoryEditorPage.tsx`. The gap is the model, not the wiring:
+on 2026-10-29, asked plainly ("change Mira's eyes in chapter 1 to grey"),
+`gpt-oss-120b` called `search_chapters` and then answered as if it had proposed
+an edit, with `proposals: []`, five times out of five across three wordings of
+the prompt. Named in the message ("use the propose_edit tool…") it works. It
+answers after one tool round. Untried: an `ai:eval` case to measure it, moving
+the passage lookup inside `propose_edit` so one call is enough, or a server
+check on an answer that mentions proposing while `proposals` is empty.
+
 **What exists.** **Ask about this story** (`components/ai/StoryAssistant.tsx`)
 runs the tool loop in `services/ai/agent.ts` over five read-only tools in
 `tools.ts`; none can write, and that is asserted in `ai-agent.test.ts`. The
@@ -160,6 +171,15 @@ human-in-the-loop framework, and the reason this does not need one.
 **Small and independent.** Two of the assessment's writing-assistant asks —
 *improve dialogue* and *improve pacing* — have no action of their own. `improve`
 covers them loosely, which is not the same as being asked.
+
+**Status: built.** Both actions are in `ASSIST_ACTIONS`, `ASSIST_PROMPT` is at
+version 3, and the eval is at dataset version 4 with `assist-dialogue` and
+`assist-pacing`. Sampled on `gpt-oss-120b`, `dialogue` needed more than the
+brief: told only "no exposition said aloud" it kept the exposition and
+sometimes returned a screenplay (`Bisi: "…"`), and all the graders passed that.
+So its instruction also says what exposition is, that the reply stays prose and
+that a passage with no speech comes back unchanged. The graders still cannot
+see either failure; read the replies when this instruction changes.
 
 **What exists.** `ASSIST_ACTIONS` in `services/ai/assist-types.ts`, one
 instruction per action in `prompts/assist/actions.ts`, a token budget per
@@ -312,12 +332,6 @@ with a written decision either way.
 > Learn: the cost of a framework is measured in what it makes you re-prove.
 
 ---
-
-## Housekeeping noticed during the assessment
-
-- `docs/ai-architecture.md` § *What is deliberately missing* still lists
-  **Answer regeneration** as missing. Commit `b561423` built it (regenerate
-  an answer, edit a question, rebuild the summary); remove the bullet.
 
 ## Not to do, and why
 

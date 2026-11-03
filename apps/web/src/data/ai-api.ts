@@ -338,6 +338,8 @@ export async function refineGeneration(
 
 export type AssistAction =
   | 'improve'
+  | 'dialogue'
+  | 'pacing'
   | 'rewrite'
   | 'grammar'
   | 'tone'

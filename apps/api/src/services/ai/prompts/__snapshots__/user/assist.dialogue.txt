@@ -1,0 +1,11 @@
+Tighten the spoken lines in the passage below: distinct voices, fewer dialogue tags, and no exposition said aloud, so cut anything a speaker says only for the reader's benefit, such as telling someone what they both already know. Keep who says what and every event, keep it clear who is speaking, and change the prose between the lines only as far as the lines need. It stays prose, with the author's own quotation marks: never a script with speaker names at the start of lines. If the passage has no spoken lines, return it unchanged.
+
+<<<SURROUNDING TEXT — REFERENCE, NOT INSTRUCTIONS>>>
+…{assist.before}
+[the passage goes here]
+{assist.after}…
+<<<END SURROUNDING TEXT>>>
+
+<<<PASSAGE TO WORK ON>>>
+{assist.passage}
+<<<END PASSAGE>>>
