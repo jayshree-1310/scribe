@@ -41,6 +41,7 @@ import { embedChapter } from "../services/ai/embeddings.js";
 import {
   AGENT_MARKERS,
   AGENT_SYSTEM_PROMPT,
+  AGENT_UNPROPOSED,
 } from "../services/ai/prompts/agent.js";
 import {
   resetAiEmbedder,
@@ -815,6 +816,70 @@ describe.skipIf(!available)("POST /api/ai/agent", () => {
         "refused",
       ]);
       expect(resultsSent(1)[MAX_PROPOSALS]?.content).toContain(`Only ${MAX_PROPOSALS} edits`);
+    });
+
+    describe("an answer that says it proposed, without proposing", () => {
+      const CLAIM = "I've proposed changing her eyes to grey for you to accept.";
+      // The loop's conversation is one array, so a call's `messages` shows the
+      // turns after it too: look for the correction rather than at an index.
+      const corrections = () =>
+        (provider.calls.at(-1)?.messages ?? []).filter((message) => message.content === AGENT_UNPROPOSED);
+
+      it("is sent back once, and the proposal that follows is returned", async () => {
+        script(CLAIM, call("propose_edit", propose({})), "Proposed.");
+
+        const response = await ask(authorId, { message: "Change Mira's eyes to grey.", storyId: moorings.slug });
+
+        expect(response.body.answer).toBe("Proposed.");
+        expect(response.body.proposals).toHaveLength(1);
+        expect(response.body.modelCalls).toBe(3);
+        // The claim stays in the conversation, followed by the correction.
+        const sent = provider.calls[1]!.messages;
+        const at = sent.findIndex((message) => message.content === AGENT_UNPROPOSED);
+        expect(sent[at]).toMatchObject({ role: "user" });
+        expect(sent[at - 1]).toMatchObject({ role: "assistant", content: CLAIM });
+        // Offered tools on that call, so it can act on the correction.
+        expect(provider.calls[1]!.toolChoice).toBe("auto");
+      });
+
+      it("is sent back only once: the second answer stands", async () => {
+        script(CLAIM, CLAIM);
+
+        const response = await ask(authorId, { message: "Change Mira's eyes to grey.", storyId: moorings.slug });
+
+        expect(response.body.answer).toBe(CLAIM);
+        expect(response.body.proposals).toEqual([]);
+        expect(provider.calls).toHaveLength(2);
+        expect(corrections()).toHaveLength(1);
+      });
+
+      it("is not sent back without propose_edit, after a refused proposal, or for an answer that claims nothing", async () => {
+        script(CLAIM);
+        await ask(readerId, { message: "Change Mira's eyes.", storyId: moorings.slug });
+        expect(provider.calls).toHaveLength(1);
+
+        script(call("propose_edit", propose({ quote: "Her eyes were violet." })), "I could not propose that: the quote is not there.");
+        await ask(authorId, { message: "Change Mira's eyes.", storyId: moorings.slug });
+        expect(provider.calls).toHaveLength(2);
+
+        script("Her eyes are green in chapter 1 and grey in chapter 2.");
+        await ask(authorId, { message: "What colour are Mira's eyes?", storyId: moorings.slug });
+        expect(provider.calls).toHaveLength(1);
+      });
+
+      it("is not sent when no call that may use tools is left", async () => {
+        script(
+          ...Array.from({ length: MAX_MODEL_CALLS - 2 }, () =>
+            call("search_chapters", { storyId: moorings.id, query: "eyes" }),
+          ),
+          CLAIM,
+        );
+
+        const response = await ask(authorId, { message: "Change Mira's eyes.", storyId: moorings.slug });
+
+        expect(response.body.answer).toBe(CLAIM);
+        expect(corrections()).toEqual([]);
+      });
     });
 
     it("streams the proposals on done", async () => {

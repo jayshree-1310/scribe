@@ -49,13 +49,24 @@
  * back on `done` beside the answer. Accepting one happens in the editor and
  * never returns here, so there is no run to suspend and resume -- the hard
  * part of human-in-the-loop, avoided rather than solved.
+ *
+ * **An answer that only says it proposed is sent back once.** gpt-oss-120b has
+ * answered after one round of lookups: asked to change something, it searched,
+ * then described the edit as proposed without calling `propose_edit`. So when
+ * the tool was offered and never called, and the answer reads as a claim
+ * (`CLAIMS_AN_EDIT`), the loop does not finish: it keeps that answer in the
+ * conversation, says nothing was proposed (`AGENT_UNPROPOSED`) and calls the
+ * model again, within the same caps. Once per request; what comes back the
+ * second time stands.
  */
 
 import { logger } from "../../lib/logger.js";
 import {
   AGENT_SYSTEM_PROMPT,
+  AGENT_UNPROPOSED,
   AGENT_WRAP_UP,
   agentMessage,
+  CLAIMS_AN_EDIT,
   toolResultMessage,
   type AgentExchange,
 } from "./prompts/agent.js";
@@ -184,6 +195,23 @@ function resultText(result: unknown): string {
 }
 
 /**
+ * An answer that talks about proposing or making a change on a request that
+ * could propose edits, in which `propose_edit` was never called. A call that
+ * was refused does not count: then the answer explaining why is the honest one.
+ */
+function claimsUnproposedEdit(
+  answer: string,
+  editing: ToolContext["editing"],
+  steps: readonly AgentStep[],
+): boolean {
+  return (
+    editing !== undefined &&
+    !steps.some((step) => step.tool === "propose_edit") &&
+    CLAIMS_AN_EDIT.test(answer)
+  );
+}
+
+/**
  * Runs the loop for one request and returns its answer, as `context.userId`.
  *
  * Throws only for what a route should turn into a status: AI not configured,
@@ -229,6 +257,7 @@ export async function* agentEvents(
   let toolCalls = 0;
   /** Set once a cap has been reached: the next call is the last. */
   let forcedBy: AgentStop | null = null;
+  let corrected = false;
 
   const finish = (answer: string, stoppedBy: AgentStop): AgentEvent => {
     logger.info(
@@ -277,6 +306,18 @@ export async function* agentEvents(
     // called a tool anyway still does not get another turn.
     if (calls.length === 0 || last) {
       const answer = completion.text.trim();
+      // Only with a call left that may still use tools: corrected on a forced
+      // last call, the model could not act on it.
+      const toolsNext = modelCalls < MAX_MODEL_CALLS - 1;
+      if (!last && toolsNext && !corrected && claimsUnproposedEdit(answer, editing, steps)) {
+        corrected = true;
+        messages.push(
+          { role: "assistant", content: completion.text },
+          { role: "user", content: AGENT_UNPROPOSED },
+        );
+        logger.info({ agent: { modelCalls, corrected: "unproposed_edit" } }, "agent correction");
+        continue;
+      }
       yield finish(answer === "" ? NO_ANSWER : answer, forcedBy ?? "answered");
       return;
     }

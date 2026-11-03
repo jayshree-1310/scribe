@@ -80,16 +80,18 @@ it.
 already cover, and it tests whether authors want agent-proposed edits before
 anything is spent on a framework for them.
 
-**Status: built, with one open gap.** `propose_edit` in `services/ai/tools.ts`,
-proposals on `done` from `agent.ts`, the cards in `StoryAssistant.tsx`,
-`applyProposal` in `StoryEditorPage.tsx`. The gap is the model, not the wiring:
-on 2026-10-29, asked plainly ("change Mira's eyes in chapter 1 to grey"),
-`gpt-oss-120b` called `search_chapters` and then answered as if it had proposed
-an edit, with `proposals: []`, five times out of five across three wordings of
-the prompt. Named in the message ("use the propose_edit tool…") it works. It
-answers after one tool round. Untried: an `ai:eval` case to measure it, moving
-the passage lookup inside `propose_edit` so one call is enough, or a server
-check on an answer that mentions proposing while `proposals` is empty.
+**Status: built.** `propose_edit` in `services/ai/tools.ts`, proposals on
+`done` from `agent.ts`, the cards in `StoryAssistant.tsx`, `applyProposal` in
+`StoryEditorPage.tsx`. On 2026-10-29, asked plainly ("change Mira's eyes in
+chapter 1 to grey"), `gpt-oss-120b` called `search_chapters` and then answered
+as if it had proposed an edit, with `proposals: []`, five times out of five
+across three wordings of the prompt. So `agent.ts` now has a server check: when
+`propose_edit` was offered and never called and the answer reads as a claim
+(`CLAIMS_AN_EDIT`), the answer is sent back once with `AGENT_UNPROPOSED` and the
+model is called again within the same caps. On 2026-11-03 the failure did not
+reproduce — seven of seven live runs, five wordings, searched and proposed
+unaided — so the check is a backstop that has not yet been seen to fire live.
+Still untried: an `ai:eval` agent case to measure this over time.
 
 **What exists.** **Ask about this story** (`components/ai/StoryAssistant.tsx`)
 runs the tool loop in `services/ai/agent.ts` over five read-only tools in

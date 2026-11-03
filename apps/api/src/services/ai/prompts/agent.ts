@@ -26,7 +26,7 @@ import { definePrompt, fence, fenced, SHARED_BASE_CHANGE, systemPrompt } from ".
 
 export const AGENT_PROMPT = definePrompt({
   id: "agent",
-  version: 4,
+  version: 5,
   tunedAgainst: ["openai/gpt-oss-120b"],
   purpose: "The assistant with tools: decide what to look up, then answer from the results.",
   rationale:
@@ -36,6 +36,7 @@ export const AGENT_PROMPT = definePrompt({
     2: `${SHARED_BASE_CHANGE} The story on screen moved into its own fence.`,
     3: "Conversation memory: earlier exchanges in their own fence, as context for what a follow-up refers to and never as a source.",
     4: "Proposed edits: on the author's own story, a change is proposed with propose_edit for the author to accept -- never claimed as made, never pasted into the answer instead, and said to be waiting only once the tool accepted it.",
+    5: "A correction turn, AGENT_UNPROPOSED, sent once when an answer on the author's story talks about proposing or making a change but propose_edit was never called. The system prompt is unchanged.",
   },
 });
 
@@ -117,3 +118,20 @@ export function toolResultMessage(json: string): string {
  */
 export const AGENT_WRAP_UP =
   "You have used all the lookups available for this request. Answer now from the results you already have, and say if they were not enough.";
+
+/**
+ * Whether an answer talks as if it proposed or made a change. Matched only
+ * when `propose_edit` was offered and never called, so a false match costs
+ * one extra model call, never a wrong edit: the author still has to accept.
+ */
+export const CLAIMS_AN_EDIT =
+  /\b(?:propos\w*|accept\w*|reject\w*)\b|\bsuggested (?:an? )?(?:edit|change)\b|\bI(?:'ve| have)? (?:changed|updated|replaced|edited|rewritten|rewrote|fixed)\b/i;
+
+/**
+ * The correction for an answer `CLAIMS_AN_EDIT` matched. Appended once, after
+ * that answer, as a user turn. On 2026-10-29 gpt-oss-120b answered after one
+ * round of lookups and described the edit it meant to propose, and no
+ * system-prompt wording stopped it; naming the tool in the request did.
+ */
+export const AGENT_UNPROPOSED =
+  "You have not called propose_edit in this request, so nothing has been proposed: the author has nothing to accept. If the author asked for a change, call propose_edit now, quoting the passage exactly as a tool result showed it (look it up first if you have not). If you did not mean to propose a change, answer again without saying that one was proposed or made.";
