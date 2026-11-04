@@ -9,7 +9,8 @@
  * service, answer. The model work lives in `services/ai/`.
  */
 
-import { Router, type Request, type Response } from "express";
+import { EventType, type RunErrorEvent } from "@ag-ui/core";
+import { Router, type Response } from "express";
 import { z } from "zod";
 import { HttpError } from "../lib/http-error.js";
 import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
@@ -100,6 +101,7 @@ import {
   agentEvents,
   runAgent,
 } from "../services/ai/agent.js";
+import { aguiEvents, fromRunAgentInput, runAgentInputSchema } from "../services/ai/agui.js";
 import { getStorySummary, regenerateStorySummaries } from "../services/ai/summaries.js";
 import { ensureChapterSummary } from "../services/ai/recap.js";
 import { db } from "../prisma/db.js";
@@ -223,12 +225,17 @@ function writeEvent(res: Response, event: unknown): boolean {
  * terminal event is what the client treats as failure.
  *
  * Returns false when the caller should hand the error on to `next` instead.
+ * `frame` shapes the error event, for a stream that speaks another protocol.
  */
 function reportStreamFailure(
   res: Response,
   error: unknown,
   fallback: string,
   context: string,
+  frame: (reported: { code: string; message: string }) => unknown = (reported) => ({
+    type: "error",
+    ...reported,
+  }),
 ): boolean {
   if (res.writableEnded || res.destroyed) return true;
   if (!res.headersSent) return false;
@@ -239,7 +246,7 @@ function reportStreamFailure(
       : { code: "internal_error", message: fallback };
 
   logger.error({ err: error }, context);
-  res.write(`data: ${JSON.stringify({ type: "error", ...reported })}\n\n`);
+  res.write(`data: ${JSON.stringify(frame(reported))}\n\n`);
   res.end();
   return true;
 }
@@ -1737,13 +1744,13 @@ const agentSchema = z.object({
 });
 
 /**
- * Everything both agent routes check before the loop starts: the caller, the
+ * Everything the agent routes check before the loop starts: the caller, the
  * body, the request limit and the day's budget. Charged here, before the
  * first model call, because one request is several of them.
  */
-async function startAgent(req: Request, res: Response) {
+async function startAgent(res: Response, request: unknown) {
   const userId = requireUserId(res);
-  const body = parseOrThrow(agentSchema, req.body);
+  const body = parseOrThrow(agentSchema, request);
 
   const key = `ai:agent:${userId}`;
   const status = await isRateLimited(key, AGENT_LIMIT);
@@ -1770,7 +1777,7 @@ async function startAgent(req: Request, res: Response) {
  */
 router.post("/agent", requireUser, async (req, res, next) => {
   try {
-    const { input, context } = await startAgent(req, res);
+    const { input, context } = await startAgent(res, req.body);
     res.json(await runAgent(input, context));
   } catch (error) {
     next(error);
@@ -1785,7 +1792,7 @@ router.post("/agent", requireUser, async (req, res, next) => {
  */
 router.post("/agent/stream", requireUser, async (req, res, next) => {
   try {
-    const { input, context } = await startAgent(req, res);
+    const { input, context } = await startAgent(res, req.body);
     for await (const event of agentEvents(input, context)) {
       if (!writeEvent(res, event)) break;
     }
@@ -1797,6 +1804,37 @@ router.post("/agent/stream", requireUser, async (req, res, next) => {
         error,
         "The assistant could not answer just now.",
         "agent stream failed",
+      )
+    ) {
+      return;
+    }
+    next(error);
+  }
+});
+
+/**
+ * The same loop, speaking AG-UI (Task AI 24): a `RunAgentInput` in, AG-UI
+ * events out. For an AG-UI client, not for `StoryAssistant`, which stays on
+ * `/agent/stream`. What the input may carry is reduced to what that route
+ * takes before the same checks run -- see `services/ai/agui.ts` -- and the
+ * caller is the session's, whatever `forwardedProps` or `state` say.
+ */
+router.post("/agent/agui", requireUser, async (req, res, next) => {
+  try {
+    const { run, request } = fromRunAgentInput(parseOrThrow(runAgentInputSchema, req.body));
+    const { input, context } = await startAgent(res, request);
+    for await (const event of aguiEvents(agentEvents(input, context), run)) {
+      if (!writeEvent(res, event)) break;
+    }
+    if (!res.writableEnded) res.end();
+  } catch (error) {
+    if (
+      reportStreamFailure(
+        res,
+        error,
+        "The assistant could not answer just now.",
+        "agent agui stream failed",
+        (reported): RunErrorEvent => ({ type: EventType.RUN_ERROR, ...reported }),
       )
     ) {
       return;

@@ -17,6 +17,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@ag-ui/core':
+        specifier: ^1.0.3
+        version: 1.0.3(zod@4.5.4)
       '@aws-sdk/client-s3':
         specifier: ^3.1133.0
         version: 3.1133.0
@@ -141,6 +144,14 @@ importers:
         version: 8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0)
 
 packages:
+
+  '@ag-ui/core@1.0.3':
+    resolution: {integrity: sha512-HdMdZPOqworKlnzLaNktnbNYgIzOPbzt5ow6J4bPhbmHCdpWpCSZQFgkifQkn1zVHgCK1V+pmKc8xtW6FsQZKA==}
+    peerDependencies:
+      zod: ^3.25.18 || ^4.0.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
 
   '@alcalzone/ansi-tokenize@0.2.5':
     resolution: {integrity: sha512-3NX/MpTdroi0aKz134A6RC2Gb2iXVECN4QaAXnvCIxxIm3C3AVB1mkUe8NaaiyvOpDfsrqWhYtj+Q6a62RrTsw==}
@@ -3928,6 +3939,10 @@ packages:
     resolution: {integrity: sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA==}
 
 snapshots:
+
+  '@ag-ui/core@1.0.3(zod@4.5.4)':
+    optionalDependencies:
+      zod: 4.5.4
 
   '@alcalzone/ansi-tokenize@0.2.5':
     dependencies:

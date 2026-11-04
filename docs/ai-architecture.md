@@ -904,7 +904,12 @@ server-sent events — `lookup` as each tool starts, `step` as it finishes,
 then `done` with the answer whole, because the wait is the lookups, not the
 writing. `history` is up to six earlier exchanges the client holds, given to
 the model as a fenced "context, not a source" block; nothing is stored, and
-nothing in it can widen a tool, which still runs as the session's user. The seam grew for it: `AiRequest.tools` and `toolChoice`,
+nothing in it can widen a tool, which still runs as the session's user.
+`POST /api/ai/agent/agui` is the same loop again for an AG-UI client
+(`services/ai/agui.ts`): a `RunAgentInput` is reduced to that same message,
+story and history before the same checks — `context` dropped, client `tools`
+refused, identity from the session — and the events go out as AG-UI's, with
+AI 21's proposals as `propose_edit` calls left pending. The seam grew for it: `AiRequest.tools` and `toolChoice`,
 `AiCompletion.toolCalls`, and two message variants — an assistant turn
 carrying tool calls and a `tool` result — which both implementations map onto
 their own wire format (`tool_call_id` for chat completions, `tool_name` and

@@ -269,6 +269,21 @@ held in Redis, and `IdeaStudioPage.tsx`.
 client is a real prospect. It is the cheap way to keep that door open: the
 protocol without the UI library.
 
+**Status: built.** `POST /api/ai/agent/agui` in `routes/ai.ts`, the mapping in
+`services/ai/agui.ts`, tests under "speaking AG-UI" in `ai-agent.test.ts`,
+where every event read is parsed with AG-UI's own `EventSchemas`. Two choices
+the prompt left open. Only `@ag-ui/core` is a dependency: `@ag-ui/encoder`'s
+SSE frame is the `data: <json>` line `writeEvent` already writes, and the
+package brings `@ag-ui/proto`, protobuf, `@protobuf-ts/protoc` and zod 3 for a
+binary transport nobody asks for. And a proposal is sent once, as a pending
+`propose_edit` call (id = the proposal's, arguments = the proposal, listed in
+`RUN_FINISHED`'s `pendingToolCallIds`); the server-side `propose_edit` that
+recorded it is not also streamed as a lookup, or a client rendering calls by
+name would draw it twice. A refused one is streamed like any other lookup.
+Tool results carry the step's outcome, not the tool's output, as on
+`/agent/stream`. Refusing client `tools` outright will need revisiting if
+AI 25 goes ahead: `useHumanInTheLoop` declares its tool from the browser.
+
 **What exists.** `agentEvents` in `agent.ts` yields `lookup`, `step` and
 `done`; `writeEvent` and `reportStreamFailure` in `routes/ai.ts` send them as
 SSE, with headers written on the first event so a 401, 429 or 503 is still
