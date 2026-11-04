@@ -324,6 +324,70 @@ JSON. `@ag-ui/core` and `@ag-ui/encoder` are MIT; core's only peer is zod.
 surface wants it. Time-box it, keep it behind a flag on `/ai-lab`, and end it
 with a written decision either way.
 
+**Status: trial run on 2026-11-04, against CopilotKit 1.83.0. Recommendation:
+remove the packages.** The trial is committed whole so that removing it is one
+commit that can be read and reverted. That removal waits on the owner's say-so.
+
+What was built. `routes/copilotkit.ts` is mounted at `/api/ai/copilotkit`, not
+`/api/copilotkit`. Mounting it inside the AI router means it inherits `runAs`,
+the baseline limit and the request-log redaction instead of re-implementing
+them. `services/ai/copilotkit.ts` holds `ScribeAgent`, an `AbstractAgent` whose
+`run` is AI 24's `aguiEvents` over `agentEvents`. `identifyUser` reads the
+caller from `runAs`, and the runtime is imported only when `AI_COPILOTKIT` is
+on. `services/ai/agent-request.ts` gives every agent route one schema and one
+charge. On the web, `components/ai/CopilotKitTrial.tsx` is a mode on
+`/ai-lab`, loaded lazily and only in development builds. It uses `useAgent`,
+and `useHumanInTheLoop` draws the story assistant's own `ProposalCard`. Tests
+are in `routes/ai-copilotkit.test.ts`.
+
+| Criterion | Result |
+| --- | --- |
+| The caller survives the runtime's async code | **Pass.** Every usage record and the day's budget land on the caller, and a reader's tool call is refused as the reader's (`ai-copilotkit.test.ts`). Also seen live. |
+| 401, 429 with `retryAfter`, 503 | **Partly.** The 401 and 429 are JSON statuses only because Scribe's own middleware answers them before the runtime does. In the browser, the 429 reaches the provider's `onError` as the string `HTTP 429: {…json…}`, and `runAgent` resolves without a word. The app would have to parse that string to show the message and the wait. A provider outage cannot be a 503 at all: the runtime answers 200 before the agent starts, so the outage arrives as an in-band `RUN_ERROR` with `code: service_unavailable` and no retry time. |
+| The 15-minute token is refreshed | **Pass, with new code.** CopilotKit's requests skip `request()`'s refresh-and-replay, so `freshAccessToken` (`lib/access-token.ts`) refreshes a token about to expire in the header builder. Checked live with an already-expired token: the refresh went first, and the run carried the new token and answered 200. |
+| `ai-security.test.ts` with the route included | **Pass.** The route needs a session and sits under the baseline limit. |
+| Bundle and install size | **Measured, not accepted.** The API's production install went from 860 MB and 599 packages to 1,042 MB and 801 packages. The extra includes the Vercel AI SDK, four provider SDKs, the OpenAI SDK (23 MB), the MCP SDK, Slack and Teams channel packages, and zod 3 beside zod 4. None of it is used. The web's production bundle is unchanged only because the import is gated on `DEV`. Without that gate, the build emitted 458 files and 15.9 MB of JavaScript (CopilotKit's markdown renderer brings Shiki, Mermaid and KaTeX). Opening the trial loads a 2.1 MB chunk (595 KB gzipped), about three times the whole app (193 KB gzipped). |
+| `pnpm typecheck` on TypeScript 6 | **Pass.** The adapter needs two casts, because the runtime pins `@ag-ui/core` 1.0.2 and AI 24 uses 1.0.3: the enum values match but the types do not. |
+
+What else the trial found:
+
+- **The version pin does not hold.** `@copilotkit/runtime@1.83.0` installs
+  `@copilotkit/core@1.84.1`, published the day before, through its own ranges.
+- **The runtime serves more than a run.** It also serves suggest, transcribe,
+  thread listing, memories, the inspector and debug events, and `/info`
+  advertises thread endpoints and suggestions. The router lets four routes
+  through (info, run, connect, stop), and a test holds that list.
+- **Threads are kept in memory.** `InMemoryAgentRunner` keeps every run's
+  events (questions, answers, proposals) in process memory until a restart,
+  with no bound. It is the first time the agent stores anything; `agent.ts`
+  says nothing is stored. Threads are scoped to their owner only because
+  `identifyUser` is set. With it, a stranger's `connect` gets an empty stream
+  and a stranger's `run` on the thread gets a 404.
+- **Client tools are ignored here, not refused as on `/agent/agui`.**
+  `useHumanInTheLoop` declares its tool from the browser on every run. The
+  model is still never offered a browser's tool.
+- **An accept stays out of the model only with `followUp: false`.** Without
+  it, CopilotKit's default sends every decision back for another run. With it,
+  no second run went out, which was confirmed live.
+- **What it bought on screen** was the proposal card that `StoryAssistant`
+  already draws with no dependency at all.
+- **The gate was not met.** No second agentic surface asked for this.
+
+Why remove it. Everything that makes the agent safe is still Scribe's code:
+identity, limits, budget, input bounds, tool scope and route fencing. What
+CopilotKit added is a client event loop and a tool-render registry. The price
+is the sizes above, a second thread store, a route surface to fence, and
+errors that arrive as strings. Revisit it when a surface needs shared agent
+state or generative UI that the `StoryAssistant` pattern cannot draw. AI 24's
+`/agent/agui` keeps that door open without any of these packages.
+
+Removing it means: drop `@copilotkit/runtime`, `@ag-ui/client` and `rxjs`
+from the API and `@copilotkit/react-core` from the web; delete
+`routes/copilotkit.ts`, `services/ai/copilotkit.ts`, `ai-copilotkit.test.ts`
+and `CopilotKitTrial.tsx`; remove the lab mode, `AI_COPILOTKIT`,
+`freshAccessToken`, the telemetry lines in the four deploy files, the security
+case and the suspension line. Keep `agent-request.ts`, which stands on its own.
+
 **Prompt:**
 
 > Try CopilotKit's headless React hooks against Scribe's own agent and record

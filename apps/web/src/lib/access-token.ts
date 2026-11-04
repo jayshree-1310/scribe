@@ -74,3 +74,35 @@ export function ensureAccessToken(): Promise<string | null> {
 
   return refreshAccessToken()
 }
+
+/** How close to its expiry a token is replaced rather than sent. */
+const EXPIRY_MARGIN_MS = 60_000
+
+/** The token's `exp` in milliseconds, or null when it cannot be read. */
+function expiresAt(token: string): number | null {
+  try {
+    const payload = token.split('.')[1] ?? ''
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    const exp = (JSON.parse(json) as { exp?: unknown }).exp
+    return typeof exp === 'number' ? exp * 1000 : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * A token that will still be valid when the request lands, refreshing first
+ * when the one in memory is about to expire.
+ *
+ * For clients that do not go through `request()` and so never see its
+ * refresh-and-replay on a 401 — CopilotKit's, which builds its own headers
+ * per request (Task AI 25). Reading the expiry here is not trusting it: the
+ * server still checks the signature, and an unreadable token is refreshed.
+ */
+export async function freshAccessToken(): Promise<string | null> {
+  const token = await ensureAccessToken()
+  if (token === null) return null
+  const expiry = expiresAt(token)
+  if (expiry !== null && expiry - Date.now() > EXPIRY_MARGIN_MS) return token
+  return refreshAccessToken()
+}

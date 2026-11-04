@@ -74,6 +74,9 @@ services:
     environment:
       DATABASE_URL: postgresql://scribe:scribe_dev_password@postgres:5432/scribe
       REDIS_URL: redis://redis:6379
+      # The CopilotKit trial's runtime reports usage to CopilotKit unless told
+      # not to (Task AI 25).
+      COPILOTKIT_TELEMETRY_DISABLED: "true"
       # Inside the network the model server answers on its service name. Left
       # to `apps/api/.env` this would point at the container's own localhost,
       # where nothing is listening.

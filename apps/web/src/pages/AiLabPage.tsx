@@ -1,4 +1,11 @@
-import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import {
+  lazy,
+  Suspense,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent,
+} from 'react'
 import {
   askAgent,
   chat,
@@ -32,12 +39,22 @@ import './ai-lab.css'
 
 const PROMPT_LIMIT = 4000
 
-type Mode = 'stream' | 'complete' | 'agent'
+/**
+ * Its own chunk, loaded when the trial is chosen. Behind `DEV` as well as the
+ * lab's route, so a production build drops the import and emits none of
+ * CopilotKit's ~400 files (its markdown renderer brings Shiki, Mermaid, KaTeX).
+ */
+const CopilotKitTrial = import.meta.env.DEV
+  ? lazy(() => import('../components/ai/CopilotKitTrial'))
+  : () => null
+
+type Mode = 'stream' | 'complete' | 'agent' | 'copilotkit'
 
 const MODES: ReadonlyArray<{ value: Mode; label: string }> = [
   { value: 'stream', label: 'Streamed' },
   { value: 'complete', label: 'One response' },
   { value: 'agent', label: 'Agent (tools)' },
+  { value: 'copilotkit', label: 'CopilotKit (trial)' },
 ]
 
 /** The agent route's own cap, repeated so the field can say it. */
@@ -164,6 +181,35 @@ export function AiLabPage() {
 
   const running = status === 'running'
 
+  const modes = (
+    <SegmentedControl
+      label="How to receive the reply"
+      items={MODES}
+      value={mode}
+      onChange={(next) => setMode(next)}
+    />
+  )
+
+  if (mode === 'copilotkit') {
+    return (
+      <>
+        <header className="page-head">
+          <div>
+            <h1 className="page-head__title">AI lab</h1>
+            <p className="page-head__sub">
+              The agent with tools, driven by CopilotKit's headless hooks (Task
+              AI 25). A trial, behind the API's <code>AI_COPILOTKIT</code> switch.
+            </p>
+          </div>
+        </header>
+        <Card className="ai-lab__form">{modes}</Card>
+        <Suspense fallback={<p className="ai-lab__waiting">Loading CopilotKit&hellip;</p>}>
+          <CopilotKitTrial />
+        </Suspense>
+      </>
+    )
+  }
+
   return (
     <>
       <header className="page-head">
@@ -179,12 +225,7 @@ export function AiLabPage() {
 
       <Card className="ai-lab__form">
         <form onSubmit={onSubmit}>
-          <SegmentedControl
-            label="How to receive the reply"
-            items={MODES}
-            value={mode}
-            onChange={(next) => setMode(next)}
-          />
+          {modes}
 
           {mode === 'agent' ? (
             <TextField

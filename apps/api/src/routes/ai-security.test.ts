@@ -39,6 +39,7 @@ const available = await databaseAvailable();
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 const ENV = [
+  "AI_COPILOTKIT",
   "AI_DAILY_TOKEN_BUDGET",
   "AI_BASELINE_REQUEST_LIMIT",
   "AI_LOG_CONTENT",
@@ -152,6 +153,18 @@ describe.skipIf(!available)("every AI route has a session and a rate limit", () 
     expect(refused.status).toBe(429);
     expect(refused.body.error.details?.limit).toBe("ai_requests");
     expect(refused.body.error.retryAfterSeconds).toBeGreaterThan(0);
+  });
+
+  it("covers the CopilotKit trial's runtime too, behind the same session and floor", async () => {
+    process.env["AI_COPILOTKIT"] = "on";
+    expect((await api.request("/api/ai/copilotkit/info")).status).toBe(401);
+
+    process.env["AI_BASELINE_REQUEST_LIMIT"] = "2";
+    const statuses: number[] = [];
+    for (let i = 0; i < 3; i += 1) {
+      statuses.push((await api.request("/api/ai/copilotkit/info", { as: reader })).status);
+    }
+    expect(statuses).toEqual([200, 200, 429]);
   });
 
   it("names the daily budget when that is what ran out", async () => {

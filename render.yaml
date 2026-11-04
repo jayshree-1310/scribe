@@ -133,6 +133,10 @@ services:
       # forwarded address can be trusted for rate-limit bucketing.
       - key: TRUST_PROXY
         value: "1"
+      # The CopilotKit trial's runtime reports usage to CopilotKit unless told
+      # not to (Task AI 25).
+      - key: COPILOTKIT_TELEMETRY_DISABLED
+        value: "true"
       # Only a fallback now. A free instance mounts no disk, so this directory
       # is wiped on every deploy and every spin-down — uploads written here
       # survive minutes, not days. The S3 block below is what makes them

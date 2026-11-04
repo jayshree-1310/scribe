@@ -21,6 +21,7 @@ import {
   requireUserId,
 } from "../middleware/current-user.js";
 import { runAs } from "../services/ai/caller.js";
+import copilotkitRouter from "./copilotkit.js";
 import { aiHealth } from "../services/ai/health.js";
 import { BIBLE_READ_JOB } from "../services/ai/job-schedule.js";
 import { disabledFeatures, setFeature } from "../services/ai/switches.js";
@@ -94,13 +95,8 @@ import {
   getChapterContinuity,
   getStoryContinuity,
 } from "../services/ai/continuity.js";
-import {
-  HISTORY_ANSWER_LIMIT,
-  HISTORY_LIMIT,
-  MESSAGE_LIMIT,
-  agentEvents,
-  runAgent,
-} from "../services/ai/agent.js";
+import { agentEvents, runAgent } from "../services/ai/agent.js";
+import { agentRequestSchema, chargeAgentRequest } from "../services/ai/agent-request.js";
 import { aguiEvents, fromRunAgentInput, runAgentInputSchema } from "../services/ai/agui.js";
 import { getStorySummary, regenerateStorySummaries } from "../services/ai/summaries.js";
 import { ensureChapterSummary } from "../services/ai/recap.js";
@@ -155,6 +151,9 @@ router.use(async (req, _res, next) => {
     next(error);
   }
 });
+
+/** The CopilotKit trial (Task AI 25), behind everything above. */
+router.use("/copilotkit", copilotkitRouter);
 
 /**
  * Deliberately tighter than the auth limiter's: a model call occupies a CPU
@@ -1709,59 +1708,13 @@ router.post(
 /* Assistant with tools --------------------------------------------------- */
 
 /**
- * Tighter than Ask This Book's: one request here is up to five model calls and
- * six lookups, so ten requests is fifty calls. The per-request token budget in
- * `agent.ts` bounds one request; this bounds how many of them.
- */
-const AGENT_LIMIT = 10;
-const AGENT_WINDOW_SECONDS = 60 * 10;
-
-const agentSchema = z.object({
-  message: z
-    .string()
-    .trim()
-    .min(2, "Ask the assistant something.")
-    .max(
-      MESSAGE_LIMIT,
-      `Keep it under ${MESSAGE_LIMIT} characters — the assistant looks the rest up.`,
-    ),
-  /** The story on screen, if any. Authorised by each tool that uses it. */
-  storyId: z.string().trim().min(1).max(200).nullish(),
-  /**
-   * The conversation so far, oldest first, as the client holds it. Context
-   * for a follow-up, never a source, and never a way to widen what a tool
-   * returns: the tools run as the session's user whatever this says.
-   */
-  history: z
-    .array(
-      z.object({
-        question: z.string().trim().min(1).max(MESSAGE_LIMIT),
-        answer: z.string().trim().min(1).max(HISTORY_ANSWER_LIMIT),
-      }),
-    )
-    .max(HISTORY_LIMIT, `Send at most ${HISTORY_LIMIT} earlier exchanges.`)
-    .default([]),
-});
-
-/**
  * Everything the agent routes check before the loop starts: the caller, the
- * body, the request limit and the day's budget. Charged here, before the
- * first model call, because one request is several of them.
+ * body, then the request limit and the day's budget (`agent-request.ts`).
  */
 async function startAgent(res: Response, request: unknown) {
   const userId = requireUserId(res);
-  const body = parseOrThrow(agentSchema, request);
-
-  const key = `ai:agent:${userId}`;
-  const status = await isRateLimited(key, AGENT_LIMIT);
-  if (status.limited) {
-    throw HttpError.tooManyRequests(
-      "You have asked the assistant a lot in a short time. Try again shortly.",
-      status.retryAfter,
-    );
-  }
-  await assertWithinDailyBudget(userId);
-  await recordAttempt(key, AGENT_WINDOW_SECONDS);
+  const body = parseOrThrow(agentRequestSchema, request);
+  await chargeAgentRequest(userId);
 
   return {
     input: { message: body.message, storyKey: body.storyId ?? null, history: body.history },

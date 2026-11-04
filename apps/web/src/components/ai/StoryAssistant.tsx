@@ -110,7 +110,7 @@ function historyOf(exchanges: Exchange[]): aiApi.AgentExchange[] {
  */
 export type ProposalOutcome = 'applied' | 'other-chapter' | 'changed'
 
-type Decision =
+export type Decision =
   | { status: 'pending'; note: string | null }
   | { status: 'applied' | 'rejected' }
 
@@ -121,10 +121,18 @@ interface ProposalCardProps {
   decision: Decision
   onAccept: () => void
   onReject: () => void
+  /** What an accepted card says; the editor's default is where it went. */
+  appliedText?: string
 }
 
 /** One proposed edit, in the writing assistant's two columns. */
-function ProposalCard({ proposal, decision, onAccept, onReject }: ProposalCardProps) {
+export function ProposalCard({
+  proposal,
+  decision,
+  onAccept,
+  onReject,
+  appliedText = 'Applied to your chapter.',
+}: ProposalCardProps) {
   return (
     <section
       className="assist story-assistant__proposal"
@@ -171,7 +179,7 @@ function ProposalCard({ proposal, decision, onAccept, onReject }: ProposalCardPr
       ) : (
         <p className="assist__note" role="status">
           {decision.status === 'applied'
-            ? 'Applied to your chapter.'
+            ? appliedText
             : 'Rejected. Your text is unchanged.'}
         </p>
       )}

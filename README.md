@@ -66,8 +66,8 @@ current tree rather than in the abstract:
 - `docs/AI-BACKLOG.md` — the GenAI roadmap (AI 0 – AI 20). All of it has
   landed.
 - `docs/AI-NEXT.md` — the work after it (AI 21 – AI 25), from the CopilotKit
-  assessment. AI 21 – AI 24 have landed; AI 25, an optional CopilotKit trial,
-  is the one task left.
+  assessment. All of it has run: AI 21 – AI 24 have landed, and AI 25, the
+  CopilotKit trial, ends with a recommendation to remove the packages.
 - `docs/ai-architecture.md` — how an AI request travels through the seam, and
   what each failure answers.
 - `docs/content-model.md` — why there is one work entity (`content.Story`)
@@ -1362,7 +1362,8 @@ The web app has no test suite yet.
 - [x] AI 22 — dialogue and pacing actions in the writing assistant
 - [x] AI 23 — plot twists in the Idea Studio
 - [x] AI 24 — the agent's stream in AG-UI's shape (`POST /api/ai/agent/agui`)
-- [ ] AI 25 — a CopilotKit trial on `/ai-lab` (optional, gated)
+- [x] AI 25 — a CopilotKit trial on `/ai-lab`, run behind `AI_COPILOTKIT`;
+      the recommendation is to remove the packages (`docs/AI-NEXT.md`)
 
 ### Phase 7 — Production Readiness
 
