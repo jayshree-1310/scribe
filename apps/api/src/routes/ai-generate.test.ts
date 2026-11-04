@@ -368,7 +368,7 @@ describe.skipIf(!available)("POST /api/ai/generate/twist", () => {
     const call = fake.calls[0];
     expect(call?.feature).toBe("generate.twist");
     expect(call?.format?.name).toBe("generate_twist");
-    expect(call?.system).toContain("name that fact in risks");
+    expect(call?.system).toContain("goes in risks, named");
 
     const brief = call?.messages[0]?.content ?? "";
     expect(brief).toContain("someone is changing it");
