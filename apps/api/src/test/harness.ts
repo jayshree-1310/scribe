@@ -1299,6 +1299,8 @@ export async function databaseAvailable(): Promise<boolean> {
     await db.orm.content.Genre.select("id").limit(1).all();
     return true;
   } catch (error) {
+    // In CI a skipped suite would read as a passing one.
+    if (process.env["CI"]) throw error;
     console.warn(
       "\n[books/library tests] Skipped: no database reachable at DATABASE_URL.\n" +
         "Start it with `docker compose up -d postgres` and re-run.\n" +

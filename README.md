@@ -1325,6 +1325,18 @@ config forces `S3_BUCKET` empty so a developer with credentials in
 
 The web app has no test suite yet.
 
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every push to `main` and every pull
+request: typecheck, the web app's lint, the build, then the API suite against
+a fresh Postgres (`pgvector/pgvector:pg17`) and Redis, migrated with
+`prisma db migrate` exactly as a deploy is. No AI provider is configured there;
+the suites that reach a model use the fake one. In CI a database the suite
+cannot reach fails the run (`CI` is set), where locally it skips.
+
+Not in CI yet: `pnpm format:check` (Prettier has not been applied to the whole
+tree) and `pnpm lint` at the root (the API has no ESLint config).
+
 ## 📌 Development Roadmap
 
 ### Phase 1 — Foundation --> Done
@@ -1373,7 +1385,8 @@ The web app has no test suite yet.
 - [x] Integration test coverage on the API
 - [ ] Frontend tests
 - [ ] API documentation (OpenAPI)
-- [ ] CI/CD
+- [x] CI — GitHub Actions on every push and pull request; deploys are not
+      gated on it yet
 - [ ] Performance optimization
 - [ ] Security hardening review
 - [ ] Monitoring

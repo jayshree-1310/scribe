@@ -1,0 +1,93 @@
+# Every push and pull request: typecheck, lint, build, then the API suite
+# against a real Postgres and Redis, migrated the way a deploy migrates them.
+#
+# Not here yet, on purpose:
+#   - `pnpm format:check`: Prettier has never been applied to the whole tree,
+#     so it would fail on hundreds of files until one formatting commit lands.
+#   - `pnpm lint`: the API has no ESLint config; only the web app is linted.
+#   - Frontend tests: the web app has no test harness (README, Phase 7).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      # The same images as docker-compose.yml: the migrations need pgvector.
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: scribe
+          POSTGRES_USER: scribe
+          POSTGRES_PASSWORD: scribe_ci_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U scribe -d scribe"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    # What `apps/api/.env` holds locally. No AI provider is configured: the
+    # suites that reach a model install the fake one themselves.
+    env:
+      DATABASE_URL: postgresql://scribe:scribe_ci_password@localhost:5432/scribe
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci-access-secret-not-used-anywhere-else
+      JWT_REFRESH_SECRET: ci-refresh-secret-not-used-anywhere-else
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 30d
+      ALLOW_DEV_USER_HEADER: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the version from `packageManager` in package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint (web)
+        run: pnpm --filter web lint
+
+      - name: Build
+        run: pnpm build
+
+      - name: Migrate the database
+        working-directory: apps/api
+        run: pnpm exec prisma db migrate --yes
+
+      - name: Test (API)
+        working-directory: apps/api
+        run: pnpm test
