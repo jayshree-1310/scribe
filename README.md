@@ -37,7 +37,7 @@ idle, so the first request after a quiet spell takes a while to answer.
 | Moderation — reporting, the queue, hiding content, suspensions            | **Real API**                         |
 | Onboarding, genre preferences & ranked recommendations                    | **Real API**                         |
 | Scribble — the GenAI discovery concierge, JSON and streaming              | **Real API**                         |
-| The rest of the GenAI roadmap (AI 3 – AI 20)                              | **Real API** — see `docs/AI-BACKLOG.md` |
+| The rest of the GenAI roadmap (AI 3 – AI 24)                              | **Real API** — see `docs/AI-BACKLOG.md`, `docs/AI-NEXT.md` |
 
 Every row above is served by the API.
 
@@ -63,8 +63,11 @@ current tree rather than in the abstract:
 - `docs/BACKLOG.md` — what closing the gap between the frontend surface and the
   API took, task by task. All of it has landed; what is still live in there is
   the list of open questions the test suite cannot reach.
-- `docs/AI-BACKLOG.md` — the GenAI roadmap (AI 0 – AI 20). AI 0 (the provider
-  seam) and AI 1.5 (Scribble, streaming included) have landed.
+- `docs/AI-BACKLOG.md` — the GenAI roadmap (AI 0 – AI 20). All of it has
+  landed.
+- `docs/AI-NEXT.md` — the work after it (AI 21 – AI 25), from the CopilotKit
+  assessment. AI 21 – AI 24 have landed; AI 25, an optional CopilotKit trial,
+  is the one task left.
 - `docs/ai-architecture.md` — how an AI request travels through the seam, and
   what each failure answers.
 - `docs/content-model.md` — why there is one work entity (`content.Story`)
@@ -1352,6 +1355,14 @@ The web app has no test suite yet.
 - [x] AI 14 — a continuity checker that warns, never blocks, and can be dismissed
 - [x] AI 15 – AI 20 — tool calling, evaluation, prompt management, cost,
       security hardening, and the job queue and ops tooling
+
+### Phase 6b — after the CopilotKit assessment (`docs/AI-NEXT.md`)
+
+- [x] AI 21 — the editor assistant proposes edits; the author accepts or rejects
+- [x] AI 22 — dialogue and pacing actions in the writing assistant
+- [x] AI 23 — plot twists in the Idea Studio
+- [x] AI 24 — the agent's stream in AG-UI's shape (`POST /api/ai/agent/agui`)
+- [ ] AI 25 — a CopilotKit trial on `/ai-lab` (optional, gated)
 
 ### Phase 7 — Production Readiness
 

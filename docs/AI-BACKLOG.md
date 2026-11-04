@@ -1741,7 +1741,8 @@ two unknowns at once.
 `services/ai/agent.ts` (the loop), `prompts/agent.ts`; tool calling added to
 the seam (`AiRequest.tools` / `toolChoice`, `AiCompletion.toolCalls`, tool-call
 and tool-result messages) and to both providers and the fake;
-`POST /api/ai/agent` and its streamed twin `/agent/stream`; **Ask about this
+`POST /api/ai/agent` and its streamed twin `/agent/stream` (and, since
+AI 24, `/agent/agui`, the same loop in AG-UI's shape); **Ask about this
 story** in the story editor (`components/ai/StoryAssistant.tsx`); an **Agent
 (tools)** mode on `/ai-lab` showing the raw trace.
 Tests in `routes/ai-agent.test.ts` and `services/ai/tools.test.ts`. Verified
@@ -2220,6 +2221,21 @@ chapter, so it survives a restart; with jobs off it keeps the in-memory timer.
 >
 > Learn: background jobs, idempotency, dead-letter handling, degradation design,
 > AI observability.
+
+---
+
+## After AI 20
+
+The tasks that follow live in `AI-NEXT.md`, which records the CopilotKit
+assessment that produced them. Same format and house rules.
+
+| Task | What | Status |
+| --- | --- | --- |
+| AI 21 | The editor assistant proposes edits; the author decides | Built |
+| AI 22 | Dialogue and pacing in the writing assistant | Built |
+| AI 23 | Plot twists in the Idea Studio | Built |
+| AI 24 | The agent's stream in AG-UI's shape (`/api/ai/agent/agui`) | Built |
+| AI 25 | A CopilotKit trial on `/ai-lab` | Open — optional, gated on a second agentic surface |
 
 ---
 
