@@ -67,7 +67,7 @@ current tree rather than in the abstract:
   landed.
 - `docs/AI-NEXT.md` — the work after it (AI 21 – AI 25), from the CopilotKit
   assessment. All of it has run: AI 21 – AI 24 have landed, and AI 25, the
-  CopilotKit trial, ends with a recommendation to remove the packages.
+  CopilotKit trial, was run and then removed.
 - `docs/ai-architecture.md` — how an AI request travels through the seam, and
   what each failure answers.
 - `docs/content-model.md` — why there is one work entity (`content.Story`)
@@ -1362,8 +1362,8 @@ The web app has no test suite yet.
 - [x] AI 22 — dialogue and pacing actions in the writing assistant
 - [x] AI 23 — plot twists in the Idea Studio
 - [x] AI 24 — the agent's stream in AG-UI's shape (`POST /api/ai/agent/agui`)
-- [x] AI 25 — a CopilotKit trial on `/ai-lab`, run behind `AI_COPILOTKIT`;
-      the recommendation is to remove the packages (`docs/AI-NEXT.md`)
+- [x] AI 25 — a CopilotKit trial on `/ai-lab`; run, judged not worth its
+      weight and removed (`docs/AI-NEXT.md`)
 
 ### Phase 7 — Production Readiness
 

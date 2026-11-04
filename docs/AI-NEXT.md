@@ -324,9 +324,10 @@ JSON. `@ag-ui/core` and `@ag-ui/encoder` are MIT; core's only peer is zod.
 surface wants it. Time-box it, keep it behind a flag on `/ai-lab`, and end it
 with a written decision either way.
 
-**Status: trial run on 2026-11-04, against CopilotKit 1.83.0. Recommendation:
-remove the packages.** The trial is committed whole so that removing it is one
-commit that can be read and reverted. That removal waits on the owner's say-so.
+**Status: trial run on 2026-11-04, against CopilotKit 1.83.0. Decision:
+removed, the same day.** The trial is committed whole in `8c1207d`, and the
+removal is the commit after it, so either can be read or reverted on its own.
+The files named below are gone from the tree; `git show 8c1207d` has them.
 
 What was built. `routes/copilotkit.ts` is mounted at `/api/ai/copilotkit`, not
 `/api/copilotkit`. Mounting it inside the AI router means it inherits `runAs`,
@@ -381,12 +382,12 @@ errors that arrive as strings. Revisit it when a surface needs shared agent
 state or generative UI that the `StoryAssistant` pattern cannot draw. AI 24's
 `/agent/agui` keeps that door open without any of these packages.
 
-Removing it means: drop `@copilotkit/runtime`, `@ag-ui/client` and `rxjs`
-from the API and `@copilotkit/react-core` from the web; delete
+The removal dropped `@copilotkit/runtime`, `@ag-ui/client` and `rxjs`
+from the API and `@copilotkit/react-core` from the web; deleted
 `routes/copilotkit.ts`, `services/ai/copilotkit.ts`, `ai-copilotkit.test.ts`
-and `CopilotKitTrial.tsx`; remove the lab mode, `AI_COPILOTKIT`,
+and `CopilotKitTrial.tsx`; and removed the lab mode, `AI_COPILOTKIT`,
 `freshAccessToken`, the telemetry lines in the four deploy files, the security
-case and the suspension line. Keep `agent-request.ts`, which stands on its own.
+case and the suspension line. `agent-request.ts` stays: it stands on its own.
 
 **Prompt:**
 

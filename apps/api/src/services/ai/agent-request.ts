@@ -1,9 +1,9 @@
 /**
  * What a request to the assistant with tools may carry, and what it costs to
  * start one -- shared by every route that runs the loop in `agent.ts`:
- * `/api/ai/agent`, its streamed twin, the AG-UI route (Task AI 24) and the
- * CopilotKit trial (Task AI 25). One schema and one charge, so no route can
- * accept more or be charged less than another.
+ * `/api/ai/agent`, its streamed twin and the AG-UI route (Task AI 24). One
+ * schema and one charge, so no route can accept more or be charged less than
+ * another.
  */
 
 import { z } from "zod";

@@ -21,7 +21,6 @@ import {
   requireUserId,
 } from "../middleware/current-user.js";
 import { runAs } from "../services/ai/caller.js";
-import copilotkitRouter from "./copilotkit.js";
 import { aiHealth } from "../services/ai/health.js";
 import { BIBLE_READ_JOB } from "../services/ai/job-schedule.js";
 import { disabledFeatures, setFeature } from "../services/ai/switches.js";
@@ -151,9 +150,6 @@ router.use(async (req, _res, next) => {
     next(error);
   }
 });
-
-/** The CopilotKit trial (Task AI 25), behind everything above. */
-router.use("/copilotkit", copilotkitRouter);
 
 /**
  * Deliberately tighter than the auth limiter's: a model call occupies a CPU

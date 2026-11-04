@@ -30,9 +30,6 @@ export default defineConfig({
       // Publishing a fixture chapter queues its embedding; with no worker in
       // the suite those jobs would only pile up. The jobs suite turns it on.
       AI_JOBS: "off",
-      // The CopilotKit trial's runtime reports usage to CopilotKit unless told
-      // not to; tests make no network calls.
-      COPILOTKIT_TELEMETRY_DISABLED: "true",
     },
   },
 });

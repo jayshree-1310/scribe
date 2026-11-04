@@ -93,11 +93,6 @@ export interface AiConfig {
    */
   jobs: boolean;
   /**
-   * Whether `/api/copilotkit`, the CopilotKit trial (Task AI 25), answers at
-   * all. Off by default: a trial is something an operator turns on.
-   */
-  copilotkitTrial: boolean;
-  /**
    * Whether saving a chapter schedules a continuity check (Task AI 14).
    *
    * An operator switch rather than a per-story setting: a story opts in by
@@ -236,7 +231,6 @@ export function loadAiConfig(): AiConfig {
     usageRetentionDays: readInt("AI_USAGE_RETENTION_DAYS", DEFAULTS.usageRetentionDays),
     baselineRequestLimit: readInt("AI_BASELINE_REQUEST_LIMIT", DEFAULTS.baselineRequestLimit),
     jobs: readFlag("AI_JOBS", true),
-    copilotkitTrial: readFlag("AI_COPILOTKIT", false),
     continuityChecks: readFlag("AI_CONTINUITY", DEFAULTS.continuityChecks),
     continuityQuietMs: readInt(
       "AI_CONTINUITY_QUIET_MS",

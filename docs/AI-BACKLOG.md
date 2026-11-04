@@ -2235,7 +2235,7 @@ assessment that produced them. Same format and house rules.
 | AI 22 | Dialogue and pacing in the writing assistant | Built |
 | AI 23 | Plot twists in the Idea Studio | Built |
 | AI 24 | The agent's stream in AG-UI's shape (`/api/ai/agent/agui`) | Built |
-| AI 25 | A CopilotKit trial on `/ai-lab` | Trial run — recommendation: remove the packages (see `AI-NEXT.md`) |
+| AI 25 | A CopilotKit trial on `/ai-lab` | Trial run, then removed (see `AI-NEXT.md`) |
 
 ---
 

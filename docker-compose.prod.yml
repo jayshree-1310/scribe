@@ -65,9 +65,6 @@ services:
       # can be trusted for rate-limit bucketing.
       TRUST_PROXY: "1"
       UPLOAD_DIR: /var/lib/scribe/uploads
-      # The CopilotKit trial's runtime reports usage to CopilotKit unless told
-      # not to (Task AI 25).
-      COPILOTKIT_TELEMETRY_DISABLED: "true"
     volumes:
       # Uploaded avatars live on disk, so they must outlive the container the
       # way the database does.
