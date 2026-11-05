@@ -1323,14 +1323,20 @@ No test calls a real model provider — a fake one lives in
 config forces `S3_BUCKET` empty so a developer with credentials in
 `apps/api/.env` does not have the suite upload to a live bucket.
 
-The web app has no test suite yet.
+The web app's tests (`pnpm --filter web test`) run in jsdom with Testing
+Library, against a fake `fetch` (`apps/web/src/test/fake-api.ts`) rather than
+mocked data modules, so each one drives the real API client — the session
+bootstrap, the refresh-and-replay, the error messages — and the real data
+module above it. Covered so far: `lib/api-client.ts` and the notifications
+page, including its optimistic writes rolling back.
 
 ### Continuous integration
 
-`.github/workflows/ci.yml` runs on every push to `main` and every pull
-request: typecheck, the web app's lint, the build, then the API suite against
-a fresh Postgres (`pgvector/pgvector:pg17`) and Redis, migrated with
-`prisma db migrate` exactly as a deploy is. No AI provider is configured there;
+`.github/workflows/ci.yml` runs on every push to `main`, every pull request
+and by hand from the Actions tab: typecheck, the web app's lint, the build, the
+web app's tests, then the API suite against a fresh Postgres
+(`pgvector/pgvector:pg17`) and Redis, migrated with `prisma db migrate`
+exactly as a deploy is. No AI provider is configured there;
 the suites that reach a model use the fake one. In CI a database the suite
 cannot reach fails the run (`CI` is set), where locally it skips.
 
@@ -1383,7 +1389,8 @@ tree) and `pnpm lint` at the root (the API has no ESLint config).
 - [x] Deployed (Render free tier — see `docs/DEPLOYMENT.md`)
 - [x] Durable uploads off the instance's disk (S3-compatible object store)
 - [x] Integration test coverage on the API
-- [ ] Frontend tests
+- [x] Frontend tests — the harness, the API client and the notifications page;
+      more pages to follow
 - [ ] API documentation (OpenAPI)
 - [x] CI — GitHub Actions on every push and pull request; deploys are not
       gated on it yet

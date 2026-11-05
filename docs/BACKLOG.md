@@ -273,12 +273,12 @@ so the honest status is unknown rather than done.
       conversion is the part to distrust: type a window, save it, reopen the
       edit dialog, and check the clock reads back the same. A host east of UTC
       is the case that would expose a sign error. § Writing challenges
-- [ ] **The notifications page, signed in.** Typechecks, lints and builds, and
-      `/notifications` redirects to sign-in as it should — but the list, the
-      filter, the sweeps and the empty states have never been drawn for a real
-      reader, because this repo has no frontend test harness and no signed-in
-      headless one either. Worth an account with more than twenty notifications
-      so "Load older" accumulates more than once. § Notifications
+- [ ] **The notifications page, signed in — how it looks.** What it does is
+      now tested (`pages/NotificationsPage.test.tsx`, 2026-11-05): the list,
+      "Load older" accumulating twice over 45 rows, the unread filter, the
+      empty and failed states, both sweeps and their roll-backs, in jsdom
+      against a fake API. What is left is what jsdom cannot show — the layout,
+      at phone width too. § Notifications
 - [ ] **The re-applied restore, against real media.** `RESTORE_SETTLE_MS` and
       `SETTLE_TOLERANCE_PX` were chosen by argument. What wants watching is a
       chapter whose video reports its size late — that the reader lands on the
@@ -288,10 +288,11 @@ so the honest status is unknown rather than done.
       against a controlled clock for every branch, but the wiring has only met a
       backdated anchor, never the database's own `now()` rolling over a UTC day.
       § Reading progress
-- [ ] **The optimistic failure paths.** The Follow button's roll-back and the
-      notification mark-read roll-back have only ever run on the happy path;
-      both want a throttled or offline browser. § Public profiles and follows,
-      § Notifications
+- [ ] **The optimistic failure paths.** The Follow button's roll-back has only
+      ever run on the happy path and wants a throttled or offline browser. The
+      notification mark-read and mark-all-read roll-backs are now tested
+      against a refusing server (`pages/NotificationsPage.test.tsx`).
+      § Public profiles and follows, § Notifications
 - [ ] **The dev-identity gap, once the dev header goes.** With no session the
       API answers for whoever `readerHeaders()` names, which crosses clubs,
       channels, comments, profiles, challenges, notifications and reading saves,
