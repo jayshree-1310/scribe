@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => ({
   sent: [] as { kind: string; input: Record<string, unknown> }[],
   /** Set to make `Upload.done()` reject, standing in for an aborted stream. */
   uploadFails: false,
+  /** Set to make every `send` reject, standing in for a store that is down. */
+  sendFails: false,
   aborted: 0,
 }));
 
@@ -27,6 +29,7 @@ vi.mock("@aws-sdk/client-s3", () => ({
   S3Client: class {
     send(command: { kind: string; input: Record<string, unknown> }) {
       mocks.sent.push(command);
+      if (mocks.sendFails) return Promise.reject(new Error("XML parse error"));
       return Promise.resolve({});
     }
   },
@@ -86,6 +89,7 @@ afterEach(() => {
   for (const name of S3_VARS) delete process.env[name];
   mocks.sent.length = 0;
   mocks.uploadFails = false;
+  mocks.sendFails = false;
   mocks.aborted = 0;
 });
 
@@ -211,7 +215,7 @@ describe("the object store backend", () => {
         extension: ".mp4",
         contentType: "video/mp4",
       }),
-    ).rejects.toThrow("stream aborted");
+    ).rejects.toMatchObject({ status: 503 });
 
     expect(mocks.aborted).toBe(1);
 
@@ -275,5 +279,53 @@ describe("keyOf", () => {
 
     expect(storage.keyOf("https://media.example.com/covers/a.png")).toBe("covers/a.png");
     expect(storage.keyOf("/uploads/covers/a.png")).toBeNull();
+  });
+});
+
+describe("a store that cannot be written to", () => {
+  it("answers 503 with a message, and reports itself degraded", async () => {
+    const { createStorage, storageHealth } = await loadStorage(BUCKET);
+    const storage = createStorage();
+
+    expect(storageHealth()).toBe("unknown");
+
+    mocks.sendFails = true;
+    await expect(
+      storage.put({
+        prefix: "covers",
+        data: Buffer.from("x"),
+        extension: ".png",
+        contentType: "image/png",
+      }),
+    ).rejects.toMatchObject({ status: 503, code: "service_unavailable" });
+    expect(storageHealth()).toBe("degraded");
+
+    mocks.sendFails = false;
+    await storage.put({
+      prefix: "covers",
+      data: Buffer.from("x"),
+      extension: ".png",
+      contentType: "image/png",
+    });
+    expect(storageHealth()).toBe("ok");
+  });
+
+  it("passes a failure of the upload itself through, and blames nobody", async () => {
+    const { createStorage, storageHealth } = await loadStorage(BUCKET);
+
+    async function* hangsUp() {
+      yield Buffer.alloc(16);
+      throw new Error("aborted");
+    }
+
+    await expect(
+      createStorage().putStream({
+        prefix: "media",
+        data: hangsUp(),
+        extension: ".mp4",
+        contentType: "video/mp4",
+      }),
+    ).rejects.toThrow("aborted");
+    expect(storageHealth()).toBe("unknown");
   });
 });

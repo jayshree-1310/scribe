@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-9, M-2, M-7, M-8 and L-13 fixed (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-9, M-2, M-7, M-8 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -179,7 +179,7 @@ So the list below is not read as "everything is broken":
   refuse to link and ask the user to sign in with the password first. Only
   auto-link when the existing row's email was already verified.
 
-### H-10 · Uploads are down in dev: the Supabase project is paused — Confirmed (environment)
+### H-10 · Uploads are down in dev: the Supabase project is paused — Confirmed (environment) — **Code side fixed; project still needs unpausing**
 - **Symptom:** every `POST /api/account/avatar`, `POST /api/uploads` (cover
   and media) returns **500 internal_error**. The API log shows
   `@aws-sdk XML parse error`, `httpStatusCode: 540`. **HTTP 540 is Supabase's
@@ -433,6 +433,11 @@ tests are "delete X with two of every child", one per entity.
    (an account that had verified its email keeps it). A returning Google
    user's avatar is refreshed only when it is not one they uploaded. L-13's
    username fallback fixed in the same block.
-4. **H-10**: unpause or replace the storage project; map storage errors to 503.
+4. **H-10**: code side **done** — a failed write now answers 503
+   `service_unavailable` ("Uploads are unavailable right now"), and `/health`
+   reports `storage.status` (`ok` / `degraded` / `unknown`) from the last real
+   write, the way it reports AI. Verified live: the dev stack answers 503 and
+   `degraded`. **Still to do by hand:** unpause the Supabase project (or move
+   to R2 as `render.yaml` suggests).
 5. **M-1** (multi-tab sign-out), then the remaining Medium items.
 6. Low items as convenient.

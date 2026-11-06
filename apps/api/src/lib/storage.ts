@@ -24,6 +24,8 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
+import { HttpError } from "./http-error.js";
+import { logger } from "./logger.js";
 
 export interface StoredFile {
   /** Opaque key the storage backend addresses the file by. */
@@ -318,7 +320,90 @@ function s3StorageBackend(bucket: string): Storage {
 export function createStorage(): Storage {
   const bucket = process.env["S3_BUCKET"];
 
-  return bucket ? s3StorageBackend(bucket) : localStorageBackend();
+  return guarded(bucket ? s3StorageBackend(bucket) : localStorageBackend());
+}
+
+/* Write health ----------------------------------------------------------- */
+
+/**
+ * The outcome of the most recent write, for `/health`.
+ *
+ * Fed by real uploads rather than by probing the store on each health check,
+ * for the reason `services/ai/health.ts` gives: a probe every few seconds is a
+ * paid request, and a passive signal is enough to see an outage -- a paused
+ * Supabase project answered every upload with a 500 for days while `/health`
+ * said `ok`.
+ */
+let lastWrite: { ok: boolean; at: number } | null = null;
+
+/** Older than this, the last write says nothing about now. */
+const HEALTH_WINDOW_MS = 15 * 60_000;
+
+export function storageHealth(): "ok" | "degraded" | "unknown" {
+  if (!lastWrite || Date.now() - lastWrite.at > HEALTH_WINDOW_MS) return "unknown";
+  return lastWrite.ok ? "ok" : "degraded";
+}
+
+/** Test seam. */
+export function resetStorageHealth(): void {
+  lastWrite = null;
+}
+
+const UNAVAILABLE = "Uploads are unavailable right now. Please try again later.";
+
+/**
+ * Wraps a backend so a store that cannot be written to answers 503 with a
+ * message, rather than the SDK's error surfacing as a bare 500.
+ *
+ * What is *not* the store's fault passes through unchanged and does not
+ * count against its health: an `HttpError` (the size cap, thrown from inside
+ * the stream) and any failure of the source stream itself (the client hung
+ * up mid-upload).
+ */
+function guarded(backend: Storage): Storage {
+  function failed(error: unknown, sourceFailed = false): never {
+    if (error instanceof HttpError || sourceFailed) throw error;
+
+    lastWrite = { ok: false, at: Date.now() };
+    logger.error({ err: error }, "storage write failed");
+    throw HttpError.unavailable(UNAVAILABLE);
+  }
+
+  return {
+    async put(input) {
+      try {
+        const stored = await backend.put(input);
+        lastWrite = { ok: true, at: Date.now() };
+        return stored;
+      } catch (error) {
+        return failed(error);
+      }
+    },
+
+    async putStream(input) {
+      let sourceFailed = false;
+
+      async function* watched(source: AsyncIterable<Buffer>) {
+        try {
+          yield* source;
+        } catch (error) {
+          sourceFailed = true;
+          throw error;
+        }
+      }
+
+      try {
+        const stored = await backend.putStream({ ...input, data: watched(input.data) });
+        lastWrite = { ok: true, at: Date.now() };
+        return stored;
+      } catch (error) {
+        return failed(error, sourceFailed);
+      }
+    },
+
+    remove: (url) => backend.remove(url),
+    keyOf: (url) => backend.keyOf(url),
+  };
 }
 
 export const storage: Storage = createStorage();

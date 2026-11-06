@@ -33,7 +33,12 @@ import recommendationsRouter from "./routes/recommendations.js";
 import storiesRouter from "./routes/stories.js";
 import uploadsRouter from "./routes/uploads.js";
 import usersRouter from "./routes/users.js";
-import { UPLOAD_ROOT, UPLOAD_URL_PREFIX, describeStorage } from "./lib/storage.js";
+import {
+  UPLOAD_ROOT,
+  UPLOAD_URL_PREFIX,
+  describeStorage,
+  storageHealth,
+} from "./lib/storage.js";
 import { describeAiConfig } from "./services/ai/config.js";
 import { aiHealth } from "./services/ai/health.js";
 
@@ -114,7 +119,9 @@ app.get("/health", (_req, res) => {
     ai: { ...describeAiConfig(), status: aiHealth() },
     // Likewise for uploads: an object store and this instance's own disk are
     // indistinguishable from outside until a file vanishes on the next deploy.
-    storage: describeStorage(),
+    // `status` is the last write's outcome, and like AI's never moves the
+    // top-level one: reading works with uploads down.
+    storage: { ...describeStorage(), status: storageHealth() },
   });
 });
 
