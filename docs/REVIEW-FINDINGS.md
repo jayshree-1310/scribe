@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-9, M-1, M-2, M-7, M-8 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-9, M-1 to M-3, M-7, M-8 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -224,7 +224,7 @@ So the list below is not read as "everything is broken":
   (`user.avatarUrl ?? identity.picture`), as the link-by-email branch already
   does.
 
-### M-3 · `Story.likeCount` is never updated, so "Trending" and analytics ignore real likes — Confirmed
+### M-3 · `Story.likeCount` is never updated, so "Trending" and analytics ignore real likes — Confirmed — **Fixed**
 - **Where:** column written only by the seed scripts; read by
   `services/stories.ts:559` (trending sort), `:1057` (related rail),
   `services/analytics.ts:534` (author "likes"), and the badges/levels
@@ -235,6 +235,11 @@ So the list below is not read as "everything is broken":
   Trending; authors see 0 likes on their dashboard.
 - **Fix:** maintain it from `engagement.chapterLike` (increment/decrement in
   `setLike`), or compute it from the like table at read time.
+- **Done:** the like and unlike statements move `likeCount` in the same SQL
+  statement, only when a row was really written or removed; deleting a
+  chapter or an account takes their likes off. Existing likes are caught up by
+  a `GREATEST` backfill in the `20261106T1000_add_uploads` migration, which
+  leaves the seeded demo baselines as they are.
 
 ### M-4 · Comments can be attached to an unpublished chapter — Confirmed
 - **Where:** `apps/api/src/services/engagement.ts:474`

@@ -413,6 +413,12 @@ describe.skipIf(!available)("DELETE /api/account/me", () => {
       .first();
 
     expect(remaining).toBeFalsy();
+
+    // The like they gave on the neighbour's chapter came off its story's count.
+    const liked = await db.orm.content.Story.select("likeCount")
+      .where((row) => row.id.eq(neighbourStory.id))
+      .first();
+    expect(liked?.likeCount).toBe(0);
   });
 
   /**

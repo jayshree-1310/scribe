@@ -894,10 +894,18 @@ export async function deleteChapter(
     await deleteAll(() =>
       tx.orm.content.Multimedia.where((item) => item.chapterId.eq(chapterId)),
     );
-    await deleteAll(() =>
-      tx.orm.engagement.ChapterLike.where((like) =>
-        like.chapterId.eq(chapterId),
-      ),
+    // The chapter's likes, taken off its story's `likeCount` as they go --
+    // see `LIKE_STATEMENTS` in `services/engagement.ts`.
+    await tx.query(
+      db.raw.sql`
+        WITH removed AS (
+          DELETE FROM "engagement"."chapterLike" WHERE "chapterId" = ${chapterId}
+          RETURNING 1
+        )
+        UPDATE "content"."story"
+           SET "likeCount" = GREATEST("likeCount" - (SELECT count(*) FROM removed)::int, 0)
+         WHERE "id" = ${chapter.storyId}
+      `.affectedCount().build(),
     );
     // See the same pass in `deleteStory`: the recap holds a foreign key onto
     // the chapter, so it goes first or the delete below fails.

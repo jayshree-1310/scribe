@@ -178,5 +178,26 @@
       }
     ],
     "postcheck": []
+  },
+  {
+    "id": "data.content.story.backfill-like-count",
+    "label": "Backfill content.story.likeCount from chapter likes",
+    "operationClass": "data",
+    "target": {
+      "id": "content.story",
+      "details": {
+        "schema": "content",
+        "name": "story",
+        "objectType": "table"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Raise each story's likeCount to at least its real chapter likes",
+        "sql": "UPDATE content.\"story\" AS s\n                     SET \"likeCount\" = GREATEST(s.\"likeCount\", real.n)\n                    FROM (\n                          SELECT c.\"storyId\", count(*)::int AS n\n                            FROM engagement.\"chapterLike\" AS l\n                            JOIN content.\"chapter\" AS c ON c.\"id\" = l.\"chapterId\"\n                           GROUP BY c.\"storyId\"\n                         ) AS real\n                   WHERE s.\"id\" = real.\"storyId\"\n                     AND s.\"likeCount\" < real.n"
+      }
+    ],
+    "postcheck": []
   }
 ]

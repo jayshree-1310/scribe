@@ -617,23 +617,46 @@ type LikeSubject = "chapter" | "comment";
  * the answer -- is shared by `setLike` below.
  */
 const LIKE_STATEMENTS = {
+  /**
+   * A chapter like also moves its story's `likeCount`, which Trending, the
+   * related rail and the author's analytics read. In the same statement, and
+   * only when a row was really written or removed -- the `RETURNING` is empty
+   * for a repeated like or an unlike of nothing -- so the counter can neither
+   * drift from the table nor be inflated by double clicks.
+   */
   chapter: {
     insert: (userId: string, chapterId: string) =>
       db.raw
         .sql`
-          INSERT INTO "engagement"."chapterLike"
-            ("userId", "chapterId", "createdAt")
-          VALUES (${userId}, ${chapterId}, now())
-          ON CONFLICT DO NOTHING
+          WITH added AS (
+            INSERT INTO "engagement"."chapterLike"
+              ("userId", "chapterId", "createdAt")
+            VALUES (${userId}, ${chapterId}, now())
+            ON CONFLICT DO NOTHING
+            RETURNING "chapterId"
+          )
+          UPDATE "content"."story" AS s
+             SET "likeCount" = s."likeCount" + 1
+            FROM added
+            JOIN "content"."chapter" AS c ON c."id" = added."chapterId"
+           WHERE s."id" = c."storyId"
         `
         .affectedCount()
         .build(),
     remove: (userId: string, chapterId: string) =>
       db.raw
         .sql`
-          DELETE FROM "engagement"."chapterLike"
-           WHERE "userId" = ${userId}
-             AND "chapterId" = ${chapterId}
+          WITH removed AS (
+            DELETE FROM "engagement"."chapterLike"
+             WHERE "userId" = ${userId}
+               AND "chapterId" = ${chapterId}
+            RETURNING "chapterId"
+          )
+          UPDATE "content"."story" AS s
+             SET "likeCount" = GREATEST(s."likeCount" - 1, 0)
+            FROM removed
+            JOIN "content"."chapter" AS c ON c."id" = removed."chapterId"
+           WHERE s."id" = c."storyId"
         `
         .affectedCount()
         .build(),

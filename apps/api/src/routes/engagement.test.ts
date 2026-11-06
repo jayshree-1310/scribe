@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TestApi, databaseAvailable } from "../test/harness.js";
+import { db } from "../prisma/db.js";
 
 const api = new TestApi();
 const available = await databaseAvailable();
@@ -511,6 +512,43 @@ describe.skipIf(!available)("chapter likes", () => {
     });
     expect(never.status).toBe(200);
     expect(never.body).toEqual({ count: 0, liked: false });
+  });
+
+  /**
+   * `Story.likeCount` is what Trending, the related rail and the author's
+   * analytics read. It was never written outside the seed scripts, so every
+   * member's story showed 0 likes.
+   */
+  it("keeps the story's likeCount in step with its chapters' likes", async () => {
+    const story = await api.createStory({ title: "Counted Hearts", authorId: author });
+    const one = await api.createChapter({ storyId: story.id, number: 1 });
+    const two = await api.createChapter({ storyId: story.id, number: 2 });
+
+    const likeCount = async () =>
+      (await db.orm.content.Story.select("likeCount")
+        .where((row) => row.id.eq(story.id))
+        .first())!.likeCount;
+
+    const like = (chapter: string, as: string, method = "PUT") =>
+      api.request(`/api/chapters/${chapter}/like`, { method, as });
+
+    await like(one, reader);
+    await like(one, reader); // a double click counts once
+    await like(one, other);
+    await like(two, other);
+    expect(await likeCount()).toBe(3);
+
+    await like(one, reader, "DELETE");
+    await like(one, reader, "DELETE"); // unliking nothing changes nothing
+    expect(await likeCount()).toBe(2);
+
+    // A deleted chapter takes its likes with it.
+    const deleted = await api.request(`/api/author/chapters/${two}`, {
+      method: "DELETE",
+      as: author,
+    });
+    expect(deleted.status).toBe(200);
+    expect(await likeCount()).toBe(1);
   });
 
   it("refuses an anonymous like", async () => {

@@ -88,6 +88,40 @@ export default class M extends Migration<Start, End> {
         ],
         postcheck: [],
       }),
+      /**
+       * Not about uploads: rides along because it ships in the same release.
+       * `content.story.likeCount` was never maintained (review M-3), so a
+       * member's story showed 0 likes whatever its chapters had. From here on
+       * `services/engagement.ts` moves it with every like; this catches up the
+       * likes already given. `GREATEST` keeps it idempotent and leaves the
+       * seeded demo stories' baselines, which are larger, where they are.
+       */
+      rawSql({
+        id: 'data.content.story.backfill-like-count',
+        label: 'Backfill content.story.likeCount from chapter likes',
+        operationClass: 'data',
+        target: {
+          id: 'content.story',
+          details: { schema: 'content', name: 'story', objectType: 'table' },
+        },
+        precheck: [],
+        execute: [
+          {
+            description: 'Raise each story\'s likeCount to at least its real chapter likes',
+            sql: `UPDATE content."story" AS s
+                     SET "likeCount" = GREATEST(s."likeCount", real.n)
+                    FROM (
+                          SELECT c."storyId", count(*)::int AS n
+                            FROM engagement."chapterLike" AS l
+                            JOIN content."chapter" AS c ON c."id" = l."chapterId"
+                           GROUP BY c."storyId"
+                         ) AS real
+                   WHERE s."id" = real."storyId"
+                     AND s."likeCount" < real.n`,
+          },
+        ],
+        postcheck: [],
+      }),
     ];
   }
 }

@@ -485,8 +485,24 @@ export async function deleteAccount(
     await deleteAll(() =>
       tx.orm.engagement.CommentLike.where((like) => like.userId.eq(userId)),
     );
-    await deleteAll(() =>
-      tx.orm.engagement.ChapterLike.where((like) => like.userId.eq(userId)),
+    // Taken off each liked story's `likeCount` as they go, as an unlike would.
+    await tx.query(
+      db.raw.sql`
+        WITH removed AS (
+          DELETE FROM "engagement"."chapterLike" WHERE "userId" = ${userId}
+          RETURNING "chapterId"
+        ),
+        per_story AS (
+          SELECT c."storyId", count(*)::int AS n
+            FROM removed
+            JOIN "content"."chapter" AS c ON c."id" = removed."chapterId"
+           GROUP BY c."storyId"
+        )
+        UPDATE "content"."story" AS s
+           SET "likeCount" = GREATEST(s."likeCount" - per_story.n, 0)
+          FROM per_story
+         WHERE s."id" = per_story."storyId"
+      `.affectedCount().build(),
     );
 
     /**
