@@ -160,6 +160,10 @@
       "model": "StoryView",
       "namespace": "engagement"
     },
+    "upload": {
+      "model": "Upload",
+      "namespace": "content"
+    },
     "usageEvent": {
       "model": "UsageEvent",
       "namespace": "ai"
@@ -5208,6 +5212,57 @@
               },
               "namespaceId": "content",
               "table": "storyGenre"
+            }
+          },
+          "Upload": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "ownerId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "url": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {},
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "ownerId": {
+                  "column": "ownerId"
+                },
+                "url": {
+                  "column": "url"
+                }
+              },
+              "namespaceId": "content",
+              "table": "upload"
             }
           }
         }
@@ -10561,6 +10616,65 @@
                 ]
               },
               "uniques": []
+            },
+            "upload": {
+              "columns": {
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "ownerId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "url": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [],
+              "indexes": [
+                {
+                  "columns": [
+                    "createdAt"
+                  ],
+                  "name": "upload_createdAt_idx_9575dbd7",
+                  "prefix": "upload_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "ownerId"
+                  ],
+                  "name": "upload_ownerId_idx_e2d0c1ef",
+                  "prefix": "upload_ownerId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "url"
+                  ]
+                }
+              ]
             }
           }
         },
@@ -12264,10 +12378,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "c4c461506692484099836f39eaf626650fd2b2da0d5681cb0367cdd730447bb4"
+    "storageHash": "e323dc4e1ccddcc6ca564ade500e6b7b618135e3c1effafb87e03ac462b8cf1a"
   },
   "execution": {
-    "executionHash": "06620e7504ae1b114a55b97bd6ede41507cf47aff9beaa6b4eb16c1e919a052a",
+    "executionHash": "7d2db05d5e947645db9eaad034511ce50b09361a5ca66b23b87121c8110a7737",
     "mutations": {
       "defaults": [
         {
@@ -12620,6 +12734,17 @@
             "column": "id",
             "namespace": "engagement",
             "table": "storyView"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "content",
+            "table": "upload"
           }
         },
         {

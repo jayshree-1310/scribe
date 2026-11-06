@@ -7,6 +7,7 @@ import { enqueue, startWorker, stopWorker } from "./lib/jobs.js";
 import { loadAiConfig } from "./services/ai/config.js";
 import { USAGE_PRUNE_JOB } from "./services/ai/job-schedule.js";
 import { registerAiJobs } from "./services/ai/jobs.js";
+import { sweepUnreferencedUploads } from "./services/uploads.js";
 
 /**
  * Queues the daily usage prune, once a day across restarts: the `NX` key is
@@ -16,6 +17,19 @@ import { registerAiJobs } from "./services/ai/jobs.js";
 async function scheduleDailyPrune(): Promise<void> {
   const claimed = await redis.set("jobs:schedule:usage.prune", "1", { NX: true, EX: 60 * 60 * 24 });
   if (claimed) await enqueue(USAGE_PRUNE_JOB, {});
+}
+
+/**
+ * Removes uploads nothing references, once a day across restarts by the same
+ * `NX` marker as the prune. Run in-process rather than queued: it is not AI
+ * work, so it must not depend on the AI job worker being switched on.
+ */
+async function sweepUploadsDaily(): Promise<void> {
+  const claimed = await redis.set("jobs:schedule:uploads.sweep", "1", { NX: true, EX: 60 * 60 * 24 });
+  if (!claimed) return;
+
+  const removed = await sweepUnreferencedUploads();
+  if (removed > 0) logger.info({ removed }, "unreferenced uploads removed");
 }
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -41,6 +55,10 @@ async function start() {
     pruneTimer = setInterval(prune, 60 * 60 * 1000);
   }
 
+  const sweep = () => void sweepUploadsDaily().catch((error) => logger.warn({ err: error }, "upload sweep failed"));
+  sweep();
+  const sweepTimer = setInterval(sweep, 60 * 60 * 1000);
+
   /** Drain in-flight requests, then release database and Redis connections. */
   async function shutdown(signal: string): Promise<void> {
     logger.info({ signal }, "Shutting down");
@@ -53,6 +71,7 @@ async function start() {
       // Stop taking jobs and let the current one finish; anything still
       // queued stays in Redis for the next process.
       clearInterval(pruneTimer);
+      clearInterval(sweepTimer);
       try {
         await stopWorker();
       } catch (workerError) {

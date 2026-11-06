@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-7 fixed (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-8, M-7 and M-8 fixed (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -144,7 +144,7 @@ So the list below is not read as "everything is broken":
   `information_schema` foreign keys onto `auth.user` / `content.story` in that
   test would catch the next table added.
 
-### H-8 · Any user can delete any other user's uploaded files — Confirmed
+### H-8 · Any user can delete any other user's uploaded files — Confirmed — **Fixed**
 - **Where:** `apps/api/src/lib/storage.ts:139` and `:271` (`remove`), called
   from `services/authoring.ts:495` (`updateStory` cover replace),
   `removeMultimedia`, `deleteChapter`, `deleteStory` via `discardUpload`.
@@ -262,7 +262,7 @@ So the list below is not read as "everything is broken":
   `WEB_APP_URL`; refuse the `log` transport when `NODE_ENV=production`, or at
   least do not log message bodies there.
 
-### M-7 · Chapter attachment URLs and cover URLs are not validated — Confirmed
+### M-7 · Chapter attachment URLs and cover URLs are not validated — Confirmed — **Fixed**
 - **Where:** `apps/api/src/routes/authoring.ts:64` (`coverUrlSchema`),
   `:128` (multimedia `url`)
 - `POST /api/author/chapters/:id/multimedia {type:"LINK",
@@ -274,7 +274,7 @@ So the list below is not read as "everything is broken":
 - **Fix:** accept only `https:` (and the app's own upload origin), checked
   with `new URL()`.
 
-### M-8 · Uploads are never garbage-collected — Confirmed
+### M-8 · Uploads are never garbage-collected — Confirmed — **Fixed**
 - `POST /api/uploads` stores a file whether or not anything ever references
   it. Abandoned editor uploads, replaced Google avatars (M-2) and files from
   `deleteAccount` (story covers and chapter media are not removed there, only
@@ -417,8 +417,17 @@ tests are "delete X with two of every child", one per entity.
    deletes for clubs, threads, channels, stories and accounts, plus a
    tripwire in `routes/account.test.ts` listing every non-cascading foreign
    key onto `auth.user`, `content.story` and `content.chapter`.
-2. **H-8** (cross-user file deletion) together with **M-7** and **M-8**: an
-   uploads table with an owner.
+2. ~~**H-8**, **M-7**, **M-8**~~ **Done.** `content.upload` records each
+   stored file's owner (backfilled from existing avatars, covers and
+   attachments). `assertUsableUrl` lets a cover or attachment use one of our
+   URLs only if the caller uploaded it, and otherwise requires an absolute
+   `https:` address (no `javascript:`, `data:`, `http:` or relative paths);
+   an unchanged cover is always accepted. `discardUpload` deletes only the
+   caller's own file, and only once nothing references it. `deleteAccount`
+   removes every file the account uploaded, and a daily sweep in `server.ts`
+   (also `pnpm --filter api uploads:sweep`) removes files left unreferenced
+   for 24 hours. Also fixed on the way: `deleteChapter` failed on a comment
+   with replies (same cause as H-5).
 3. **H-9** (Google account pre-hijack) and **M-2** (avatar overwrite): both
    in the same block of `routes/auth.ts`.
 4. **H-10**: unpause or replace the storage project; map storage errors to 503.

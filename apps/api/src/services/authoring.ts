@@ -26,7 +26,7 @@ import { scheduleContinuityCheck } from "./ai/continuity-queue.js";
 import { refreshStoryVector } from "./ai/embeddings.js";
 import { scheduleBibleRefresh, scheduleChapterEmbedding } from "./ai/job-schedule.js";
 import { logger } from "../lib/logger.js";
-import { discardUpload } from "./uploads.js";
+import { assertUsableUrl, discardUpload } from "./uploads.js";
 import { evaluateBadges } from "./gamification.js";
 import { notify } from "./notifications.js";
 import { getStory, listStories, toIso, type Page, type Story } from "./stories.js";
@@ -385,6 +385,8 @@ export async function createStory(
 ): Promise<Story> {
   const timestamp = now();
 
+  if (input.coverUrl) await assertUsableUrl(userId, input.coverUrl, "coverUrl");
+
   const storyId = await db.transaction(async (tx) => {
     const slug = await uniqueSlug(input.title, async (candidate) => {
       const taken = await tx.orm.content.Story.select("id")
@@ -477,6 +479,9 @@ export async function updateStory(
       const next = input.coverUrl.length > 0 ? input.coverUrl : null;
 
       if (next !== story.coverUrl) {
+        if (next !== null) {
+          await assertUsableUrl(userId, next, "coverUrl", story.coverUrl);
+        }
         changes["coverUrl"] = next;
         replacedCover = story.coverUrl;
       }
@@ -493,7 +498,7 @@ export async function updateStory(
     if (input.genreIds) await replaceGenres(tx, storyId, input.genreIds);
   });
 
-  await discardUpload(replacedCover);
+  await discardUpload(userId, replacedCover);
 
   return getStory(storyId, userId);
 }
@@ -521,8 +526,8 @@ export async function deleteStory(
   });
 
   // Nothing references the cover or the chapter attachments now.
-  await discardUpload(cover);
-  await discardUploads(media);
+  await discardUpload(userId, cover);
+  await discardUploads(userId, media);
 }
 
 /* Publication ------------------------------------------------------------ */
@@ -925,7 +930,7 @@ export async function deleteChapter(
     return chapter.storyId;
   });
 
-  await discardUploads(media);
+  await discardUploads(userId, media);
   // Its passages went with it (the foreign key cascades).
   await refreshVectorQuietly(storyId);
 
@@ -988,8 +993,8 @@ async function mediaUrls(tx: Tx, chapterIds: string[]): Promise<string[]> {
 }
 
 /** Best-effort cleanup of the files whose rows have just gone. */
-async function discardUploads(urls: string[]): Promise<void> {
-  await Promise.all(urls.map((url) => discardUpload(url)));
+async function discardUploads(userId: string, urls: string[]): Promise<void> {
+  await Promise.all(urls.map((url) => discardUpload(userId, url)));
 }
 
 function toMedia(row: {
@@ -1018,6 +1023,8 @@ export async function addMultimedia(
   input: { type: MultimediaType; url: string; displayOrder?: number | undefined },
 ): Promise<AuthoredMedia> {
   const timestamp = now();
+
+  await assertUsableUrl(userId, input.url, "url");
 
   const mediaId = await db.transaction(async (tx) => {
     const { chapter } = await ownedChapter(tx, chapterId, userId);
@@ -1086,7 +1093,7 @@ export async function removeMultimedia(
     url = item.url;
   });
 
-  // After the commit, and only for a file this backend wrote — `discardUpload`
+  // After the commit, and only for the caller's own file -- `discardUpload`
   // ignores anything else, so a LINK attachment costs nothing here.
-  await discardUpload(url);
+  await discardUpload(userId, url);
 }

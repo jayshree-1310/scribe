@@ -251,3 +251,29 @@ describe("the object store backend", () => {
     expect(mocks.sent).toHaveLength(0);
   });
 });
+
+describe("keyOf", () => {
+  it("recognises the local backend's URLs, absolute or root-relative", async () => {
+    const { createStorage } = await loadStorage({
+      PUBLIC_UPLOAD_BASE_URL: "https://api.example.com",
+    });
+    const storage = createStorage();
+
+    expect(storage.keyOf("https://api.example.com/uploads/covers/a.png")).toBe("covers/a.png");
+    // Written before the base URL was set.
+    expect(storage.keyOf("/uploads/covers/a.png")).toBe("covers/a.png");
+    // Somebody else's host, and a path that climbs out of the upload root.
+    expect(storage.keyOf("https://evil.example/uploads/covers/a.png")).toBeNull();
+    expect(storage.keyOf("/uploads/../../etc/passwd")).toBeNull();
+
+    delete process.env["PUBLIC_UPLOAD_BASE_URL"];
+  });
+
+  it("recognises only the object store's public origin", async () => {
+    const { createStorage } = await loadStorage(BUCKET);
+    const storage = createStorage();
+
+    expect(storage.keyOf("https://media.example.com/covers/a.png")).toBe("covers/a.png");
+    expect(storage.keyOf("/uploads/covers/a.png")).toBeNull();
+  });
+});

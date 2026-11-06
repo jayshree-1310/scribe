@@ -33,9 +33,9 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'c4c461506692484099836f39eaf626650fd2b2da0d5681cb0367cdd730447bb4'>;
+  StorageHashBase<'e323dc4e1ccddcc6ca564ade500e6b7b618135e3c1effafb87e03ac462b8cf1a'>;
 export type ExecutionHash =
-  ExecutionHashBase<'06620e7504ae1b114a55b97bd6ede41507cf47aff9beaa6b4eb16c1e919a052a'>;
+  ExecutionHashBase<'7d2db05d5e947645db9eaad034511ce50b09361a5ca66b23b87121c8110a7737'>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
@@ -614,6 +614,12 @@ export type FieldOutputTypes = {
       readonly storyId: CodecTypes['pg/text@1']['output'];
       readonly genreId: CodecTypes['pg/text@1']['output'];
     };
+    readonly Upload: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly url: CodecTypes['pg/text@1']['output'];
+      readonly ownerId: CodecTypes['pg/text@1']['output'];
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    };
   };
   readonly engagement: {
     readonly ChapterLike: {
@@ -1115,6 +1121,12 @@ export type FieldInputTypes = {
     readonly StoryGenre: {
       readonly storyId: CodecTypes['pg/text@1']['input'];
       readonly genreId: CodecTypes['pg/text@1']['input'];
+    };
+    readonly Upload: {
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly url: CodecTypes['pg/text@1']['input'];
+      readonly ownerId: CodecTypes['pg/text@1']['input'];
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
   };
   readonly engagement: {
@@ -1618,6 +1630,12 @@ export type StorageColumnTypes = {
       readonly genreId: CodecTypes['pg/text@1']['output'];
       readonly storyId: CodecTypes['pg/text@1']['output'];
     };
+    readonly upload: {
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly ownerId: CodecTypes['pg/text@1']['output'];
+      readonly url: CodecTypes['pg/text@1']['output'];
+    };
   };
   readonly engagement: {
     readonly chapterLike: {
@@ -2119,6 +2137,12 @@ export type StorageColumnInputTypes = {
     readonly storyGenre: {
       readonly genreId: CodecTypes['pg/text@1']['input'];
       readonly storyId: CodecTypes['pg/text@1']['input'];
+    };
+    readonly upload: {
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly ownerId: CodecTypes['pg/text@1']['input'];
+      readonly url: CodecTypes['pg/text@1']['input'];
     };
   };
   readonly engagement: {
@@ -5122,6 +5146,48 @@ type ContractBase = Omit<
                 },
               ];
             };
+            readonly upload: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly url: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly ownerId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly createdAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['url'] }];
+              indexes: readonly [
+                {
+                  readonly name: 'upload_ownerId_idx_e2d0c1ef';
+                  readonly prefix: 'upload_ownerId_idx';
+                  readonly columns: readonly ['ownerId'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'upload_createdAt_idx_9575dbd7';
+                  readonly prefix: 'upload_createdAt_idx';
+                  readonly columns: readonly ['createdAt'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [];
+            };
           };
         };
       };
@@ -6374,6 +6440,7 @@ type ContractBase = Omit<
       readonly namespace: 'content' & NamespaceId;
       readonly model: 'Multimedia';
     };
+    readonly upload: { readonly namespace: 'content' & NamespaceId; readonly model: 'Upload' };
     readonly genre: { readonly namespace: 'content' & NamespaceId; readonly model: 'Genre' };
     readonly storyGenre: {
       readonly namespace: 'content' & NamespaceId;
@@ -9714,6 +9781,40 @@ type ContractBase = Omit<
               };
             };
           };
+          readonly Upload: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly url: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly ownerId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+            };
+            readonly relations: Record<string, never>;
+            readonly storage: {
+              readonly table: 'upload';
+              readonly namespaceId: 'content';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly url: { readonly column: 'url' };
+                readonly ownerId: { readonly column: 'ownerId' };
+                readonly createdAt: { readonly column: 'createdAt' };
+              };
+            };
+          };
         };
       };
       readonly engagement: {
@@ -11003,6 +11104,14 @@ type ContractBase = Omit<
           readonly ref: {
             readonly namespace: 'engagement';
             readonly table: 'storyView';
+            readonly column: 'id';
+          };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
+        {
+          readonly ref: {
+            readonly namespace: 'content';
+            readonly table: 'upload';
             readonly column: 'id';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };

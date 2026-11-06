@@ -661,8 +661,8 @@ export function StoryEditorPage() {
    *
    * Two requests, because the upload does not know what it is for: the bytes
    * are stored first and the row that points at them is written second. An
-   * upload whose attach fails leaks the file, which is the same trade the
-   * cover upload makes.
+   * upload whose attach fails is left unreferenced, and the API sweeps it
+   * after a day -- the same as an abandoned cover upload.
    *
    * The chapter has to exist on the server before anything can hang off it, so
    * a pending draft is saved first — the same rule as publishing a chapter.

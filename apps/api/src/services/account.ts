@@ -16,6 +16,7 @@ import { revokeAllSessions } from "../lib/sessions.js";
 import { storage } from "../lib/storage.js";
 import { drainDeferredWrites } from "./deferred.js";
 import { deletePreferencesFor, hasCompletedOnboarding } from "./preferences.js";
+import { discardUpload, discardUploadsOf, recordUpload } from "./uploads.js";
 import { removeChannel, removeClub, removeStory } from "./removal.js";
 
 /** The profile shape the account endpoints return. Written out field by field
@@ -313,6 +314,7 @@ export async function setAvatar(
     extension: kind.extension,
     contentType: kind.contentType,
   });
+  await recordUpload(userId, stored.url);
 
   try {
     await db.orm.auth.User.where((u) => u.id.eq(userId)).update({
@@ -321,11 +323,11 @@ export async function setAvatar(
     });
   } catch (error) {
     // Nothing references the file we just wrote, so it would leak.
-    await storage.remove(stored.url);
+    await discardUpload(userId, stored.url);
     throw error;
   }
 
-  if (previous) await storage.remove(previous);
+  await discardUpload(userId, previous);
 
   return loadProfile(userId);
 }
@@ -340,7 +342,7 @@ export async function removeAvatar(userId: string): Promise<AccountProfile> {
       updatedAt: Temporal.Now.instant(),
     });
 
-    await storage.remove(previous);
+    await discardUpload(userId, previous);
   }
 
   return loadProfile(userId);
@@ -416,8 +418,6 @@ export async function deleteAccount(
       });
     }
   }
-
-  const avatarUrl = (await loadProfile(userId)).avatarUrl;
 
   /**
    * Settle any badge evaluation or notification fan-out still in flight before
@@ -654,5 +654,7 @@ export async function deleteAccount(
   // Past the point of no return: neither of these can fail the deletion, and
   // both would be wrong to retry against an account that no longer exists.
   await revokeAllSessions(userId);
-  if (avatarUrl) await storage.remove(avatarUrl);
+  // Every file they uploaded: avatar, covers, attachments, and anything
+  // uploaded but never used.
+  await discardUploadsOf(userId);
 }

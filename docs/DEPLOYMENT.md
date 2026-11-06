@@ -414,6 +414,12 @@ fetches. Setting one without the other throws at startup, so a misconfigured
 deployment fails its health check rather than accepting uploads nothing can
 read.
 
+Every upload is recorded in `content.upload` with the account that sent it.
+A cover or attachment may use one of the app's own file URLs only if the
+caller uploaded it, and a file is deleted only on its owner's behalf. Files
+nothing references are removed after 24 hours by a daily sweep the API runs
+itself; `pnpm --filter api uploads:sweep` runs it by hand.
+
 Make the bucket readable through its own configuration — an R2 public bucket or
 a custom domain, an S3 bucket policy — rather than per-object ACLs, which R2
 does not implement and rejects.

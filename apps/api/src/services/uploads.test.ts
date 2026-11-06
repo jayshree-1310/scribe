@@ -10,10 +10,19 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { readdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import { HttpError } from "../lib/http-error.js";
 import { UPLOAD_ROOT } from "../lib/storage.js";
+import { databaseAvailable } from "../test/harness.js";
+import { db } from "../prisma/db.js";
+import { deleteAll } from "../prisma/delete-all.js";
 import { storeMedia } from "./uploads.js";
+
+/** Stored files are recorded with an owner; `content.Upload` has no foreign
+ * key onto the account, so any id works and the rows are cleared below. */
+const OWNER = randomUUID();
+const available = await databaseAvailable();
 
 /** Files these tests wrote, removed afterwards so runs leave no residue. */
 const written: string[] = [];
@@ -46,18 +55,23 @@ function ogg(codec: string): Buffer {
 }
 
 async function store(bytes: Buffer, maxBytes?: number) {
-  const stored = await storeMedia(Readable.from([bytes]), maxBytes);
+  const stored = await storeMedia(OWNER, Readable.from([bytes]), maxBytes);
   written.push(stored.url);
   return stored;
 }
 
 afterAll(async () => {
+  if (!available) return;
+
   for (const url of written) {
     await rm(path.join(UPLOAD_ROOT, keyOf(url)), { force: true });
   }
+  await deleteAll(() =>
+    db.orm.content.Upload.where((row) => row.ownerId.eq(OWNER)),
+  );
 });
 
-describe("storeMedia", () => {
+describe.skipIf(!available)("storeMedia", () => {
   it("names each container from its signature, not from a declared type", async () => {
     // Nothing here declares a content type at all — the bytes are the only
     // input, which is the point.
@@ -121,13 +135,13 @@ describe("storeMedia", () => {
     // never reaches the decision.
     const html = Buffer.from("<script>alert(1)</script>".padEnd(128), "utf8");
 
-    await expect(storeMedia(Readable.from([html]))).rejects.toThrow(
+    await expect(storeMedia(OWNER, Readable.from([html]))).rejects.toThrow(
       /not audio or video/,
     );
   });
 
   it("rejects an empty upload", async () => {
-    await expect(storeMedia(Readable.from([]))).rejects.toThrow(/empty/);
+    await expect(storeMedia(OWNER, Readable.from([]))).rejects.toThrow(/empty/);
   });
 
   it("rejects an oversize file and leaves no partial behind", async () => {
@@ -137,7 +151,7 @@ describe("storeMedia", () => {
     // refusal can only come from the byte count during the write.
     const bytes = Buffer.concat([MP3, Buffer.alloc(1024)]);
 
-    await expect(storeMedia(Readable.from([bytes]), 512)).rejects.toMatchObject(
+    await expect(storeMedia(OWNER, Readable.from([bytes]), 512)).rejects.toMatchObject(
       { status: 413 },
     );
 
@@ -149,7 +163,7 @@ describe("storeMedia", () => {
     const oversize = Buffer.concat([MP3, Buffer.alloc(3 * 1024 * 1024)]);
 
     await expect(
-      storeMedia(Readable.from([oversize]), 2 * 1024 * 1024),
+      storeMedia(OWNER, Readable.from([oversize]), 2 * 1024 * 1024),
     ).rejects.toThrow(/under 2 MB/);
   });
 
@@ -158,7 +172,7 @@ describe("storeMedia", () => {
     // handler as a 413, not as a write error.
     const bytes = Buffer.concat([MP3, Buffer.alloc(1024)]);
 
-    await expect(storeMedia(Readable.from([bytes]), 512)).rejects.toBeInstanceOf(
+    await expect(storeMedia(OWNER, Readable.from([bytes]), 512)).rejects.toBeInstanceOf(
       HttpError,
     );
   });

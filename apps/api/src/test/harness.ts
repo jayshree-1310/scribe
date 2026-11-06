@@ -16,6 +16,7 @@ import { deleteAll } from "../prisma/delete-all.js";
 import { drainDeferredWrites } from "../services/deferred.js";
 import { type NotificationType } from "../services/notifications.js";
 import { deletePreferencesFor } from "../services/preferences.js";
+import { discardUploadsOf } from "../services/uploads.js";
 import { DEV_USER_HEADER } from "../middleware/current-user.js";
 import { slugify } from "../lib/slug.js";
 
@@ -1284,6 +1285,9 @@ export class TestApi {
       await db.orm.content.Genre.where((genre) => genre.id.eq(genreId)).delete();
     }
     for (const userId of this.created.users) {
+      // Files a fixture uploaded, and their ownership records. Last, so the
+      // rows that referenced them are already gone and the files go too.
+      await discardUploadsOf(userId);
       await db.orm.auth.User.where((user) => user.id.eq(userId)).delete();
     }
   }

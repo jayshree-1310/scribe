@@ -3,11 +3,14 @@ import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { TestApi, databaseAvailable } from "../test/harness.js";
 import { UPLOAD_ROOT } from "../lib/storage.js";
+import { db } from "../prisma/db.js";
+import { sweepUnreferencedUploads } from "../services/uploads.js";
 
 const api = new TestApi();
 const available = await databaseAvailable();
 
 let authorId: string;
+let otherId: string;
 
 /** A one-pixel PNG: the smallest input that passes signature sniffing. */
 const PNG = Buffer.from(
@@ -41,6 +44,7 @@ beforeAll(async () => {
   await api.start();
 
   authorId = await api.createUser("uploader");
+  otherId = await api.createUser("bystander");
 }, 30_000);
 
 afterAll(async () => {
@@ -380,5 +384,186 @@ describe.skipIf(!available)("chapter attachments", () => {
     await expect(
       readFile(path.join(UPLOAD_ROOT, keyOf(uploaded.body.url))),
     ).rejects.toThrow();
+  });
+});
+
+/* Ownership: whose file a URL names, and who may delete it ---------------- */
+
+/** Whether the file behind one of our URLs is still on disk. */
+async function exists(url: string): Promise<boolean> {
+  return readFile(path.join(UPLOAD_ROOT, keyOf(url))).then(
+    () => true,
+    () => false,
+  );
+}
+
+async function draftStory(as: string, body: Record<string, unknown> = {}) {
+  return api.request("/api/author/stories", {
+    method: "POST",
+    as,
+    body: { title: `Owned ${api.runId}`, ...body },
+  });
+}
+
+async function draftChapter(as: string): Promise<string> {
+  const story = await draftStory(as);
+  const chapter = await api.request(
+    `/api/author/stories/${story.body.story.id}/chapters`,
+    { method: "POST", as, body: { title: "One", content: "Hi." } },
+  );
+  return chapter.body.chapter.id;
+}
+
+describe.skipIf(!available)("upload ownership", () => {
+  it("refuses somebody else's upload as a cover or an attachment", async () => {
+    // The avatar is public on the owner's profile, which is how the URL leaks.
+    const avatar = await api.request("/api/account/avatar", {
+      method: "POST",
+      as: authorId,
+      raw: { data: PNG, contentType: "image/png" },
+    });
+    const url: string = avatar.body.avatarUrl;
+    writtenUrls.push(url);
+
+    const created = await draftStory(otherId, { coverUrl: url });
+    expect(created.status).toBe(400);
+    expect(created.body.error.details.coverUrl).toBeTruthy();
+
+    const own = await draftStory(otherId);
+    const patched = await api.request(`/api/author/stories/${own.body.story.id}`, {
+      method: "PATCH",
+      as: otherId,
+      body: { coverUrl: url },
+    });
+    expect(patched.status).toBe(400);
+
+    const attached = await api.request(
+      `/api/author/chapters/${await draftChapter(otherId)}/multimedia`,
+      { method: "POST", as: otherId, body: { type: "IMAGE", url } },
+    );
+    expect(attached.status).toBe(400);
+    expect(attached.body.error.details.url).toBeTruthy();
+
+    expect(await exists(url)).toBe(true);
+  });
+
+  it("never deletes somebody else's file, even from a row that names it", async () => {
+    // A row that already holds another account's URL -- written before
+    // ownership was checked. Clearing it must leave the file alone.
+    const uploaded = await upload(PNG, authorId);
+    writtenUrls.push(uploaded.body.url);
+
+    const story = await draftStory(otherId);
+    await db.orm.content.Story.where((row) => row.id.eq(story.body.story.id)).update({
+      coverUrl: uploaded.body.url,
+    });
+
+    const cleared = await api.request(`/api/author/stories/${story.body.story.id}`, {
+      method: "PATCH",
+      as: otherId,
+      body: { coverUrl: "" },
+    });
+
+    expect(cleared.status).toBe(200);
+    expect(await exists(uploaded.body.url)).toBe(true);
+  });
+
+  it("accepts an unchanged cover it cannot vouch for", async () => {
+    // A form resubmitting the cover a story already has must still save, even
+    // when that file predates the ownership record.
+    const story = await draftStory(otherId);
+    await db.orm.content.Story.where((row) => row.id.eq(story.body.story.id)).update({
+      coverUrl: "/uploads/covers/00000000-0000-4000-8000-000000000000.png",
+    });
+
+    const saved = await api.request(`/api/author/stories/${story.body.story.id}`, {
+      method: "PATCH",
+      as: otherId,
+      body: {
+        title: `Renamed ${api.runId}`,
+        coverUrl: "/uploads/covers/00000000-0000-4000-8000-000000000000.png",
+      },
+    });
+
+    expect(saved.status).toBe(200);
+  });
+
+  it("keeps a file the author still uses elsewhere", async () => {
+    const uploaded = await upload(PNG, authorId);
+    writtenUrls.push(uploaded.body.url);
+
+    await draftStory(authorId, { coverUrl: uploaded.body.url });
+    const attached = await api.request(
+      `/api/author/chapters/${await draftChapter(authorId)}/multimedia`,
+      { method: "POST", as: authorId, body: { type: "IMAGE", url: uploaded.body.url } },
+    );
+    expect(attached.status).toBe(201);
+
+    await api.request(`/api/author/multimedia/${attached.body.multimedia.id}`, {
+      method: "DELETE",
+      as: authorId,
+    });
+
+    // Still the cover, so still on disk.
+    expect(await exists(uploaded.body.url)).toBe(true);
+  });
+});
+
+describe.skipIf(!available)("cover and attachment URLs", () => {
+  it.each([
+    "javascript:alert(document.cookie)",
+    "data:text/html,<script>alert(1)</script>",
+    "http://tracker.example/pixel.png",
+    "/somewhere/relative.png",
+    "not a url",
+  ])("refuses %s", async (url) => {
+    const attached = await api.request(
+      `/api/author/chapters/${await draftChapter(authorId)}/multimedia`,
+      { method: "POST", as: authorId, body: { type: "LINK", url } },
+    );
+    expect(attached.status).toBe(400);
+
+    const created = await draftStory(authorId, { coverUrl: url });
+    expect(created.status).toBe(400);
+  });
+
+  it("accepts an external https address and never deletes it", async () => {
+    const url = "https://example.com/some/page";
+
+    const attached = await api.request(
+      `/api/author/chapters/${await draftChapter(authorId)}/multimedia`,
+      { method: "POST", as: authorId, body: { type: "LINK", url } },
+    );
+    expect(attached.status).toBe(201);
+
+    const created = await draftStory(authorId, { coverUrl: "https://example.com/c.png" });
+    expect(created.status).toBe(201);
+  });
+});
+
+describe.skipIf(!available)("the unreferenced-upload sweep", () => {
+  it("removes old files nothing uses, and keeps the rest", async () => {
+    const abandoned = await upload(PNG, authorId);
+    const recent = await upload(PNG, authorId);
+    const used = await upload(PNG, authorId);
+    writtenUrls.push(abandoned.body.url, recent.body.url, used.body.url);
+
+    await draftStory(authorId, { coverUrl: used.body.url });
+
+    // Past the grace period, except `recent`.
+    for (const url of [abandoned.body.url, used.body.url]) {
+      await db.runtime().query(
+        db.raw.sql`
+          UPDATE "content"."upload" SET "createdAt" = now() - interval '2 days'
+           WHERE "url" = ${url}
+        `.affectedCount().build(),
+      );
+    }
+
+    await sweepUnreferencedUploads();
+
+    expect(await exists(abandoned.body.url)).toBe(false);
+    expect(await exists(recent.body.url)).toBe(true);
+    expect(await exists(used.body.url)).toBe(true);
   });
 });

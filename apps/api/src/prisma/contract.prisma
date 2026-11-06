@@ -539,6 +539,26 @@ namespace content {
       @relation(fields: [chapterId], references: [id])
   }
 
+  /// A file somebody uploaded through `POST /api/uploads` or the avatar route,
+  /// and who. `Story.coverUrl`, `Multimedia.url` and `User.avatarUrl` are free
+  /// strings, so this is the only record of whose a stored file is: a caller
+  /// may reference and delete only their own (see `services/uploads.ts`), and
+  /// rows nothing references are swept after a grace period. No foreign key
+  /// onto the owner, like `ai.UsageEvent`: `deleteAccount` reads these rows to
+  /// remove the files, then deletes them itself.
+  model Upload {
+    id        String   @id @default(uuid())
+    /// The URL `lib/storage.ts` returned, exactly as the referencing row stores it.
+    url       String   @unique
+    ownerId   String
+    createdAt DateTime @default(now())
+
+    /// One account's files, for `deleteAccount`.
+    @@index([ownerId])
+    /// The unreferenced-file sweep reads oldest first.
+    @@index([createdAt])
+  }
+
   model Genre {
     id        String   @id @default(uuid())
     name      String   @unique

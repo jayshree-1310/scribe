@@ -16,8 +16,9 @@
  *
  * The upload and the row that references it are two steps: this returns a URL,
  * and the caller saves it (`PATCH /api/author/stories/:id` with `coverUrl`).
- * That means an abandoned upload can leak a file, which is the trade for not
- * making every consumer of an upload its own endpoint.
+ * The file is recorded as the caller's, so only they can save or delete it,
+ * and one nothing comes to reference is swept after a grace period -- see
+ * `services/uploads.ts`.
  */
 
 import { Router } from "express";
@@ -73,7 +74,7 @@ router.post("/", imageBody, async (req, res, next) => {
     // not match. For `media` that is the audio/video case and `req` is still
     // unread; for `cover` it is the "you sent JSON, or nothing" case.
     if (Buffer.isBuffer(req.body)) {
-      res.status(201).json(await storeImage(kind, req.body));
+      res.status(201).json(await storeImage(userId, kind, req.body));
       return;
     }
 
@@ -83,7 +84,7 @@ router.post("/", imageBody, async (req, res, next) => {
       });
     }
 
-    res.status(201).json(await storeMedia(req));
+    res.status(201).json(await storeMedia(userId, req));
   } catch (error) {
     next(error);
   }

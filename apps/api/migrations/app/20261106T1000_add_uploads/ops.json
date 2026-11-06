@@ -1,0 +1,182 @@
+[
+  {
+    "id": "table.upload",
+    "label": "Create table \"upload\"",
+    "summary": "Creates table \"upload\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "table",
+        "name": "upload"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"upload\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"upload\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"upload\"",
+        "sql": "CREATE TABLE \"content\".\"upload\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"ownerId\" text NOT NULL,\n  \"url\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"upload\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"upload\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.upload.upload_url_key",
+    "label": "Add unique constraint on \"upload\" (url)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "unique",
+        "name": "upload_url_key",
+        "table": "upload"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"upload_url_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "upload_url_key",
+          "content",
+          "\"content\".\"upload\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"upload_url_key\"",
+        "sql": "ALTER TABLE \"content\".\"upload\" ADD CONSTRAINT \"upload_url_key\" UNIQUE (\"url\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"upload_url_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "upload_url_key",
+          "content",
+          "\"content\".\"upload\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.upload.upload_createdAt_idx_9575dbd7",
+    "label": "Create index \"upload_createdAt_idx_9575dbd7\" on \"upload\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "upload_createdAt_idx_9575dbd7",
+        "table": "upload"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"upload_createdAt_idx_9575dbd7\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"upload_createdAt_idx_9575dbd7\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"upload_createdAt_idx_9575dbd7\"",
+        "sql": "CREATE INDEX \"upload_createdAt_idx_9575dbd7\" ON \"content\".\"upload\" (\"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"upload_createdAt_idx_9575dbd7\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"upload_createdAt_idx_9575dbd7\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.upload.upload_ownerId_idx_e2d0c1ef",
+    "label": "Create index \"upload_ownerId_idx_e2d0c1ef\" on \"upload\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "upload_ownerId_idx_e2d0c1ef",
+        "table": "upload"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"upload_ownerId_idx_e2d0c1ef\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"upload_ownerId_idx_e2d0c1ef\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"upload_ownerId_idx_e2d0c1ef\"",
+        "sql": "CREATE INDEX \"upload_ownerId_idx_e2d0c1ef\" ON \"content\".\"upload\" (\"ownerId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"upload_ownerId_idx_e2d0c1ef\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"upload_ownerId_idx_e2d0c1ef\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "data.content.upload.backfill",
+    "label": "Backfill content.upload from existing references",
+    "operationClass": "data",
+    "target": {
+      "id": "content.upload",
+      "details": {
+        "schema": "content",
+        "name": "upload",
+        "objectType": "table"
+      }
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Record avatars, covers and attachments with their owners",
+        "sql": "INSERT INTO content.\"upload\" (\"id\", \"url\", \"ownerId\", \"createdAt\")\n                  SELECT gen_random_uuid()::text, refs.url, refs.\"ownerId\", now()\n                    FROM (\n                          SELECT u.\"avatarUrl\" AS url, u.\"id\" AS \"ownerId\", 1 AS rank\n                            FROM auth.\"user\" AS u\n                           WHERE u.\"avatarUrl\" IS NOT NULL\n                          UNION ALL\n                          SELECT s.\"coverUrl\", s.\"authorId\", 2\n                            FROM content.\"story\" AS s\n                           WHERE s.\"coverUrl\" IS NOT NULL\n                          UNION ALL\n                          SELECT m.\"url\", s.\"authorId\", 3\n                            FROM content.\"multimedia\" AS m\n                            JOIN content.\"chapter\" AS c ON c.\"id\" = m.\"chapterId\"\n                            JOIN content.\"story\" AS s ON s.\"id\" = c.\"storyId\"\n                         ) AS refs\n                   WHERE refs.url ~ '(^|/)(avatars|covers|media)/[0-9a-f-]{36}\\.[a-z0-9]+$'\n                   ORDER BY refs.rank\n                  ON CONFLICT (\"url\") DO NOTHING"
+      }
+    ],
+    "postcheck": []
+  }
+]

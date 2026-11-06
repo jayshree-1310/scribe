@@ -64,6 +64,13 @@ export interface Storage {
    * must not error.
    */
   remove(url: string): Promise<void>;
+
+  /**
+   * The key of a file this backend wrote, read back from its URL, or null for
+   * a URL it did not produce (a Google picture, a remote image). Lets callers
+   * tell "one of our files, which somebody owns" from "an address elsewhere".
+   */
+  keyOf(url: string): string | null;
 }
 
 /** Directory served statically by `app.ts`, and the path prefix it is served at. */
@@ -136,21 +143,30 @@ function localStorageBackend(): Storage {
       };
     },
 
-    async remove(url) {
-      const marker = `${UPLOAD_URL_PREFIX}/`;
-      const index = url.indexOf(marker);
-      if (index === -1) return;
+    keyOf(url) {
+      // Absolute on `PUBLIC_UPLOAD_BASE_URL` when it is set, root-relative
+      // otherwise -- and root-relative is still ours once it is set, for files
+      // written before. Nothing else is.
+      const marker = [`${PUBLIC_BASE_URL}${UPLOAD_URL_PREFIX}/`, `${UPLOAD_URL_PREFIX}/`]
+        .find((candidate) => url.startsWith(candidate));
+      if (marker === undefined) return null;
 
-      const key = url.slice(index + marker.length);
+      const key = url.slice(marker.length);
 
-      // `path.normalize` collapses any `..` the stored value might contain
-      // before the containment check, so a doctored row cannot reach outside
-      // the upload root.
+      // `path.normalize` collapses any `..` the value might contain before the
+      // containment check, so a doctored URL cannot reach outside the root.
       const target = path.normalize(path.join(UPLOAD_ROOT, key));
-      if (!target.startsWith(`${UPLOAD_ROOT}${path.sep}`)) return;
+      if (!target.startsWith(`${UPLOAD_ROOT}${path.sep}`)) return null;
+
+      return key;
+    },
+
+    async remove(url) {
+      const key = this.keyOf(url);
+      if (key === null) return;
 
       try {
-        await unlink(target);
+        await unlink(path.join(UPLOAD_ROOT, key));
       } catch {
         // Already gone, or never written by this backend. Removing a file is
         // best-effort cleanup; the row no longer points at it either way.
@@ -268,15 +284,20 @@ function s3StorageBackend(bucket: string): Storage {
       return { key, bytes, url: urlFor(key) };
     },
 
+    keyOf(url) {
+      const marker = `${S3_PUBLIC_BASE_URL}/`;
+      if (!url.startsWith(marker)) return null;
+
+      const key = url.slice(marker.length);
+      return key.length === 0 ? null : key;
+    },
+
     async remove(url) {
       // Anything this backend did not write is ignored rather than failing:
       // Google avatar URLs sit in the same column, and so do rows written
       // before the store was switched over.
-      const marker = `${S3_PUBLIC_BASE_URL}/`;
-      if (!url.startsWith(marker)) return;
-
-      const key = url.slice(marker.length);
-      if (key.length === 0) return;
+      const key = this.keyOf(url);
+      if (key === null) return;
 
       try {
         await client.send(
