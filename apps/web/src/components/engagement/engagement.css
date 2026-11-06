@@ -34,6 +34,11 @@
   color: var(--brand);
 }
 
+/* A count with no press behind it: no hover colour promising one. */
+.like--static:hover {
+  color: var(--text-secondary);
+}
+
 /* The filled heart is the state; the colour is what makes it readable at a
    glance without counting. */
 .like.is-on {

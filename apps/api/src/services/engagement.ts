@@ -763,7 +763,14 @@ export async function likeChapter(
   chapterId: string,
 ): Promise<LikeSummary> {
   await assertNotSuspended(userId);
-  await visibleChapterId(chapterId, userId);
+  const chapter = await findVisibleChapter(chapterId, userId);
+  if (chapter === null) {
+    throw HttpError.notFound("That chapter could not be found.");
+  }
+  // Chapter likes feed the story's `likeCount` and so Trending; an author's
+  // own would be a thumb on that scale. (A comment is different: liking your
+  // own comment moves nothing but the comment.)
+  await assertNotAuthorOf(chapter.storyId, userId, "You cannot like your own chapter.");
 
   return setLike("chapter", userId, chapterId, true);
 }
@@ -776,6 +783,19 @@ export async function unlikeChapter(
   await visibleChapterId(chapterId, userId);
 
   return setLike("chapter", userId, chapterId, false);
+}
+
+/** Refuses a reader's act on their own story. */
+async function assertNotAuthorOf(
+  storyId: string,
+  userId: string,
+  message: string,
+): Promise<void> {
+  const story = await db.orm.content.Story.select("authorId")
+    .where((row) => row.id.eq(storyId))
+    .first();
+
+  if (story?.authorId === userId) throw HttpError.forbidden(message);
 }
 
 async function visibleChapterId(
@@ -860,12 +880,13 @@ async function recomputeStoryRating(
   const count = totals.count;
   const average = count === 0 ? null : toAverage(totals.average);
 
+  // No `updatedAt`: that is "last updated" on the story page, and means the
+  // author changed something -- not that a reader scored it.
   await tx.orm.content.Story.where((story) => story.id.eq(storyId)).update({
     // Null rather than 0 when the last rating goes: the column means "what
     // readers scored this", and nobody scored it 0.
     ratingAverage: average === null ? null : String(average),
     ratingCount: count,
-    updatedAt: now(),
   });
 
   return { average, count };
@@ -930,11 +951,12 @@ async function findMyRating(
 /**
  * Records the caller's score, replacing the one they had.
  *
- * Upsert by hand rather than by unique-constraint conflict: `Rating` is unique
- * on `(userId, storyId)`, so the update branch is the common case and the
- * insert races only against the same person rating twice at once. That race is
- * caught below and retried as an update, which is what the unique index would
- * have forced anyway.
+ * One `INSERT ... ON CONFLICT DO UPDATE` on the `(userId, storyId)` unique
+ * key, so two first ratings sent at once (a double click) land as one row
+ * rather than one of them failing on the index.
+ *
+ * Not on your own story: an author's score would move the average and the
+ * "Top rated" sort with nothing a reader thought behind it.
  */
 export async function upsertRating(
   userId: string,
@@ -942,27 +964,19 @@ export async function upsertRating(
   score: number,
 ): Promise<RatingSummary> {
   const storyId = await visibleStoryId(slugOrId, userId);
-  const timestamp = now();
+  await assertNotAuthorOf(storyId, userId, "You cannot rate your own story.");
 
   await db.transaction(async (tx) => {
-    const existing = await tx.orm.engagement.Rating.select("id")
-      .where((rating) => rating.storyId.eq(storyId))
-      .where((rating) => rating.userId.eq(userId))
-      .first();
-
-    if (existing) {
-      await tx.orm.engagement.Rating.where((rating) =>
-        rating.id.eq(existing.id),
-      ).update({ rating: String(score), updatedAt: timestamp });
-    } else {
-      await tx.orm.engagement.Rating.create({
-        storyId,
-        userId,
-        rating: String(score),
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      });
-    }
+    await tx.query(
+      db.raw.sql`
+        INSERT INTO "engagement"."rating"
+          ("id", "storyId", "userId", "rating", "createdAt", "updatedAt")
+        VALUES (gen_random_uuid()::text, ${storyId}, ${userId},
+                ${String(score)}::numeric, now(), now())
+        ON CONFLICT ("userId", "storyId")
+        DO UPDATE SET "rating" = EXCLUDED."rating", "updatedAt" = now()
+      `.affectedCount().build(),
+    );
 
     await recomputeStoryRating(tx, storyId);
   });

@@ -150,6 +150,7 @@ export function StoryDetailPage() {
   }
 
   const data = story.data
+  const isOwnStory = myId !== null && data?.author.id === myId
   const hue = data.genres[0]?.hue ?? 268
 
   /**
@@ -419,13 +420,16 @@ export function StoryDetailPage() {
                 {inLibrary ? 'In your library' : 'Add to Library'}
               </Button>
 
-              <Button
-                size="lg"
-                onClick={openRateDialog}
-                startIcon={<Icon name="star" />}
-              >
-                {ratings.data?.mine ? `Rated ${ratings.data.mine}` : 'Rate'}
-              </Button>
+              {/* Authors cannot score their own story; the API refuses it. */}
+              {isOwnStory ? null : (
+                <Button
+                  size="lg"
+                  onClick={openRateDialog}
+                  startIcon={<Icon name="star" />}
+                >
+                  {ratings.data?.mine ? `Rated ${ratings.data.mine}` : 'Rate'}
+                </Button>
+              )}
 
               <Button
                 size="lg"
@@ -525,13 +529,15 @@ export function StoryDetailPage() {
                       them from invented weights would have been a lie. */}
                   <RatingBars breakdown={summary.breakdown} total={summary.count} />
 
-                  <Button
-                    fullWidth
-                    onClick={openRateDialog}
-                    startIcon={<Icon name="star" />}
-                  >
-                    {summary.mine ? 'Change your rating' : 'Rate this story'}
-                  </Button>
+                  {isOwnStory ? null : (
+                    <Button
+                      fullWidth
+                      onClick={openRateDialog}
+                      startIcon={<Icon name="star" />}
+                    >
+                      {summary.mine ? 'Change your rating' : 'Rate this story'}
+                    </Button>
+                  )}
                 </>
               )}
             </Card>

@@ -51,6 +51,11 @@ interface LikeButtonProps {
   variant?: 'pill' | 'inline'
   /** Announced to screen readers, e.g. "this chapter" or "this comment". */
   noun: string
+  /**
+   * Shows the count without offering the press: an author's own chapter,
+   * which the API refuses to let them like.
+   */
+  readOnly?: boolean
   className?: string
 }
 
@@ -61,6 +66,7 @@ export function LikeButton({
   likedByMe,
   variant = 'inline',
   noun,
+  readOnly = false,
   className,
 }: LikeButtonProps) {
   const { showToast } = useToast()
@@ -120,6 +126,18 @@ export function LikeButton({
       setPending(false)
     }
   }, [count, liked, noun, pending, setOverride, showToast, subject, subjectId])
+
+  if (readOnly) {
+    return (
+      <span
+        className={cn('like', `like--${variant}`, 'like--static', className)}
+        aria-label={`${formatCount(count)} ${count === 1 ? 'like' : 'likes'} on ${noun}`}
+      >
+        <Icon name="heart" size="1em" />
+        <span className="like__count">{formatCount(count)}</span>
+      </span>
+    )
+  }
 
   return (
     <button

@@ -574,6 +574,15 @@ describe.skipIf(!available)("chapter likes", () => {
     expect(await likeCount()).toBe(1);
   });
 
+  it("refuses the author's like on their own chapter", async () => {
+    const { status } = await api.request(`/api/chapters/${chapterId}/like`, {
+      method: "PUT",
+      as: author,
+    });
+
+    expect(status).toBe(403);
+  });
+
   it("refuses an anonymous like", async () => {
     const { status } = await api.request(`/api/chapters/${chapterId}/like`, {
       method: "PUT",
@@ -593,11 +602,13 @@ describe.skipIf(!available)("chapter likes", () => {
     });
     expect(stranger.status).toBe(404);
 
+    // Its author can see it -- so a 403 for liking their own work, not the
+    // 404 a stranger gets.
     const owner = await api.request(`/api/chapters/${hidden}/like`, {
       method: "PUT",
       as: author,
     });
-    expect(owner.status).toBe(200);
+    expect(owner.status).toBe(403);
   });
 
   it("refuses a like from a suspended account", async () => {
@@ -833,6 +844,54 @@ describe.skipIf(!available)("ratings", () => {
     expect(second.body.breakdown).toEqual({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 1 });
   });
 
+  it("refuses the author's own rating", async () => {
+    const story = await api.createStory({ title: "Self Scored", authorId: author });
+
+    const { status } = await api.request(`/api/stories/${story.slug}/rating`, {
+      method: "PUT",
+      as: author,
+      body: { rating: 5 },
+    });
+
+    expect(status).toBe(403);
+    expect((await api.readStoryRating(story.id)).count).toBe(0);
+  });
+
+  it("takes two first ratings sent at once as one", async () => {
+    const story = await api.createStory({ title: "Double Click", authorId: author });
+
+    const responses = await Promise.all(
+      [3, 4].map((rating) =>
+        api.request(`/api/stories/${story.slug}/rating`, {
+          method: "PUT",
+          as: reader,
+          body: { rating },
+        }),
+      ),
+    );
+
+    expect(responses.map((response) => response.status)).toEqual([200, 200]);
+    expect((await api.readStoryRating(story.id)).count).toBe(1);
+  });
+
+  it("does not move the story's last-updated time", async () => {
+    const story = await api.createStory({ title: "Untouched", authorId: author });
+    const before = await db.orm.content.Story.select("updatedAt")
+      .where((row) => row.id.eq(story.id))
+      .first();
+
+    await api.request(`/api/stories/${story.slug}/rating`, {
+      method: "PUT",
+      as: reader,
+      body: { rating: 4 },
+    });
+
+    const after = await db.orm.content.Story.select("updatedAt")
+      .where((row) => row.id.eq(story.id))
+      .first();
+    expect(String(after?.updatedAt)).toBe(String(before?.updatedAt));
+  });
+
   it("rejects a score outside 1-5, and a fractional one", async () => {
     for (const rating of [0, 6, -1, 3.5]) {
       const { status } = await api.request(`/api/stories/${storySlug}/rating`, {
@@ -948,13 +1007,16 @@ describe.skipIf(!available)("the denormalised rating columns", () => {
       else expect(body.average).toBeCloseTo(expected, 4);
     }
 
+    // A third reader: the author may not rate their own story.
+    const third = await api.createUser("ef");
+
     await rate(reader, 5);
     await rate(other, 2);
-    await rate(author, 4);
+    await rate(third, 4);
     // An upsert, not a fourth row.
     await rate(reader, 1);
     await withdraw(other);
-    await withdraw(author);
+    await withdraw(third);
     await withdraw(reader);
   });
 

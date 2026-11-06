@@ -15,6 +15,7 @@ import {
   useReaderPrefs,
 } from '../lib/reader-prefs'
 import { useTheme } from '../lib/theme'
+import { useAuth } from '../lib/auth'
 import { formatCount, formatRelative } from '../lib/format'
 import { renderChapter } from '../lib/chapter-markdown'
 import { findPassage } from '../lib/find-passage'
@@ -53,6 +54,7 @@ export function ReaderPage() {
   const { showToast } = useToast()
   const { preferences, update } = useReaderPrefs()
   const { resolved: appTheme } = useTheme()
+  const { session } = useAuth()
 
   /**
    * The surface to draw. `preferences.theme` may be `auto`, which is a
@@ -354,6 +356,8 @@ export function ReaderPage() {
   }
 
   const data = story.data
+  // An author reads their own chapters too, but may not like them.
+  const isOwnStory = data !== null && data !== undefined && session?.user.id === data.author.id
   const current = chapter.data
   const hue = data?.genres[0]?.hue ?? 268
 
@@ -546,6 +550,7 @@ export function ReaderPage() {
                   likedByMe={current.likedByMe}
                   variant="pill"
                   noun="this chapter"
+                  readOnly={isOwnStory}
                 />
 
                 <button
