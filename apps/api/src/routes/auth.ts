@@ -22,6 +22,7 @@ import {
 import { verifyRefreshToken } from "../lib/jwt.js";
 import { verifyGoogleIdToken } from "../lib/google.js";
 import { redis } from "../lib/redis.js";
+import { storage } from "../lib/storage.js";
 import {
   assertWithinRateLimit,
   chargeRateLimit,
@@ -300,7 +301,9 @@ function deriveUsername(identity: {
   email: string;
   name: string | null;
 }): string {
-  const source = identity.email.split("@")[0] ?? identity.name ?? "reader";
+  // `||`, not `??`: `split` always yields a string, so only an empty local
+  // part should fall through to the name.
+  const source = identity.email.split("@")[0] || identity.name || "reader";
 
   const base = source
     .toLowerCase()
@@ -353,10 +356,19 @@ router.post("/google", async (req, res) => {
   let created = false;
 
   if (user) {
-    // Keep the profile fields fresh, but never overwrite a name the user set.
+    /**
+     * Keep the profile fields fresh, but never overwrite what the user chose:
+     * a name they set, or an avatar they uploaded in Settings. A Google
+     * picture (or none) is refreshed, so a changed Google photo follows.
+     */
+    const uploadedAvatar =
+      user.avatarUrl !== null && storage.keyOf(user.avatarUrl) !== null;
+
     await db.orm.auth.User.where((u) => u.id.eq(user!.id)).update({
       displayName: user.displayName ?? identity.name,
-      avatarUrl: identity.picture,
+      avatarUrl: uploadedAvatar
+        ? user.avatarUrl
+        : (identity.picture ?? user.avatarUrl),
       emailVerified: true,
     });
   } else {
@@ -369,15 +381,22 @@ router.post("/google", async (req, res) => {
        * Same address, no Google link yet: adopt it. Safe only because Google
        * asserted the address is verified.
        *
-       * Existing sessions are revoked as a precaution. If this account was
-       * created by someone squatting the address before its owner arrived,
-       * their sessions die here.
+       * If *we* never verified it, the account may have been created by
+       * somebody squatting the address before its owner arrived (account
+       * pre-hijacking). Their password is cleared, so only the address's
+       * owner can sign in from here on; the owner can set a new one from
+       * Settings (`/set-password`). An account that had verified its email
+       * is the owner's own, and keeps its password.
+       *
+       * Existing sessions are revoked either way, so a squatter's sessions die
+       * here too.
        */
       await db.orm.auth.User.where((u) => u.id.eq(byEmail.id)).update({
         googleId: identity.googleId,
         displayName: byEmail.displayName ?? identity.name,
         avatarUrl: byEmail.avatarUrl ?? identity.picture,
         emailVerified: true,
+        ...(byEmail.emailVerified ? {} : { passwordHash: null }),
       });
 
       await revokeAllSessions(byEmail.id);

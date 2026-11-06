@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-8, M-7 and M-8 fixed (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-9, M-2, M-7, M-8 and L-13 fixed (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -165,7 +165,7 @@ So the list below is not read as "everything is broken":
   uploaded (or external `https:` URLs, which are then never deleted); have
   `discardUpload` delete only files owned by the caller.
 
-### H-9 · Google sign-in can attach to an account pre-registered by someone else — Code review
+### H-9 · Google sign-in can attach to an account pre-registered by someone else — Code review — **Fixed**
 - **Where:** `apps/api/src/routes/auth.ts:362-385`
 - **Scenario:** an attacker signs up with `victim@gmail.com` and a password
   (email is never verified). Later the real owner signs in with Google. The
@@ -215,7 +215,7 @@ So the list below is not read as "everything is broken":
   on the web side, serialise refreshes across tabs (`navigator.locks` or a
   `BroadcastChannel`).
 
-### M-2 · Google sign-in overwrites a custom avatar on every login — Code review
+### M-2 · Google sign-in overwrites a custom avatar on every login — Code review — **Fixed**
 - **Where:** `apps/api/src/routes/auth.ts:357-361`
 - Returning Google users get `avatarUrl: identity.picture` on each sign-in.
   An avatar uploaded in Settings is replaced, or cleared when Google sends no
@@ -345,7 +345,7 @@ So the list below is not read as "everything is broken":
 | L-10 | `POST /api/ai/agent` with someone else's draft `storyId` answers 200 and spends a model call (tools correctly reply "not found"). Authorise the story up-front and 404 before calling the model. | `services/ai/agent-request.ts` | Confirmed |
 | L-11 | Author-only routes answer **403** "not yours to edit" for another user's draft id but 404 for a random id, which confirms the draft exists. UUIDs make this hard to exploit. | `services/authoring.ts` `ownedStory` | Confirmed |
 | L-12 | `JWT_REFRESH_EXPIRES_IN=30d` (render, `.env.example`) vs the hard-coded 7-day `REFRESH_SESSION_TTL_SECONDS`: the JWT outlives its Redis session, and the env var reads as if it controls something it does not. | `lib/sessions.ts:20`, `lib/jwt.ts` | Code review |
-| L-13 | `deriveUsername`: `email.split("@")[0]` is never `undefined`, so the `?? identity.name` fallback is dead code. | `routes/auth.ts:303` | Code review |
+| L-13 | **Fixed.** `deriveUsername`: `email.split("@")[0]` is never `undefined`, so the `?? identity.name` fallback is dead code. | `routes/auth.ts:303` | Code review |
 | L-14 | Web bundle is one 690 kB chunk (199 kB gzip); no route-level code splitting (`React.lazy`) for author/AI/admin pages. | `apps/web` build | Confirmed |
 | L-15 | `listGenres` loads every `storyGenre` row and every listed story into memory per request; `getRelatedStories` loads every story in the genre. Fine now, linear in catalogue size. | `services/stories.ts:1101`, `:1025` | Code review |
 | L-16 | No upper bound on `page`: `?page=999999999` is accepted (returns empty, but issues a huge `OFFSET`). | list schemas in `routes/*.ts` | Confirmed |
@@ -428,8 +428,11 @@ tests are "delete X with two of every child", one per entity.
    (also `pnpm --filter api uploads:sweep`) removes files left unreferenced
    for 24 hours. Also fixed on the way: `deleteChapter` failed on a comment
    with replies (same cause as H-5).
-3. **H-9** (Google account pre-hijack) and **M-2** (avatar overwrite): both
-   in the same block of `routes/auth.ts`.
+3. ~~**H-9**, **M-2**~~ **Done.** Adopting an account whose email we never
+   verified now clears its password, so a squatter's password stops working
+   (an account that had verified its email keeps it). A returning Google
+   user's avatar is refreshed only when it is not one they uploaded. L-13's
+   username fallback fixed in the same block.
 4. **H-10**: unpause or replace the storage project; map storage errors to 503.
 5. **M-1** (multi-tab sign-out), then the remaining Medium items.
 6. Low items as convenient.

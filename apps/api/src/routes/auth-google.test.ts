@@ -233,7 +233,7 @@ describe.skipIf(!available)("POST /api/auth/google", () => {
     expect(reuse.status).toBe(401);
   });
 
-  it("keeps password login working for a linked account", async () => {
+  it("keeps password login working for a linked account whose email was verified", async () => {
     const email = `both_${Math.random().toString(36).slice(2)}@fixtures.invalid`;
     const password = "SuperSecret123!";
 
@@ -244,10 +244,65 @@ describe.skipIf(!available)("POST /api/auth/google", () => {
     });
     createdUserIds.add(signup.body.user.id);
 
+    // The owner had confirmed the address through our own email link.
+    await db.orm.auth.User.where((u) => u.id.eq(signup.body.user.id)).update({
+      emailVerified: true,
+    });
+
     await signInWithGoogle(googleIdentity({ email }));
 
     const login = await post("/api/auth/login", { email, password });
     expect(login.status).toBe(200);
+  });
+
+  /**
+   * Account pre-hijacking: somebody registers the victim's address with a
+   * password of their own and never verifies it. When the real owner later
+   * signs in with Google and the account is adopted, the squatter's password
+   * must stop working, or they share the victim's account from then on.
+   */
+  it("clears the password of an unverified account Google adopts", async () => {
+    const email = `squat_${Math.random().toString(36).slice(2)}@fixtures.invalid`;
+    const password = "SquattersSecret123!";
+
+    const signup = await post("/api/auth/signup", {
+      username: `sqt${Math.random().toString(36).slice(2, 10)}`,
+      email,
+      password,
+    });
+    createdUserIds.add(signup.body.user.id);
+
+    const linked = await signInWithGoogle(googleIdentity({ email }));
+    expect(linked.status).toBe(200);
+    expect(linked.body.user.id).toBe(signup.body.user.id);
+
+    const login = await post("/api/auth/login", { email, password });
+    expect(login.status).toBe(401);
+
+    const stored = await db.orm.auth.User.where((u) =>
+      u.id.eq(signup.body.user.id),
+    ).first();
+    expect(stored?.passwordHash).toBeNull();
+  });
+
+  it("refreshes a Google picture but keeps an avatar the user uploaded", async () => {
+    const identity = googleIdentity({ picture: "https://example.invalid/one.png" });
+    const created = await signInWithGoogle(identity);
+    const userId = created.body.user.id;
+
+    // A changed Google photo follows the user.
+    await signInWithGoogle({ ...identity, picture: "https://example.invalid/two.png" });
+    let stored = await db.orm.auth.User.where((u) => u.id.eq(userId)).first();
+    expect(stored?.avatarUrl).toBe("https://example.invalid/two.png");
+
+    // One uploaded in Settings does not get replaced, or cleared.
+    const uploaded = "/uploads/avatars/00000000-0000-4000-8000-000000000000.png";
+    await db.orm.auth.User.where((u) => u.id.eq(userId)).update({ avatarUrl: uploaded });
+
+    await signInWithGoogle({ ...identity, picture: "https://example.invalid/three.png" });
+    await signInWithGoogle({ ...identity, picture: null });
+    stored = await db.orm.auth.User.where((u) => u.id.eq(userId)).first();
+    expect(stored?.avatarUrl).toBe(uploaded);
   });
 
   it("refuses password login for a Google-only account instead of crashing", async () => {
