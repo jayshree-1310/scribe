@@ -900,22 +900,16 @@ export async function deleteChapter(
       tx.orm.ai.ChapterSummary.where((row) => row.chapterId.eq(chapterId)),
     );
 
-    // Likes on this chapter's comments, before the comments go. See the same
-    // pass in `deleteStory` for why this is per comment.
-    const commented = await tx.orm.engagement.Comment.select("id")
-      .where((row) => row.chapterId.eq(chapterId))
-      .all();
-
-    for (const comment of commented) {
-      await deleteAll(() =>
-        tx.orm.engagement.CommentLike.where((like) =>
-          like.commentId.eq(comment.id),
-        ),
-      );
-    }
-
-    await deleteAll(() =>
-      tx.orm.engagement.Comment.where((row) => row.chapterId.eq(chapterId)),
+    // Likes on this chapter's comments, then the comments -- threads and
+    // replies in one statement, for the reason `services/removal.ts` gives.
+    await tx.query(
+      db.raw.sql`
+        DELETE FROM "engagement"."commentLike"
+         WHERE "commentId" IN (SELECT "id" FROM "engagement"."comment" WHERE "chapterId" = ${chapterId})
+      `.affectedCount().build(),
+    );
+    await tx.query(
+      db.raw.sql`DELETE FROM "engagement"."comment" WHERE "chapterId" = ${chapterId}`.affectedCount().build(),
     );
     // A resume point inside the deleted chapter has nowhere to point; the
     // story-level row survives, so the reader keeps their place in the story.

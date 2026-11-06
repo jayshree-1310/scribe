@@ -488,6 +488,16 @@ describe.skipIf(!available)("chapter writes", () => {
       chapterId: doomed,
       content: "About this chapter.",
     });
+    // Two replies under it: the self-referencing key refused a delete that
+    // could take the thread before its replies.
+    for (const author of [authorId, intruderId]) {
+      await api.createComment({
+        storyId: story.id,
+        userId: author,
+        chapterId: doomed,
+        parentId: comment,
+      });
+    }
     await api.request(`/api/chapters/${doomed}/like`, {
       method: "PUT",
       as: intruderId,
