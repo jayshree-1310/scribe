@@ -166,7 +166,14 @@ describe.skipIf(!available)("POST /api/auth/google", () => {
     expect(refreshed.setCookie).toBeDefined();
     expect(refreshed.setCookie).not.toContain(cookie);
 
-    // And the replayed token is rejected, as it is for any other session.
+    // And the replayed token is rejected once its grace period is over, as
+    // it is for any other session (see `ROTATION_GRACE_SECONDS`).
+    const token = decodeURIComponent(cookie.split("=").slice(1).join("="));
+    const { sid } = JSON.parse(
+      Buffer.from(token.split(".")[1]!, "base64url").toString("utf8"),
+    );
+    await redis.del(`auth:rotated:${sid}`);
+
     const replay = await post("/api/auth/refresh", undefined, cookie);
     expect(replay.status).toBe(401);
   });

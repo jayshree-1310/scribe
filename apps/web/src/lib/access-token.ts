@@ -53,7 +53,21 @@ export function refreshAccessToken(): Promise<string | null> {
   if (inFlight) return inFlight
   if (!refresher) return Promise.resolve(accessToken)
 
-  inFlight = refresher().finally(() => {
+  const run = refresher
+
+  /**
+   * Across tabs too, where the browser supports it: two tabs refreshing at
+   * once send the same cookie, and the second would arrive with a token the
+   * first has just rotated. Under the lock the second waits and then sends the
+   * rotated cookie. The API forgives the race for a short grace period anyway
+   * (`ROTATION_GRACE_SECONDS`); this keeps it from happening in the first place.
+   */
+  const locked =
+    typeof navigator !== 'undefined' && navigator.locks
+      ? navigator.locks.request('scribe:auth-refresh', () => run())
+      : run()
+
+  inFlight = locked.finally(() => {
     inFlight = null
   })
 

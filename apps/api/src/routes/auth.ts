@@ -19,7 +19,7 @@ import {
   passwordSchema,
   usernameSchema,
 } from "../lib/auth-schemas.js";
-import { verifyRefreshToken } from "../lib/jwt.js";
+import { createAccessToken, verifyRefreshToken } from "../lib/jwt.js";
 import { verifyGoogleIdToken } from "../lib/google.js";
 import { redis } from "../lib/redis.js";
 import { storage } from "../lib/storage.js";
@@ -38,6 +38,8 @@ import {
   revokeAllSessions,
   revokeFamily,
   revokeSession,
+  rotatedKey,
+  ROTATION_GRACE_SECONDS,
   sessionKey,
   startSession,
   userSessionsKey,
@@ -154,6 +156,15 @@ router.post("/refresh", async (req, res) => {
   const raw = await redis.get(sessionKey(payload.sid));
 
   if (!raw) {
+    // Rotated a moment ago by another tab or an earlier request: see
+    // `ROTATION_GRACE_SECONDS`.
+    const graced = await graceAccessToken(refreshToken, payload);
+
+    if (graced) {
+      res.status(200).json({ message: "Token refreshed successfully", accessToken: graced });
+      return;
+    }
+
     /**
      * The token verifies but its session is gone. If the chain is still alive,
      * this token was already rotated and is being replayed — burn the chain.
@@ -194,16 +205,26 @@ router.post("/refresh", async (req, res) => {
   }
 
   /**
-   * Rotate. `DEL` reports how many keys it removed, and that makes it the
-   * mutex: concurrent replays of one token all get past the `GET` above, but
-   * exactly one gets a 1 back here. Ignoring this result let a single token
-   * mint a session per concurrent request.
+   * Rotate. Claiming the grace marker with `NX` is the mutex: concurrent
+   * requests with one token all get past the `GET` above, but exactly one
+   * claims it and mints the next session. The rest are inside the grace
+   * period by definition, and get an access token without a new session --
+   * one token must never mint a session per concurrent request.
    */
-  const rotated = await redis.del(sessionKey(payload.sid));
+  const claimed = await redis.set(rotatedKey(payload.sid), JSON.stringify(session), {
+    NX: true,
+    EX: ROTATION_GRACE_SECONDS,
+  });
 
-  if (rotated === 0) {
-    throw HttpError.unauthorized("Invalid refresh token.");
+  if (claimed === null) {
+    const graced = await graceAccessToken(refreshToken, payload);
+    if (!graced) throw HttpError.unauthorized("Invalid refresh token.");
+
+    res.status(200).json({ message: "Token refreshed successfully", accessToken: graced });
+    return;
   }
+
+  await redis.del(sessionKey(payload.sid));
 
   await redis.zRem(userSessionsKey(session.userId), payload.sid);
 
@@ -219,6 +240,34 @@ router.post("/refresh", async (req, res) => {
     accessToken,
   });
 });
+
+/**
+ * An access token for a refresh token rotated within the grace period, or
+ * null when it was not. The chain has to be alive still: a logout, a password
+ * change or a replay burn deletes the family, and a token from a revoked chain
+ * gets nothing however recently it was rotated.
+ */
+async function graceAccessToken(
+  refreshToken: string,
+  payload: { sub: string; sid: string; fid: string },
+): Promise<string | null> {
+  const raw = await redis.get(rotatedKey(payload.sid));
+  const rotated = raw ? parseSession(raw) : null;
+
+  if (
+    !rotated ||
+    rotated.userId !== payload.sub ||
+    rotated.familyId !== payload.fid ||
+    !hashesMatch(hashRefreshToken(refreshToken), rotated.refreshTokenHash) ||
+    rotated.absoluteExpiresAt <= Date.now()
+  ) {
+    return null;
+  }
+
+  if ((await redis.exists(familyKey(payload.fid))) === 0) return null;
+
+  return createAccessToken(rotated.userId);
+}
 
 /**
  * Idempotent by design: an unverifiable or already-revoked cookie still leaves

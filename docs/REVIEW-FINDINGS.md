@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-9, M-2, M-7, M-8 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-9, M-1, M-2, M-7, M-8 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -199,7 +199,7 @@ So the list below is not read as "everything is broken":
 
 ## 3. Medium
 
-### M-1 · A second tab (or a quick reload) can sign the user out everywhere — Confirmed
+### M-1 · A second tab (or a quick reload) can sign the user out everywhere — Confirmed — **Fixed**
 - **Where:** `apps/api/src/routes/auth.ts:153-205`; web
   `components/providers/AuthProvider.tsx`, `lib/access-token.ts`
 - **Repro:** refresh with cookie C → rotated to C2. A second request still
@@ -439,5 +439,11 @@ tests are "delete X with two of every child", one per entity.
    write, the way it reports AI. Verified live: the dev stack answers 503 and
    `degraded`. **Still to do by hand:** unpause the Supabase project (or move
    to R2 as `render.yaml` suggests).
-5. **M-1** (multi-tab sign-out), then the remaining Medium items.
+5. ~~**M-1**~~ **Done.** A just-rotated refresh token is honoured for 30 s
+   (`ROTATION_GRACE_SECONDS`): the request gets an access token and no new
+   cookie, provided the chain has not been signed out or revoked. The
+   rotation mutex is now a `SET NX` grace marker, so parallel refreshes
+   still mint only one session. Replays after the window burn the chain as
+   before. The web app also serialises refreshes across tabs with
+   `navigator.locks`. Then the remaining Medium items.
 6. Low items as convenient.

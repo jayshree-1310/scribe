@@ -78,6 +78,32 @@ export function userSessionsKey(userId: string): string {
   return `auth:sessions:${userId}`;
 }
 
+/**
+ * Marks a token that was just rotated, for `ROTATION_GRACE_SECONDS`. Holds the
+ * rotated session's record, so a late request carrying that token can be
+ * checked against it.
+ */
+export function rotatedKey(sessionId: string): string {
+  return `auth:rotated:${sessionId}`;
+}
+
+/**
+ * How long a just-rotated refresh token is still honoured.
+ *
+ * Two tabs that load at the same moment, or a reload while a refresh is on
+ * the wire, send the same cookie twice: the first rotates it, and the second
+ * arrives with the old one. Without a grace period that second request is
+ * indistinguishable from a replayed token and burns the whole chain, signing
+ * the user out of every tab. Inside the window it gets an access token
+ * instead, and no new cookie -- the browser's cookie jar is shared, so it
+ * already holds the rotated one.
+ *
+ * A thief replaying a stolen token inside the window gets an access token
+ * too, which is the trade every reuse interval makes; past it, a replay burns
+ * the chain exactly as before.
+ */
+export const ROTATION_GRACE_SECONDS = 30;
+
 export interface SessionRecord {
   userId: string;
   familyId: string;

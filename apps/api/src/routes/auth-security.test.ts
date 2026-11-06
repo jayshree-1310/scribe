@@ -166,8 +166,12 @@ beforeEach(async () => {
   if (!available) return;
   sent.length = 0;
   // Every test shares 127.0.0.1, so one suite would otherwise exhaust the
-  // per-IP budgets the routes are supposed to be enforcing per caller.
-  for (const key of await redis.keys("auth:ratelimit:*")) await redis.del(key);
+  // per-IP budgets the routes are supposed to be enforcing per caller. Not the
+  // Google scope: this suite never calls it, and `auth-google.test.ts`, which
+  // may be running at the same time, counts on that budget running out.
+  for (const key of await redis.keys("auth:ratelimit:*")) {
+    if (!key.startsWith("auth:ratelimit:google:")) await redis.del(key);
+  }
 });
 
 describe.skipIf(!available)("POST /api/auth/forgot-password", () => {
@@ -433,5 +437,79 @@ describe.skipIf(!available)("email verification", () => {
 
     expect(response.status).toBe(200);
     expect(sent).toHaveLength(0);
+  });
+});
+
+/* Refresh rotation across tabs ---------------------------------------------- */
+
+/** The session id inside a refresh cookie, read from its JWT payload. */
+function sidOf(cookie: string): string {
+  const token = decodeURIComponent(cookie.split(";")[0]!.split("=").slice(1).join("="));
+  const payload = JSON.parse(Buffer.from(token.split(".")[1]!, "base64url").toString("utf8"));
+  return payload.sid as string;
+}
+
+describe.skipIf(!available)("POST /api/auth/refresh across tabs", () => {
+  it("answers two simultaneous refreshes, rotating once", async () => {
+    const account = await signUp();
+    const { cookie } = await signIn(account);
+
+    const [a, b] = await Promise.all([
+      call("/api/auth/refresh", { cookie }),
+      call("/api/auth/refresh", { cookie }),
+    ]);
+
+    expect([a.status, b.status]).toEqual([200, 200]);
+    expect(a.body.accessToken).toBeTruthy();
+    expect(b.body.accessToken).toBeTruthy();
+
+    // Exactly one of them minted the next session, and it works.
+    const rotated = [a.cookie, b.cookie].filter(Boolean);
+    expect(rotated).toHaveLength(1);
+    expect((await call("/api/auth/refresh", { cookie: rotated[0] })).status).toBe(200);
+  });
+
+  it("honours a just-rotated token without burning the chain", async () => {
+    const account = await signUp();
+    const { cookie } = await signIn(account);
+
+    const first = await call("/api/auth/refresh", { cookie });
+    expect(first.status).toBe(200);
+
+    // The second tab, a moment later, still holding the old cookie.
+    const late = await call("/api/auth/refresh", { cookie });
+    expect(late.status).toBe(200);
+    expect(late.body.accessToken).toBeTruthy();
+    // No cookie: the browser already holds the rotated one.
+    expect(late.cookie).toBeUndefined();
+
+    // And the rotated one still works.
+    expect((await call("/api/auth/refresh", { cookie: first.cookie })).status).toBe(200);
+  });
+
+  it("still burns the chain for a replay after the grace period", async () => {
+    const account = await signUp();
+    const { cookie } = await signIn(account);
+
+    const first = await call("/api/auth/refresh", { cookie });
+
+    // The grace period running out, without waiting for it.
+    await redis.del(`auth:rotated:${sidOf(cookie!)}`);
+
+    const replay = await call("/api/auth/refresh", { cookie });
+    expect(replay.status).toBe(401);
+
+    // Both holders re-authenticate: the live token died with the chain.
+    expect((await call("/api/auth/refresh", { cookie: first.cookie })).status).toBe(401);
+  });
+
+  it("gives nothing for a rotated token once the user has signed out", async () => {
+    const account = await signUp();
+    const { cookie } = await signIn(account);
+
+    const first = await call("/api/auth/refresh", { cookie });
+    await call("/api/auth/logout", { cookie: first.cookie });
+
+    expect((await call("/api/auth/refresh", { cookie })).status).toBe(401);
   });
 });
