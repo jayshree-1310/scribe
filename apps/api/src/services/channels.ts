@@ -18,6 +18,7 @@ import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
 import { notify } from "./notifications.js";
 import { moderate } from "./ai/moderation.js";
+import { removeChannel } from "./removal.js";
 import { assertNotSuspended } from "./roles.js";
 import { toIso } from "./stories.js";
 
@@ -458,16 +459,7 @@ export async function deleteChannel(
   await db.transaction(async (tx) => {
     const channel = await ownedChannel(tx, slugOrId, userId);
 
-    // Posts and subscribers both reference the channel, so they go first.
-    await tx.orm.channels.ChannelPost.where((row) =>
-      row.channelId.eq(channel.id),
-    ).delete();
-    await tx.orm.channels.ChannelSubscriber.where((row) =>
-      row.channelId.eq(channel.id),
-    ).delete();
-    await tx.orm.channels.BroadcastChannel.where((row) =>
-      row.id.eq(channel.id),
-    ).delete();
+    await removeChannel(tx, channel.id);
   });
 }
 

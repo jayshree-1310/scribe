@@ -415,6 +415,175 @@ describe.skipIf(!available)("DELETE /api/account/me", () => {
     expect(remaining).toBeFalsy();
   });
 
+  /**
+   * An account that has used the social side: club threads with other
+   * people's replies under them, a club of its own with discussions, comment
+   * threads in both directions, a story somebody else's club is reading, and
+   * a hosted challenge. Each of these failed the deletion with a 500 on its
+   * own foreign key; the case above touched none of them.
+   */
+  it("deletes an account that has used clubs, threads and challenges", async () => {
+    const user = await createDeletable("d6", "open sesame please");
+    const neighbourId = await api.createUser("d7");
+    const thirdId = await api.createUser("d8");
+
+    // Their story, with a reply thread, picked as another club's current read.
+    const story = await api.createStory({ title: "Being Read", authorId: user.id });
+    await api.createChapter({ storyId: story.id, number: 1 });
+    const onTheirs = await api.createComment({ storyId: story.id, userId: neighbourId });
+    await api.createComment({ storyId: story.id, userId: user.id, parentId: onTheirs });
+    await api.createComment({ storyId: story.id, userId: thirdId, parentId: onTheirs });
+
+    const neighbourClub = await api.createClub({
+      name: "Neighbour's Club",
+      creatorId: neighbourId,
+      currentStoryId: story.id,
+    });
+    await api.addClubMember({ clubId: neighbourClub.id, userId: user.id });
+    await api.addClubMember({ clubId: neighbourClub.id, userId: thirdId });
+
+    // A thread of theirs with two replies from others, and a reply of theirs
+    // under a thread that stays.
+    const theirThread = await api.createDiscussion({
+      clubId: neighbourClub.id,
+      userId: user.id,
+    });
+    await api.createDiscussion({ clubId: neighbourClub.id, userId: neighbourId, parentId: theirThread });
+    await api.createDiscussion({ clubId: neighbourClub.id, userId: thirdId, parentId: theirThread });
+    const keptThread = await api.createDiscussion({
+      clubId: neighbourClub.id,
+      userId: neighbourId,
+    });
+    await api.createDiscussion({ clubId: neighbourClub.id, userId: user.id, parentId: keptThread });
+
+    // A club of their own, with discussions by somebody else.
+    const ownClub = await api.createClub({ name: "Own Club", creatorId: user.id });
+    await api.addClubMember({ clubId: ownClub.id, userId: neighbourId });
+    const inOwn = await api.createDiscussion({ clubId: ownClub.id, userId: neighbourId });
+    await api.createDiscussion({ clubId: ownClub.id, userId: neighbourId, parentId: inOwn });
+    await api.createDiscussion({ clubId: ownClub.id, userId: thirdId, parentId: inOwn });
+
+    // A comment on somebody else's story with two third-party replies.
+    const neighbourStory = await api.createStory({
+      title: "Neighbour's Story",
+      authorId: neighbourId,
+    });
+    const theirComment = await api.createComment({
+      storyId: neighbourStory.id,
+      userId: user.id,
+    });
+    await api.createComment({ storyId: neighbourStory.id, userId: neighbourId, parentId: theirComment });
+    await api.createComment({ storyId: neighbourStory.id, userId: thirdId, parentId: theirComment });
+
+    // A challenge they host, with somebody else's entry.
+    const challenge = await api.createChallenge({ title: "Hosted", hostId: user.id });
+    await api.createChallengeEntry({
+      challengeId: challenge.id,
+      userId: neighbourId,
+      storyId: neighbourStory.id,
+    });
+
+    const response = await api.request("/api/account/me", {
+      method: "DELETE",
+      as: user.id,
+      body: { confirmUsername: user.username, password: "open sesame please" },
+    });
+
+    expect(response.status).toBe(200);
+    expect(await stillExists(user.id)).toBeFalsy();
+
+    // The neighbour's club stays, reading nothing; their kept thread stays
+    // without the deleted account's reply; the neighbour's story stays
+    // without the deleted account's comment thread.
+    const club = await db.orm.clubs.BookClub.select("currentStoryId")
+      .where((row) => row.id.eq(neighbourClub.id))
+      .first();
+    expect(club).toEqual({ currentStoryId: null });
+
+    const discussions = await db.orm.clubs.ClubDiscussion.select("id")
+      .where((row) => row.clubId.eq(neighbourClub.id))
+      .all();
+    expect(discussions.map((row) => row.id)).toEqual([keptThread]);
+
+    const comments = await db.orm.engagement.Comment.select("id")
+      .where((row) => row.storyId.eq(neighbourStory.id))
+      .all();
+    expect(comments).toHaveLength(0);
+
+    const challenges = await db.orm.challenges.WritingChallenge.select("id")
+      .where((row) => row.id.eq(challenge.id))
+      .all();
+    expect(challenges).toHaveLength(0);
+  });
+
+  /**
+   * A tripwire, not a behaviour test. Every foreign key onto an account, a
+   * story or a chapter that does not cascade has to be handled by hand in
+   * `deleteAccount` (and, for stories and chapters, `removeStory` in
+   * `services/removal.ts`). When this list changes, a table was added or
+   * dropped: update those sweeps first, then this list.
+   */
+  it("knows every table that blocks deleting an account or a story", async () => {
+    const rows = await db.runtime().query(
+      db.raw.sql`
+        SELECT n.nspname || '.' || c.relname || '.' || a.attname
+               || ' -> ' || fn.nspname || '.' || f.relname AS "fk"
+          FROM pg_constraint k
+          JOIN pg_class c      ON c.oid = k.conrelid
+          JOIN pg_namespace n  ON n.oid = c.relnamespace
+          JOIN pg_class f      ON f.oid = k.confrelid
+          JOIN pg_namespace fn ON fn.oid = f.relnamespace
+          JOIN pg_attribute a  ON a.attrelid = k.conrelid AND a.attnum = k.conkey[1]
+         WHERE k.contype = 'f'
+           AND k.confdeltype <> 'c'
+           AND fn.nspname || '.' || f.relname IN ('auth.user', 'content.story', 'content.chapter')
+      `.returnsRow({ fk: "pg/text@1" }).build(),
+    );
+
+    expect(rows.map((row) => row.fk).sort()).toEqual([
+      "ai.chapterSummary.chapterId -> content.chapter",
+      "auth.genrePreference.userId -> auth.user",
+      "auth.notificationMute.userId -> auth.user",
+      "auth.userPreference.userId -> auth.user",
+      "challenges.challengeEntry.storyId -> content.story",
+      "challenges.challengeEntry.userId -> auth.user",
+      "challenges.writingChallenge.hostId -> auth.user",
+      "channels.broadcastChannel.authorId -> auth.user",
+      "channels.channelSubscriber.userId -> auth.user",
+      "clubs.bookClub.creatorId -> auth.user",
+      "clubs.bookClub.currentStoryId -> content.story",
+      "clubs.clubDiscussion.userId -> auth.user",
+      "clubs.clubMembership.userId -> auth.user",
+      "content.chapter.storyId -> content.story",
+      "content.multimedia.chapterId -> content.chapter",
+      "content.story.authorId -> auth.user",
+      "content.storyGenre.storyId -> content.story",
+      "engagement.chapterLike.chapterId -> content.chapter",
+      "engagement.chapterLike.userId -> auth.user",
+      "engagement.chapterRead.chapterId -> content.chapter",
+      "engagement.chapterRead.storyId -> content.story",
+      "engagement.chapterRead.userId -> auth.user",
+      "engagement.comment.chapterId -> content.chapter",
+      "engagement.comment.storyId -> content.story",
+      "engagement.comment.userId -> auth.user",
+      "engagement.commentLike.userId -> auth.user",
+      "engagement.follow.followerId -> auth.user",
+      "engagement.follow.followingId -> auth.user",
+      "engagement.rating.storyId -> content.story",
+      "engagement.rating.userId -> auth.user",
+      "engagement.readingHistory.chapterId -> content.chapter",
+      "engagement.readingHistory.storyId -> content.story",
+      "engagement.readingHistory.userId -> auth.user",
+      "engagement.storyView.storyId -> content.story",
+      "engagement.storyView.userId -> auth.user",
+      "gamification.userBadge.userId -> auth.user",
+      "moderation.report.reporterId -> auth.user",
+      "moderation.report.resolvedById -> auth.user",
+      "notifications.notification.actorId -> auth.user",
+      "notifications.notification.userId -> auth.user",
+    ]);
+  });
+
   it("asks a Google-only account for the username alone", async () => {
     const user = await createDeletable("d4", null);
 

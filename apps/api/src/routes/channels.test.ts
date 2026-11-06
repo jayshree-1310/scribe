@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TestApi, databaseAvailable } from "../test/harness.js";
+import { db } from "../prisma/db.js";
 
 const api = new TestApi();
 const available = await databaseAvailable();
@@ -312,6 +313,34 @@ describe.skipIf(!available)("creating a channel", () => {
 
     expect(deleted.status).toBe(204);
     expect((await api.request(`/api/channels/${doomed}`)).status).toBe(404);
+  });
+
+  // Two of every child: the one-of-each case above passed while a channel
+  // with a second post or subscriber failed on `channelPost_channelId_fkey`.
+  it("deletes a channel with two posts and two subscribers", async () => {
+    const doomed = await api.createChannel({ name: "Busy Channel", authorId: rival });
+
+    await api.createChannelPost({ channelId: doomed.id, title: "One" });
+    await api.createChannelPost({ channelId: doomed.id, title: "Two" });
+    await api.subscribeToChannel({ channelId: doomed.id, userId: reader });
+    await api.subscribeToChannel({ channelId: doomed.id, userId: author });
+
+    const deleted = await api.request(`/api/channels/${doomed.id}`, {
+      method: "DELETE",
+      as: rival,
+    });
+
+    expect(deleted.status).toBe(204);
+
+    const posts = await db.orm.channels.ChannelPost.select("id")
+      .where((row) => row.channelId.eq(doomed.id))
+      .all();
+    const subscribers = await db.orm.channels.ChannelSubscriber.select("id")
+      .where((row) => row.channelId.eq(doomed.id))
+      .all();
+
+    expect(posts).toHaveLength(0);
+    expect(subscribers).toHaveLength(0);
   });
 });
 

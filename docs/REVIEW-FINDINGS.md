@@ -5,6 +5,8 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
+**Fix progress:** H-1 to H-7 fixed (2026-11-06) — see §8.
+
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
 behaviour a user will hit), Low (edge case, polish, tech debt). **Status:**
@@ -63,7 +65,7 @@ So the list below is not read as "everything is broken":
 
 ## 2. High
 
-### H-1 · Deleting a club thread with 2+ replies fails (500) — Confirmed
+### H-1 · Deleting a club thread with 2+ replies fails (500) — Confirmed — **Fixed**
 - **Where:** `apps/api/src/services/clubs.ts:1168` (`deleteDiscussion`)
 - **Repro:** post a thread, add two replies, `DELETE /api/clubs/discussions/:id`
   as the author or a club admin.
@@ -73,7 +75,7 @@ So the list below is not read as "everything is broken":
   (see `prisma/delete-all.ts`).
 - **Fix:** `deleteAll(() => tx.orm.clubs.ClubDiscussion.where(parentId = id))`.
 
-### H-2 · Deleting a club with 2+ members or 2+ discussions fails (500) — Confirmed
+### H-2 · Deleting a club with 2+ members or 2+ discussions fails (500) — Confirmed — **Fixed**
 - **Where:** `apps/api/src/services/clubs.ts:701` (`deleteClub`)
 - **Repro:** club with 3 members and 2 threads → `DELETE /api/clubs/:id`.
 - **Actual:** 500, `clubDiscussion_parentId_fkey`; with no discussions it
@@ -82,12 +84,12 @@ So the list below is not read as "everything is broken":
   memberships.
 - **Fix:** `deleteAll` for each, replies before threads.
 
-### H-3 · Deleting a channel with 2+ posts or 2+ subscribers fails (500) — Confirmed
+### H-3 · Deleting a channel with 2+ posts or 2+ subscribers fails (500) — Confirmed — **Fixed**
 - **Where:** `apps/api/src/services/channels.ts:454` (`deleteChannel`)
 - **Actual:** 500, `channelPost_channelId_fkey`.
 - **Fix:** `deleteAll` for posts and subscribers.
 
-### H-4 · An author cannot delete a story anyone has viewed (500) — Confirmed
+### H-4 · An author cannot delete a story anyone has viewed (500) — Confirmed — **Fixed**
 - **Where:** `apps/api/src/services/authoring.ts:509` (`deleteStory`)
 - **Repro:** publish a story, open it as another user (or signed out),
   then `DELETE /api/author/stories/:id`.
@@ -99,7 +101,7 @@ So the list below is not read as "everything is broken":
   shared "remove a story" helper used by both `deleteStory` and
   `deleteAccount`.
 
-### H-5 · Deleting a story whose comments have 2+ replies fails (500) — Confirmed
+### H-5 · Deleting a story whose comments have 2+ replies fails (500) — Confirmed — **Fixed**
 - **Where:** `services/authoring.ts:562` and `services/account.ts:510`
   (`deleteAll(Comment.where(storyId))`), plus `services/account.ts:580`
   (the caller's own comments).
@@ -113,7 +115,7 @@ So the list below is not read as "everything is broken":
   one raw `DELETE … WHERE "storyId" = $1` (Postgres checks the constraint at
   statement end, so self-references in the same statement are fine).
 
-### H-6 · A story that is any club's current read cannot be deleted (500) — Confirmed
+### H-6 · A story that is any club's current read cannot be deleted (500) — Confirmed — **Fixed**
 - **Where:** `services/authoring.ts:509`, `services/account.ts:442`
 - **Repro:** user B's club sets user A's story as its current read; A
   deletes the story (or their account).
@@ -122,7 +124,7 @@ So the list below is not read as "everything is broken":
 - **Fix:** `UPDATE clubs."bookClub" SET "currentStoryId" = NULL WHERE
   "currentStoryId" = $story` inside both deletes.
 
-### H-7 · Account deletion fails for most active users (500) — Confirmed
+### H-7 · Account deletion fails for most active users (500) — Confirmed — **Fixed**
 - **Where:** `apps/api/src/services/account.ts:387` (`deleteAccount`)
 - **Confirmed failures:**
   - posted any club discussion → `clubDiscussion_userId_fkey`
@@ -403,9 +405,18 @@ tests are "delete X with two of every child", one per entity.
 
 ## 8. Suggested fix order
 
-1. **H-1 to H-7** (one root cause: delete paths): a shared `removeStory`
-   helper, `deleteAll` everywhere a predicate can match many rows, and
-   two-children tests per entity.
+1. ~~**H-1 to H-7**~~ **Done.** `services/removal.ts` holds `removeStory`,
+   `removeClub` and `removeChannel`, shared by the single deletes and
+   `deleteAccount`. Each sweep is one raw statement, so self-referencing
+   threads (comments, club discussions) go in a single `DELETE` and Postgres
+   checks the foreign key at statement end. `deleteAccount` also removes the
+   replies under the account's own comments and club threads (as
+   `deleteComment` / `deleteDiscussion` do), the discussions in clubs it
+   created, and challenges it hosted; a story's deletion clears
+   `bookClub.currentStoryId` instead of failing. Tests: two-of-every-child
+   deletes for clubs, threads, channels, stories and accounts, plus a
+   tripwire in `routes/account.test.ts` listing every non-cascading foreign
+   key onto `auth.user`, `content.story` and `content.chapter`.
 2. **H-8** (cross-user file deletion) together with **M-7** and **M-8**: an
    uploads table with an owner.
 3. **H-9** (Google account pre-hijack) and **M-2** (avatar overwrite): both

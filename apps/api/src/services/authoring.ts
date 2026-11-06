@@ -21,6 +21,7 @@ import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
 import { uniqueSlug } from "../lib/slug.js";
 import { deleteAll } from "../prisma/delete-all.js";
+import { removeStory } from "./removal.js";
 import { scheduleContinuityCheck } from "./ai/continuity-queue.js";
 import { refreshStoryVector } from "./ai/embeddings.js";
 import { scheduleBibleRefresh, scheduleChapterEmbedding } from "./ai/job-schedule.js";
@@ -498,13 +499,9 @@ export async function updateStory(
 }
 
 /**
- * Deletes a story and everything hanging off it.
- *
- * The dependent rows go by hand because only `library.LibraryEntry` declares
- * `onDelete: Cascade` in the contract; the rest would raise a foreign-key
- * violation. That includes other people's comments, ratings and progress:
- * there is nothing for them to point at once the story is gone, which is what
- * the confirmation dialog warns about.
+ * Deletes a story and everything hanging off it -- including other people's
+ * comments, ratings and progress, which is what the confirmation dialog warns
+ * about. The sweep itself is `removeStory`, shared with `deleteAccount`.
  */
 export async function deleteStory(
   userId: string,
@@ -518,67 +515,9 @@ export async function deleteStory(
     cover = story.coverUrl;
 
     const chapterIds = await chapterIdsInOrder(tx, storyId);
-
     media.push(...(await mediaUrls(tx, chapterIds)));
 
-    for (const chapterId of chapterIds) {
-      await deleteAll(() =>
-        tx.orm.content.Multimedia.where((item) => item.chapterId.eq(chapterId)),
-      );
-      await deleteAll(() =>
-        tx.orm.engagement.ChapterLike.where((like) =>
-          like.chapterId.eq(chapterId),
-        ),
-      );
-      // The generated recap, which has a foreign key onto the chapter and so
-      // would block its deletion. Nothing regrets losing it: it is derived
-      // from a chapter that is about to stop existing.
-      await deleteAll(() =>
-        tx.orm.ai.ChapterSummary.where((row) => row.chapterId.eq(chapterId)),
-      );
-    }
-
-    /**
-     * Likes on this story's comments, before the comments they point at.
-     * Gathered per comment rather than per story because `engagement.CommentLike`
-     * carries no `storyId` -- it is a fact about a comment, and the comment is
-     * the only thing that knows which story it belongs to.
-     */
-    const commented = await tx.orm.engagement.Comment.select("id")
-      .where((row) => row.storyId.eq(storyId))
-      .all();
-
-    for (const comment of commented) {
-      await deleteAll(() =>
-        tx.orm.engagement.CommentLike.where((like) =>
-          like.commentId.eq(comment.id),
-        ),
-      );
-    }
-
-    // Comments and progress rows carry `storyId` even when they point at a
-    // chapter, so one pass each clears both the story-level and chapter-level
-    // rows before the chapters themselves go.
-    await deleteAll(() =>
-      tx.orm.engagement.Comment.where((row) => row.storyId.eq(storyId)),
-    );
-    await deleteAll(() =>
-      tx.orm.engagement.ReadingHistory.where((row) => row.storyId.eq(storyId)),
-    );
-    await deleteAll(() =>
-      tx.orm.engagement.Rating.where((row) => row.storyId.eq(storyId)),
-    );
-    await deleteAll(() =>
-      tx.orm.challenges.ChallengeEntry.where((row) => row.storyId.eq(storyId)),
-    );
-    await deleteAll(() =>
-      tx.orm.content.StoryGenre.where((link) => link.storyId.eq(storyId)),
-    );
-    await deleteAll(() =>
-      tx.orm.content.Chapter.where((chapter) => chapter.storyId.eq(storyId)),
-    );
-
-    await tx.orm.content.Story.where((story) => story.id.eq(storyId)).delete();
+    await removeStory(tx, storyId);
   });
 
   // Nothing references the cover or the chapter attachments now.

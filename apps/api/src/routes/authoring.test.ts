@@ -368,6 +368,68 @@ describe.skipIf(!available)("DELETE /api/author/stories/:id", () => {
     const gone = await api.request(`/api/stories/${story.slug}`, { as: authorId });
     expect(gone.status).toBe(404);
   });
+
+  /**
+   * What a story that real readers have found looks like: views and reads,
+   * signed in and signed out, a comment thread with several replies, and
+   * somebody else's club reading it. Each of these failed the delete with a
+   * 500 on its own foreign key, and none appeared in the case above.
+   */
+  it("deletes a story readers have opened, discussed and picked for a club", async () => {
+    const story = await api.createStory({
+      title: title("Well Read"),
+      authorId,
+      genreIds: [genreId],
+    });
+    const chapterOne = await api.createChapter({ storyId: story.id, number: 1 });
+    await api.createChapter({ storyId: story.id, number: 2 });
+
+    await Promise.all([
+      api.request(`/api/stories/${story.slug}`, { as: intruderId }),
+      api.request(`/api/stories/${story.slug}`),
+      api.request(`/api/stories/${story.slug}/chapters/1`, { as: intruderId }),
+      api.request(`/api/stories/${story.slug}/chapters/2`, { as: intruderId }),
+      api.request(`/api/stories/${story.slug}/chapters/1`),
+    ]);
+    await api.settleBackgroundWrites();
+    expect(await api.countStoryViews(story.id)).toBeGreaterThan(0);
+    expect(await api.countChapterReads(chapterOne)).toBeGreaterThan(0);
+
+    for (const n of [1, 2]) {
+      const thread = await api.createComment({
+        storyId: story.id,
+        userId: intruderId,
+        content: `Thread ${n}.`,
+      });
+      await api.createComment({ storyId: story.id, userId: authorId, parentId: thread });
+      await api.createComment({ storyId: story.id, userId: intruderId, parentId: thread });
+    }
+
+    const club = await api.createClub({
+      name: "Readers Of Well Read",
+      creatorId: intruderId,
+      currentStoryId: story.id,
+    });
+
+    const { status } = await api.request(`/api/author/stories/${story.id}`, {
+      method: "DELETE",
+      as: authorId,
+    });
+    expect(status).toBe(204);
+
+    const comments = await db.orm.engagement.Comment.select("id")
+      .where((row) => row.storyId.eq(story.id))
+      .all();
+    expect(comments).toHaveLength(0);
+    expect(await api.countStoryViews(story.id)).toBe(0);
+    expect(await api.countChapterReads(chapterOne)).toBe(0);
+
+    // The club survives the delete with no current read.
+    const kept = await db.orm.clubs.BookClub.select("currentStoryId")
+      .where((row) => row.id.eq(club.id))
+      .first();
+    expect(kept).toEqual({ currentStoryId: null });
+  });
 });
 
 /* Chapters --------------------------------------------------------------- */

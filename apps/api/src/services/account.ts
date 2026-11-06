@@ -16,6 +16,7 @@ import { revokeAllSessions } from "../lib/sessions.js";
 import { storage } from "../lib/storage.js";
 import { drainDeferredWrites } from "./deferred.js";
 import { deletePreferencesFor, hasCompletedOnboarding } from "./preferences.js";
+import { removeChannel, removeClub, removeStory } from "./removal.js";
 
 /** The profile shape the account endpoints return. Written out field by field
  * rather than spread from the row, so adding a column — `passwordHash` being
@@ -444,92 +445,15 @@ export async function deleteAccount(
       .where((story) => story.authorId.eq(userId))
       .all();
 
+    /**
+     * Their stories, with everything other readers left on them. The same
+     * sweep `deleteStory` uses, so the two cannot drift apart again. Recaps of
+     * their chapters go with it, which they would have to regardless: a recap
+     * is written from a member's own unpublished prose, and erasing the prose
+     * while keeping a model's paraphrase of it is not a deletion.
+     */
     for (const { id: storyId } of stories) {
-      const chapters = await tx.orm.content.Chapter.select("id")
-        .where((chapter) => chapter.storyId.eq(storyId))
-        .all();
-
-      for (const { id: chapterId } of chapters) {
-        await deleteAll(() =>
-          tx.orm.content.Multimedia.where((item) => item.chapterId.eq(chapterId)),
-        );
-        await deleteAll(() =>
-          tx.orm.engagement.ChapterLike.where((like) =>
-            like.chapterId.eq(chapterId),
-          ),
-        );
-        /**
-         * Generated recaps of this account's chapters. They hold a foreign key
-         * onto the chapter, so they would block the delete below -- but they
-         * would have to go regardless: a recap is written from a member's own
-         * unpublished prose, and erasing the prose while keeping a model's
-         * paraphrase of it is not a deletion. See the retention note in the
-         * header.
-         */
-        await deleteAll(() =>
-          tx.orm.ai.ChapterSummary.where((row) => row.chapterId.eq(chapterId)),
-        );
-      }
-
-      /**
-       * Likes on this story's comments, before the comments. Per comment
-       * rather than per story: `engagement.CommentLike` carries no `storyId`,
-       * for the reason `deleteStory` in `services/authoring.ts` gives beside
-       * the same pass.
-       */
-      const commented = await tx.orm.engagement.Comment.select("id")
-        .where((row) => row.storyId.eq(storyId))
-        .all();
-
-      for (const comment of commented) {
-        await deleteAll(() =>
-          tx.orm.engagement.CommentLike.where((like) =>
-            like.commentId.eq(comment.id),
-          ),
-        );
-      }
-
-      /**
-       * The analytics events against this story, whoever generated them.
-       *
-       * Both tables carry `storyId`, so one pass each reaches the chapter-level
-       * rows too -- and both have to, because most of these rows belong to
-       * *nobody*: a signed-out visitor is recorded with a null `userId` and a
-       * salted `visitorKey`, so the per-user sweep further down cannot see them
-       * and `chapterRead_chapterId_fkey` refuses the chapter delete below.
-       */
-      await deleteAll(() =>
-        tx.orm.engagement.ChapterRead.where((row) => row.storyId.eq(storyId)),
-      );
-      await deleteAll(() =>
-        tx.orm.engagement.StoryView.where((row) => row.storyId.eq(storyId)),
-      );
-
-      // Everyone's rows against this story, not just the author's: the story
-      // is going, and a rating pointing at nothing is a foreign-key error.
-      await deleteAll(() =>
-        tx.orm.engagement.Comment.where((row) => row.storyId.eq(storyId)),
-      );
-      await deleteAll(() =>
-        tx.orm.engagement.Rating.where((row) => row.storyId.eq(storyId)),
-      );
-      await deleteAll(() =>
-        tx.orm.engagement.ReadingHistory.where((row) => row.storyId.eq(storyId)),
-      );
-      await deleteAll(() =>
-        tx.orm.library.LibraryEntry.where((row) => row.storyId.eq(storyId)),
-      );
-      await deleteAll(() =>
-        tx.orm.challenges.ChallengeEntry.where((row) => row.storyId.eq(storyId)),
-      );
-      await deleteAll(() =>
-        tx.orm.content.StoryGenre.where((row) => row.storyId.eq(storyId)),
-      );
-      await deleteAll(() =>
-        tx.orm.content.Chapter.where((row) => row.storyId.eq(storyId)),
-      );
-
-      await tx.orm.content.Story.where((row) => row.id.eq(storyId)).delete();
+      await removeStory(tx, storyId);
     }
 
     /**
@@ -565,20 +489,29 @@ export async function deleteAccount(
       tx.orm.engagement.ChapterLike.where((like) => like.userId.eq(userId)),
     );
 
-    const theirComments = await tx.orm.engagement.Comment.select("id")
-      .where((row) => row.userId.eq(userId))
-      .all();
-
-    for (const comment of theirComments) {
-      await deleteAll(() =>
-        tx.orm.engagement.CommentLike.where((like) =>
-          like.commentId.eq(comment.id),
-        ),
-      );
-    }
-
-    await deleteAll(() =>
-      tx.orm.engagement.Comment.where((row) => row.userId.eq(userId)),
+    /**
+     * Their comments on other people's stories, and the replies under them --
+     * the same rule `deleteComment` applies when a thread is retracted. One
+     * statement each, because the replies point back into the same table and
+     * the ORM's row-at-a-time delete can take a thread before its replies (see
+     * `services/removal.ts`). Likes on any of those rows go first.
+     */
+    await tx.query(
+      db.raw.sql`
+        DELETE FROM "engagement"."commentLike"
+         WHERE "commentId" IN (
+           SELECT "id" FROM "engagement"."comment"
+            WHERE "userId" = ${userId}
+               OR "parentId" IN (SELECT "id" FROM "engagement"."comment" WHERE "userId" = ${userId})
+         )
+      `.affectedCount().build(),
+    );
+    await tx.query(
+      db.raw.sql`
+        DELETE FROM "engagement"."comment"
+         WHERE "userId" = ${userId}
+            OR "parentId" IN (SELECT "id" FROM "engagement"."comment" WHERE "userId" = ${userId})
+      `.affectedCount().build(),
     );
     await deleteAll(() =>
       tx.orm.engagement.Rating.where((row) => row.userId.eq(userId)),
@@ -662,6 +595,37 @@ export async function deleteAccount(
         updatedAt: Temporal.Now.instant(),
       });
     }
+    /**
+     * Clubs and channels they created, with everything in them. Before the
+     * per-user sweeps below, which would otherwise have nothing left to do for
+     * these.
+     */
+    const clubs = await tx.orm.clubs.BookClub.select("id")
+      .where((club) => club.creatorId.eq(userId))
+      .all();
+
+    for (const { id: clubId } of clubs) await removeClub(tx, clubId);
+
+    const channels = await tx.orm.channels.BroadcastChannel.select("id")
+      .where((channel) => channel.authorId.eq(userId))
+      .all();
+
+    for (const { id: channelId } of channels) {
+      await removeChannel(tx, channelId);
+    }
+
+    /**
+     * What they posted in other people's clubs, and the replies under their
+     * threads -- what `deleteDiscussion` does when a thread is retracted. One
+     * statement, for the self-reference reason given above for comments.
+     */
+    await tx.query(
+      db.raw.sql`
+        DELETE FROM "clubs"."clubDiscussion"
+         WHERE "userId" = ${userId}
+            OR "parentId" IN (SELECT "id" FROM "clubs"."clubDiscussion" WHERE "userId" = ${userId})
+      `.affectedCount().build(),
+    );
     await deleteAll(() =>
       tx.orm.clubs.ClubMembership.where((row) => row.userId.eq(userId)),
     );
@@ -669,34 +633,20 @@ export async function deleteAccount(
       tx.orm.channels.ChannelSubscriber.where((row) => row.userId.eq(userId)),
     );
 
-    const clubs = await tx.orm.clubs.BookClub.select("id")
-      .where((club) => club.creatorId.eq(userId))
-      .all();
-
-    for (const { id: clubId } of clubs) {
-      await deleteAll(() =>
-        tx.orm.clubs.ClubMembership.where((row) => row.clubId.eq(clubId)),
-      );
-      await tx.orm.clubs.BookClub.where((row) => row.id.eq(clubId)).delete();
-    }
-
-    const channels = await tx.orm.channels.BroadcastChannel.select("id")
-      .where((channel) => channel.authorId.eq(userId))
-      .all();
-
-    for (const { id: channelId } of channels) {
-      await deleteAll(() =>
-        tx.orm.channels.ChannelPost.where((row) => row.channelId.eq(channelId)),
-      );
-      await deleteAll(() =>
-        tx.orm.channels.ChannelSubscriber.where((row) =>
-          row.channelId.eq(channelId),
-        ),
-      );
-      await tx.orm.channels.BroadcastChannel.where((row) =>
-        row.id.eq(channelId),
-      ).delete();
-    }
+    /**
+     * Challenges they hosted (admins only), with everyone's entries. The
+     * entries are places in a challenge that is going; the stories entered
+     * stay, because they belong to their authors.
+     */
+    await tx.query(
+      db.raw.sql`
+        DELETE FROM "challenges"."challengeEntry"
+         WHERE "challengeId" IN (SELECT "id" FROM "challenges"."writingChallenge" WHERE "hostId" = ${userId})
+      `.affectedCount().build(),
+    );
+    await tx.query(
+      db.raw.sql`DELETE FROM "challenges"."writingChallenge" WHERE "hostId" = ${userId}`.affectedCount().build(),
+    );
 
     await tx.orm.auth.User.where((row) => row.id.eq(userId)).delete();
   });

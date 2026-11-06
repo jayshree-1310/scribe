@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { or } from "@prisma/orm-postgres/orm-client";
 import { TestApi, databaseAvailable } from "../test/harness.js";
+import { db } from "../prisma/db.js";
 
 const api = new TestApi();
 const available = await databaseAvailable();
@@ -442,6 +444,40 @@ describe.skipIf(!available)("creating a club", () => {
     expect(deleted.status).toBe(204);
     expect((await api.request(`/api/clubs/${doomed}`)).status).toBe(404);
   });
+
+  /**
+   * Two of every child, because the ORM's `delete()` removes one row per call:
+   * a club with one member, one thread and one reply passed while anything
+   * bigger failed on `clubDiscussion_parentId_fkey`.
+   */
+  it("deletes a club with two of every child", async () => {
+    const doomed = await api.createClub({ name: "Crowded Club", creatorId: owner });
+    await api.addClubMember({ clubId: doomed.id, userId: admin, role: "ADMIN" });
+    await api.addClubMember({ clubId: doomed.id, userId: member });
+
+    for (const author of [owner, member]) {
+      const thread = await api.createDiscussion({ clubId: doomed.id, userId: author });
+      await api.createDiscussion({ clubId: doomed.id, userId: admin, parentId: thread });
+      await api.createDiscussion({ clubId: doomed.id, userId: member, parentId: thread });
+    }
+
+    const deleted = await api.request(`/api/clubs/${doomed.id}`, {
+      method: "DELETE",
+      as: owner,
+    });
+
+    expect(deleted.status).toBe(204);
+
+    const discussions = await db.orm.clubs.ClubDiscussion.select("id")
+      .where((row) => row.clubId.eq(doomed.id))
+      .all();
+    const memberships = await db.orm.clubs.ClubMembership.select("id")
+      .where((row) => row.clubId.eq(doomed.id))
+      .all();
+
+    expect(discussions).toHaveLength(0);
+    expect(memberships).toHaveLength(0);
+  });
 });
 
 describe.skipIf(!available)("the club's current read", () => {
@@ -726,6 +762,24 @@ describe.skipIf(!available)("discussions", () => {
       `/api/clubs/${clubSlug}/discussions?parentId=${threadId}`,
     );
     expect(replies.body.items).toHaveLength(0);
+  });
+
+  it("deletes a thread with several replies", async () => {
+    const threadId = await api.createDiscussion({ clubId, userId: member });
+    for (const author of [admin, owner, member]) {
+      await api.createDiscussion({ clubId, userId: author, parentId: threadId });
+    }
+
+    const deleted = await api.request(`/api/clubs/discussions/${threadId}`, {
+      method: "DELETE",
+      as: admin,
+    });
+    expect(deleted.status).toBe(204);
+
+    const left = await db.orm.clubs.ClubDiscussion.select("id")
+      .where((row) => or(row.id.eq(threadId), row.parentId.eq(threadId)))
+      .all();
+    expect(left).toHaveLength(0);
   });
 
   it("paginates threads without repeating one", async () => {

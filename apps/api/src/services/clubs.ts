@@ -25,6 +25,7 @@ import { uniqueSlug } from "../lib/slug.js";
 import { evaluateBadges } from "./gamification.js";
 import { notify } from "./notifications.js";
 import { moderate } from "./ai/moderation.js";
+import { removeClub } from "./removal.js";
 import { assertNotSuspended } from "./roles.js";
 import { getStoriesByIds, toIso, type Story } from "./stories.js";
 
@@ -711,22 +712,7 @@ export async function deleteClub(
       "Only the club's owner or an admin can delete it.",
     );
 
-    /**
-     * Replies before threads: a reply's `parentId` points at another row in
-     * this same table, so deleting threads first would breach that foreign
-     * key. Both before the memberships, which they do not reference but which
-     * the club does.
-     */
-    await tx.orm.clubs.ClubDiscussion.where((row) => row.clubId.eq(club.id))
-      .where((row) => row.parentId.isNotNull())
-      .delete();
-    await tx.orm.clubs.ClubDiscussion.where((row) =>
-      row.clubId.eq(club.id),
-    ).delete();
-    await tx.orm.clubs.ClubMembership.where((entry) =>
-      entry.clubId.eq(club.id),
-    ).delete();
-    await tx.orm.clubs.BookClub.where((row) => row.id.eq(club.id)).delete();
+    await removeClub(tx, club.id);
   });
 }
 
@@ -1191,14 +1177,15 @@ export async function deleteDiscussion(
       }
     }
 
-    // Replies first, so deleting a thread does not breach the self-referencing
-    // foreign key. Deleting a reply matches nothing here, which is fine.
-    await tx.orm.clubs.ClubDiscussion.where((item) =>
-      item.parentId.eq(row.id),
-    ).delete();
-    await tx.orm.clubs.ClubDiscussion.where((item) =>
-      item.id.eq(row.id),
-    ).delete();
+    // The post and, for a thread, every reply under it, in one statement:
+    // Postgres checks the self-referencing foreign key at the end of the
+    // statement, so the row order does not matter. See `services/removal.ts`.
+    await tx.query(
+      db.raw.sql`
+        DELETE FROM "clubs"."clubDiscussion"
+         WHERE "id" = ${row.id} OR "parentId" = ${row.id}
+      `.affectedCount().build(),
+    );
   });
 }
 
