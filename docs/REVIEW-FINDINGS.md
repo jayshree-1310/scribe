@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-9, M-1 to M-3, M-7, M-8 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-9, M-1 to M-4, M-7, M-8 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -241,7 +241,7 @@ So the list below is not read as "everything is broken":
   a `GREATEST` backfill in the `20261106T1000_add_uploads` migration, which
   leaves the seeded demo baselines as they are.
 
-### M-4 · Comments can be attached to an unpublished chapter — Confirmed
+### M-4 · Comments can be attached to an unpublished chapter — Confirmed — **Fixed**
 - **Where:** `apps/api/src/services/engagement.ts:474`
 - **Repro:** B posts `{ chapterId: <unpublished chapter of a listed story> }`
   → **201**. The author gets a notification linking to

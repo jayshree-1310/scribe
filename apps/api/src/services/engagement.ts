@@ -472,9 +472,10 @@ export async function createComment(
       // the chapter panel its thread is showing in.
       chapterId = parent.chapterId;
     } else if (input.chapterId !== undefined) {
-      const chapter = await tx.orm.content.Chapter.select("id", "storyId")
-        .where((row) => row.id.eq(input.chapterId as string))
-        .first();
+      // A chapter the caller can read, through the helper likes use: an
+      // unpublished chapter is a 404 to everybody but its author, and a
+      // comment on one would notify the author with a link nobody can open.
+      const chapter = await findVisibleChapter(input.chapterId, userId);
 
       if (!chapter || chapter.storyId !== storyId) {
         throw HttpError.notFound("That chapter could not be found.");

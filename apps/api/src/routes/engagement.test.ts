@@ -225,6 +225,29 @@ describe.skipIf(!available)("posting comments", () => {
     expect(body.comment.chapterId).toBe(chapterId);
   });
 
+  it("rejects a chapter readers cannot open yet, but lets its author comment", async () => {
+    const unpublished = await api.createChapter({
+      storyId,
+      number: 30,
+      published: false,
+    });
+
+    const refused = await api.request(`/api/stories/${storySlug}/comments`, {
+      method: "POST",
+      as: reader,
+      body: { content: "Early.", chapterId: unpublished },
+    });
+    expect(refused.status).toBe(404);
+
+    // The author can read their own draft chapter, so they may note on it.
+    const own = await api.request(`/api/stories/${storySlug}/comments`, {
+      method: "POST",
+      as: author,
+      body: { content: "Note to self.", chapterId: unpublished },
+    });
+    expect(own.status).toBe(201);
+  });
+
   it("rejects a chapter belonging to another story", async () => {
     const elsewhere = await api.createStory({
       title: "Somewhere Else",
