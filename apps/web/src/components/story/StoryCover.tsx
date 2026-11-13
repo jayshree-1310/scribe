@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { LayeredImage } from '../ui/LayeredImage'
 import { cn } from '../../lib/cn'
 import { coverArt } from '../../lib/cover'
 
@@ -69,7 +70,7 @@ export function StoryCover({ story, size = 'md', className }: StoryCoverProps) {
         {story.author.displayName || story.author.username}
       </span>
       {story.coverUrl ? (
-        <img className="cover__art" src={story.coverUrl} alt="" loading="lazy" />
+        <LayeredImage className="cover__art" src={story.coverUrl} loading="lazy" />
       ) : null}
     </div>
   )

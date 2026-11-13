@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { LayeredImage } from '../ui/LayeredImage'
 import { cn } from '../../lib/cn'
 import { coverArt } from '../../lib/cover'
 import { authorName, type Book } from '../../types/books'
@@ -42,7 +43,7 @@ export function BookCover({ book, size = 'md', className }: BookCoverProps) {
       <span className="cover__title">{book.title}</span>
       <span className="cover__author">{authorName(book.author)}</span>
       {book.coverUrl ? (
-        <img className="cover__art" src={book.coverUrl} alt="" loading="lazy" />
+        <LayeredImage className="cover__art" src={book.coverUrl} loading="lazy" />
       ) : null}
     </div>
   )

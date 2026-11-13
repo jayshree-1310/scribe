@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { LayeredImage } from './LayeredImage'
 import { cn } from '../../lib/cn'
 import { hueFor } from '../../lib/cover'
 
@@ -51,7 +52,7 @@ export function Avatar({ user, size = 'md', className }: AvatarProps) {
     >
       {initials(user.displayName || user.username)}
       {user.avatarUrl ? (
-        <img className="avatar__image" src={user.avatarUrl} alt="" />
+        <LayeredImage className="avatar__image" src={user.avatarUrl} />
       ) : null}
     </span>
   )
