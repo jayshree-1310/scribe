@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-9, M-1 to M-5, M-7, M-8, L-5, L-6 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-9, M-1 to M-8, L-5, L-6 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -255,7 +255,7 @@ So the list below is not read as "everything is broken":
   average and the "rating" sort move. Chapter likes have the same gap.
 - **Fix:** refuse (403) when `story.authorId === userId`.
 
-### M-6 · Password reset and email verification cannot work in production — Code review (config)
+### M-6 · Password reset and email verification cannot work in production — Code review (config) — **Fixed (needs a Resend key to deliver)**
 - **Where:** `apps/api/src/lib/mailer.ts`, `render.yaml`
 - Only the `log` transport exists, and `render.yaml` sets neither
   `MAIL_TRANSPORT` nor `WEB_APP_URL`. In production:
@@ -266,6 +266,12 @@ So the list below is not read as "everything is broken":
 - **Fix:** add a real transport (the file already marks the spot); set
   `WEB_APP_URL`; refuse the `log` transport when `NODE_ENV=production`, or at
   least do not log message bodies there.
+- **Done:** `MAIL_TRANSPORT=resend` (with `RESEND_API_KEY`, `MAIL_FROM`)
+  delivers through Resend's HTTP API, no new dependency. In production the
+  `log` transport no longer prints the message, only an error that nothing was
+  sent. Links fall back to the first `CORS_ORIGIN` instead of `localhost`.
+  `/health` reports `mail.transport`. **Still to do by hand:** a Resend
+  account, a verified sending domain, and the three variables on Render.
 
 ### M-7 · Chapter attachment URLs and cover URLs are not validated — Confirmed — **Fixed**
 - **Where:** `apps/api/src/routes/authoring.ts:64` (`coverUrlSchema`),

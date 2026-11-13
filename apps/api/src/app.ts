@@ -41,6 +41,7 @@ import {
 } from "./lib/storage.js";
 import { describeAiConfig } from "./services/ai/config.js";
 import { aiHealth } from "./services/ai/health.js";
+import { describeMail } from "./lib/mailer.js";
 
 const app = express();
 
@@ -122,6 +123,9 @@ app.get("/health", (_req, res) => {
     // `status` is the last write's outcome, and like AI's never moves the
     // top-level one: reading works with uploads down.
     storage: { ...describeStorage(), status: storageHealth() },
+    // Which mail transport is live: `log` in production means password reset
+    // and email verification silently send nothing.
+    mail: describeMail(),
   });
 });
 

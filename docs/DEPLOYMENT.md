@@ -143,6 +143,19 @@ Both URLs exist now, so fill in the two that reference each other. On
 | `CORS_ORIGIN` | `https://scribe-web-7mpz.onrender.com` |
 | `PUBLIC_UPLOAD_BASE_URL` | `https://scribe-new.onrender.com` |
 
+Email (password reset and verification) needs a transport, or the API sends
+nothing — `/health` shows `mail.transport: "log"` while that is so. With a
+Resend account and a verified sending domain, add:
+
+| Key | Value |
+| --- | --- |
+| `MAIL_TRANSPORT` | `resend` |
+| `RESEND_API_KEY` | the Resend API key |
+| `MAIL_FROM` | `Scribe <no-reply@your-domain>` |
+
+Links in those emails point at `WEB_APP_URL`, or at `CORS_ORIGIN` when it is
+unset, so nothing else is needed for them.
+
 Without `CORS_ORIGIN` every browser call fails: `apps/web/src/lib/api-client.ts`
 sends `credentials: 'include'`, and a wildcard origin is rejected for
 credentialed requests.

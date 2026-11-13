@@ -177,6 +177,21 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_ID
         sync: false
+      # --- Email ------------------------------------------------------
+      # Password reset and email verification. With no transport the API
+      # sends nothing (and logs only that it did not); /health shows
+      # `mail.transport`. Resend's free tier is enough: verify a sending
+      # domain there, create an API key, and set
+      #   MAIL_TRANSPORT  resend
+      #   MAIL_FROM       Scribe <no-reply@your-domain>
+      # Links in the mail point at WEB_APP_URL, or at CORS_ORIGIN when that is
+      # unset -- which is already the web app's origin.
+      - key: MAIL_TRANSPORT
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
 
   # --- web -----------------------------------------------------------------
   - type: web
