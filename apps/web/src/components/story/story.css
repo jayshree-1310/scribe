@@ -490,6 +490,19 @@
   color: var(--brand);
 }
 
+/* The title's link covers the card, so the whole card is one click target
+   and one tab stop, without a second link wrapped around it. */
+.challenge-card {
+  position: relative;
+}
+
+.challenge-card__title a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
 .challenge-card__prompt {
   color: var(--text-secondary);
   font-family: var(--font-display);

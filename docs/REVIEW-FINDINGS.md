@@ -364,7 +364,7 @@ So the list below is not read as "everything is broken":
 
 | ID | Finding | Where | Status |
 | --- | --- | --- | --- |
-| L-1 | Nested `<a>` inside `<a>` on /challenges: `Link` wraps `ChallengeCard`, which contains its own `Link`. React logs a `validateDOMNesting` error; invalid HTML and two tab stops per card. | `apps/web/src/pages/ChallengesPage.tsx:116`, `components/story/Cards.tsx:81` | Confirmed (browser) |
+| L-1 | **Fixed.** Nested `<a>` inside `<a>` on /challenges: `Link` wraps `ChallengeCard`, which contains its own `Link`. React logs a `validateDOMNesting` error; invalid HTML and two tab stops per card. | `apps/web/src/pages/ChallengesPage.tsx:116`, `components/story/Cards.tsx:81` | Confirmed (browser) |
 | L-2 | No `onError` fallback on cover/avatar `<img>`: a missing file shows a broken image instead of the generated cover/monogram. Seen live: a seeded story cover `/uploads/covers/451c79…png` and an avatar `/uploads/avatars/c9a0bf…jpg` point at files that no longer exist. | `components/story/StoryCover.tsx:72`, `components/books/BookCover.tsx:45`, `components/ui/Avatar.tsx:54` | Confirmed (browser) |
 | L-3 | Generic 404 copy says "We couldn't find that **note** — it may have been deleted." (template leftover). | `apps/web/src/lib/api-client.ts:24` | Code review |
 | L-4 | `/profile/:username` for an unknown user fires 5 requests (profile, stories, clubs, badges…) that all 404 before the page settles; the list requests could wait for the profile. | `apps/web/src/pages/ProfilePage.tsx` | Confirmed (browser) |

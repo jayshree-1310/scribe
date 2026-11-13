@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
@@ -112,14 +111,10 @@ export function ChallengesPage() {
           />
         ) : (
           <div className="card-grid">
+            {/* The card links itself (its title covers it); wrapping it in a
+                second link nested one `<a>` inside another. */}
             {shown.map((challenge) => (
-              <Link
-                key={challenge.id}
-                to={`/challenges/${challenge.slug}`}
-                className="card-link"
-              >
-                <ChallengeCard challenge={challenge} />
-              </Link>
+              <ChallengeCard key={challenge.id} challenge={challenge} />
             ))}
           </div>
         )}
