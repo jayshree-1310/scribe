@@ -2,7 +2,7 @@ import { useId, useState } from 'react'
 import { ApiError } from '../../lib/api-client'
 import { useToast } from '../../lib/toast'
 import { reportContent } from '../../data/moderation-api'
-import { Button } from '../ui/Button'
+import { Button, type ButtonSize } from '../ui/Button'
 import { Dialog } from '../ui/Dialog'
 import { DropdownMenu, MenuItem } from '../ui/DropdownMenu'
 import { Icon } from '../ui/Icon'
@@ -24,14 +24,16 @@ interface ReportMenuProps {
    * API, and an action that always fails is worse than no action.
    */
   hidden?: boolean
+  /** The trigger's size, to sit beside the buttons around it. */
+  size?: ButtonSize
 }
 
 /**
  * The overflow menu on a piece of user-written text, and the reason dialog
  * behind its one item.
  *
- * One component for all three surfaces -- story comments, club threads,
- * channel posts -- because the API is one endpoint over one shape, and three
+ * One component for every surface -- comments, club threads, channel posts,
+ * stories and chapters -- because the API is one endpoint over one shape, and three
  * copies of a reason list is how three surfaces end up offering three
  * different sets of reasons.
  *
@@ -45,6 +47,7 @@ export function ReportMenu({
   targetId,
   noun,
   hidden = false,
+  size = 'sm',
 }: ReportMenuProps) {
   const { showToast } = useToast()
   // Scopes the radio group to this menu rather than to the page.
@@ -121,7 +124,7 @@ export function ReportMenu({
           <Button
             {...props}
             variant="ghost"
-            size="sm"
+            size={size}
             iconOnly
             aria-label={`Actions for this ${noun}`}
             startIcon={<Icon name="more" />}

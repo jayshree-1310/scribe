@@ -11,7 +11,7 @@
  */
 
 /** The three kinds of user-written text that can be reported. */
-export type ReportTarget = 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST'
+export type ReportTarget = 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER'
 
 export type ReportReason =
   | 'SPAM'
@@ -165,6 +165,8 @@ export const TARGET_LABELS: Record<ReportTarget, string> = {
   COMMENT: 'Comment',
   CLUB_DISCUSSION: 'Club post',
   CHANNEL_POST: 'Channel post',
+  STORY: 'Story',
+  CHAPTER: 'Chapter',
 }
 
 /**

@@ -87,7 +87,7 @@ enum NotificationType {
 /// `moderation.Report.targetType` says what was reported, and
 /// `notifications.Notification.sourceType` says what a notification quoted.
 /// They have to agree, because hiding a reported comment is what sweeps the
-/// notifications that copied it -- two spellings of the same three values
+/// notifications that copied it -- two spellings of the same values
 /// would mean a sweep that silently matched nothing.
 ///
 /// A reader is not on the list. Every report points at something somebody
@@ -100,6 +100,10 @@ enum ReportTarget {
   COMMENT
   CLUB_DISCUSSION
   CHANNEL_POST
+  /// A whole story (its title and blurb) or one chapter. Hidden by unlisting
+  /// or unpublishing; see `services/moderation.ts`.
+  STORY
+  CHAPTER
 }
 
 /// Why a reader says something should not be there.
@@ -432,6 +436,13 @@ namespace content {
     /// becoming visible on Scribe the day it was imported, and a draft would
     /// otherwise be indistinguishable from an import with an unknown date.
     listedAt        DateTime?
+    /// Set while a moderator has taken the story down (`services/moderation.ts`).
+    /// Hiding unlists it -- every read path already treats `listedAt` null as
+    /// not there -- and `hiddenListedAt` keeps the value it had, so dismissing
+    /// the report restores it exactly. The author cannot list it again while
+    /// this is set.
+    hiddenAt        DateTime?
+    hiddenListedAt  DateTime?
 
     coverUrl        String?
     description     String?
@@ -498,6 +509,10 @@ namespace content {
     createdAt     DateTime @default(now())
     updatedAt     DateTime @default(now())
     publishedAt   DateTime?
+    /// A moderator's take-down, as on `Story.hiddenAt`: hiding unpublishes,
+    /// and `hiddenPublishedAt` keeps the date for a dismissal to restore.
+    hiddenAt          DateTime?
+    hiddenPublishedAt DateTime?
 
     story          Story
       @relation(fields: [storyId], references: [id])

@@ -182,6 +182,30 @@ interface OwnedChapterRow {
 
 /** The same guard, entered from a chapter id. */
 /**
+ * Refuses to list a story, or publish a chapter, that a moderator took down.
+ *
+ * A take-down unlists or unpublishes (see `setHidden` in
+ * `services/moderation.ts`), and without this the author's own Publish
+ * button would undo it. The way back is a moderator dismissing the report.
+ */
+async function assertNotTakenDown(
+  tx: Tx,
+  kind: "story" | "chapter",
+  id: string,
+): Promise<void> {
+  const row =
+    kind === "story"
+      ? await tx.orm.content.Story.select("hiddenAt").where((r) => r.id.eq(id)).first()
+      : await tx.orm.content.Chapter.select("hiddenAt").where((r) => r.id.eq(id)).first();
+
+  if (row?.hiddenAt !== null && row?.hiddenAt !== undefined) {
+    throw HttpError.forbidden(
+      `A moderator has taken this ${kind} down, so it cannot be published again.`,
+    );
+  }
+}
+
+/**
  * Refuses a suspended author's change to something readers can already see.
  *
  * Suspension stops an account putting text in front of other people, and
@@ -580,6 +604,7 @@ export async function publishStory(
 
   const newlyListed = await db.transaction(async (tx) => {
     const story = await ownedStory(tx, storyId, userId);
+    await assertNotTakenDown(tx, "story", storyId);
 
     const published = await tx.orm.content.Chapter.select("id")
       .where((chapter) => chapter.storyId.eq(storyId))
@@ -673,6 +698,7 @@ export async function publishChapter(
 
   const storyId = await db.transaction(async (tx) => {
     const { chapter } = await ownedChapter(tx, chapterId, userId);
+    await assertNotTakenDown(tx, "chapter", chapterId);
 
     if (chapter.content.trim().length === 0) {
       throw HttpError.badRequest("This chapter is still empty.", {

@@ -4185,6 +4185,20 @@
                   "kind": "scalar"
                 }
               },
+              "hiddenAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "hiddenPublishedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -4451,6 +4465,12 @@
                 "createdAt": {
                   "column": "createdAt"
                 },
+                "hiddenAt": {
+                  "column": "hiddenAt"
+                },
+                "hiddenPublishedAt": {
+                  "column": "hiddenPublishedAt"
+                },
                 "id": {
                   "column": "id"
                 },
@@ -4676,6 +4696,20 @@
                 "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "hiddenAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "hiddenListedAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
                   "kind": "scalar"
                 }
               },
@@ -5098,6 +5132,12 @@
                 },
                 "description": {
                   "column": "description"
+                },
+                "hiddenAt": {
+                  "column": "hiddenAt"
+                },
+                "hiddenListedAt": {
+                  "column": "hiddenListedAt"
                 },
                 "id": {
                   "column": "id"
@@ -6948,6 +6988,14 @@
               {
                 "name": "CHANNEL_POST",
                 "value": "CHANNEL_POST"
+              },
+              {
+                "name": "STORY",
+                "value": "STORY"
+              },
+              {
+                "name": "CHAPTER",
+                "value": "CHAPTER"
               }
             ]
           }
@@ -8110,8 +8158,8 @@
                   "prefix": "moderationDecision_outcome_check"
                 },
                 {
-                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST')",
-                  "name": "moderationDecision_targetType_check_2c6acd2f",
+                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER')",
+                  "name": "moderationDecision_targetType_check_d2f61544",
                   "prefix": "moderationDecision_targetType_check"
                 }
               ],
@@ -10134,6 +10182,16 @@
                   "nativeType": "timestamptz",
                   "nullable": false
                 },
+                "hiddenAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "hiddenPublishedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
                 "id": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -10381,6 +10439,16 @@
                 "description": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
+                  "nullable": true
+                },
+                "hiddenAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "hiddenListedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
                   "nullable": true
                 },
                 "id": {
@@ -11898,8 +11966,8 @@
                   "prefix": "report_status_check"
                 },
                 {
-                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST')",
-                  "name": "report_targetType_check_2c6acd2f",
+                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER')",
+                  "name": "report_targetType_check_d2f61544",
                   "prefix": "report_targetType_check"
                 }
               ],
@@ -12095,8 +12163,8 @@
             "notification": {
               "checks": [
                 {
-                  "expression": "\"sourceType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST')",
-                  "name": "notification_sourceType_check_18693ee1",
+                  "expression": "\"sourceType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER')",
+                  "name": "notification_sourceType_check_800baecb",
                   "prefix": "notification_sourceType_check"
                 },
                 {
@@ -12369,7 +12437,9 @@
               "values": [
                 "COMMENT",
                 "CLUB_DISCUSSION",
-                "CHANNEL_POST"
+                "CHANNEL_POST",
+                "STORY",
+                "CHAPTER"
               ]
             }
           }
@@ -12378,7 +12448,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "e323dc4e1ccddcc6ca564ade500e6b7b618135e3c1effafb87e03ac462b8cf1a"
+    "storageHash": "a674777e0f04c1f19f33123ac7c766a0ff7a78c99af7488a858b12609fde3076"
   },
   "execution": {
     "executionHash": "7d2db05d5e947645db9eaad034511ce50b09361a5ca66b23b87121c8110a7737",

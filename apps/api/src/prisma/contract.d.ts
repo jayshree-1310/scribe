@@ -33,7 +33,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'e323dc4e1ccddcc6ca564ade500e6b7b618135e3c1effafb87e03ac462b8cf1a'>;
+  StorageHashBase<'a674777e0f04c1f19f33123ac7c766a0ff7a78c99af7488a858b12609fde3076'>;
 export type ExecutionHash =
   ExecutionHashBase<'7d2db05d5e947645db9eaad034511ce50b09361a5ca66b23b87121c8110a7737'>;
 export type ProfileHash =
@@ -355,7 +355,7 @@ export type FieldOutputTypes = {
     };
     readonly ModerationDecision: {
       readonly id: CodecTypes['pg/text@1']['output'];
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
+      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
       readonly targetId: CodecTypes['pg/text@1']['output'];
       readonly outcome: 'ALLOW' | 'REVIEW' | 'REJECT' | 'UNCHECKED';
       readonly category: CodecTypes['pg/text@1']['output'] | null;
@@ -573,6 +573,8 @@ export type FieldOutputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly publishedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly hiddenPublishedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
     };
     readonly Genre: {
       readonly id: CodecTypes['pg/text@1']['output'];
@@ -595,6 +597,8 @@ export type FieldOutputTypes = {
       readonly slug: CodecTypes['pg/text@1']['output'];
       readonly source: 'SCRIBE' | 'CATALOGUE';
       readonly listedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly hiddenListedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly coverUrl: CodecTypes['pg/text@1']['output'] | null;
       readonly description: CodecTypes['pg/text@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
@@ -708,7 +712,7 @@ export type FieldOutputTypes = {
     readonly Report: {
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly reporterId: CodecTypes['pg/text@1']['output'] | null;
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
+      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
       readonly targetId: CodecTypes['pg/text@1']['output'];
       readonly reason: 'SPAM' | 'HARASSMENT' | 'HATE' | 'SEXUAL' | 'VIOLENCE' | 'SPOILER' | 'OTHER';
       readonly details: CodecTypes['pg/text@1']['output'] | null;
@@ -739,7 +743,8 @@ export type FieldOutputTypes = {
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly excerpt: CodecTypes['pg/text@1']['output'] | null;
       readonly href: CodecTypes['pg/text@1']['output'];
-      readonly sourceType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | null;
+      readonly sourceType:
+        'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER' | null;
       readonly sourceId: CodecTypes['pg/text@1']['output'] | null;
       readonly readAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
@@ -863,7 +868,7 @@ export type FieldInputTypes = {
     };
     readonly ModerationDecision: {
       readonly id: CodecTypes['pg/text@1']['input'];
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
+      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
       readonly targetId: CodecTypes['pg/text@1']['input'];
       readonly outcome: 'ALLOW' | 'REVIEW' | 'REJECT' | 'UNCHECKED';
       readonly category: CodecTypes['pg/text@1']['input'] | null;
@@ -1081,6 +1086,8 @@ export type FieldInputTypes = {
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly publishedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly hiddenPublishedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
     };
     readonly Genre: {
       readonly id: CodecTypes['pg/text@1']['input'];
@@ -1103,6 +1110,8 @@ export type FieldInputTypes = {
       readonly slug: CodecTypes['pg/text@1']['input'];
       readonly source: 'SCRIBE' | 'CATALOGUE';
       readonly listedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly hiddenListedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly coverUrl: CodecTypes['pg/text@1']['input'] | null;
       readonly description: CodecTypes['pg/text@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
@@ -1216,7 +1225,7 @@ export type FieldInputTypes = {
     readonly Report: {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly reporterId: CodecTypes['pg/text@1']['input'] | null;
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
+      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
       readonly targetId: CodecTypes['pg/text@1']['input'];
       readonly reason: 'SPAM' | 'HARASSMENT' | 'HATE' | 'SEXUAL' | 'VIOLENCE' | 'SPOILER' | 'OTHER';
       readonly details: CodecTypes['pg/text@1']['input'] | null;
@@ -1247,7 +1256,8 @@ export type FieldInputTypes = {
       readonly title: CodecTypes['pg/text@1']['input'];
       readonly excerpt: CodecTypes['pg/text@1']['input'] | null;
       readonly href: CodecTypes['pg/text@1']['input'];
-      readonly sourceType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | null;
+      readonly sourceType:
+        'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER' | null;
       readonly sourceId: CodecTypes['pg/text@1']['input'] | null;
       readonly readAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
@@ -1383,7 +1393,7 @@ export type StorageColumnTypes = {
       readonly reportId: CodecTypes['pg/text@1']['output'] | null;
       readonly reviewThreshold: CodecTypes['pg/numeric@1']['output'];
       readonly targetId: CodecTypes['pg/text@1']['output'];
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
+      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
     };
     readonly moderationScore: {
       readonly category: CodecTypes['pg/text@1']['output'];
@@ -1583,6 +1593,8 @@ export type StorageColumnTypes = {
       readonly chapterNumber: CodecTypes['pg/int4@1']['output'];
       readonly content: CodecTypes['pg/text@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly hiddenPublishedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly publishedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly storyId: CodecTypes['pg/text@1']['output'];
@@ -1609,6 +1621,8 @@ export type StorageColumnTypes = {
       readonly coverUrl: CodecTypes['pg/text@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly hiddenListedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly isbn: CodecTypes['pg/text@1']['output'] | null;
       readonly isCompleted: CodecTypes['pg/bool@1']['output'];
@@ -1733,7 +1747,7 @@ export type StorageColumnTypes = {
       readonly resolvedById: CodecTypes['pg/text@1']['output'] | null;
       readonly status: 'OPEN' | 'RESOLVED';
       readonly targetId: CodecTypes['pg/text@1']['output'];
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
+      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
   };
@@ -1746,7 +1760,8 @@ export type StorageColumnTypes = {
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly readAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly sourceId: CodecTypes['pg/text@1']['output'] | null;
-      readonly sourceType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | null;
+      readonly sourceType:
+        'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER' | null;
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly type:
         | 'CHANNEL_POST'
@@ -1891,7 +1906,7 @@ export type StorageColumnInputTypes = {
       readonly reportId: CodecTypes['pg/text@1']['input'] | null;
       readonly reviewThreshold: CodecTypes['pg/numeric@1']['input'];
       readonly targetId: CodecTypes['pg/text@1']['input'];
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
+      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
     };
     readonly moderationScore: {
       readonly category: CodecTypes['pg/text@1']['input'];
@@ -2091,6 +2106,8 @@ export type StorageColumnInputTypes = {
       readonly chapterNumber: CodecTypes['pg/int4@1']['input'];
       readonly content: CodecTypes['pg/text@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly hiddenPublishedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly publishedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly storyId: CodecTypes['pg/text@1']['input'];
@@ -2117,6 +2134,8 @@ export type StorageColumnInputTypes = {
       readonly coverUrl: CodecTypes['pg/text@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly hiddenListedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly isbn: CodecTypes['pg/text@1']['input'] | null;
       readonly isCompleted: CodecTypes['pg/bool@1']['input'];
@@ -2241,7 +2260,7 @@ export type StorageColumnInputTypes = {
       readonly resolvedById: CodecTypes['pg/text@1']['input'] | null;
       readonly status: 'OPEN' | 'RESOLVED';
       readonly targetId: CodecTypes['pg/text@1']['input'];
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST';
+      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
   };
@@ -2254,7 +2273,8 @@ export type StorageColumnInputTypes = {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly readAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly sourceId: CodecTypes['pg/text@1']['input'] | null;
-      readonly sourceType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | null;
+      readonly sourceType:
+        'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER' | null;
       readonly title: CodecTypes['pg/text@1']['input'];
       readonly type:
         | 'CHANNEL_POST'
@@ -4811,6 +4831,16 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-temporal@1';
                   readonly nullable: true;
                 };
+                readonly hiddenAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: true;
+                };
+                readonly hiddenPublishedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: true;
+                };
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [{ readonly columns: readonly ['storyId', 'chapterNumber'] }];
@@ -4965,6 +4995,16 @@ type ContractBase = Omit<
                   };
                 };
                 readonly listedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: true;
+                };
+                readonly hiddenAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: true;
+                };
+                readonly hiddenListedAt: {
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz-temporal@1';
                   readonly nullable: true;
@@ -6408,7 +6448,13 @@ type ContractBase = Omit<
             };
             readonly ReportTarget: {
               readonly kind: 'valueSet';
-              readonly values: readonly ['COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST'];
+              readonly values: readonly [
+                'COMMENT',
+                'CLUB_DISCUSSION',
+                'CHANNEL_POST',
+                'STORY',
+                'CHAPTER',
+              ];
             };
           };
         };
@@ -9121,6 +9167,20 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-temporal@1';
                 };
               };
+              readonly hiddenAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+              readonly hiddenPublishedAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
             };
             readonly relations: {
               readonly comments: {
@@ -9291,6 +9351,8 @@ type ContractBase = Omit<
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
                 readonly publishedAt: { readonly column: 'publishedAt' };
+                readonly hiddenAt: { readonly column: 'hiddenAt' };
+                readonly hiddenPublishedAt: { readonly column: 'hiddenPublishedAt' };
               };
             };
           };
@@ -9430,6 +9492,20 @@ type ContractBase = Omit<
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
               readonly listedAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+              readonly hiddenAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+              readonly hiddenListedAt: {
                 readonly nullable: true;
                 readonly type: {
                   readonly kind: 'scalar';
@@ -9720,6 +9796,8 @@ type ContractBase = Omit<
                 readonly slug: { readonly column: 'slug' };
                 readonly source: { readonly column: 'source' };
                 readonly listedAt: { readonly column: 'listedAt' };
+                readonly hiddenAt: { readonly column: 'hiddenAt' };
+                readonly hiddenListedAt: { readonly column: 'hiddenListedAt' };
                 readonly coverUrl: { readonly column: 'coverUrl' };
                 readonly description: { readonly column: 'description' };
                 readonly createdAt: { readonly column: 'createdAt' };
@@ -10778,6 +10856,8 @@ type ContractBase = Omit<
               { readonly name: 'COMMENT'; readonly value: 'COMMENT' },
               { readonly name: 'CLUB_DISCUSSION'; readonly value: 'CLUB_DISCUSSION' },
               { readonly name: 'CHANNEL_POST'; readonly value: 'CHANNEL_POST' },
+              { readonly name: 'STORY'; readonly value: 'STORY' },
+              { readonly name: 'CHAPTER'; readonly value: 'CHAPTER' },
             ];
           };
           readonly ReportReason: {

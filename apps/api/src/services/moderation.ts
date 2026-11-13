@@ -21,6 +21,13 @@
  *   `DELETE`. The price is that *every* public read path has to filter, and
  *   the list of them is below.
  *
+ *   Stories and chapters are the exception to that price. They have
+ *   `hiddenAt` too, but hiding one unlists or unpublishes it, keeping the old
+ *   `listedAt` / `publishedAt` aside to restore -- every read path already
+ *   treats an unlisted story or unpublished chapter as not there, so none had
+ *   to learn a new filter. `setHidden` holds the details, and
+ *   `services/authoring.ts` refuses the author's Publish while it is set.
+ *
  * - **A hidden row's notifications are deleted, not blanked.**
  *   `notifications.Notification.excerpt` is a copy taken at fan-out time, so
  *   hiding the comment it quotes does not touch it -- the abusive reply is
@@ -92,6 +99,8 @@ export const REPORT_TARGETS = [
   "COMMENT",
   "CLUB_DISCUSSION",
   "CHANNEL_POST",
+  "STORY",
+  "CHAPTER",
 ] as const;
 
 export type ReportTarget = (typeof REPORT_TARGETS)[number];
@@ -144,6 +153,8 @@ const TARGET_WORDS: Record<ReportTarget, string> = {
   COMMENT: "comment",
   CLUB_DISCUSSION: "club post",
   CHANNEL_POST: "channel post",
+  STORY: "story",
+  CHAPTER: "chapter",
 };
 
 /** The same four fields every other author summary in the app carries. */
@@ -240,6 +251,9 @@ const REPORT_NOT_FOUND = "That report could not be found.";
 
 const TARGET_NOT_FOUND = "That content could not be found.";
 
+/** How much of a reported chapter the queue shows. */
+const CHAPTER_EXCERPT_CHARS = 1200;
+
 /* Helpers ---------------------------------------------------------------- */
 
 /** `now()` in the spelling the timestamp codec writes. */
@@ -302,6 +316,13 @@ interface TargetRow {
   authorId: string;
   hidden: boolean;
   href: string;
+  /**
+   * Whether readers can reach it at all, apart from a moderator's hide: false
+   * for a draft story or an unpublished chapter. A report against one is a
+   * report against something the reporter cannot have seen, so it 404s the
+   * way a hidden row does. Absent means reachable.
+   */
+  reachable?: boolean;
 }
 
 /**
@@ -433,6 +454,81 @@ async function loadTargets(
     });
   }
 
+  if (type === "STORY") {
+    const rows = await db.orm.content.Story.select(
+      "id",
+      "slug",
+      "title",
+      "description",
+      "authorId",
+      "source",
+      "listedAt",
+      "hiddenAt",
+    )
+      .where((row) => row.id.in(unique))
+      .all();
+
+    return rows.flatMap((row) =>
+      // A catalogue book has no member author to answer for it.
+      row.authorId === null || row.source !== "SCRIBE"
+        ? []
+        : [
+            {
+              type,
+              id: row.id,
+              // What a reader saw on the story's page: its title and blurb.
+              body: `${row.title}\n${row.description ?? ""}`.trim(),
+              authorId: row.authorId,
+              hidden: row.hiddenAt !== null && row.hiddenAt !== undefined,
+              reachable: row.listedAt !== null && row.listedAt !== undefined,
+              href: `/story/${row.slug}`,
+            },
+          ],
+    );
+  }
+
+  if (type === "CHAPTER") {
+    const rows = await db.orm.content.Chapter.select(
+      "id",
+      "storyId",
+      "chapterNumber",
+      "title",
+      "content",
+      "publishedAt",
+      "hiddenAt",
+    )
+      .where((row) => row.id.in(unique))
+      .all();
+
+    if (rows.length === 0) return [];
+
+    const stories = await db.orm.content.Story.select("id", "slug", "authorId", "listedAt")
+      .where((row) => row.id.in(rows.map((chapter) => chapter.storyId)))
+      .all();
+    const byId = new Map(stories.map((story) => [story.id, story]));
+
+    return rows.flatMap((row) => {
+      const story = byId.get(row.storyId);
+      if (story === undefined || story.authorId === null) return [];
+
+      return [
+        {
+          type,
+          id: row.id,
+          // The opening, not the whole chapter: enough for a moderator to see
+          // what is on the page, with the link for the rest.
+          body: `${row.title}\n${row.content.slice(0, CHAPTER_EXCERPT_CHARS)}`,
+          authorId: story.authorId,
+          hidden: row.hiddenAt !== null && row.hiddenAt !== undefined,
+          reachable:
+            row.publishedAt !== null && row.publishedAt !== undefined &&
+            story.listedAt !== null && story.listedAt !== undefined,
+          href: `/read/${story.slug}/${row.chapterNumber}`,
+        },
+      ];
+    });
+  }
+
   const rows = await db.orm.channels.ChannelPost.select(
     "id",
     "title",
@@ -503,6 +599,43 @@ async function setHidden(
         hiddenAt,
       });
       return;
+    /**
+     * A story or chapter is hidden by unlisting or unpublishing it, which
+     * every read path already honours, with the original date kept aside so
+     * restoring puts it back exactly where it was in "newest" and the rest.
+     * Guarded on `hiddenAt` so hiding twice cannot overwrite the kept date
+     * with the null the first hide left.
+     */
+    case "STORY":
+      await db.runtime().query(
+        hiddenAt === null
+          ? db.raw.sql`
+              UPDATE "content"."story"
+                 SET "listedAt" = "hiddenListedAt", "hiddenListedAt" = NULL, "hiddenAt" = NULL
+               WHERE "id" = ${id} AND "hiddenAt" IS NOT NULL
+            `.affectedCount().build()
+          : db.raw.sql`
+              UPDATE "content"."story"
+                 SET "hiddenListedAt" = "listedAt", "listedAt" = NULL, "hiddenAt" = now()
+               WHERE "id" = ${id} AND "hiddenAt" IS NULL
+            `.affectedCount().build(),
+      );
+      return;
+    case "CHAPTER":
+      await db.runtime().query(
+        hiddenAt === null
+          ? db.raw.sql`
+              UPDATE "content"."chapter"
+                 SET "publishedAt" = "hiddenPublishedAt", "hiddenPublishedAt" = NULL, "hiddenAt" = NULL
+               WHERE "id" = ${id} AND "hiddenAt" IS NOT NULL
+            `.affectedCount().build()
+          : db.raw.sql`
+              UPDATE "content"."chapter"
+                 SET "hiddenPublishedAt" = "publishedAt", "publishedAt" = NULL, "hiddenAt" = now()
+               WHERE "id" = ${id} AND "hiddenAt" IS NULL
+            `.affectedCount().build(),
+      );
+      return;
   }
 }
 
@@ -567,8 +700,11 @@ export async function createReport(
 
   const target = await loadTarget(input.targetType, input.targetId);
 
-  // Hidden reads as absent here exactly as it does on every public list.
-  if (!target || target.hidden) throw HttpError.notFound(TARGET_NOT_FOUND);
+  // Hidden reads as absent here exactly as it does on every public list, and
+  // so does a draft: nobody but its author could have seen it.
+  if (!target || target.hidden || target.reachable === false) {
+    throw HttpError.notFound(TARGET_NOT_FOUND);
+  }
 
   if (target.authorId === userId) {
     throw HttpError.badRequest("You cannot report your own post.");

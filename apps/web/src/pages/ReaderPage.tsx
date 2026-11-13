@@ -28,6 +28,7 @@ import {
 } from '../types/engagement'
 import { LikeButton } from '../components/engagement/LikeButton'
 import { SignInPrompt } from '../components/engagement/SignInPrompt'
+import { ReportMenu } from '../components/moderation/ReportMenu'
 import { RecapCard } from '../components/ai/RecapCard'
 import { ExplainSheet } from '../components/ai/ExplainSheet'
 import { AskBookSheet } from '../components/ai/AskBookSheet'
@@ -583,6 +584,13 @@ export function ReaderPage() {
                         : `${formatCount(commentTotal)} comments`}
                   </span>
                 </button>
+
+                <ReportMenu
+                  targetType="CHAPTER"
+                  targetId={current.id}
+                  noun="chapter"
+                  hidden={!signedIn || isOwnStory}
+                />
               </div>
 
               <nav

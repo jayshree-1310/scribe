@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-9, M-1 to M-10, M-12 to M-14, L-5, L-6, L-13 and L-19 fixed, and H-10's code side (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-9, M-1 to M-14 (M-11 for stories and chapters), L-5, L-6, L-13 and L-19 fixed, and H-10's code side (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -317,11 +317,18 @@ So the list below is not read as "everything is broken":
   one). Drafts stay editable and taking things down is never refused. The
   decisions are recorded in `routes/suspension.test.ts`.
 
-### M-11 · Stories, chapters, profiles, clubs and channels cannot be reported — Code review
+### M-11 · Stories, chapters, profiles, clubs and channels cannot be reported — Code review — **Stories and chapters done**
 - **Where:** `services/moderation.ts` `REPORT_TARGETS = COMMENT |
   CLUB_DISCUSSION | CHANNEL_POST`
 - There is no way to flag an abusive story, chapter, bio/avatar, or club/
   channel description, and no admin hide for them.
+- **Done for stories and chapters** (the agreed scope): `STORY` and `CHAPTER`
+  report targets, a report menu on the story page and in the reader, and a
+  moderator `HIDE` that unlists the story or unpublishes the chapter. The
+  original `listedAt` / `publishedAt` is kept in `hiddenListedAt` /
+  `hiddenPublishedAt` so `DISMISS` restores it exactly, and the author cannot
+  publish again while it is hidden. Drafts cannot be reported. **Still open:**
+  profiles (bio/avatar), clubs and channels.
 
 ### M-12 · "Remember me" on the login form does nothing — Code review — **Fixed**
 - **Where:** `apps/web/src/pages/LoginPage.tsx:25,125`; the argument is

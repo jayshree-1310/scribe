@@ -1,0 +1,422 @@
+[
+  {
+    "id": "dropCheckConstraint.moderationDecision.moderationDecision_targetType_check_2c6acd2f",
+    "label": "Drop check constraint \"moderationDecision_targetType_check_2c6acd2f\" on \"moderationDecision\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "checkConstraint",
+        "name": "moderationDecision_targetType_check_2c6acd2f",
+        "table": "moderationDecision"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"moderationDecision_targetType_check_2c6acd2f\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "moderationDecision_targetType_check_2c6acd2f",
+          "ai",
+          "\"ai\".\"moderationDecision\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"moderationDecision_targetType_check_2c6acd2f\"",
+        "sql": "ALTER TABLE \"ai\".\"moderationDecision\" DROP CONSTRAINT \"moderationDecision_targetType_check_2c6acd2f\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"moderationDecision_targetType_check_2c6acd2f\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "moderationDecision_targetType_check_2c6acd2f",
+          "ai",
+          "\"ai\".\"moderationDecision\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropCheckConstraint.report.report_targetType_check_2c6acd2f",
+    "label": "Drop check constraint \"report_targetType_check_2c6acd2f\" on \"report\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "moderation",
+        "objectType": "checkConstraint",
+        "name": "report_targetType_check_2c6acd2f",
+        "table": "report"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"report_targetType_check_2c6acd2f\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "report_targetType_check_2c6acd2f",
+          "moderation",
+          "\"moderation\".\"report\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"report_targetType_check_2c6acd2f\"",
+        "sql": "ALTER TABLE \"moderation\".\"report\" DROP CONSTRAINT \"report_targetType_check_2c6acd2f\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"report_targetType_check_2c6acd2f\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "report_targetType_check_2c6acd2f",
+          "moderation",
+          "\"moderation\".\"report\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropCheckConstraint.notification.notification_sourceType_check_18693ee1",
+    "label": "Drop check constraint \"notification_sourceType_check_18693ee1\" on \"notification\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_sourceType_check_18693ee1",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_sourceType_check_18693ee1\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_sourceType_check_18693ee1",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"notification_sourceType_check_18693ee1\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" DROP CONSTRAINT \"notification_sourceType_check_18693ee1\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_sourceType_check_18693ee1\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_sourceType_check_18693ee1",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.content.chapter.hiddenAt",
+    "label": "Add column \"hiddenAt\" to \"chapter\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "column",
+        "name": "hiddenAt",
+        "table": "chapter"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"hiddenAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "chapter",
+          "hiddenAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"hiddenAt\"",
+        "sql": "ALTER TABLE \"content\".\"chapter\" ADD COLUMN \"hiddenAt\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"hiddenAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "chapter",
+          "hiddenAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.content.chapter.hiddenPublishedAt",
+    "label": "Add column \"hiddenPublishedAt\" to \"chapter\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "column",
+        "name": "hiddenPublishedAt",
+        "table": "chapter"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"hiddenPublishedAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "chapter",
+          "hiddenPublishedAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"hiddenPublishedAt\"",
+        "sql": "ALTER TABLE \"content\".\"chapter\" ADD COLUMN \"hiddenPublishedAt\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"hiddenPublishedAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "chapter",
+          "hiddenPublishedAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.content.story.hiddenAt",
+    "label": "Add column \"hiddenAt\" to \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "column",
+        "name": "hiddenAt",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"hiddenAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "hiddenAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"hiddenAt\"",
+        "sql": "ALTER TABLE \"content\".\"story\" ADD COLUMN \"hiddenAt\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"hiddenAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "hiddenAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.content.story.hiddenListedAt",
+    "label": "Add column \"hiddenListedAt\" to \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "column",
+        "name": "hiddenListedAt",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"hiddenListedAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "hiddenListedAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"hiddenListedAt\"",
+        "sql": "ALTER TABLE \"content\".\"story\" ADD COLUMN \"hiddenListedAt\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"hiddenListedAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "story",
+          "hiddenListedAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.moderationDecision.moderationDecision_targetType_check_d2f61544",
+    "label": "Add check constraint \"moderationDecision_targetType_check_d2f61544\" on \"moderationDecision\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "checkConstraint",
+        "name": "moderationDecision_targetType_check_d2f61544",
+        "table": "moderationDecision"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"moderationDecision_targetType_check_d2f61544\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "moderationDecision_targetType_check_d2f61544",
+          "ai",
+          "\"ai\".\"moderationDecision\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"moderationDecision_targetType_check_d2f61544\"",
+        "sql": "ALTER TABLE \"ai\".\"moderationDecision\" ADD CONSTRAINT \"moderationDecision_targetType_check_d2f61544\" CHECK (\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"moderationDecision_targetType_check_d2f61544\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "moderationDecision_targetType_check_d2f61544",
+          "ai",
+          "\"ai\".\"moderationDecision\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.report.report_targetType_check_d2f61544",
+    "label": "Add check constraint \"report_targetType_check_d2f61544\" on \"report\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "moderation",
+        "objectType": "checkConstraint",
+        "name": "report_targetType_check_d2f61544",
+        "table": "report"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"report_targetType_check_d2f61544\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "report_targetType_check_d2f61544",
+          "moderation",
+          "\"moderation\".\"report\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"report_targetType_check_d2f61544\"",
+        "sql": "ALTER TABLE \"moderation\".\"report\" ADD CONSTRAINT \"report_targetType_check_d2f61544\" CHECK (\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"report_targetType_check_d2f61544\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "report_targetType_check_d2f61544",
+          "moderation",
+          "\"moderation\".\"report\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notification.notification_sourceType_check_800baecb",
+    "label": "Add check constraint \"notification_sourceType_check_800baecb\" on \"notification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_sourceType_check_800baecb",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_sourceType_check_800baecb\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_sourceType_check_800baecb",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notification_sourceType_check_800baecb\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" ADD CONSTRAINT \"notification_sourceType_check_800baecb\" CHECK (\"sourceType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_sourceType_check_800baecb\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_sourceType_check_800baecb",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  }
+]

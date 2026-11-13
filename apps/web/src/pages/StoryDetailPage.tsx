@@ -445,6 +445,14 @@ export function StoryDetailPage() {
                 onClick={onShare}
                 startIcon={<Icon name="share" />}
               />
+
+              <ReportMenu
+                targetType="STORY"
+                targetId={data.id}
+                noun="story"
+                size="lg"
+                hidden={!signedIn || isOwnStory}
+              />
             </div>
           </div>
         </div>

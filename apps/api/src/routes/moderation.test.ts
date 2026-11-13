@@ -707,3 +707,86 @@ describe.skipIf(!available)("reinstating an account", () => {
     expect(status).toBe(403);
   });
 });
+
+/* Stories and chapters (review M-11) ------------------------------------- */
+
+describe.skipIf(!available)("reporting a story or a chapter", () => {
+  /** The story's `listedAt` and a chapter's `publishedAt`, as stored. */
+  async function stamps(storyId: string, chapterId: string) {
+    const { db } = await import("../prisma/db.js");
+    const s = await db.orm.content.Story.select("listedAt", "hiddenAt")
+      .where((row) => row.id.eq(storyId))
+      .first();
+    const c = await db.orm.content.Chapter.select("publishedAt", "hiddenAt")
+      .where((row) => row.id.eq(chapterId))
+      .first();
+    return {
+      listedAt: String(s?.listedAt ?? null),
+      storyHidden: s?.hiddenAt !== null && s?.hiddenAt !== undefined,
+      publishedAt: String(c?.publishedAt ?? null),
+      chapterHidden: c?.hiddenAt !== null && c?.hiddenAt !== undefined,
+    };
+  }
+
+  it("takes a story down, keeps the author from relisting it, and restores it exactly", async () => {
+    const reported = await api.createStory({ title: "Reported Story", authorId: offender });
+    const chapter = await api.createChapter({ storyId: reported.id, number: 1 });
+    const before = await stamps(reported.id, chapter);
+
+    const filed = await fileReport(reporter, { targetType: "STORY", targetId: reported.id });
+    expect(filed.status).toBe(201);
+
+    const hidden = await resolve(moderator, filed.body.report.id, "HIDE");
+    expect(hidden.status).toBe(200);
+
+    // Gone for readers, the way an unlisted story is.
+    expect((await api.request(`/api/stories/${reported.slug}`, { as: reporter })).status).toBe(404);
+    expect((await api.request(`/api/stories/${reported.slug}`)).status).toBe(404);
+
+    // The author's own Publish cannot undo the take-down.
+    const relist = await api.request(`/api/author/stories/${reported.id}/publish`, {
+      method: "POST",
+      as: offender,
+    });
+    expect(relist.status).toBe(403);
+
+    // A moderator reversing it puts it back where it was, date and all.
+    const again = await fileReport(other, { targetType: "STORY", targetId: reported.id });
+    expect(again.status).toBe(404); // hidden reads as absent to reporters too
+    const dismissed = await resolve(moderator, filed.body.report.id, "DISMISS");
+    expect(dismissed.status).toBe(200);
+    expect(await stamps(reported.id, chapter)).toEqual(before);
+    expect((await api.request(`/api/stories/${reported.slug}`)).status).toBe(200);
+  });
+
+  it("takes one chapter down without touching the rest of the story", async () => {
+    const reported = await api.createStory({ title: "Reported Chapter", authorId: offender });
+    const one = await api.createChapter({ storyId: reported.id, number: 1 });
+    const two = await api.createChapter({ storyId: reported.id, number: 2 });
+
+    const filed = await fileReport(reporter, { targetType: "CHAPTER", targetId: two });
+    expect(filed.status).toBe(201);
+    expect((await resolve(moderator, filed.body.report.id, "HIDE")).status).toBe(200);
+
+    expect((await api.request(`/api/stories/${reported.slug}/chapters/2`)).status).toBe(404);
+    expect((await api.request(`/api/stories/${reported.slug}/chapters/1`)).status).toBe(200);
+
+    const republish = await api.request(`/api/author/chapters/${two}/publish`, {
+      method: "POST",
+      as: offender,
+    });
+    expect(republish.status).toBe(403);
+    expect((await stamps(reported.id, one)).chapterHidden).toBe(false);
+  });
+
+  it("refuses a report on a draft, which the reporter cannot have read", async () => {
+    const draft = await api.createStory({
+      title: "Unlisted Draft",
+      authorId: offender,
+      listed: false,
+    });
+
+    const filed = await fileReport(reporter, { targetType: "STORY", targetId: draft.id });
+    expect(filed.status).toBe(404);
+  });
+});
