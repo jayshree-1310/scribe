@@ -43,6 +43,8 @@ function adopt(response: AuthResponse): AuthResult {
 export async function signInWithPassword(input: {
   email: string
   password: string
+  /** "Remember me". False ends the session when the browser closes. */
+  rememberMe?: boolean
 }): Promise<AuthResult> {
   return adopt(
     await request<AuthResponse>('/auth/login', {

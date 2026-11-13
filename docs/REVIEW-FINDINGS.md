@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-9, M-1 to M-10, M-14, L-5, L-6 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-9, M-1 to M-10, M-12, M-14, L-5, L-6 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -323,7 +323,7 @@ So the list below is not read as "everything is broken":
 - There is no way to flag an abusive story, chapter, bio/avatar, or club/
   channel description, and no admin hide for them.
 
-### M-12 · "Remember me" on the login form does nothing — Code review
+### M-12 · "Remember me" on the login form does nothing — Code review — **Fixed**
 - **Where:** `apps/web/src/pages/LoginPage.tsx:25,125`; the argument is
   accepted and ignored in `components/providers/AuthProvider.tsx:138`.
   Unchecking it still keeps a 7-day (up to 30-day) session.

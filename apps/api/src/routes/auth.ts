@@ -56,6 +56,8 @@ const signupSchema = z.object({
 const loginSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
+  /** "Remember me". Unticked, the session ends when the browser closes. */
+  rememberMe: z.boolean().default(true),
 });
 
 const DUMMY_PASSWORD_HASH =
@@ -107,7 +109,7 @@ router.post("/signup", async (req, res) => {
 router.post("/login", async (req, res) => {
   await assertWithinRateLimit(req, "login", 10);
 
-  const { email, password } = parseOrThrow(loginSchema, req.body);
+  const { email, password, rememberMe } = parseOrThrow(loginSchema, req.body);
 
   const user = await db.orm.auth.User.where((u) => u.email.eq(email)).first();
 
@@ -128,7 +130,7 @@ router.post("/login", async (req, res) => {
     throw HttpError.unauthorized("Invalid email or password.");
   }
 
-  const accessToken = await startSession(res, user.id);
+  const accessToken = await startSession(res, user.id, rememberMe);
 
   res.status(200).json({
     message: "Login successful",
@@ -233,6 +235,7 @@ router.post("/refresh", async (req, res) => {
     session.userId,
     session.familyId,
     session.absoluteExpiresAt,
+    session.persistent !== false,
   );
 
   res.status(200).json({

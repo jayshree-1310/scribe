@@ -110,6 +110,13 @@ export interface SessionRecord {
   refreshTokenHash: string;
   /** Epoch ms after which no rotation may extend this chain. */
   absoluteExpiresAt: number;
+  /**
+   * False when the reader unticked "Remember me": the cookie is then a
+   * browser-session cookie, gone when the browser closes. Carried through
+   * every rotation so the choice holds for the life of the chain. Absent on
+   * records written before it existed, which means true.
+   */
+  persistent?: boolean;
 }
 
 export function hashRefreshToken(token: string): string {
@@ -136,7 +143,8 @@ export function parseSession(raw: string): SessionRecord | null {
       typeof parsed.userId !== "string" ||
       typeof parsed.familyId !== "string" ||
       typeof parsed.refreshTokenHash !== "string" ||
-      typeof parsed.absoluteExpiresAt !== "number"
+      typeof parsed.absoluteExpiresAt !== "number" ||
+      (parsed.persistent !== undefined && typeof parsed.persistent !== "boolean")
     ) {
       return null;
     }
@@ -317,10 +325,20 @@ export function readRefreshCookie(req: Request): string | null {
   return null;
 }
 
-export function setRefreshCookie(res: Response, token: string, ttl: number): void {
+/**
+ * A persistent cookie lives as long as its session. A non-persistent one has
+ * no `maxAge`, so the browser drops it when it closes -- the session in Redis
+ * still expires on its own TTL either way.
+ */
+export function setRefreshCookie(
+  res: Response,
+  token: string,
+  ttl: number,
+  persistent = true,
+): void {
   res.cookie(REFRESH_TOKEN_COOKIE, token, {
     ...refreshCookieOptions,
-    maxAge: ttl * 1000,
+    ...(persistent ? { maxAge: ttl * 1000 } : {}),
   });
 }
 
@@ -342,6 +360,7 @@ export async function issueSession(
   userId: string,
   familyId: string,
   absoluteExpiresAt: number,
+  persistent = true,
 ): Promise<string> {
   const sessionId = randomBytes(32).toString("hex");
   const refreshToken = createRefreshToken(userId, sessionId, familyId);
@@ -351,13 +370,14 @@ export async function issueSession(
     familyId,
     refreshTokenHash: hashRefreshToken(refreshToken),
     absoluteExpiresAt,
+    persistent,
   });
 
   if (ttl <= 0) {
     throw HttpError.unauthorized("Your session has expired. Please sign in.");
   }
 
-  setRefreshCookie(res, refreshToken, ttl);
+  setRefreshCookie(res, refreshToken, ttl, persistent);
 
   return createAccessToken(userId);
 }
@@ -366,11 +386,16 @@ export async function issueSession(
  * Starts a brand-new chain for a user who has just proven who they are.
  * Login, Google sign-in and a password change all want exactly this.
  */
-export function startSession(res: Response, userId: string): Promise<string> {
+export function startSession(
+  res: Response,
+  userId: string,
+  persistent = true,
+): Promise<string> {
   return issueSession(
     res,
     userId,
     randomBytes(32).toString("hex"),
     Date.now() + ABSOLUTE_SESSION_TTL_SECONDS * 1000,
+    persistent,
   );
 }

@@ -135,8 +135,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signIn = useCallback(
-    async ({ email, password }: { email: string; password: string; remember: boolean }) => {
-      await signInWithPassword({ email, password })
+    async ({ email, password, remember }: { email: string; password: string; remember: boolean }) => {
+      await signInWithPassword({ email, password, rememberMe: remember })
 
       const profile = await getMyAccount()
       // Signing in does not mean onboarding was done: an account that never

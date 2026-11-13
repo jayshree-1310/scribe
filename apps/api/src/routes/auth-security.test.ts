@@ -513,3 +513,29 @@ describe.skipIf(!available)("POST /api/auth/refresh across tabs", () => {
     expect((await call("/api/auth/refresh", { cookie })).status).toBe(401);
   });
 });
+
+/* Remember me ---------------------------------------------------------------- */
+
+describe.skipIf(!available)("POST /api/auth/login with rememberMe", () => {
+  it("issues a lasting cookie by default", async () => {
+    const account = await signUp();
+    const { cookie } = await signIn(account);
+
+    expect(cookie).toMatch(/Max-Age=\d+/);
+  });
+
+  it("issues a browser-session cookie when unticked, and keeps it so on refresh", async () => {
+    const account = await signUp();
+    const login = await call("/api/auth/login", {
+      body: { email: account.email, password: account.password, rememberMe: false },
+    });
+
+    expect(login.status).toBe(200);
+    expect(login.cookie).toBeDefined();
+    expect(login.cookie).not.toMatch(/Max-Age|Expires/);
+
+    const refreshed = await call("/api/auth/refresh", { cookie: login.cookie });
+    expect(refreshed.status).toBe(200);
+    expect(refreshed.cookie).not.toMatch(/Max-Age|Expires/);
+  });
+});
