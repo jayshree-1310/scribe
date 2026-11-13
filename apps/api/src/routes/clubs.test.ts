@@ -832,3 +832,36 @@ describe.skipIf(!available)("discussions", () => {
     expect(new Set(ids).size).toBe(4);
   });
 });
+
+describe.skipIf(!available)("creating clubs", () => {
+  it("allows ten a day, and refusals do not use up the allowance", async () => {
+    const founder = await api.createUser("founder");
+
+    // Refused by the service (a suspended account) after the attempt was
+    // counted: it is given back, so all ten below still succeed.
+    await api.setSuspended(founder);
+    const refused = await api.request("/api/clubs", {
+      method: "POST",
+      as: founder,
+      body: { name: `Refused ${api.runId}` },
+    });
+    expect(refused.status).toBe(403);
+    await api.setSuspended(founder, false);
+
+    for (let n = 1; n <= 10; n += 1) {
+      const created = await api.request("/api/clubs", {
+        method: "POST",
+        as: founder,
+        body: { name: `Founded Number ${n} ${api.runId}` },
+      });
+      expect(created.status, `club ${n}`).toBe(201);
+    }
+
+    const eleventh = await api.request("/api/clubs", {
+      method: "POST",
+      as: founder,
+      body: { name: `One Too Many ${api.runId}` },
+    });
+    expect(eleventh.status).toBe(429);
+  });
+});

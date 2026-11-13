@@ -12,6 +12,8 @@
 
 import { Router } from "express";
 import { z } from "zod";
+import { HttpError } from "../lib/http-error.js";
+import { reserveAttempt } from "../lib/rate-limit.js";
 import { pageSchema, parseOrThrow } from "../lib/validate.js";
 import {
   getUserId,
@@ -160,14 +162,36 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+/**
+ * New channels per person per day. Each one is a public page with a name and
+ * description anybody can find, so an account creating them by the hundred is
+ * spam rather than enthusiasm.
+ */
+const CREATE_CHANNEL_LIMIT = 10;
+const CREATE_CHANNEL_WINDOW_SECONDS = 24 * 60 * 60;
+
 router.post("/", requireUser, async (req, res, next) => {
   try {
     const body = parseOrThrow(channelBodySchema, req.body);
+    const userId = requireUserId(res);
 
-    const channel = await createChannel(requireUserId(res), {
+    const attempt = await reserveAttempt(
+      `channels:ratelimit:create:${userId}`,
+      CREATE_CHANNEL_LIMIT,
+      CREATE_CHANNEL_WINDOW_SECONDS,
+    );
+    if (attempt.limited) {
+      throw HttpError.tooManyRequests(
+        "You have started a lot of channels today. Try again tomorrow.",
+        attempt.retryAfter || CREATE_CHANNEL_WINDOW_SECONDS,
+      );
+    }
+
+    // Charged only if it lands: a refused request gives the attempt back.
+    const channel = await createChannel(userId, {
       name: body.name,
       description: body.description,
-    });
+    }).catch(attempt.refundAndRethrow);
 
     res.status(201).json({ channel });
   } catch (error) {

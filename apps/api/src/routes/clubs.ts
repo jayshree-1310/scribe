@@ -183,14 +183,36 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+/**
+ * New clubs per person per day. Each one is a public page with a name and
+ * description anybody can find, so an account creating them by the hundred is
+ * spam rather than enthusiasm.
+ */
+const CREATE_CLUB_LIMIT = 10;
+const CREATE_CLUB_WINDOW_SECONDS = 24 * 60 * 60;
+
 router.post("/", requireUser, async (req, res, next) => {
   try {
     const body = parseOrThrow(clubBodySchema, req.body);
+    const userId = requireUserId(res);
 
-    const club = await createClub(requireUserId(res), {
+    const attempt = await reserveAttempt(
+      `clubs:ratelimit:create:${userId}`,
+      CREATE_CLUB_LIMIT,
+      CREATE_CLUB_WINDOW_SECONDS,
+    );
+    if (attempt.limited) {
+      throw HttpError.tooManyRequests(
+        "You have started a lot of clubs today. Try again tomorrow.",
+        attempt.retryAfter || CREATE_CLUB_WINDOW_SECONDS,
+      );
+    }
+
+    // Charged only if it lands: a refused request gives the attempt back.
+    const club = await createClub(userId, {
       name: body.name,
       description: body.description,
-    });
+    }).catch(attempt.refundAndRethrow);
 
     res.status(201).json({ club });
   } catch (error) {
