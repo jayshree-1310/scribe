@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-9, M-1 to M-8, L-5, L-6 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-9, M-1 to M-9, L-5, L-6 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -294,7 +294,7 @@ So the list below is not read as "everything is broken":
 - **Fix:** track uploads (see H-8) and sweep unreferenced ones after a grace
   period; remove covers/media in `deleteAccount`.
 
-### M-9 · A deleted account's access token gets 500s instead of 401 — Confirmed
+### M-9 · A deleted account's access token gets 500s instead of 401 — Confirmed — **Fixed**
 - After `DELETE /api/account/me`, the still-valid access token (up to 15 min)
   on `POST /api/author/stories` and `POST /api/clubs` → **500**
   (`story_authorId_fkey` / `bookClub_creatorId_fkey`). Other routes answer 4xx.

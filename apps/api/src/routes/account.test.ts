@@ -590,6 +590,36 @@ describe.skipIf(!available)("DELETE /api/account/me", () => {
     ]);
   });
 
+  /**
+   * An access token stays valid for up to fifteen minutes after the account
+   * goes. Writes made with it breached a foreign key onto the deleted user and
+   * answered 500; they should say "sign in again".
+   */
+  it("answers 401, not 500, to writes from an account that was just deleted", async () => {
+    const user = await createDeletable("d9", "open sesame please");
+
+    const deleted = await api.request("/api/account/me", {
+      method: "DELETE",
+      as: user.id,
+      body: { confirmUsername: user.username, password: "open sesame please" },
+    });
+    expect(deleted.status).toBe(200);
+
+    const story = await api.request("/api/author/stories", {
+      method: "POST",
+      as: user.id,
+      body: { title: "Written by nobody" },
+    });
+    expect(story.status).toBe(401);
+
+    const club = await api.request("/api/clubs", {
+      method: "POST",
+      as: user.id,
+      body: { name: "Founded by nobody" },
+    });
+    expect(club.status).toBe(401);
+  });
+
   it("asks a Google-only account for the username alone", async () => {
     const user = await createDeletable("d4", null);
 

@@ -12,6 +12,7 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import app from "../app.js";
 import { db } from "../prisma/db.js";
+import { connectRedis } from "../lib/redis.js";
 import { deleteAll } from "../prisma/delete-all.js";
 import { drainDeferredWrites } from "../services/deferred.js";
 import { type NotificationType } from "../services/notifications.js";
@@ -57,6 +58,10 @@ export class TestApi {
   readonly runId = `test-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
 
   async start(): Promise<void> {
+    // The server process connects Redis at boot; a suite has to do it itself,
+    // or a test run on its own (`-t`) meets a closed client wherever a route
+    // touches sessions, rate limits or caches.
+    await connectRedis();
     this.server = app.listen(0);
     await new Promise<void>((resolve) => this.server?.once("listening", resolve));
     const { port } = this.server.address() as AddressInfo;
