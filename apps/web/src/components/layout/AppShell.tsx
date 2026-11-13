@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../lib/auth'
+import { Spinner } from '../ui/Spinner'
 import { useTour } from '../../lib/tour'
 import { Icon } from '../ui/Icon'
 import { ScribbleWidget } from '../ai/ScribbleWidget'
@@ -106,7 +107,17 @@ export function AppShell({ children, variant = 'reader', width = 'default' }: Ap
           id="main"
           data-tour="app"
         >
-          {children}
+          {/* Inside `<main>`, so a page loaded on demand (see `App.tsx`) keeps
+              the sidebar and top bar on screen while it arrives. */}
+          <Suspense
+            fallback={
+              <div className="shell__loading">
+                <Spinner label="Loading" />
+              </div>
+            }
+          >
+            {children}
+          </Suspense>
         </main>
       </div>
 

@@ -1,3 +1,4 @@
+import { lazy } from 'react'
 import {
   Navigate,
   Outlet,
@@ -37,21 +38,28 @@ import { ChallengesPage } from './pages/ChallengesPage'
 import { ChallengeDetailPage } from './pages/ChallengeDetailPage'
 import { BadgesPage } from './pages/BadgesPage'
 import { NotificationsPage } from './pages/NotificationsPage'
-import { ModerationQueuePage } from './pages/ModerationQueuePage'
-import { AiSpendPage } from './pages/AiSpendPage'
 import { ChannelsPage } from './pages/ChannelsPage'
 import { ChannelDetailPage } from './pages/ChannelDetailPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
-import { AiLabPage } from './pages/AiLabPage'
-import { AuthorDashboardPage } from './pages/author/AuthorDashboardPage'
-import { AuthorStoriesPage } from './pages/author/AuthorStoriesPage'
-import { IdeaStudioPage } from './pages/author/IdeaStudioPage'
-import { AuthorAnalyticsPage } from './pages/author/AuthorAnalyticsPage'
-import { AuthorChannelsPage } from './pages/author/AuthorChannelsPage'
-import { StoryEditorPage } from './pages/author/StoryEditorPage'
-import { StoryBiblePage } from './pages/author/StoryBiblePage'
+
+/**
+ * Pages most readers never open -- the author studio, the admin pages, the AI
+ * workbench -- load on first visit instead of riding in the main bundle every
+ * reader downloads. Each shell renders them inside a `Suspense` boundary
+ * (`AppShell`), so the frame stays put while one arrives.
+ */
+const ModerationQueuePage = lazy(() => import('./pages/ModerationQueuePage').then((m) => ({ default: m.ModerationQueuePage })))
+const AiSpendPage = lazy(() => import('./pages/AiSpendPage').then((m) => ({ default: m.AiSpendPage })))
+const AiLabPage = lazy(() => import('./pages/AiLabPage').then((m) => ({ default: m.AiLabPage })))
+const AuthorDashboardPage = lazy(() => import('./pages/author/AuthorDashboardPage').then((m) => ({ default: m.AuthorDashboardPage })))
+const AuthorStoriesPage = lazy(() => import('./pages/author/AuthorStoriesPage').then((m) => ({ default: m.AuthorStoriesPage })))
+const IdeaStudioPage = lazy(() => import('./pages/author/IdeaStudioPage').then((m) => ({ default: m.IdeaStudioPage })))
+const AuthorAnalyticsPage = lazy(() => import('./pages/author/AuthorAnalyticsPage').then((m) => ({ default: m.AuthorAnalyticsPage })))
+const AuthorChannelsPage = lazy(() => import('./pages/author/AuthorChannelsPage').then((m) => ({ default: m.AuthorChannelsPage })))
+const StoryEditorPage = lazy(() => import('./pages/author/StoryEditorPage').then((m) => ({ default: m.StoryEditorPage })))
+const StoryBiblePage = lazy(() => import('./pages/author/StoryBiblePage').then((m) => ({ default: m.StoryBiblePage })))
 
 /**
  * A data router rather than `<BrowserRouter>`: `useBlocker` — which Settings
