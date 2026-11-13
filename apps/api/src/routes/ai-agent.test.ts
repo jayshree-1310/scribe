@@ -292,6 +292,16 @@ describe.skipIf(!available)("POST /api/ai/agent", () => {
       expect(provider.calls).toHaveLength(0);
     });
 
+    it("refuses somebody else's draft as the story on screen, before any model call", async () => {
+      script("Hello.");
+      const response = await ask(readerId, {
+        message: "Tell me about this one.",
+        storyId: stories.draft.id,
+      });
+      expect(response.status).toBe(404);
+      expect(provider.calls).toHaveLength(0);
+    });
+
     it("rejects an empty or overlong message before any model call", async () => {
       script("Hello.");
       for (const message of [" ", "x".repeat(MESSAGE_LIMIT + 1)]) {

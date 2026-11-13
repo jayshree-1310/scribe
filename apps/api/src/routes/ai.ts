@@ -103,7 +103,7 @@ import { db } from "../prisma/db.js";
 import { SPEND_WINDOWS, spendReport, type SpendWindow } from "../services/ai/spend.js";
 import { assertAdmin } from "../services/roles.js";
 import { FACT_KINDS } from "../services/ai/schemas.js";
-import { MAX_PAGE_SIZE } from "../services/stories.js";
+import { MAX_PAGE_SIZE, findVisibleStoryId } from "../services/stories.js";
 import { logger } from "../lib/logger.js";
 
 const router = Router();
@@ -1707,11 +1707,22 @@ router.post(
 
 /**
  * Everything the agent routes check before the loop starts: the caller, the
- * body, then the request limit and the day's budget (`agent-request.ts`).
+ * body, the story on screen, then the request limit and the day's budget
+ * (`agent-request.ts`).
+ *
+ * The story is authorised here, not only by the tools: a story the caller
+ * cannot read -- somebody else's draft -- would otherwise cost a model call
+ * and a slot of their limit to be told, by every tool, that it is not there.
+ * 404 like every other read of it, so this does not confirm the draft exists.
  */
 async function startAgent(res: Response, request: unknown) {
   const userId = requireUserId(res);
   const body = parseOrThrow(agentRequestSchema, request);
+
+  if (body.storyId && (await findVisibleStoryId(body.storyId, userId)) === null) {
+    throw HttpError.notFound("That story could not be found.");
+  }
+
   await chargeAgentRequest(userId);
 
   return {
