@@ -568,6 +568,17 @@ textarea.field__control {
   cursor: pointer;
 }
 
+.checkbox__label a {
+  color: var(--brand);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.checkbox__label a:hover {
+  text-decoration-thickness: 2px;
+}
+
 .checkbox__hint {
   margin-top: var(--space-1);
   padding-left: calc(1.125rem + var(--space-3));

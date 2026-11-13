@@ -177,8 +177,14 @@ export function RegisterPage() {
           disabled={submitting}
           label={
             <>
-              I agree to the <Link to="/terms">Terms</Link> and{' '}
-              <Link to="/privacy">Privacy Policy</Link>
+              I agree to the{' '}
+              <Link to="/terms" target="_blank" rel="noopener noreferrer">
+                Terms
+              </Link>{' '}
+              and{' '}
+              <Link to="/privacy" target="_blank" rel="noopener noreferrer">
+                Privacy Policy
+              </Link>
             </>
           }
         />
