@@ -118,7 +118,8 @@ describe.skipIf(!available)("POST /api/ai/assist", () => {
       body: body(),
     });
 
-    expect(response.status).toBe(403);
+    // Somebody else's draft: 404, so the refusal does not confirm it exists.
+    expect(response.status).toBe(404);
     expect(fake.calls).toHaveLength(0);
   });
 
@@ -349,7 +350,7 @@ describe.skipIf(!available)("POST /api/ai/assist/stream", () => {
     expect(deltas.map((event) => event.text).join("")).toContain("```");
   });
 
-  it("answers a non-owner with an ordinary 403, not an error frame", async () => {
+  it("answers a non-owner with an ordinary 404, not an error frame", async () => {
     scripted("Rewritten.");
 
     const { status, contentType, body: failure } = await stream(
@@ -359,9 +360,9 @@ describe.skipIf(!available)("POST /api/ai/assist/stream", () => {
 
     // Nothing is written until authorisation has passed, so the status line is
     // still available to carry the refusal.
-    expect(status).toBe(403);
+    expect(status).toBe(404);
     expect(contentType).not.toContain("text/event-stream");
-    expect(failure.error.code).toBe("forbidden");
+    expect(failure.error.code).toBe("not_found");
   });
 
   it("reports a provider outage before the stream starts as a 503", async () => {

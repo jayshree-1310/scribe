@@ -261,7 +261,8 @@ describe.skipIf(!available)("generation seeded with a story", () => {
       body: { seed: { storyId: story.id } },
     });
 
-    expect(response.status).toBe(403);
+    // Somebody else's draft: 404, so the refusal does not confirm it exists.
+    expect(response.status).toBe(404);
     expect(fake.calls).toHaveLength(0);
   });
 
@@ -352,7 +353,8 @@ describe.skipIf(!available)("POST /api/ai/generate/twist", () => {
 
     const response = await ask(strangerId, { storyId: bible.id });
 
-    expect(response.status).toBe(403);
+    // Somebody else's draft: 404, so the refusal does not confirm it exists.
+    expect(response.status).toBe(404);
     expect(fake.calls).toHaveLength(0);
   });
 

@@ -162,6 +162,12 @@ async function ownedStory(
 
   if (!row) throw HttpError.notFound(STORY_NOT_FOUND);
   if (row.authorId !== userId) {
+    // Somebody else's draft is a 404, exactly like an id that names nothing:
+    // a 403 would confirm that an unlisted story exists. A listed one is
+    // public, so saying it is not theirs gives nothing away.
+    if (row.listedAt === null || row.listedAt === undefined) {
+      throw HttpError.notFound(STORY_NOT_FOUND);
+    }
     throw HttpError.forbidden("That story is not yours to edit.");
   }
   if (row.source !== "SCRIBE") {

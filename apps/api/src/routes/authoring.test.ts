@@ -81,7 +81,7 @@ describe.skipIf(!available)("/api/author access", () => {
     expect(status).toBe(401);
   });
 
-  it("403s every write against somebody else's story", async () => {
+  it("404s every write against somebody else's draft", async () => {
     const story = await newStory({ title: title("Not Yours") });
     const chapter = await newChapter(story.id, { title: "One", content: "A word." });
 
@@ -107,6 +107,8 @@ describe.skipIf(!available)("/api/author access", () => {
       ],
     ];
 
+    // A draft: 404, exactly as for an id that names nothing, so the refusal
+    // does not confirm an unlisted story exists.
     for (const [method, path, body] of writes) {
       const { status } = await api.request(path, {
         method,
@@ -114,7 +116,7 @@ describe.skipIf(!available)("/api/author access", () => {
         ...(body === undefined ? {} : { body }),
       });
 
-      expect(status, `${method} ${path}`).toBe(403);
+      expect(status, `${method} ${path}`).toBe(404);
     }
 
     // And the story is untouched by the attempt.
@@ -124,7 +126,19 @@ describe.skipIf(!available)("/api/author access", () => {
     expect(body.chapters).toHaveLength(1);
   });
 
-  it("403s an attachment belonging to another author's chapter", async () => {
+  it("403s writes to somebody else's listed story, which anybody can see", async () => {
+    const listed = await api.createStory({ title: title("Public Not Yours"), authorId });
+
+    const { status } = await api.request(`/api/author/stories/${listed.id}`, {
+      method: "PATCH",
+      as: intruderId,
+      body: { title: "Mine Now" },
+    });
+
+    expect(status).toBe(403);
+  });
+
+  it("refuses an attachment belonging to another author's chapter", async () => {
     const story = await newStory({ title: title("Guarded Media") });
     const chapter = await newChapter(story.id, { title: "One", content: "Word." });
 
@@ -142,7 +156,8 @@ describe.skipIf(!available)("/api/author access", () => {
       { method: "DELETE", as: intruderId },
     );
 
-    expect(status).toBe(403);
+    // A draft's attachment: as absent as the draft.
+    expect(status).toBe(404);
   });
 
   it("404s a story that does not exist, rather than 403", async () => {
