@@ -351,6 +351,11 @@ describe.skipIf(!available)("POST /api/auth/change-password", () => {
     expect(
       (await call("/api/auth/refresh", { cookie: response.cookie })).status,
     ).toBe(200);
+
+    // Access tokens too: the phone's is refused at once rather than working
+    // out its fifteen minutes, and the one this response issued works.
+    expect((await call("/api/account/me", { method: "GET", token: phone.body.accessToken })).status).toBe(401);
+    expect((await call("/api/account/me", { method: "GET", token: response.body.accessToken })).status).toBe(200);
   });
 
   it("refuses to reuse the password that is already set", async () => {

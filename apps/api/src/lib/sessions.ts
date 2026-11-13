@@ -51,6 +51,41 @@ const refreshCookieOptions = {
   path: "/api/auth",
 };
 
+/* Access-token cut-off --------------------------------------------------- */
+
+/**
+ * Access tokens are stateless, so revoking a user's sessions used to leave
+ * every access token already issued working until it expired -- up to fifteen
+ * minutes after a password change, a reset or "sign out everywhere", which is
+ * the window a stolen token is most wanted in. Revoking now also records the
+ * moment, and `authenticate` refuses a token issued before it.
+ *
+ * Kept for a day: longer than any access token lives, however
+ * `JWT_ACCESS_EXPIRES_IN` is set, and then it has nothing left to refuse.
+ */
+const ACCESS_CUTOFF_TTL_SECONDS = 24 * 60 * 60;
+
+function accessCutoffKey(userId: string): string {
+  return `auth:access-cutoff:${userId}`;
+}
+
+/** Invalidates every access token issued to the user before now. */
+export async function revokeAccessTokens(userId: string): Promise<void> {
+  await redis.set(accessCutoffKey(userId), String(Date.now()), {
+    EX: ACCESS_CUTOFF_TTL_SECONDS,
+  });
+}
+
+/**
+ * Whether an access token issued at `issuedAtMs` predates the user's last
+ * revocation. The session a password change starts is issued after its
+ * cut-off is written, so it is never caught by it.
+ */
+export async function isAccessTokenRevoked(userId: string, issuedAtMs: number): Promise<boolean> {
+  const cutoff = await redis.get(accessCutoffKey(userId));
+  return cutoff !== null && issuedAtMs < Number(cutoff);
+}
+
 /* Session storage ------------------------------------------------------- */
 
 /**
@@ -205,6 +240,8 @@ export async function revokeFamily(familyId: string): Promise<void> {
  * achieves nothing.
  */
 export async function revokeAllSessions(userId: string): Promise<number> {
+  await revokeAccessTokens(userId);
+
   const sessionIds = await redis.zRange(userSessionsKey(userId), 0, -1);
 
   if (sessionIds.length === 0) {

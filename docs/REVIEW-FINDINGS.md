@@ -5,7 +5,10 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-9, M-1 to M-14 (M-11 for stories and chapters), L-5, L-6, L-13 and L-19 fixed, and H-10's code side (2026-11-06) — see §8.
+**Fix progress (2026-11-13):** every High, Medium and Low finding is fixed,
+except where noted: H-10 needs the Supabase project unpausing (or a move to
+R2), M-6 needs a Resend key and sending domain to deliver mail, and M-11 covers
+stories and chapters — profiles, clubs and channels are still not reportable.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -384,7 +387,7 @@ So the list below is not read as "everything is broken":
 | L-18 | **Fixed** (per-job leases; dead list pruned). Job worker start moves **every** job in `jobs:running` back to ready, assuming they are orphans. Correct for one instance; with two API instances a restart re-runs the other's in-flight jobs. The dead list also keeps ids whose job hashes have expired. | `lib/jobs.ts` `startWorker` | Code review |
 | L-19 | **Fixed** (web no longer sends the header; the API keeps it for its test suite). Leftover dev-user fallback: the comment in `current-user.ts` says to delete `X-Scribe-User-Id` "once the web app signs in for real", which it now does. In dev, signed-out requests from the web app are attributed to the demo user `…0001`, who has no `auth.user` row, so signed-out behaviour is never exercised locally and writes 500. | `middleware/current-user.ts`, `web/src/data/*-api.ts` `readerHeaders` | Code review |
 | L-20 | **Fixed** (10 a day each). Clubs and channels have no creation rate limit. | `routes/clubs.ts`, `routes/channels.ts` | Code review |
-| L-21 | Access tokens stay valid up to 15 min after a password change, reset, suspension or account deletion (stateless JWT). Expected trade-off; worth knowing, and it is what makes M-9 reachable. | `lib/jwt.ts` | Confirmed |
+| L-21 | **Fixed** for password change, reset, sign-out-everywhere and deletion (a cut-off in Redis; tokens carry a millisecond issue time). Suspension was already enforced per write. Access tokens stay valid up to 15 min after a password change, reset, suspension or account deletion (stateless JWT). Expected trade-off; worth knowing, and it is what makes M-9 reachable. | `lib/jwt.ts` | Confirmed |
 | L-22 | **Fixed** (answers before the lookup). `forgot-password` does a Redis write and logs/sends mail only when the address exists, so response time is a weak existence oracle (the body is identical). | `services/passwords.ts:161` | Code review |
 
 ---
@@ -477,4 +480,5 @@ tests are "delete X with two of every child", one per entity.
    still mint only one session. Replays after the window burn the chain as
    before. The web app also serialises refreshes across tabs with
    `navigator.locks`. Then the remaining Medium items.
-6. Low items as convenient.
+6. ~~Low items~~ **Done**, one commit each (L-5, L-6 and L-13 rode along with
+   M-5 and H-9).

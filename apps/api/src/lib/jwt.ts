@@ -32,6 +32,12 @@ export function createAccessToken(userId: string): string {
     {
       sub: userId,
       type: "access",
+      /**
+       * Issue time in milliseconds. `iat` is whole seconds, too coarse to
+       * tell a token issued just before a revocation from the one issued just
+       * after it (`isAccessTokenRevoked` in `lib/sessions.ts`).
+       */
+      iatMs: Date.now(),
     },
     accessSecret,
     accessOptions,
@@ -119,7 +125,7 @@ export function verifyRefreshToken(token: string): RefreshTokenPayload | null {
  * pinned algorithm and payload shape together, collapsing every failure to
  * `null` so a caller cannot accidentally treat a bad token as anonymous.
  */
-export function verifyAccessToken(token: string): { sub: string } | null {
+export function verifyAccessToken(token: string): { sub: string; issuedAtMs: number } | null {
   let payload: string | jwt.JwtPayload;
 
   try {
@@ -135,10 +141,14 @@ export function verifyAccessToken(token: string): { sub: string } | null {
   if (
     payload.type !== "access" ||
     typeof payload.sub !== "string" ||
-    payload.sub.length === 0
+    payload.sub.length === 0 ||
+    typeof payload.iat !== "number"
   ) {
     return null;
   }
 
-  return { sub: payload.sub };
+  // Tokens issued before `iatMs` existed carry only the second.
+  const issuedAtMs = typeof payload["iatMs"] === "number" ? payload["iatMs"] : payload.iat * 1000;
+
+  return { sub: payload.sub, issuedAtMs };
 }
