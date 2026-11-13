@@ -385,7 +385,7 @@ So the list below is not read as "everything is broken":
 | L-19 | **Fixed** (web no longer sends the header; the API keeps it for its test suite). Leftover dev-user fallback: the comment in `current-user.ts` says to delete `X-Scribe-User-Id` "once the web app signs in for real", which it now does. In dev, signed-out requests from the web app are attributed to the demo user `…0001`, who has no `auth.user` row, so signed-out behaviour is never exercised locally and writes 500. | `middleware/current-user.ts`, `web/src/data/*-api.ts` `readerHeaders` | Code review |
 | L-20 | **Fixed** (10 a day each). Clubs and channels have no creation rate limit. | `routes/clubs.ts`, `routes/channels.ts` | Code review |
 | L-21 | Access tokens stay valid up to 15 min after a password change, reset, suspension or account deletion (stateless JWT). Expected trade-off; worth knowing, and it is what makes M-9 reachable. | `lib/jwt.ts` | Confirmed |
-| L-22 | `forgot-password` does a Redis write and logs/sends mail only when the address exists, so response time is a weak existence oracle (the body is identical). | `services/passwords.ts:161` | Code review |
+| L-22 | **Fixed** (answers before the lookup). `forgot-password` does a Redis write and logs/sends mail only when the address exists, so response time is a weak existence oracle (the body is identical). | `services/passwords.ts:161` | Code review |
 
 ---
 

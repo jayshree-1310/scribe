@@ -27,7 +27,7 @@ import {
 } from "../services/email-verification.js";
 import {
   changePassword,
-  requestPasswordReset,
+  startPasswordReset,
   resetPassword,
   setPassword,
 } from "../services/passwords.js";
@@ -75,7 +75,8 @@ router.post("/forgot-password", async (req, res, next) => {
     await assertWithinLimit("forgot", subject, 3);
     await chargeLimit("forgot", subject);
 
-    await requestPasswordReset(email);
+    // Not awaited: see `startPasswordReset` for why the answer comes first.
+    startPasswordReset(email);
 
     /**
      * Deliberately the same body whether or not that address has an account.

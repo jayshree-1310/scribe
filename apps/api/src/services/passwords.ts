@@ -11,6 +11,7 @@
 import argon2 from "argon2";
 import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.js";
+import { logger } from "../lib/logger.js";
 import { HttpError } from "../lib/http-error.js";
 import { sendMail, webLink } from "../lib/mailer.js";
 import {
@@ -146,6 +147,31 @@ export async function setPassword(
   }
 
   await writePassword(userId, newPassword);
+}
+
+/** Reset requests still being worked on; see `startPasswordReset`. */
+const pendingResets = new Set<Promise<void>>();
+
+/**
+ * Starts a reset request and returns at once, without waiting to learn
+ * whether the address has an account.
+ *
+ * Awaiting `requestPasswordReset` made the response slower for a registered
+ * address -- a token write and an email -- than for an unknown one, which
+ * answered immediately: an existence oracle by timing, whatever the body said.
+ * Answering before the lookup makes both the same request.
+ */
+export function startPasswordReset(email: string): void {
+  const work = requestPasswordReset(email).catch((error: unknown) => {
+    logger.error({ err: error }, "password reset request failed");
+  });
+  pendingResets.add(work);
+  void work.finally(() => pendingResets.delete(work));
+}
+
+/** Settles every reset request in flight. For `drainDeferredWrites`. */
+export async function flushPasswordResets(): Promise<void> {
+  await Promise.all([...pendingResets]);
 }
 
 /**

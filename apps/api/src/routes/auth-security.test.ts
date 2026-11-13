@@ -31,6 +31,7 @@ const { default: app } = await import("../app.js");
 const { db } = await import("../prisma/db.js");
 const { redis, connectRedis } = await import("../lib/redis.js");
 const { databaseAvailable } = await import("../test/harness.js");
+const { drainDeferredWrites } = await import("../services/deferred.js");
 const { DEV_USER_HEADER } = await import("../middleware/current-user.js");
 
 const available = await databaseAvailable();
@@ -189,7 +190,9 @@ describe.skipIf(!available)("POST /api/auth/forgot-password", () => {
     expect(known.status).toBe(200);
     expect(known.body).toEqual(unknown.body);
 
-    // ...and the difference that must not be observable from outside is real.
+    // ...and the difference that must not be observable from outside is real,
+    // once the work the response did not wait for has finished.
+    await drainDeferredWrites();
     expect(sent).toHaveLength(1);
     expect(sent[0]!.to).toBe(account.email);
   });
@@ -200,6 +203,7 @@ describe.skipIf(!available)("POST /api/auth/reset-password", () => {
     const account = await signUp();
 
     await call("/api/auth/forgot-password", { body: { email: account.email } });
+    await drainDeferredWrites();
     const token = tokenSentTo(account.email, "reset-password");
 
     const first = await call("/api/auth/reset-password", {
@@ -223,6 +227,7 @@ describe.skipIf(!available)("POST /api/auth/reset-password", () => {
     const account = await signUp();
 
     await call("/api/auth/forgot-password", { body: { email: account.email } });
+    await drainDeferredWrites();
     const token = tokenSentTo(account.email, "reset-password");
 
     // Expiry is a Redis TTL, so the honest way to test it is to let the key
@@ -247,6 +252,7 @@ describe.skipIf(!available)("POST /api/auth/reset-password", () => {
     const account = await signUp();
 
     await call("/api/auth/forgot-password", { body: { email: account.email } });
+    await drainDeferredWrites();
     const token = tokenSentTo(account.email, "reset-password");
 
     await db.orm.auth.User.where((u) => u.id.eq(account.id)).update({
@@ -270,6 +276,7 @@ describe.skipIf(!available)("POST /api/auth/reset-password", () => {
     expect(phone.cookie).toBeDefined();
 
     await call("/api/auth/forgot-password", { body: { email: account.email } });
+    await drainDeferredWrites();
     await call("/api/auth/reset-password", {
       body: {
         token: tokenSentTo(account.email, "reset-password"),
@@ -287,6 +294,7 @@ describe.skipIf(!available)("POST /api/auth/reset-password", () => {
     const account = await signUp();
 
     await call("/api/auth/forgot-password", { body: { email: account.email } });
+    await drainDeferredWrites();
     await call("/api/auth/reset-password", {
       body: {
         token: tokenSentTo(account.email, "reset-password"),

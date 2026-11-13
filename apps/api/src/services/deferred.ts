@@ -32,6 +32,7 @@ import { flushUsage } from "./ai/usage.js";
 import { flushAnalytics } from "./analytics.js";
 import { flushBadges } from "./gamification.js";
 import { flushNotifications } from "./notifications.js";
+import { flushPasswordResets } from "./passwords.js";
 
 export async function drainDeferredWrites(): Promise<void> {
   /**
@@ -39,8 +40,14 @@ export async function drainDeferredWrites(): Promise<void> {
    * causes none and is here only because it can settle alongside for free.
    * The content check belongs here for the same reason badges do: hiding a
    * comment tells its author, which is a notification issued as it lands.
+   * Password-reset requests cause nothing further and settle here too.
    */
-  await Promise.all([flushBadges(), flushAnalytics(), flushModeration()]);
+  await Promise.all([
+    flushBadges(),
+    flushAnalytics(),
+    flushModeration(),
+    flushPasswordResets(),
+  ]);
 
   /**
    * Second band: writers the first band feeds. A badge landing above issues a
