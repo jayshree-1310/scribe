@@ -21,7 +21,7 @@ const GENERIC_MESSAGE = 'Something went wrong. Please try again.'
 
 const STATUS_MESSAGES: Record<number, string> = {
   400: 'Some of the details need fixing.',
-  404: "We couldn't find that note — it may have been deleted.",
+  404: "We couldn't find that — it may have been deleted.",
   409: 'That change conflicts with a more recent update.',
   429: 'Too many requests. Give it a moment and try again.',
   500: 'The server ran into a problem. Please try again.',
