@@ -93,6 +93,12 @@ import { notify } from "./notifications.js";
 import { assertAdmin, assertNotSuspended } from "./roles.js";
 import { toIso } from "./stories.js";
 
+/**
+ * The transaction context, derived from `db.transaction` for the reason
+ * `services/authoring.ts` gives: the type is not re-exported.
+ */
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 /* Shapes returned to the client ------------------------------------------ */
 
 export const REPORT_TARGETS = [
@@ -579,23 +585,24 @@ async function loadTargets(
  * compiler then refuses a fourth surface that forgot to add its table here.
  */
 async function setHidden(
+  tx: Tx,
   type: ReportTarget,
   id: string,
   hiddenAt: Temporal.Instant | null,
 ): Promise<void> {
   switch (type) {
     case "COMMENT":
-      await db.orm.engagement.Comment.where((row) => row.id.eq(id)).update({
+      await tx.orm.engagement.Comment.where((row) => row.id.eq(id)).update({
         hiddenAt,
       });
       return;
     case "CLUB_DISCUSSION":
-      await db.orm.clubs.ClubDiscussion.where((row) => row.id.eq(id)).update({
+      await tx.orm.clubs.ClubDiscussion.where((row) => row.id.eq(id)).update({
         hiddenAt,
       });
       return;
     case "CHANNEL_POST":
-      await db.orm.channels.ChannelPost.where((row) => row.id.eq(id)).update({
+      await tx.orm.channels.ChannelPost.where((row) => row.id.eq(id)).update({
         hiddenAt,
       });
       return;
@@ -607,7 +614,7 @@ async function setHidden(
      * with the null the first hide left.
      */
     case "STORY":
-      await db.runtime().query(
+      await tx.query(
         hiddenAt === null
           ? db.raw.sql`
               UPDATE "content"."story"
@@ -622,7 +629,7 @@ async function setHidden(
       );
       return;
     case "CHAPTER":
-      await db.runtime().query(
+      await tx.query(
         hiddenAt === null
           ? db.raw.sql`
               UPDATE "content"."chapter"
@@ -647,8 +654,8 @@ async function setHidden(
  * `notification_sourceType_sourceId_idx`, so a comment nobody was notified
  * about costs an index probe and no rows.
  */
-async function hideContent(type: ReportTarget, id: string): Promise<void> {
-  await setHidden(type, id, now());
+async function hideContent(tx: Tx, type: ReportTarget, id: string): Promise<void> {
+  await setHidden(tx, type, id, now());
 
   const plan = db.raw.sql`
     DELETE FROM "notifications"."notification"
@@ -658,7 +665,7 @@ async function hideContent(type: ReportTarget, id: string): Promise<void> {
     .affectedCount()
     .build();
 
-  await db.runtime().query(plan);
+  await tx.query(plan);
 }
 
 /* Reports ----------------------------------------------------------------- */
@@ -1043,7 +1050,7 @@ export async function fileAutomatedReport(
     null;
 
   if (input.hide && !target.hidden) {
-    await hideContent(input.targetType, input.targetId);
+    await db.transaction((tx) => hideContent(tx, input.targetType, input.targetId));
 
     notify({
       event: "content-hidden",
@@ -1182,58 +1189,66 @@ export async function resolveReport(
 
   const timestamp = now();
 
-  if (input.action === "HIDE" || input.action === "SUSPEND") {
-    await hideContent(targetType, report.targetId);
-  } else if (target?.hidden) {
-    await setHidden(targetType, report.targetId, null);
-  }
-
-  if (input.action === "SUSPEND" && target) {
-    await db.orm.auth.User.where((user) => user.id.eq(target.authorId)).update({
-      suspendedAt: timestamp,
-      updatedAt: timestamp,
-    });
-  }
-
-  // The undo half of a suspension: only for the report that imposed it.
-  if (input.action === "DISMISS" && report.action === "SUSPEND" && target) {
-    await db.orm.auth.User.where((user) => user.id.eq(target.authorId)).update({
-      suspendedAt: null,
-      updatedAt: timestamp,
-    });
-  }
-
-  const note = input.note?.trim();
-
   /**
-   * One statement for the report itself and every other open report on the
-   * same target. `OR` rather than two updates, so a moderator cannot see a
-   * half-resolved queue between them.
-   *
-   * `RETURNING "reporterId"` is what makes the reporters tellable: the sweep
-   * already knows every person who asked about this target, and a second
-   * query to find them again could only disagree with it.
+   * The content, the account and the report change together or not at all.
+   * They used to be separate statements, so a failure part-way left content
+   * hidden under a report still open, or an account suspended by a report
+   * that never recorded doing it.
    */
-  const plan = db.raw.sql`
-    UPDATE "moderation"."report"
-       SET "status" = 'RESOLVED',
-           "action" = ${input.action},
-           "note" = NULLIF(${note ?? ""}::text, ''),
-           "resolvedById" = ${callerId},
-           "resolvedAt" = now(),
-           "updatedAt" = now()
-     WHERE "id" = ${reportId}
-        OR ("targetType" = ${report.targetType}
-            AND "targetId" = ${report.targetId}
-            AND "status" = 'OPEN')
-    RETURNING "reporterId"
-  `
-    .returnsRow({ reporterId: { codecId: "pg/text@1", nullable: true } })
-    .build();
+  const swept = await db.transaction(async (tx) => {
+    if (input.action === "HIDE" || input.action === "SUSPEND") {
+      await hideContent(tx, targetType, report.targetId);
+    } else if (target?.hidden) {
+      await setHidden(tx, targetType, report.targetId, null);
+    }
 
-  const swept = (await db.runtime().query(plan)) as {
-    reporterId: string | null;
-  }[];
+    if (input.action === "SUSPEND" && target) {
+      await tx.orm.auth.User.where((user) => user.id.eq(target.authorId)).update({
+        suspendedAt: timestamp,
+        updatedAt: timestamp,
+      });
+    }
+
+    // The undo half of a suspension: only for the report that imposed it.
+    if (input.action === "DISMISS" && report.action === "SUSPEND" && target) {
+      await tx.orm.auth.User.where((user) => user.id.eq(target.authorId)).update({
+        suspendedAt: null,
+        updatedAt: timestamp,
+      });
+    }
+
+    const note = input.note?.trim();
+
+    /**
+     * One statement for the report itself and every other open report on the
+     * same target. `OR` rather than two updates, so a moderator cannot see a
+     * half-resolved queue between them.
+     *
+     * `RETURNING "reporterId"` is what makes the reporters tellable: the sweep
+     * already knows every person who asked about this target, and a second
+     * query to find them again could only disagree with it.
+     */
+    const plan = db.raw.sql`
+      UPDATE "moderation"."report"
+         SET "status" = 'RESOLVED',
+             "action" = ${input.action},
+             "note" = NULLIF(${note ?? ""}::text, ''),
+             "resolvedById" = ${callerId},
+             "resolvedAt" = now(),
+             "updatedAt" = now()
+       WHERE "id" = ${reportId}
+          OR ("targetType" = ${report.targetType}
+              AND "targetId" = ${report.targetId}
+              AND "status" = 'OPEN')
+      RETURNING "reporterId"
+    `
+      .returnsRow({ reporterId: { codecId: "pg/text@1", nullable: true } })
+      .build();
+
+    return (await tx.query(plan)) as {
+      reporterId: string | null;
+    }[];
+  });
 
   const resolved = await findReport(reportId);
   if (!resolved) throw HttpError.notFound(REPORT_NOT_FOUND);
