@@ -27,6 +27,7 @@ import { refreshStoryVector } from "./ai/embeddings.js";
 import { scheduleBibleRefresh, scheduleChapterEmbedding } from "./ai/job-schedule.js";
 import { logger } from "../lib/logger.js";
 import { assertUsableUrl, discardUpload } from "./uploads.js";
+import { assertNotSuspended } from "./roles.js";
 import { evaluateBadges } from "./gamification.js";
 import { notify } from "./notifications.js";
 import { getStory, listStories, toIso, type Page, type Story } from "./stories.js";
@@ -180,6 +181,29 @@ interface OwnedChapterRow {
 }
 
 /** The same guard, entered from a chapter id. */
+/**
+ * Refuses a suspended author's change to something readers can already see.
+ *
+ * Suspension stops an account putting text in front of other people, and
+ * rewriting a published chapter (or a listed story's description) into the
+ * content they were suspended for is exactly that. Drafts stay theirs to work
+ * on, so the check only applies once the thing is public.
+ */
+async function assertMayChangePublic(userId: string, isPublicNow: boolean): Promise<void> {
+  if (isPublicNow) await assertNotSuspended(userId);
+}
+
+/** A chapter readers can open: published, in a listed story. */
+function isPublic(
+  chapter: { publishedAt: unknown },
+  story: { listedAt?: unknown },
+): boolean {
+  return (
+    chapter.publishedAt !== null && chapter.publishedAt !== undefined &&
+    story.listedAt !== null && story.listedAt !== undefined
+  );
+}
+
 async function ownedChapter(
   client: Orm,
   chapterId: string,
@@ -448,6 +472,10 @@ export async function updateStory(
   await db.transaction(async (tx) => {
     const story = await ownedStory(tx, storyId, userId);
 
+    // A listed story's title, description and cover are public text; a
+    // suspended author may still work on a draft. See `assertMayChangePublic`.
+    await assertMayChangePublic(userId, story.listedAt !== null && story.listedAt !== undefined);
+
     const changes: Record<string, unknown> = { updatedAt: timestamp };
 
     if (input.title !== undefined && input.title !== story.title) {
@@ -545,6 +573,9 @@ export async function publishStory(
   userId: string,
   storyId: string,
 ): Promise<Story> {
+  // Puts text in front of readers; see `routes/suspension.test.ts`.
+  await assertNotSuspended(userId);
+
   const timestamp = now();
 
   const newlyListed = await db.transaction(async (tx) => {
@@ -635,6 +666,9 @@ export async function publishChapter(
   userId: string,
   chapterId: string,
 ): Promise<AuthoredChapter> {
+  // Puts text in front of readers; see `routes/suspension.test.ts`.
+  await assertNotSuspended(userId);
+
   const timestamp = now();
 
   const storyId = await db.transaction(async (tx) => {
@@ -842,7 +876,9 @@ export async function updateChapter(
   const timestamp = now();
 
   const storyId = await db.transaction(async (tx) => {
-    const { chapter } = await ownedChapter(tx, chapterId, userId);
+    const { chapter, story } = await ownedChapter(tx, chapterId, userId);
+
+    await assertMayChangePublic(userId, isPublic(chapter, story));
 
     const changes: Record<string, unknown> = { updatedAt: timestamp };
 
@@ -1035,7 +1071,9 @@ export async function addMultimedia(
   await assertUsableUrl(userId, input.url, "url");
 
   const mediaId = await db.transaction(async (tx) => {
-    const { chapter } = await ownedChapter(tx, chapterId, userId);
+    const { chapter, story } = await ownedChapter(tx, chapterId, userId);
+
+    await assertMayChangePublic(userId, isPublic(chapter, story));
 
     let order = input.displayOrder;
 

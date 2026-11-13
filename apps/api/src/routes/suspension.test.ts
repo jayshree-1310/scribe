@@ -35,6 +35,20 @@ const GUARDED = new Set([
   "clubs.ts POST /:id/discussions",
   "channels.ts POST /:id/posts",
   "moderation.ts POST /reports",
+  // Text that is, or becomes, public: publishing, a club or channel's name
+  // and description, an edit to a channel post. (Review M-10.)
+  "authoring.ts POST /stories/:id/publish",
+  "authoring.ts POST /chapters/:id/publish",
+  "channels.ts POST /",
+  "channels.ts PATCH /:id",
+  "channels.ts PATCH /posts/:id",
+  "clubs.ts POST /",
+  "clubs.ts PATCH /:id",
+  // Refused once the story or chapter is public; a draft stays the author's
+  // to work on. See `assertMayChangePublic` in `services/authoring.ts`.
+  "authoring.ts PATCH /stories/:id",
+  "authoring.ts PATCH /chapters/:id",
+  "authoring.ts POST /chapters/:id/multimedia",
 ]);
 
 /**
@@ -84,36 +98,24 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
       "notifications.ts DELETE /read",
     ].map((route) => [route, "reading state; a suspended account still reads"]),
 
-    // Authoring. A draft is the author's own work and reaches nobody until it
-    // is listed. **Publishing is the arguable one**: it does put work in front
-    // of other people, and suspension does not stop it today. Recorded rather
-    // than quietly changed -- widening what a suspension means is a product
-    // decision, not a missing line.
+    // Authoring a draft, which reaches nobody until it is listed, and taking
+    // things down. Publishing and editing what is already public are guarded
+    // above (review M-10); removing work never is.
     ...[
       "authoring.ts POST /stories",
-      "authoring.ts PATCH /stories/:id",
       "authoring.ts DELETE /stories/:id",
-      "authoring.ts POST /stories/:id/publish",
       "authoring.ts POST /stories/:id/unpublish",
       "authoring.ts POST /stories/:id/chapters",
       "authoring.ts POST /stories/:id/chapters/reorder",
-      "authoring.ts PATCH /chapters/:id",
       "authoring.ts DELETE /chapters/:id",
-      "authoring.ts POST /chapters/:id/publish",
       "authoring.ts POST /chapters/:id/unpublish",
-      "authoring.ts POST /chapters/:id/multimedia",
       "authoring.ts DELETE /multimedia/:id",
-      "channels.ts POST /",
-      "channels.ts PATCH /:id",
       "channels.ts DELETE /:id",
-      "channels.ts PATCH /posts/:id",
       "channels.ts DELETE /posts/:id",
-      "clubs.ts POST /",
-      "clubs.ts PATCH /:id",
       "clubs.ts DELETE /:id",
       "clubs.ts PUT /:id/current-read",
       "clubs.ts DELETE /discussions/:id",
-    ].map((route) => [route, "the author's own work, or removing it"]),
+    ].map((route) => [route, "a draft nobody sees, an order, a pointer, or removing it"]),
 
     // Joining, leaving, following: membership rather than speech.
     ...[
@@ -263,6 +265,13 @@ describe("suspension coverage", () => {
       ["clubs.ts", "createDiscussion"],
       ["channels.ts", "createPost"],
       ["moderation.ts", "createReport"],
+      ["authoring.ts", "publishStory"],
+      ["authoring.ts", "publishChapter"],
+      ["channels.ts", "createChannel"],
+      ["channels.ts", "updateChannel"],
+      ["channels.ts", "updatePost"],
+      ["clubs.ts", "createClub"],
+      ["clubs.ts", "updateClub"],
     ];
 
     for (const [file, fn] of seams) {
@@ -279,6 +288,27 @@ describe("suspension coverage", () => {
       expect(
         opening.includes("assertNotSuspended"),
         `${file} ${fn} does not call assertNotSuspended`,
+      ).toBe(true);
+    }
+  });
+
+  it("guards edits to public stories and chapters, and only those", () => {
+    // Conditional, so the call sits after the ownership read rather than in
+    // the opening: checked over the whole function body instead.
+    const source = readFileSync(
+      path.join(ROUTES_DIR, "..", "services", "authoring.ts"),
+      "utf8",
+    );
+
+    for (const fn of ["updateStory", "updateChapter", "addMultimedia"]) {
+      const start = source.indexOf(`export async function ${fn}(`);
+      expect(start, `authoring.ts no longer exports ${fn}`).toBeGreaterThan(-1);
+
+      const end = source.indexOf("\nexport ", start + 1);
+      const body = source.slice(start, end === -1 ? undefined : end);
+      expect(
+        body.includes("assertMayChangePublic"),
+        `authoring.ts ${fn} does not call assertMayChangePublic`,
       ).toBe(true);
     }
   });

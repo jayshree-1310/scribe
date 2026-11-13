@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-9, M-1 to M-9, M-14, L-5, L-6 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-9, M-1 to M-10, M-14, L-5, L-6 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -301,7 +301,7 @@ So the list below is not read as "everything is broken":
 - **Fix:** map FK violations on the user id to 401, or check that the user
   row exists in `requireUser` for write routes.
 
-### M-10 · Suspended users can still edit public text — Code review
+### M-10 · Suspended users can still edit public text — Code review — **Fixed**
 - **Where:** `apps/api/src/routes/suspension.test.ts:86-131` (recorded
   decisions)
 - Recorded as exempt: `PATCH /api/channels/posts/:id` (rewrite a published
@@ -311,6 +311,11 @@ So the list below is not read as "everything is broken":
   already-visible post into the content they were suspended for.
 - **Decision needed:** at least guard edits to already-public text
   (channel posts, club/channel descriptions, published chapters).
+- **Decided and done:** a suspension now also refuses publishing a story or
+  chapter, creating or editing a club or channel, editing a channel post, and
+  editing a listed story or a public chapter (including adding media to
+  one). Drafts stay editable and taking things down is never refused. The
+  decisions are recorded in `routes/suspension.test.ts`.
 
 ### M-11 · Stories, chapters, profiles, clubs and channels cannot be reported — Code review
 - **Where:** `services/moderation.ts` `REPORT_TARGETS = COMMENT |

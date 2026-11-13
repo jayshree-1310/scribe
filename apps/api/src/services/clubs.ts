@@ -623,6 +623,9 @@ export async function createClub(
   userId: string,
   input: ClubInput,
 ): Promise<ClubDetail> {
+  // Puts text in front of readers; see `routes/suspension.test.ts`.
+  await assertNotSuspended(userId);
+
   const timestamp = now();
 
   const clubId = await db.transaction(async (tx) => {
@@ -664,6 +667,9 @@ export async function updateClub(
   slugOrId: string,
   input: Partial<ClubInput>,
 ): Promise<ClubDetail> {
+  // Puts text in front of readers; see `routes/suspension.test.ts`.
+  await assertNotSuspended(userId);
+
   const timestamp = now();
 
   const clubId = await db.transaction(async (tx) => {

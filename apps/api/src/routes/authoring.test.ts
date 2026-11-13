@@ -826,3 +826,54 @@ describe.skipIf(!available)("chapter multimedia", () => {
     expect(status).toBe(400);
   });
 });
+
+/* Suspension ------------------------------------------------------------- */
+
+/**
+ * Suspension stops an account putting text in front of readers (review M-10):
+ * publishing, editing what is already public, and starting a club or channel.
+ * A draft stays the author's to work on, and taking things down is never
+ * refused.
+ */
+describe.skipIf(!available)("a suspended author", () => {
+  it("keeps working on drafts but cannot publish or change public text", async () => {
+    const suspended = await api.createUser("suspended");
+
+    // A listed story with a published chapter, written before the suspension.
+    const listed = await api.createStory({ title: title("Already Out"), authorId: suspended });
+    const publicChapter = await api.createChapter({ storyId: listed.id, number: 1 });
+
+    const draft = await newStory({ title: title("Still A Draft") }, suspended);
+    const draftChapter = await newChapter(draft.id, { title: "One", content: "Words." }, suspended);
+
+    await api.setSuspended(suspended);
+
+    const draftEdit = await api.request(`/api/author/chapters/${draftChapter.id}`, {
+      method: "PATCH",
+      as: suspended,
+      body: { content: "Better words." },
+    });
+    expect(draftEdit.status).toBe(200);
+
+    const refused: [string, string, unknown][] = [
+      ["POST", `/api/author/chapters/${draftChapter.id}/publish`, undefined],
+      ["POST", `/api/author/stories/${draft.id}/publish`, undefined],
+      ["PATCH", `/api/author/chapters/${publicChapter}`, { content: "Rewritten." }],
+      ["PATCH", `/api/author/stories/${listed.id}`, { description: "Rewritten." }],
+      ["POST", "/api/clubs", { name: "Suspended Club" }],
+      ["POST", "/api/channels", { name: "Suspended Channel" }],
+    ];
+
+    for (const [method, path, body] of refused) {
+      const response = await api.request(path, { method, as: suspended, body });
+      expect(response.status, `${method} ${path}`).toBe(403);
+    }
+
+    // Taking a public story down is still theirs to do.
+    const unpublished = await api.request(`/api/author/stories/${listed.id}/unpublish`, {
+      method: "POST",
+      as: suspended,
+    });
+    expect(unpublished.status).toBe(200);
+  });
+});

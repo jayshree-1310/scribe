@@ -386,6 +386,9 @@ export async function createChannel(
   userId: string,
   input: ChannelInput,
 ): Promise<Channel> {
+  // Puts text in front of readers; see `routes/suspension.test.ts`.
+  await assertNotSuspended(userId);
+
   const timestamp = now();
 
   const channelId = await db.transaction(async (tx) => {
@@ -425,6 +428,9 @@ export async function updateChannel(
   slugOrId: string,
   input: Partial<ChannelInput>,
 ): Promise<Channel> {
+  // Puts text in front of readers; see `routes/suspension.test.ts`.
+  await assertNotSuspended(userId);
+
   const timestamp = now();
 
   const channelId = await db.transaction(async (tx) => {
@@ -688,6 +694,9 @@ export async function updatePost(
   postId: string,
   input: Partial<PostInput>,
 ): Promise<ChannelPost> {
+  // Puts text in front of readers; see `routes/suspension.test.ts`.
+  await assertNotSuspended(userId);
+
   const timestamp = now();
 
   await db.transaction(async (tx) => {
