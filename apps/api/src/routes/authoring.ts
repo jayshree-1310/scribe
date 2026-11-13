@@ -12,7 +12,7 @@
 
 import { Router } from "express";
 import { z } from "zod";
-import { parseOrThrow } from "../lib/validate.js";
+import { pageSchema, parseOrThrow } from "../lib/validate.js";
 import { requireUser, requireUserId } from "../middleware/current-user.js";
 import { MAX_PAGE_SIZE } from "../services/stories.js";
 import {
@@ -45,7 +45,7 @@ const idParamSchema = z.object({
 });
 
 const listQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageSchema,
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(24),
 });
 

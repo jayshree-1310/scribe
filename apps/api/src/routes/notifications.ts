@@ -13,7 +13,7 @@
 
 import { Router } from "express";
 import { z } from "zod";
-import { parseOrThrow } from "../lib/validate.js";
+import { pageSchema, parseOrThrow } from "../lib/validate.js";
 import { requireUser, requireUserId } from "../middleware/current-user.js";
 import {
   MAX_PAGE_SIZE,
@@ -28,7 +28,7 @@ const router = Router();
 router.use(requireUser);
 
 const listQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageSchema,
   /**
    * Twenty is what the bell's dropdown draws without scrolling forever; the
    * ceiling is half the other lists' because a notification row is taller than

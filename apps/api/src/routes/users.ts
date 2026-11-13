@@ -14,7 +14,7 @@
 
 import { Router } from "express";
 import { z } from "zod";
-import { parseOrThrow } from "../lib/validate.js";
+import { pageSchema, parseOrThrow } from "../lib/validate.js";
 import { HttpError } from "../lib/http-error.js";
 import { reserveAttempt } from "../lib/rate-limit.js";
 import {
@@ -65,7 +65,7 @@ const usernameParamSchema = z.object({
 });
 
 const pageQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageSchema,
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(24),
 });
 

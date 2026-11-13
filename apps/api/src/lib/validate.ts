@@ -1,4 +1,4 @@
-import type { ZodType } from "zod";
+import { z, type ZodType } from "zod";
 import { HttpError, type ErrorDetails } from "./http-error.js";
 
 /**
@@ -30,3 +30,18 @@ export function parseOrThrow<T>(
 
   throw HttpError.badRequest(message, toDetails(result.error.issues));
 }
+
+/**
+ * The deepest page any list serves. Without a ceiling `?page=999999999` was
+ * accepted, answered empty, and still made the database walk an `OFFSET` of
+ * billions to say so. A thousand pages is past anything a person pages to.
+ */
+export const MAX_PAGE = 1000;
+
+/** `page` for every paginated list: 1-based, defaulting to the first. */
+export const pageSchema = z.coerce
+  .number()
+  .int()
+  .min(1)
+  .max(MAX_PAGE, `Pages go up to ${MAX_PAGE}.`)
+  .default(1);

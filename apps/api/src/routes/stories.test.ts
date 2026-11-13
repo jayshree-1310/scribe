@@ -128,6 +128,11 @@ describe.skipIf(!available)("GET /api/stories", () => {
     expect(body.items).toHaveLength(0);
   });
 
+  it("refuses a page past the ceiling instead of walking a huge OFFSET", async () => {
+    expect((await api.request("/api/stories?page=999999999")).status).toBe(400);
+    expect((await api.request("/api/stories?page=1000")).status).toBe(200);
+  });
+
   it("filters by genre", async () => {
     const { body } = await api.request(`/api/stories?genreId=${otherGenreId}`);
     const slugs = body.items.map((story: { slug: string }) => story.slug);

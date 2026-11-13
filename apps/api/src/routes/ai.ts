@@ -14,7 +14,7 @@ import { Router, type Response } from "express";
 import { z } from "zod";
 import { HttpError } from "../lib/http-error.js";
 import { reserveAttempt } from "../lib/rate-limit.js";
-import { parseOrThrow } from "../lib/validate.js";
+import { pageSchema, parseOrThrow } from "../lib/validate.js";
 import {
   getUserId,
   requireUser,
@@ -1230,7 +1230,7 @@ const searchQuerySchema = z.object({
   genreId: z.uuid("Not a known genre.").optional(),
   source: z.enum(["SCRIBE", "CATALOGUE"]).optional(),
   mode: z.enum(SEARCH_MODES).default("hybrid"),
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageSchema,
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(12),
 });
 

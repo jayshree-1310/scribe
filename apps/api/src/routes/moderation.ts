@@ -16,7 +16,7 @@
 
 import { Router } from "express";
 import { z } from "zod";
-import { parseOrThrow } from "../lib/validate.js";
+import { pageSchema, parseOrThrow } from "../lib/validate.js";
 import { HttpError } from "../lib/http-error.js";
 import { reserveAttempt } from "../lib/rate-limit.js";
 import { requireUser, requireUserId } from "../middleware/current-user.js";
@@ -74,7 +74,7 @@ const queueQuerySchema = z.object({
   status: z.enum([...REPORT_STATUSES, "ALL"]).default("OPEN"),
   targetType: z.enum(REPORT_TARGETS).optional(),
   reason: z.enum(REPORT_REASONS).optional(),
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageSchema,
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(20),
 });
 

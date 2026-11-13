@@ -12,7 +12,7 @@
 
 import { Router } from "express";
 import { z } from "zod";
-import { parseOrThrow } from "../lib/validate.js";
+import { pageSchema, parseOrThrow } from "../lib/validate.js";
 import { HttpError } from "../lib/http-error.js";
 import { reserveAttempt } from "../lib/rate-limit.js";
 import {
@@ -70,7 +70,7 @@ const listQuerySchema = z.object({
     .transform((value) => value === "true")
     .optional(),
   sort: z.enum(CLUB_SORTS).default("members"),
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageSchema,
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(12),
 });
 
@@ -122,7 +122,7 @@ const currentReadBodySchema = z.object({
 
 const discussionQuerySchema = z.object({
   parentId: z.uuid("That discussion could not be found.").optional(),
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageSchema,
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(20),
 });
 
@@ -136,7 +136,7 @@ const discussionBodySchema = z.object({
 });
 
 const memberQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageSchema,
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(24),
 });
 

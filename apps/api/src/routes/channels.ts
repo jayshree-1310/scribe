@@ -12,7 +12,7 @@
 
 import { Router } from "express";
 import { z } from "zod";
-import { parseOrThrow } from "../lib/validate.js";
+import { pageSchema, parseOrThrow } from "../lib/validate.js";
 import {
   getUserId,
   requireUser,
@@ -51,7 +51,7 @@ const listQuerySchema = z.object({
     .transform((value) => value === "true")
     .optional(),
   sort: z.enum(CHANNEL_SORTS).default("subscribers"),
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageSchema,
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(12),
 });
 
@@ -73,7 +73,7 @@ const postIdParamSchema = z.object({
 });
 
 const pageQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
+  page: pageSchema,
   limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(10),
 });
 
