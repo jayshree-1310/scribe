@@ -19,6 +19,7 @@ import {
   drainJobs,
   enqueue,
   getJob,
+  recoverOrphanedJobs,
   registerJobType,
   retryDeadJob,
   runNextJob,
@@ -172,6 +173,53 @@ describe.skipIf(!available)("the job queue", () => {
     const id = await enqueue("test.nobody-handles-this", {});
     await drainJobs();
     expect(await getJob(id)).toMatchObject({ status: "dead", error: "unknown_job_type" });
+  });
+
+  /**
+   * Two API instances share one queue. A job listed as running is recovered
+   * only when nobody holds its lease: the other instance's job in flight is
+   * left alone, and a crashed one's is put back.
+   */
+  it("recovers only running jobs whose worker stopped holding them", async () => {
+    const held = `held-${api.runId}`;
+    const abandoned = `abandoned-${api.runId}`;
+    await redis.rPush(`${QUEUE}:running`, [held, abandoned]);
+    await redis.set(`${QUEUE}:lease:${held}`, "1", { EX: 60 });
+
+    const recovered = await recoverOrphanedJobs();
+
+    expect(recovered).toEqual([abandoned]);
+    expect(await redis.lRange(`${QUEUE}:running`, 0, -1)).toEqual([held]);
+    expect(await redis.lRange(`${QUEUE}:ready`, 0, -1)).toContain(abandoned);
+
+    await redis.lRem(`${QUEUE}:running`, 1, held);
+    await redis.lRem(`${QUEUE}:ready`, 1, abandoned);
+  });
+
+  it("takes a lease while a job runs, and gives it up when it is done", async () => {
+    let leasedWhileRunning = false;
+    registerJobType("test.lease-check", {
+      maxAttempts: 1,
+      handler: async (_payload, { job }) => {
+        leasedWhileRunning = (await redis.exists(`${QUEUE}:lease:${job.id}`)) === 1;
+        return null;
+      },
+    });
+
+    const id = await enqueue("test.lease-check", {});
+    await drainJobs();
+
+    expect(leasedWhileRunning).toBe(true);
+    expect(await redis.exists(`${QUEUE}:lease:${id}`)).toBe(0);
+  });
+
+  it("drops dead-letter ids whose records have expired", async () => {
+    const ghost = `ghost-${api.runId}`;
+    await redis.rPush(`${QUEUE}:dead`, ghost);
+
+    await deadJobs();
+
+    expect(await redis.lRange(`${QUEUE}:dead`, 0, -1)).not.toContain(ghost);
   });
 });
 

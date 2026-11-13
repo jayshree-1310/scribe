@@ -101,7 +101,59 @@ const KEY = {
     return `${prefix()}:dead`;
   },
   dedupe: (key: string) => `${prefix()}:dedupe:${key}`,
+  /** Prefix of the per-job lease; see `LEASE_SECONDS`. */
+  get leasePrefix() {
+    return `${prefix()}:lease:`;
+  },
 };
+
+/**
+ * How long a running job's lease lasts without a heartbeat.
+ *
+ * A job in the running list is one some worker holds. With one API instance,
+ * anything still listed at start-up was orphaned by the last process; with two,
+ * it may be the other instance's job in flight, and re-running it would do the
+ * work twice. So each running job carries a lease its worker refreshes every
+ * `LEASE_SECONDS / 3` while the handler runs, and only jobs whose lease has
+ * lapsed are recovered -- at start-up and every lease period after, so a
+ * crashed instance's jobs are picked up by a live one rather than only at the
+ * next restart.
+ */
+const LEASE_SECONDS = 60;
+
+/** Takes the next ready job and its lease in one step, so no peer sees it unleased. */
+const TAKE_SCRIPT = `
+local id = redis.call('LMOVE', KEYS[1], KEYS[2], 'LEFT', 'RIGHT')
+if id then redis.call('SET', ARGV[1] .. id, '1', 'EX', tonumber(ARGV[2])) end
+return id
+`;
+
+/** Puts back every running job whose lease has lapsed; returns their ids. */
+const RECOVER_SCRIPT = `
+local moved = {}
+for _, id in ipairs(redis.call('LRANGE', KEYS[1], 0, -1)) do
+  if redis.call('EXISTS', ARGV[1] .. id) == 0 then
+    redis.call('LREM', KEYS[1], 1, id)
+    redis.call('RPUSH', KEYS[2], id)
+    table.insert(moved, id)
+  end
+end
+return moved
+`;
+
+/** Re-queues running jobs nobody holds a lease on. */
+export async function recoverOrphanedJobs(): Promise<string[]> {
+  await connectRedis();
+  const moved = (await redis.eval(RECOVER_SCRIPT, {
+    keys: [KEY.running, KEY.ready],
+    arguments: [KEY.leasePrefix],
+  })) as string[];
+
+  for (const id of moved) {
+    logger.warn({ job: { id } }, "job recovered: its worker stopped holding it");
+  }
+  return moved;
+}
 
 /** A finished job is kept a day for status polls; a dead one a week, for a person. */
 const DONE_TTL_SECONDS = 60 * 60 * 24;
@@ -261,9 +313,27 @@ export async function runNextJob(signal: AbortSignal = new AbortController().sig
   await connectRedis();
   await promoteDue();
 
-  const id = await redis.lMove(KEY.ready, KEY.running, "LEFT", "RIGHT");
+  const id = (await redis.eval(TAKE_SCRIPT, {
+    keys: [KEY.ready, KEY.running],
+    arguments: [KEY.leasePrefix, String(LEASE_SECONDS)],
+  })) as string | null;
   if (!id) return false;
 
+  const lease = `${KEY.leasePrefix}${id}`;
+  const heartbeat = setInterval(() => {
+    void redis.expire(lease, LEASE_SECONDS).catch(() => {});
+  }, (LEASE_SECONDS * 1000) / 3);
+
+  try {
+    return await runTaken(id, signal);
+  } finally {
+    clearInterval(heartbeat);
+    await redis.del(lease);
+  }
+}
+
+/** Runs a job this worker has just taken and holds the lease for. */
+async function runTaken(id: string, signal: AbortSignal): Promise<boolean> {
   const job = await getJob(id);
   if (!job) {
     await redis.lRem(KEY.running, 1, id);
@@ -326,19 +396,16 @@ export async function drainJobs(limit = 1_000): Promise<number> {
 let worker: { controller: AbortController; done: Promise<void> } | null = null;
 
 /**
- * Starts the in-process worker. First puts back anything a previous process
- * was running when it stopped -- with one worker, a job still listed as
- * running at start-up is a job nobody is running.
+ * Starts the in-process worker. First puts back anything no worker holds a
+ * lease on any more -- a previous process's jobs, never a live peer's -- and
+ * keeps doing so every lease period. See `LEASE_SECONDS`.
  */
 export async function startWorker(options: { pollMs?: number } = {}): Promise<void> {
   if (worker) return;
   await connectRedis();
 
-  for (;;) {
-    const orphan = await redis.lMove(KEY.running, KEY.ready, "LEFT", "RIGHT");
-    if (!orphan) break;
-    logger.warn({ job: { id: orphan } }, "job recovered from a previous worker");
-  }
+  await recoverOrphanedJobs();
+  let lastRecovery = Date.now();
 
   const controller = new AbortController();
   const pollMs = options.pollMs ?? 1_000;
@@ -346,6 +413,10 @@ export async function startWorker(options: { pollMs?: number } = {}): Promise<vo
   const loop = async () => {
     while (!controller.signal.aborted) {
       try {
+        if (Date.now() - lastRecovery > LEASE_SECONDS * 1000) {
+          lastRecovery = Date.now();
+          await recoverOrphanedJobs();
+        }
         const ran = await runNextJob(controller.signal);
         if (!ran) await new Promise((resolve) => setTimeout(resolve, pollMs));
       } catch (error) {
@@ -393,6 +464,12 @@ export async function deadJobs(limit = 50): Promise<Job[]> {
   await connectRedis();
   const ids = await redis.lRange(KEY.dead, -limit, -1);
   const jobs = await Promise.all(ids.map((id) => getJob(id)));
+
+  // A dead job's record expires after `DEAD_TTL_SECONDS`, but its id stayed in
+  // the list for good. Pruned here, where they are found.
+  const expired = ids.filter((_, index) => jobs[index] === null);
+  for (const id of expired) await redis.lRem(KEY.dead, 1, id);
+
   return jobs.filter((job): job is Job => job !== null);
 }
 
