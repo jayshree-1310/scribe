@@ -87,6 +87,23 @@ describe.skipIf(!available)("recording story views", () => {
     expect(await api.countStoryViews(story.id)).toBe(2);
   });
 
+  /**
+   * A signed-out visitor is keyed on their address for the day. The user
+   * agent used to be part of the key, which let one visitor count as a new
+   * reader on every request just by changing it.
+   */
+  it("counts one signed-out visitor once, whatever user agent they send", async () => {
+    const fresh = await api.createStory({ title: "Agent Rotation", authorId: watched });
+    const before = await api.readViewCount(fresh.id);
+
+    for (const agent of ["Agent/1", "Agent/2", "Agent/3"]) {
+      expect(await read(`/api/stories/${fresh.slug}`, undefined, { "User-Agent": agent })).toBe(200);
+    }
+
+    expect(await api.countStoryViews(fresh.id)).toBe(1);
+    expect(await api.readViewCount(fresh.id)).toBe(before + 1);
+  });
+
   it("does not count the author looking at their own story", async () => {
     const before = await api.readViewCount(story.id);
 

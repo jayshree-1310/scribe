@@ -41,7 +41,6 @@ function visitor(req: Request) {
   return visitorFor({
     userId: getUserId(req),
     ip: req.ip,
-    userAgent: req.get("user-agent"),
   });
 }
 

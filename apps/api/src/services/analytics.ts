@@ -184,12 +184,19 @@ function salt(): string {
  * The dedupe subject for a request.
  *
  * A signed-in reader is themselves. A signed-out one is a digest of their
- * address and user agent **salted with the day**, so the same visitor is one
+ * address **salted with the day**, so the same visitor is one
  * visitor for as long as the day lasts and is not the same anybody tomorrow.
  * That is the point: a stable digest of an address would be a pseudonymous
  * tracker sitting in the database, and there is nothing analytics needs it
  * for. Most readers are signed out, so refusing to count them at all would be
  * wrong by roughly the same margin every day rather than not wrong.
+ *
+ * The address alone, not the address and user agent: the user agent is the
+ * caller's to choose, so mixing it in let one visitor rotate it and count as
+ * a new reader on every request -- and `viewCount` drives the Views sort,
+ * Trending's tie-break and author badges. Keying on the address undercounts
+ * readers sharing one (a household, an office) by counting them once a day,
+ * which is the safe direction for a number people compete on.
  *
  * The day here is the *app's* UTC day while the row's `day` column is the
  * *database's*. In the second they disagree a visitor can land twice, once on
@@ -200,7 +207,6 @@ function salt(): string {
 export function visitorFor(request: {
   userId: string | null;
   ip: string | undefined;
-  userAgent: string | undefined;
 }): Visitor {
   if (request.userId) {
     return { userId: request.userId, key: `user:${request.userId}` };
@@ -209,7 +215,7 @@ export function visitorFor(request: {
   const today = new Date().toISOString().slice(0, 10);
   const digest = createHash("sha256")
     .update(
-      [salt(), today, request.ip ?? "unknown", request.userAgent ?? ""].join(
+      [salt(), today, request.ip ?? "unknown"].join(
         "\u0000",
       ),
     )
