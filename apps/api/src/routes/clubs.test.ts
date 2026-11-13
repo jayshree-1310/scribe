@@ -445,6 +445,23 @@ describe.skipIf(!available)("creating a club", () => {
     expect((await api.request(`/api/clubs/${doomed}`)).status).toBe(404);
   });
 
+  it("lets only the owner delete a club, not an admin", async () => {
+    const guarded = await api.createClub({ name: "Owner's Call", creatorId: owner });
+    await api.addClubMember({ clubId: guarded.id, userId: admin, role: "ADMIN" });
+
+    const byAdmin = await api.request(`/api/clubs/${guarded.id}`, {
+      method: "DELETE",
+      as: admin,
+    });
+    expect(byAdmin.status).toBe(403);
+
+    const byOwner = await api.request(`/api/clubs/${guarded.id}`, {
+      method: "DELETE",
+      as: owner,
+    });
+    expect(byOwner.status).toBe(204);
+  });
+
   /**
    * Two of every child, because the ORM's `delete()` removes one row per call:
    * a club with one member, one thread and one reply passed while anything

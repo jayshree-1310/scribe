@@ -582,7 +582,8 @@ export function ClubDetailPage() {
             </ul>
           </Card>
 
-          {moderates ? (
+          {/* Owner only, as the API enforces: admins moderate, owners delete. */}
+          {data.membership?.role === 'OWNER' ? (
             <Card>
               <p className="club-side__label">Manage</p>
               <Button

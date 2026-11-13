@@ -708,8 +708,11 @@ export async function deleteClub(
       tx,
       slugOrId,
       userId,
-      ["OWNER", "ADMIN"],
-      "Only the club's owner or an admin can delete it.",
+      // Owner only: an admin moderates posts and members, but deleting the
+      // club takes everybody's discussions with it, and that is the owner's
+      // decision alone.
+      ["OWNER"],
+      "Only the club's owner can delete it.",
     );
 
     await removeClub(tx, club.id);
