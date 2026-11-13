@@ -125,8 +125,6 @@ services:
 
       - key: JWT_ACCESS_EXPIRES_IN
         value: 15m
-      - key: JWT_REFRESH_EXPIRES_IN
-        value: 30d
       - key: LOG_LEVEL
         value: info
       # Render's load balancer is the single hop in front of the API, so one

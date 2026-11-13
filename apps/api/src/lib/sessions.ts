@@ -244,6 +244,16 @@ export async function revokeAllSessions(userId: string): Promise<number> {
  * seven days: near the absolute ceiling the remaining window is shorter, and a
  * cookie outliving its session only produces confusing 401s.
  */
+/**
+ * How long a session written now may live: the rotation window, cut short
+ * near the chain's absolute ceiling. The refresh token is issued with the
+ * same lifetime, so the two expire together.
+ */
+function sessionTtl(absoluteExpiresAt: number): number {
+  const secondsLeft = Math.floor((absoluteExpiresAt - Date.now()) / 1000);
+  return Math.min(REFRESH_SESSION_TTL_SECONDS, secondsLeft);
+}
+
 export async function storeSession(
   sessionId: string,
   session: SessionRecord,
@@ -252,7 +262,7 @@ export async function storeSession(
     (session.absoluteExpiresAt - Date.now()) / 1000,
   );
 
-  const ttl = Math.min(REFRESH_SESSION_TTL_SECONDS, secondsLeft);
+  const ttl = sessionTtl(session.absoluteExpiresAt);
 
   if (ttl <= 0) {
     return 0;
@@ -363,7 +373,11 @@ export async function issueSession(
   persistent = true,
 ): Promise<string> {
   const sessionId = randomBytes(32).toString("hex");
-  const refreshToken = createRefreshToken(userId, sessionId, familyId);
+  const lifetime = sessionTtl(absoluteExpiresAt);
+  if (lifetime <= 0) {
+    throw HttpError.unauthorized("Your session has expired. Please sign in.");
+  }
+  const refreshToken = createRefreshToken(userId, sessionId, familyId, lifetime);
 
   const ttl = await storeSession(sessionId, {
     userId,

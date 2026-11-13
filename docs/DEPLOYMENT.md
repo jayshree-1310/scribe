@@ -94,7 +94,6 @@ openssl rand -base64 48   # run twice
 | `JWT_ACCESS_SECRET` | first generated secret |
 | `JWT_REFRESH_SECRET` | second generated secret |
 | `JWT_ACCESS_EXPIRES_IN` | `15m` |
-| `JWT_REFRESH_EXPIRES_IN` | `30d` |
 | `LOG_LEVEL` | `info` |
 | `TRUST_PROXY` | `1` |
 | `UPLOAD_DIR` | `/var/lib/scribe/uploads` |

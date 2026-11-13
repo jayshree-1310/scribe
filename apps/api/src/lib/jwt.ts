@@ -14,7 +14,6 @@ const accessSecret = getEnvSecret("JWT_ACCESS_SECRET");
 const refreshSecret = getEnvSecret("JWT_REFRESH_SECRET");
 
 const accessExpiresIn = process.env.JWT_ACCESS_EXPIRES_IN || "15m";
-const refreshExpiresIn = process.env.JWT_REFRESH_EXPIRES_IN || "7d";
 
 /**
  * Pinned on both sign and verify. Naming the algorithm explicitly stops a
@@ -28,11 +27,6 @@ const accessOptions: SignOptions = {
   expiresIn: accessExpiresIn as SignOptions["expiresIn"],
 };
 
-const refreshOptions: SignOptions = {
-  algorithm: ALGORITHM,
-  expiresIn: refreshExpiresIn as SignOptions["expiresIn"],
-};
-
 export function createAccessToken(userId: string): string {
   return jwt.sign(
     {
@@ -44,10 +38,20 @@ export function createAccessToken(userId: string): string {
   );
 }
 
+/**
+ * A refresh token that expires with its session.
+ *
+ * `expiresInSeconds` is the Redis session's own TTL (`storeSession` in
+ * `lib/sessions.ts`), which is what actually decides whether a refresh
+ * works. There used to be a separate `JWT_REFRESH_EXPIRES_IN` here, set to
+ * 30 days while sessions lasted 7: the token outlived what it named, and the
+ * variable read as if it controlled something it did not.
+ */
 export function createRefreshToken(
   userId: string,
   sessionId: string,
   familyId: string,
+  expiresInSeconds: number,
 ): string {
   return jwt.sign(
     {
@@ -63,7 +67,7 @@ export function createRefreshToken(
       type: "refresh",
     },
     refreshSecret,
-    refreshOptions,
+    { algorithm: ALGORITHM, expiresIn: expiresInSeconds },
   );
 }
 

@@ -517,6 +517,20 @@ describe.skipIf(!available)("POST /api/auth/refresh across tabs", () => {
 /* Remember me ---------------------------------------------------------------- */
 
 describe.skipIf(!available)("POST /api/auth/login with rememberMe", () => {
+  it("issues a refresh token that expires with its session, not after it", async () => {
+    const account = await signUp();
+    const { cookie } = await signIn(account);
+
+    const token = decodeURIComponent(cookie!.split(";")[0]!.split("=").slice(1).join("="));
+    const { exp } = JSON.parse(Buffer.from(token.split(".")[1]!, "base64url").toString("utf8"));
+    const ttl = await redis.ttl(`auth:refresh:${sidOf(cookie!)}`);
+
+    // Within a few seconds of the Redis session's own TTL: seven days, where
+    // the old JWT_REFRESH_EXPIRES_IN made it thirty.
+    expect(Math.abs(exp - Math.floor(Date.now() / 1000) - ttl)).toBeLessThan(5);
+    expect(ttl).toBeLessThanOrEqual(7 * 24 * 60 * 60);
+  });
+
   it("issues a lasting cookie by default", async () => {
     const account = await signUp();
     const { cookie } = await signIn(account);
