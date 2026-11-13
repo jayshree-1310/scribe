@@ -135,15 +135,20 @@ export function ProfilePage() {
   const following = follow?.following ?? data?.isFollowing ?? false
   const followerCount = follow?.followerCount ?? data?.followerCount ?? 0
 
-  // Fired alongside the profile rather than after it: both are keyed on the
-  // handle alone, and chaining them would put two round trips in front of the
-  // Stories tab for no extra safety — a handle nobody holds 404s here too.
+  /**
+   * The handle, once the profile has said somebody holds it. Every list below
+   * waits for this rather than firing alongside the profile: a handle nobody
+   * holds then costs one 404 instead of five, at the price of one round trip
+   * before the Stories tab fills.
+   */
+  const found = data ? handle : ''
+
   const stories = useAsync(
     () =>
-      handle && !initialising
-        ? usersApi.listUserStories(handle, { limit: 24 })
+      found
+        ? usersApi.listUserStories(found, { limit: 24 })
         : Promise.resolve(null),
-    [handle, initialising],
+    [found],
   )
 
   /**
@@ -153,17 +158,17 @@ export function ProfilePage() {
    */
   const followers = useAsync(
     () =>
-      handle && !initialising && tab === 'followers'
-        ? usersApi.listFollowers(handle, { limit: 48 })
+      found && tab === 'followers'
+        ? usersApi.listFollowers(found, { limit: 48 })
         : Promise.resolve(null),
-    [handle, initialising, tab === 'followers'],
+    [found, tab === 'followers'],
   )
   const followingList = useAsync(
     () =>
-      handle && !initialising && tab === 'following'
-        ? usersApi.listFollowing(handle, { limit: 48 })
+      found && tab === 'following'
+        ? usersApi.listFollowing(found, { limit: 48 })
         : Promise.resolve(null),
-    [handle, initialising, tab === 'following'],
+    [found, tab === 'following'],
   )
 
   /**
@@ -174,24 +179,22 @@ export function ProfilePage() {
    */
   const badges = useAsync(
     () =>
-      handle && !initialising
-        ? gamification.getUserBadges(handle)
+      found
+        ? gamification.getUserBadges(found)
         : Promise.resolve([]),
-    [handle, initialising],
+    [found],
   )
 
   /**
    * Public now, so this asks about whoever the page is showing rather than
-   * about the caller. `handle` is absent on `/profile`, where the answer is
-   * the signed-in reader -- and `data.username` is who that turned out to be.
+   * about the caller.
    */
-  const clubsOf = handle ?? data?.username
   const clubs = useAsync(
     () =>
-      clubsOf
-        ? usersApi.listUserClubs(clubsOf, { limit: 24 }).then((page) => page.items)
+      found
+        ? usersApi.listUserClubs(found, { limit: 24 }).then((page) => page.items)
         : Promise.resolve([]),
-    [clubsOf],
+    [found],
   )
   const reading = useAsync(
     () =>
