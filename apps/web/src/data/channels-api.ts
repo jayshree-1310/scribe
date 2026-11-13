@@ -7,7 +7,6 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type {
   Channel,
   ChannelPage,
@@ -33,7 +32,6 @@ export async function listChannels(
   filters: ChannelFilters = {},
 ): Promise<ChannelPage> {
   return request<ChannelPage>('/channels', {
-    headers: readerHeaders(),
     query: {
       search: filters.search?.trim() || undefined,
       // Omitted rather than sent as "false": the API reads an absent flag as
@@ -51,7 +49,6 @@ export async function listChannels(
 export async function getChannel(slugOrId: string): Promise<Channel> {
   const { channel } = await request<{ channel: Channel }>(
     `/channels/${encodeURIComponent(slugOrId)}`,
-    { headers: readerHeaders() },
   )
   return channel
 }
@@ -64,7 +61,6 @@ export async function getChannelPosts(
   return request<ChannelPostPage>(
     `/channels/${encodeURIComponent(slugOrId)}/posts`,
     {
-      headers: readerHeaders(),
       query: {
         page: options.page === undefined ? undefined : String(options.page),
         limit: options.limit === undefined ? undefined : String(options.limit),
@@ -85,7 +81,6 @@ export async function createChannel(
 ): Promise<Channel> {
   const { channel } = await request<{ channel: Channel }>('/channels', {
     method: 'POST',
-    headers: readerHeaders(),
     body: input,
   })
   return channel
@@ -97,7 +92,7 @@ export async function updateChannel(
 ): Promise<Channel> {
   const { channel } = await request<{ channel: Channel }>(
     `/channels/${encodeURIComponent(channelId)}`,
-    { method: 'PATCH', headers: readerHeaders(), body: input },
+    { method: 'PATCH', body: input },
   )
   return channel
 }
@@ -105,7 +100,6 @@ export async function updateChannel(
 export async function deleteChannel(channelId: string): Promise<void> {
   await request<void>(`/channels/${encodeURIComponent(channelId)}`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }
 
@@ -113,14 +107,12 @@ export async function deleteChannel(channelId: string): Promise<void> {
 export async function subscribe(channelId: string): Promise<void> {
   await request<void>(`/channels/${encodeURIComponent(channelId)}/subscribe`, {
     method: 'POST',
-    headers: readerHeaders(),
   })
 }
 
 export async function unsubscribe(channelId: string): Promise<void> {
   await request<void>(`/channels/${encodeURIComponent(channelId)}/subscribe`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }
 
@@ -136,7 +128,7 @@ export async function createPost(
 ): Promise<ChannelPost> {
   const { post } = await request<{ post: ChannelPost }>(
     `/channels/${encodeURIComponent(channelId)}/posts`,
-    { method: 'POST', headers: readerHeaders(), body: input },
+    { method: 'POST', body: input },
   )
   return post
 }
@@ -147,7 +139,7 @@ export async function updatePost(
 ): Promise<ChannelPost> {
   const { post } = await request<{ post: ChannelPost }>(
     `/channels/posts/${encodeURIComponent(postId)}`,
-    { method: 'PATCH', headers: readerHeaders(), body: input },
+    { method: 'PATCH', body: input },
   )
   return post
 }
@@ -155,6 +147,5 @@ export async function updatePost(
 export async function deletePost(postId: string): Promise<void> {
   await request<void>(`/channels/posts/${encodeURIComponent(postId)}`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }

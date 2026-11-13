@@ -17,18 +17,8 @@ import {
   request,
   toApiError,
 } from '../lib/api-client'
-import { ensureAccessToken, getAccessToken } from '../lib/access-token'
+import { ensureAccessToken } from '../lib/access-token'
 import type { Story, StoryPage } from '../types/stories'
-
-const DEV_READER_ID =
-  import.meta.env.VITE_DEV_USER_ID ?? '00000000-0000-4000-8000-000000000001'
-
-/** See the identical block in `books-api.ts`; both go when sign-in is wired. */
-function readerHeaders(): Record<string, string> {
-  if (import.meta.env.PROD) return {}
-  if (getAccessToken() !== null) return {}
-  return { 'X-Scribe-User-Id': DEV_READER_ID }
-}
 
 export interface ScribbleGenre {
   id: string
@@ -72,7 +62,6 @@ export async function askScribble(
 ): Promise<ScribbleReply> {
   return request<ScribbleReply>('/ai/scribble', {
     method: 'POST',
-    headers: readerHeaders(),
     body: { message },
     // Two model calls on a local CPU model: the shared 15s default aborts
     // every one of them.
@@ -169,7 +158,6 @@ export async function* streamRequest<T extends { type: string }>(
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...readerHeaders(),
       },
       body: JSON.stringify(payload),
       credentials: 'include',
@@ -318,7 +306,6 @@ export async function generate(
 ): Promise<GenerationResult> {
   return request<GenerationResult>(`/ai/generate/${kind}`, {
     method: 'POST',
-    headers: readerHeaders(),
     body: { seed, count },
     // Up to three sequential completions on a local CPU model. The shared 15s
     // default would abort the first one.
@@ -335,7 +322,6 @@ export async function refineGeneration(
 ): Promise<RefinementResult> {
   return request<RefinementResult>('/ai/generate/refine', {
     method: 'POST',
-    headers: readerHeaders(),
     body: { sessionId, index, instruction },
     timeoutMs: AI_REQUEST_TIMEOUT_MS,
     ...(signal ? { signal } : {}),
@@ -390,7 +376,6 @@ export async function assist(
 ): Promise<{ action: AssistAction; text: string; facts: number }> {
   return request('/ai/assist', {
     method: 'POST',
-    headers: readerHeaders(),
     body: payload,
     timeoutMs: AI_REQUEST_TIMEOUT_MS,
     ...(signal ? { signal } : {}),
@@ -484,7 +469,6 @@ export async function getStoryBible(
   signal?: AbortSignal,
 ): Promise<StoryBible> {
   return request<StoryBible>(`/ai/bible/${storyId}`, {
-    headers: readerHeaders(),
     ...(signal ? { signal } : {}),
   })
 }
@@ -499,7 +483,6 @@ export async function refreshStoryBible(
 ): Promise<BibleRefresh> {
   return request<BibleRefresh>(`/ai/bible/${storyId}/refresh`, {
     method: 'POST',
-    headers: readerHeaders(),
     body: { limit: 1 },
     timeoutMs: AI_REQUEST_TIMEOUT_MS,
     ...(signal ? { signal } : {}),
@@ -512,7 +495,7 @@ export async function addStoryFact(
 ): Promise<StoryFact> {
   const { fact } = await request<{ fact: StoryFact }>(
     `/ai/bible/${storyId}/facts`,
-    { method: 'POST', headers: readerHeaders(), body: draft },
+    { method: 'POST', body: draft },
   )
   return fact
 }
@@ -524,7 +507,7 @@ export async function updateStoryFact(
 ): Promise<StoryFact> {
   const { fact } = await request<{ fact: StoryFact }>(
     `/ai/bible/facts/${factId}`,
-    { method: 'PATCH', headers: readerHeaders(), body: patch },
+    { method: 'PATCH', body: patch },
   )
   return fact
 }
@@ -532,7 +515,6 @@ export async function updateStoryFact(
 export async function removeStoryFact(factId: string): Promise<void> {
   await request<void>(`/ai/bible/facts/${factId}`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }
 
@@ -589,7 +571,6 @@ export async function getChapterContinuity(
   signal?: AbortSignal,
 ): Promise<ChapterContinuity> {
   return request<ChapterContinuity>(`/ai/continuity/chapters/${chapterId}`, {
-    headers: readerHeaders(),
     ...(signal ? { signal } : {}),
   })
 }
@@ -603,7 +584,6 @@ export async function checkChapterContinuity(
     `/ai/continuity/chapters/${chapterId}/check`,
     {
       method: 'POST',
-      headers: readerHeaders(),
       timeoutMs: AI_REQUEST_TIMEOUT_MS,
       ...(signal ? { signal } : {}),
     },
@@ -634,7 +614,6 @@ export async function getStoryContinuity(
   signal?: AbortSignal,
 ): Promise<StoryContinuity> {
   return request<StoryContinuity>(`/ai/continuity/stories/${storyId}`, {
-    headers: readerHeaders(),
     ...(signal ? { signal } : {}),
   })
 }
@@ -645,7 +624,7 @@ export async function countContinuityFindings(
 ): Promise<{ storyId: string; findings: number }[]> {
   const body = await request<{ stories: { storyId: string; findings: number }[] }>(
     '/ai/continuity/stories',
-    { headers: readerHeaders(), ...(signal ? { signal } : {}) },
+    { ...(signal ? { signal } : {}) },
   )
   return body.stories
 }
@@ -654,7 +633,6 @@ export async function countContinuityFindings(
 export async function dismissContinuityFinding(findingId: string): Promise<void> {
   await request<void>(`/ai/continuity/findings/${findingId}/dismiss`, {
     method: 'POST',
-    headers: readerHeaders(),
   })
 }
 
@@ -694,7 +672,6 @@ export async function getRecap(
   return request<RecapStatus>(
     `/ai/recap/${encodeURIComponent(slugOrId)}/${chapterNumber}`,
     {
-      headers: readerHeaders(),
       ...(signal ? { signal } : {}),
     },
   )
@@ -716,7 +693,6 @@ export async function generateRecap(
     `/ai/recap/${encodeURIComponent(slugOrId)}/${chapterNumber}`,
     {
       method: 'POST',
-      headers: readerHeaders(),
       // A whole chapter through a local CPU model; the shared 15s default
       // would abort every one of them.
       timeoutMs: AI_REQUEST_TIMEOUT_MS,
@@ -861,7 +837,6 @@ export async function startConversation(
 ): Promise<ConversationSummary> {
   return request<ConversationSummary>('/ai/conversations', {
     method: 'POST',
-    headers: readerHeaders(),
     body: { storyId },
   })
 }
@@ -871,7 +846,6 @@ export async function listConversations(
   signal?: AbortSignal,
 ): Promise<{ items: ConversationSummary[] }> {
   return request<{ items: ConversationSummary[] }>('/ai/conversations', {
-    headers: readerHeaders(),
     query: { storyId },
     ...(signal ? { signal } : {}),
   })
@@ -882,7 +856,6 @@ export async function getConversation(
   signal?: AbortSignal,
 ): Promise<Conversation> {
   return request<Conversation>(`/ai/conversations/${encodeURIComponent(id)}`, {
-    headers: readerHeaders(),
     ...(signal ? { signal } : {}),
   })
 }
@@ -890,7 +863,6 @@ export async function getConversation(
 export async function deleteConversation(id: string): Promise<void> {
   await request<null>(`/ai/conversations/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }
 
@@ -948,7 +920,6 @@ export async function chat(
 ): Promise<ChatReply> {
   return request<ChatReply>('/ai/chat', {
     method: 'POST',
-    headers: readerHeaders(),
     body: { prompt },
     // A local CPU model takes tens of seconds; the shared 15s default would
     // abort every call.
@@ -1037,7 +1008,6 @@ export async function askAgent(
 ): Promise<AgentAnswer> {
   return request<AgentAnswer>('/ai/agent', {
     method: 'POST',
-    headers: readerHeaders(),
     body: { message, storyId },
     // Several model calls with lookups between them.
     timeoutMs: AI_REQUEST_TIMEOUT_MS,
@@ -1111,7 +1081,6 @@ export async function searchStories(
   signal?: AbortSignal,
 ): Promise<SearchPage> {
   return request<SearchPage>('/ai/search', {
-    headers: readerHeaders(),
     query: {
       q: filters.q.trim(),
       genreId: filters.genreId ?? undefined,
@@ -1157,7 +1126,6 @@ export interface SpendReport {
 /** Administrators only; anybody else gets a 403. */
 export async function getSpend(days: SpendWindow): Promise<SpendReport> {
   return request<SpendReport>('/ai/admin/spend', {
-    headers: readerHeaders(),
     query: { days: String(days) },
   })
 }
@@ -1188,7 +1156,6 @@ export async function getStorySummary(
   upToChapter?: number | null,
 ): Promise<StorySummaryStatus> {
   return request<StorySummaryStatus>(`/ai/summaries/story/${encodeURIComponent(storyKey)}`, {
-    headers: readerHeaders(),
     ...(upToChapter ? { query: { upToChapter: String(upToChapter) } } : {}),
   })
 }
@@ -1197,6 +1164,5 @@ export async function getStorySummary(
 export async function regenerateStorySummary(storyId: string): Promise<{ jobId: string }> {
   return request<{ jobId: string }>(`/ai/summaries/story/${encodeURIComponent(storyId)}/regenerate`, {
     method: 'POST',
-    headers: readerHeaders(),
   })
 }

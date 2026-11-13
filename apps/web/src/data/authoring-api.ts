@@ -12,7 +12,6 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type { Story, StoryPage } from '../types/stories'
 
 /**
@@ -62,7 +61,6 @@ export interface StoryDraft {
 /** The caller's own stories, drafts included. */
 export function listMyStories(page = 1, limit = 48): Promise<StoryPage> {
   return request<StoryPage>('/author/stories', {
-    headers: readerHeaders(),
     query: { page: String(page), limit: String(limit) },
   })
 }
@@ -70,7 +68,6 @@ export function listMyStories(page = 1, limit = 48): Promise<StoryPage> {
 export async function createStory(draft: StoryDraft): Promise<Story> {
   const { story } = await request<{ story: Story }>('/author/stories', {
     method: 'POST',
-    headers: readerHeaders(),
     body: draft,
   })
   return story
@@ -82,7 +79,7 @@ export async function updateStory(
 ): Promise<Story> {
   const { story } = await request<{ story: Story }>(
     `/author/stories/${storyId}`,
-    { method: 'PATCH', headers: readerHeaders(), body: draft },
+    { method: 'PATCH', body: draft },
   )
   return story
 }
@@ -90,7 +87,6 @@ export async function updateStory(
 export function deleteStory(storyId: string): Promise<void> {
   return request<void>(`/author/stories/${storyId}`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }
 
@@ -101,7 +97,7 @@ export function deleteStory(storyId: string): Promise<void> {
 export async function publishStory(storyId: string): Promise<Story> {
   const { story } = await request<{ story: Story }>(
     `/author/stories/${storyId}/publish`,
-    { method: 'POST', headers: readerHeaders() },
+    { method: 'POST' },
   )
   return story
 }
@@ -109,7 +105,7 @@ export async function publishStory(storyId: string): Promise<Story> {
 export async function unpublishStory(storyId: string): Promise<Story> {
   const { story } = await request<{ story: Story }>(
     `/author/stories/${storyId}/unpublish`,
-    { method: 'POST', headers: readerHeaders() },
+    { method: 'POST' },
   )
   return story
 }
@@ -122,7 +118,6 @@ export async function listMyChapters(
 ): Promise<AuthoredChapter[]> {
   const { chapters } = await request<{ chapters: AuthoredChapter[] }>(
     `/author/stories/${storyId}/chapters`,
-    { headers: readerHeaders() },
   )
   return chapters
 }
@@ -134,7 +129,7 @@ export async function createChapter(
 ): Promise<AuthoredChapter> {
   const { chapter: created } = await request<{ chapter: AuthoredChapter }>(
     `/author/stories/${storyId}/chapters`,
-    { method: 'POST', headers: readerHeaders(), body: chapter },
+    { method: 'POST', body: chapter },
   )
   return created
 }
@@ -145,7 +140,7 @@ export async function updateChapter(
 ): Promise<AuthoredChapter> {
   const { chapter } = await request<{ chapter: AuthoredChapter }>(
     `/author/chapters/${chapterId}`,
-    { method: 'PATCH', headers: readerHeaders(), body: patch },
+    { method: 'PATCH', body: patch },
   )
   return chapter
 }
@@ -156,7 +151,7 @@ export async function deleteChapter(
 ): Promise<AuthoredChapter[]> {
   const { chapters } = await request<{ chapters: AuthoredChapter[] }>(
     `/author/chapters/${chapterId}`,
-    { method: 'DELETE', headers: readerHeaders() },
+    { method: 'DELETE' },
   )
   return chapters
 }
@@ -168,7 +163,7 @@ export async function reorderChapters(
 ): Promise<AuthoredChapter[]> {
   const { chapters } = await request<{ chapters: AuthoredChapter[] }>(
     `/author/stories/${storyId}/chapters/reorder`,
-    { method: 'POST', headers: readerHeaders(), body: { chapterIds } },
+    { method: 'POST', body: { chapterIds } },
   )
   return chapters
 }
@@ -178,7 +173,7 @@ export async function publishChapter(
 ): Promise<AuthoredChapter> {
   const { chapter } = await request<{ chapter: AuthoredChapter }>(
     `/author/chapters/${chapterId}/publish`,
-    { method: 'POST', headers: readerHeaders() },
+    { method: 'POST' },
   )
   return chapter
 }
@@ -188,7 +183,7 @@ export async function unpublishChapter(
 ): Promise<AuthoredChapter> {
   const { chapter } = await request<{ chapter: AuthoredChapter }>(
     `/author/chapters/${chapterId}/unpublish`,
-    { method: 'POST', headers: readerHeaders() },
+    { method: 'POST' },
   )
   return chapter
 }
@@ -201,7 +196,7 @@ export async function addMultimedia(
 ): Promise<AuthoredMedia> {
   const { multimedia } = await request<{ multimedia: AuthoredMedia }>(
     `/author/chapters/${chapterId}/multimedia`,
-    { method: 'POST', headers: readerHeaders(), body: media },
+    { method: 'POST', body: media },
   )
   return multimedia
 }
@@ -209,6 +204,5 @@ export async function addMultimedia(
 export function removeMultimedia(mediaId: string): Promise<void> {
   return request<void>(`/author/multimedia/${mediaId}`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }

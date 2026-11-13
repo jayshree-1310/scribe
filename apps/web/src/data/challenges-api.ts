@@ -12,7 +12,6 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type {
   Challenge,
   ChallengeBoard,
@@ -31,14 +30,13 @@ import type {
  * of them.
  */
 export async function getChallenges(): Promise<ChallengeBoard> {
-  return request<ChallengeBoard>('/challenges', { headers: readerHeaders() })
+  return request<ChallengeBoard>('/challenges')
 }
 
 /** One challenge by slug or by id, with the caller's own entry when they have one. */
 export async function getChallenge(slugOrId: string): Promise<ChallengeDetail> {
   const { challenge } = await request<{ challenge: ChallengeDetail }>(
     `/challenges/${encodeURIComponent(slugOrId)}`,
-    { headers: readerHeaders() },
   )
   return challenge
 }
@@ -50,7 +48,6 @@ export async function getLeaderboard(
   return request<LeaderboardPage>(
     `/challenges/${encodeURIComponent(slugOrId)}/leaderboard`,
     {
-      headers: readerHeaders(),
       query: {
         page: options.page === undefined ? undefined : String(options.page),
         limit: options.limit === undefined ? undefined : String(options.limit),
@@ -71,7 +68,7 @@ export async function getLeaderboard(
 export async function enterChallenge(challengeId: string): Promise<ChallengeEntry> {
   const { entry } = await request<{ entry: ChallengeEntry }>(
     `/challenges/${encodeURIComponent(challengeId)}/enter`,
-    { method: 'POST', headers: readerHeaders() },
+    { method: 'POST' },
   )
   return entry
 }
@@ -86,7 +83,7 @@ export async function updateEntry(
 ): Promise<ChallengeEntry> {
   const { entry } = await request<{ entry: ChallengeEntry }>(
     `/challenges/entries/${encodeURIComponent(entryId)}`,
-    { method: 'PUT', headers: readerHeaders(), body: input },
+    { method: 'PUT', body: input },
   )
   return entry
 }
@@ -95,7 +92,6 @@ export async function updateEntry(
 export async function withdrawEntry(entryId: string): Promise<void> {
   await request<void>(`/challenges/entries/${encodeURIComponent(entryId)}`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }
 
@@ -124,7 +120,6 @@ export async function createChallenge(
 ): Promise<Challenge> {
   const { challenge } = await request<{ challenge: Challenge }>('/challenges', {
     method: 'POST',
-    headers: readerHeaders(),
     body: draft,
   })
 
@@ -141,7 +136,7 @@ export async function updateChallenge(
 ): Promise<Challenge> {
   const { challenge } = await request<{ challenge: Challenge }>(
     `/challenges/${encodeURIComponent(id)}`,
-    { method: 'PATCH', headers: readerHeaders(), body: changes },
+    { method: 'PATCH', body: changes },
   )
 
   return challenge

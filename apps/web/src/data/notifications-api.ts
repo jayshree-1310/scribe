@@ -12,7 +12,6 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type { NotificationPage } from '../types/notifications'
 
 export interface NotificationQuery {
@@ -26,7 +25,6 @@ export async function getNotifications(
   query: NotificationQuery = {},
 ): Promise<NotificationPage> {
   return request<NotificationPage>('/notifications', {
-    headers: readerHeaders(),
     query: {
       page: query.page === undefined ? undefined : String(query.page),
       limit: query.limit === undefined ? undefined : String(query.limit),
@@ -41,7 +39,7 @@ export async function getNotifications(
 export async function markNotificationRead(id: string): Promise<number> {
   const { unreadCount } = await request<{ unreadCount: number }>(
     `/notifications/${encodeURIComponent(id)}/read`,
-    { method: 'POST', headers: readerHeaders() },
+    { method: 'POST' },
   )
 
   return unreadCount
@@ -51,7 +49,7 @@ export async function markNotificationRead(id: string): Promise<number> {
 export async function markAllNotificationsRead(): Promise<number> {
   const { unreadCount } = await request<{ unreadCount: number }>(
     '/notifications/read-all',
-    { method: 'POST', headers: readerHeaders() },
+    { method: 'POST' },
   )
 
   return unreadCount
@@ -67,7 +65,7 @@ export async function markAllNotificationsRead(): Promise<number> {
 export async function clearReadNotifications(): Promise<number> {
   const { unreadCount } = await request<{ unreadCount: number }>(
     '/notifications/read',
-    { method: 'DELETE', headers: readerHeaders() },
+    { method: 'DELETE' },
   )
 
   return unreadCount

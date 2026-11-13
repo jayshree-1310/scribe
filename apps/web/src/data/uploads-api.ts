@@ -9,7 +9,6 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 
 /**
  * What an upload is for. `cover` takes images only; `media` is a chapter
@@ -73,7 +72,6 @@ export function uploadFile(
 ): Promise<StoredUpload> {
   return request<StoredUpload>('/uploads', {
     method: 'POST',
-    headers: readerHeaders(),
     query: { kind },
     body: file,
   })

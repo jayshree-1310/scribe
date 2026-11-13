@@ -11,7 +11,6 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type {
   ModerationUser,
   Report,
@@ -38,7 +37,6 @@ import type {
 export async function reportContent(input: ReportInput): Promise<void> {
   await request<{ report: unknown }>('/reports', {
     method: 'POST',
-    headers: readerHeaders(),
     body: input,
   })
 }
@@ -58,7 +56,6 @@ export async function listReports(
   filters: QueueFilters = {},
 ): Promise<ReportPage> {
   return request<ReportPage>('/moderation/reports', {
-    headers: readerHeaders(),
     query: {
       status: filters.status,
       targetType: filters.targetType,
@@ -82,7 +79,7 @@ export async function resolveReport(
 ): Promise<Report> {
   const { report } = await request<{ report: Report }>(
     `/moderation/reports/${encodeURIComponent(id)}/resolve`,
-    { method: 'POST', headers: readerHeaders(), body: input },
+    { method: 'POST', body: input },
   )
 
   return report
@@ -99,7 +96,7 @@ export async function resolveReport(
 export async function reinstateUser(userId: string): Promise<ModerationUser> {
   const { user } = await request<{ user: ModerationUser }>(
     `/moderation/users/${encodeURIComponent(userId)}/reinstate`,
-    { method: 'POST', headers: readerHeaders() },
+    { method: 'POST' },
   )
 
   return user

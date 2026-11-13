@@ -57,11 +57,7 @@ export function StoryDetailPage() {
   const { showToast } = useToast()
   const { session } = useAuth()
 
-  /**
-   * Null in local development, where `readerHeaders()` identifies the caller
-   * by header rather than by session -- so the Delete action below hides
-   * rather than guessing wrong, the same trade `ClubDetailPage` makes.
-   */
+  /** The signed-in reader, or null when signed out. */
   const myId = session?.user.id ?? null
 
   const story = useAsync(() => stories.getStory(slug), [slug])

@@ -12,13 +12,11 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type { Preferences, PreferenceUpdate } from '../types/preferences'
 
 export async function getPreferences(): Promise<Preferences> {
   const { preferences } = await request<{ preferences: Preferences }>(
     '/account/preferences',
-    { headers: readerHeaders() },
   )
   return preferences
 }
@@ -32,7 +30,7 @@ export async function savePreferences(
 ): Promise<Preferences> {
   const { preferences } = await request<{ preferences: Preferences }>(
     '/account/preferences',
-    { method: 'PUT', headers: readerHeaders(), body: update },
+    { method: 'PUT', body: update },
   )
   return preferences
 }

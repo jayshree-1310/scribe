@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-9, M-1 to M-10, M-12, M-14, L-5, L-6 and L-13 fixed, and H-10's code side (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-9, M-1 to M-10, M-12, M-14, L-5, L-6, L-13 and L-19 fixed, and H-10's code side (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -367,7 +367,7 @@ So the list below is not read as "everything is broken":
 | L-16 | No upper bound on `page`: `?page=999999999` is accepted (returns empty, but issues a huge `OFFSET`). | list schemas in `routes/*.ts` | Confirmed |
 | L-17 | `resolveReport` hides content, suspends the user and updates the report in separate statements with no transaction; a failure part-way leaves them inconsistent. | `services/moderation.ts:1043-1065` | Code review |
 | L-18 | Job worker start moves **every** job in `jobs:running` back to ready, assuming they are orphans. Correct for one instance; with two API instances a restart re-runs the other's in-flight jobs. The dead list also keeps ids whose job hashes have expired. | `lib/jobs.ts` `startWorker` | Code review |
-| L-19 | Leftover dev-user fallback: the comment in `current-user.ts` says to delete `X-Scribe-User-Id` "once the web app signs in for real", which it now does. In dev, signed-out requests from the web app are attributed to the demo user `…0001`, who has no `auth.user` row, so signed-out behaviour is never exercised locally and writes 500. | `middleware/current-user.ts`, `web/src/data/*-api.ts` `readerHeaders` | Code review |
+| L-19 | **Fixed** (web no longer sends the header; the API keeps it for its test suite). Leftover dev-user fallback: the comment in `current-user.ts` says to delete `X-Scribe-User-Id` "once the web app signs in for real", which it now does. In dev, signed-out requests from the web app are attributed to the demo user `…0001`, who has no `auth.user` row, so signed-out behaviour is never exercised locally and writes 500. | `middleware/current-user.ts`, `web/src/data/*-api.ts` `readerHeaders` | Code review |
 | L-20 | Clubs and channels have no creation rate limit. | `routes/clubs.ts`, `routes/channels.ts` | Code review |
 | L-21 | Access tokens stay valid up to 15 min after a password change, reset, suspension or account deletion (stateless JWT). Expected trade-off; worth knowing, and it is what makes M-9 reachable. | `lib/jwt.ts` | Confirmed |
 | L-22 | `forgot-password` does a Redis write and logs/sends mail only when the address exists, so response time is a weak existence oracle (the body is identical). | `services/passwords.ts:161` | Code review |

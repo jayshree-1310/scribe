@@ -4,12 +4,10 @@
  * Split out of `stories-api.ts` rather than added to it: everything here needs
  * a reader, while every story read works signed out too, and keeping the two
  * apart means nothing in the reader-facing catalogue accidentally depends on a
- * session. Shares that module's dev-identity header for the same reason it
- * exists there — see `readerHeaders`.
+ * session.
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type { ContinueEntry, ReadingProgress } from '../types/stories'
 
 export interface ProgressInput {
@@ -34,7 +32,6 @@ export async function saveProgress(
 ): Promise<SavedProgress> {
   return request<SavedProgress>('/reading/progress', {
     method: 'PUT',
-    headers: readerHeaders(),
     body: input,
   })
 }
@@ -46,7 +43,6 @@ export async function getContinueReading(
   const { entries } = await request<{ entries: ContinueEntry[] }>(
     '/reading/continue',
     {
-      headers: readerHeaders(),
       query: { limit: limit === undefined ? undefined : String(limit) },
     },
   )
@@ -59,7 +55,6 @@ export async function getProgress(
 ): Promise<ReadingProgress | null> {
   const { progress } = await request<{ progress: ReadingProgress | null }>(
     `/reading/progress/${encodeURIComponent(storyId)}`,
-    { headers: readerHeaders() },
   )
   return progress
 }
@@ -67,6 +62,5 @@ export async function getProgress(
 export async function clearProgress(storyId: string): Promise<void> {
   await request<void>(`/reading/progress/${encodeURIComponent(storyId)}`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }

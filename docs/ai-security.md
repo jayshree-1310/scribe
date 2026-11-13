@@ -27,7 +27,7 @@ ones written for this audit.
 ## 1. No provider key reachable from the browser
 
 **Checked.** Every `VITE_` variable the web app reads, in source and in `.env`
-files: `VITE_API_URL`, `VITE_API_PROXY_TARGET`, `VITE_DEV_USER_ID`,
+files: `VITE_API_URL`, `VITE_API_PROXY_TARGET`,
 `VITE_GOOGLE_CLIENT_ID`. The last is an OAuth *client* id, public by design.
 No model key. The browser talks only to `/api/ai`. `/health` reports which
 provider is selected and whether its credential is present, through

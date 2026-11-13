@@ -12,7 +12,6 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type {
   AnalyticsRange,
   AuthorOverview,
@@ -31,7 +30,6 @@ export async function getOverview(
   range: AnalyticsRange = '30d',
 ): Promise<AuthorOverview> {
   return request<AuthorOverview>('/author/analytics', {
-    headers: readerHeaders(),
     query: { range },
   })
 }
@@ -43,6 +41,6 @@ export async function getStoryAnalytics(
 ): Promise<StoryAnalytics> {
   return request<StoryAnalytics>(
     `/author/analytics/stories/${encodeURIComponent(storyId)}`,
-    { headers: readerHeaders(), query: { range } },
+    { query: { range } },
   )
 }

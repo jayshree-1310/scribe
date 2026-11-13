@@ -9,14 +9,12 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type { AuthorSuggestion, Recommendations } from '../types/recommendations'
 
 export async function getRecommendations(
   limit = 12,
 ): Promise<Recommendations> {
   return request<Recommendations>('/recommendations', {
-    headers: readerHeaders(),
     query: { limit: String(limit) },
   })
 }
@@ -30,7 +28,7 @@ export async function getSuggestedAuthors(
 ): Promise<AuthorSuggestion[]> {
   const { authors } = await request<{ authors: AuthorSuggestion[] }>(
     '/recommendations/authors',
-    { headers: readerHeaders(), query: { limit: String(limit) } },
+    { query: { limit: String(limit) } },
   )
   return authors
 }

@@ -6,15 +6,13 @@ import { HttpError } from "../lib/http-error.js";
  * asking.
  *
  * `authenticate` populates `req.user.id` from a bearer access token, and this
- * reads it back. The `X-Scribe-User-Id` header remains as a local development
- * convenience, because the web app has not been wired to the auth endpoints
- * yet — but it now requires `ALLOW_DEV_USER_HEADER=true` to be set explicitly.
- * Keying it off `NODE_ENV !== "production"` meant any environment that simply
- * had not set NODE_ENV — a staging box, a CI runner, a container missing one
- * env var — would impersonate any user on request.
- *
- * Delete the fallback, and the flag from `.env`, once the web app signs in for
- * real.
+ * reads it back. The `X-Scribe-User-Id` header remains for the API test
+ * suite, which acts as dozens of fixture users without signing each one in;
+ * the web app signs in for real and no longer sends it. It requires
+ * `ALLOW_DEV_USER_HEADER=true` to be set explicitly. Keying it off
+ * `NODE_ENV !== "production"` meant any environment that simply had not set
+ * NODE_ENV — a staging box, a CI runner, a container missing one env var —
+ * would impersonate any user on request.
  */
 
 /** Shape `authenticate` attaches to the request. */

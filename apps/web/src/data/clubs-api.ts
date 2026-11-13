@@ -8,7 +8,6 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type {
   Club,
   ClubDetail,
@@ -34,7 +33,6 @@ export interface ClubFilters {
 
 export async function listClubs(filters: ClubFilters = {}): Promise<ClubPage> {
   return request<ClubPage>('/clubs', {
-    headers: readerHeaders(),
     query: {
       search: filters.search?.trim() || undefined,
       // Omitted rather than sent as "false": the API treats the flag's
@@ -51,7 +49,6 @@ export async function listClubs(filters: ClubFilters = {}): Promise<ClubPage> {
 export async function getClub(slugOrId: string): Promise<ClubDetail> {
   const { club } = await request<{ club: ClubDetail }>(
     `/clubs/${encodeURIComponent(slugOrId)}`,
-    { headers: readerHeaders() },
   )
   return club
 }
@@ -63,7 +60,6 @@ export async function getClubMembers(
   return request<MemberPage>(
     `/clubs/${encodeURIComponent(slugOrId)}/members`,
     {
-      headers: readerHeaders(),
       query: {
         page: options.page === undefined ? undefined : String(options.page),
         limit: options.limit === undefined ? undefined : String(options.limit),
@@ -85,7 +81,6 @@ export async function getClubDiscussions(
   return request<DiscussionPage>(
     `/clubs/${encodeURIComponent(slugOrId)}/discussions`,
     {
-      headers: readerHeaders(),
       query: {
         parentId: options.parentId,
         page: options.page === undefined ? undefined : String(options.page),
@@ -105,7 +100,6 @@ export interface ClubInput {
 export async function createClub(input: ClubInput): Promise<ClubDetail> {
   const { club } = await request<{ club: ClubDetail }>('/clubs', {
     method: 'POST',
-    headers: readerHeaders(),
     body: input,
   })
   return club
@@ -117,7 +111,7 @@ export async function updateClub(
 ): Promise<ClubDetail> {
   const { club } = await request<{ club: ClubDetail }>(
     `/clubs/${encodeURIComponent(clubId)}`,
-    { method: 'PATCH', headers: readerHeaders(), body: input },
+    { method: 'PATCH', body: input },
   )
   return club
 }
@@ -125,7 +119,6 @@ export async function updateClub(
 export async function deleteClub(clubId: string): Promise<void> {
   await request<void>(`/clubs/${encodeURIComponent(clubId)}`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }
 
@@ -133,7 +126,7 @@ export async function deleteClub(clubId: string): Promise<void> {
 export async function joinClub(clubId: string): Promise<ClubMembership> {
   const { membership } = await request<{ membership: ClubMembership }>(
     `/clubs/${encodeURIComponent(clubId)}/join`,
-    { method: 'POST', headers: readerHeaders() },
+    { method: 'POST' },
   )
   return membership
 }
@@ -145,7 +138,6 @@ export async function joinClub(clubId: string): Promise<ClubMembership> {
 export async function leaveClub(clubId: string): Promise<void> {
   await request<void>(`/clubs/${encodeURIComponent(clubId)}/leave`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }
 
@@ -156,7 +148,7 @@ export async function setMemberRole(
 ): Promise<void> {
   await request<void>(
     `/clubs/${encodeURIComponent(clubId)}/members/${encodeURIComponent(userId)}`,
-    { method: 'PATCH', headers: readerHeaders(), body: { role } },
+    { method: 'PATCH', body: { role } },
   )
 }
 
@@ -166,7 +158,7 @@ export async function removeMember(
 ): Promise<void> {
   await request<void>(
     `/clubs/${encodeURIComponent(clubId)}/members/${encodeURIComponent(userId)}`,
-    { method: 'DELETE', headers: readerHeaders() },
+    { method: 'DELETE' },
   )
 }
 
@@ -177,7 +169,7 @@ export async function setCurrentRead(
 ): Promise<Club> {
   const { club } = await request<{ club: ClubDetail }>(
     `/clubs/${encodeURIComponent(clubId)}/current-read`,
-    { method: 'PUT', headers: readerHeaders(), body: { storyId } },
+    { method: 'PUT', body: { storyId } },
   )
   return club
 }
@@ -189,7 +181,7 @@ export async function postDiscussion(
 ): Promise<Discussion> {
   const { discussion } = await request<{ discussion: Discussion }>(
     `/clubs/${encodeURIComponent(clubId)}/discussions`,
-    { method: 'POST', headers: readerHeaders(), body: input },
+    { method: 'POST', body: input },
   )
   return discussion
 }
@@ -198,6 +190,6 @@ export async function postDiscussion(
 export async function deleteDiscussion(discussionId: string): Promise<void> {
   await request<void>(
     `/clubs/discussions/${encodeURIComponent(discussionId)}`,
-    { method: 'DELETE', headers: readerHeaders() },
+    { method: 'DELETE' },
   )
 }

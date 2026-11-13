@@ -12,7 +12,6 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type { ClubPage } from '../types/clubs'
 import type { StoryPage } from '../types/stories'
 import type { FollowPage, FollowState, PublicProfile } from '../types/users'
@@ -22,7 +21,6 @@ import type { FollowPage, FollowState, PublicProfile } from '../types/users'
 export async function getProfile(username: string): Promise<PublicProfile> {
   const { profile } = await request<{ profile: PublicProfile }>(
     `/users/${encodeURIComponent(username)}`,
-    { headers: readerHeaders() },
   )
   return profile
 }
@@ -39,7 +37,6 @@ export async function listUserStories(
   return request<StoryPage>(
     `/users/${encodeURIComponent(username)}/stories`,
     {
-      headers: readerHeaders(),
       query: {
         page: options.page === undefined ? undefined : String(options.page),
         limit: options.limit === undefined ? undefined : String(options.limit),
@@ -60,7 +57,6 @@ export async function listUserClubs(
   options: { page?: number; limit?: number } = {},
 ): Promise<ClubPage> {
   return request<ClubPage>(`/users/${encodeURIComponent(username)}/clubs`, {
-    headers: readerHeaders(),
     query: {
       page: options.page === undefined ? undefined : String(options.page),
       limit: options.limit === undefined ? undefined : String(options.limit),
@@ -75,7 +71,6 @@ export async function listFollowers(
   return request<FollowPage>(
     `/users/${encodeURIComponent(username)}/followers`,
     {
-      headers: readerHeaders(),
       query: {
         page: options.page === undefined ? undefined : String(options.page),
         limit: options.limit === undefined ? undefined : String(options.limit),
@@ -91,7 +86,6 @@ export async function listFollowing(
   return request<FollowPage>(
     `/users/${encodeURIComponent(username)}/following`,
     {
-      headers: readerHeaders(),
       query: {
         page: options.page === undefined ? undefined : String(options.page),
         limit: options.limit === undefined ? undefined : String(options.limit),
@@ -106,7 +100,6 @@ export async function listFollowing(
 export async function followUser(username: string): Promise<FollowState> {
   return request<FollowState>(`/users/${encodeURIComponent(username)}/follow`, {
     method: 'POST',
-    headers: readerHeaders(),
   })
 }
 
@@ -114,6 +107,5 @@ export async function followUser(username: string): Promise<FollowState> {
 export async function unfollowUser(username: string): Promise<FollowState> {
   return request<FollowState>(`/users/${encodeURIComponent(username)}/follow`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }

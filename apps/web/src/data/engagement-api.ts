@@ -11,7 +11,6 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type {
   Comment,
   CommentPage,
@@ -38,7 +37,6 @@ export async function listComments(
   return request<CommentPage>(
     `/stories/${encodeURIComponent(storyIdOrSlug)}/comments`,
     {
-      headers: readerHeaders(),
       query: {
         parentId: filters.parentId,
         chapterId: filters.chapterId,
@@ -63,7 +61,7 @@ export async function postComment(
 ): Promise<Comment> {
   const { comment } = await request<{ comment: Comment }>(
     `/stories/${encodeURIComponent(storyIdOrSlug)}/comments`,
-    { method: 'POST', headers: readerHeaders(), body: input },
+    { method: 'POST', body: input },
   )
   return comment
 }
@@ -72,7 +70,6 @@ export async function postComment(
 export async function deleteComment(commentId: string): Promise<void> {
   await request<void>(`/comments/${encodeURIComponent(commentId)}`, {
     method: 'DELETE',
-    headers: readerHeaders(),
   })
 }
 
@@ -92,7 +89,7 @@ export async function deleteComment(commentId: string): Promise<void> {
 export async function likeChapter(chapterId: string): Promise<LikeSummary> {
   return request<LikeSummary>(
     `/chapters/${encodeURIComponent(chapterId)}/like`,
-    { method: 'PUT', headers: readerHeaders() },
+    { method: 'PUT' },
   )
 }
 
@@ -100,14 +97,14 @@ export async function likeChapter(chapterId: string): Promise<LikeSummary> {
 export async function unlikeChapter(chapterId: string): Promise<LikeSummary> {
   return request<LikeSummary>(
     `/chapters/${encodeURIComponent(chapterId)}/like`,
-    { method: 'DELETE', headers: readerHeaders() },
+    { method: 'DELETE' },
   )
 }
 
 export async function likeComment(commentId: string): Promise<LikeSummary> {
   return request<LikeSummary>(
     `/comments/${encodeURIComponent(commentId)}/like`,
-    { method: 'PUT', headers: readerHeaders() },
+    { method: 'PUT' },
   )
 }
 
@@ -115,7 +112,7 @@ export async function likeComment(commentId: string): Promise<LikeSummary> {
 export async function unlikeComment(commentId: string): Promise<LikeSummary> {
   return request<LikeSummary>(
     `/comments/${encodeURIComponent(commentId)}/like`,
-    { method: 'DELETE', headers: readerHeaders() },
+    { method: 'DELETE' },
   )
 }
 
@@ -130,7 +127,6 @@ export async function getRatings(
 ): Promise<RatingSummary> {
   return request<RatingSummary>(
     `/stories/${encodeURIComponent(storyIdOrSlug)}/ratings`,
-    { headers: readerHeaders() },
   )
 }
 
@@ -145,7 +141,7 @@ export async function rateStory(
 ): Promise<RatingSummary> {
   return request<RatingSummary>(
     `/stories/${encodeURIComponent(storyIdOrSlug)}/rating`,
-    { method: 'PUT', headers: readerHeaders(), body: { rating } },
+    { method: 'PUT', body: { rating } },
   )
 }
 
@@ -155,6 +151,6 @@ export async function clearRating(
 ): Promise<RatingSummary> {
   return request<RatingSummary>(
     `/stories/${encodeURIComponent(storyIdOrSlug)}/rating`,
-    { method: 'DELETE', headers: readerHeaders() },
+    { method: 'DELETE' },
   )
 }

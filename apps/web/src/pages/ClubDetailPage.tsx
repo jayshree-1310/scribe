@@ -35,9 +35,7 @@ export function ClubDetailPage() {
 
   /**
    * The signed-in reader, for deciding which posts show a Delete action. Null
-   * when signed out — and also in local development, where `readerHeaders()`
-   * identifies the caller by header rather than by session, so the action
-   * hides rather than guessing wrong.
+   * when signed out, so the action hides.
    */
   const myId = session?.user.id ?? null
 

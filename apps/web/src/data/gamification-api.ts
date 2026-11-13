@@ -17,12 +17,11 @@
  */
 
 import { request } from '../lib/api-client'
-import { readerHeaders } from './stories-api'
 import type { BadgeCollection, BadgeProgress } from '../types/gamification'
 
 /** The caller's whole catalogue, with their progress on each badge. */
 export async function getBadges(): Promise<BadgeCollection> {
-  return request<BadgeCollection>('/badges', { headers: readerHeaders() })
+  return request<BadgeCollection>('/badges')
 }
 
 /**
@@ -35,7 +34,6 @@ export async function getBadges(): Promise<BadgeCollection> {
 export async function getUserBadges(username: string): Promise<BadgeProgress[]> {
   const { badges } = await request<{ badges: BadgeProgress[] }>(
     `/users/${encodeURIComponent(username)}/badges`,
-    { headers: readerHeaders() },
   )
   return badges
 }

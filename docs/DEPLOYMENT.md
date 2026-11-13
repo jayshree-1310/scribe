@@ -104,9 +104,9 @@ openssl rand -base64 48   # run twice
 
 `PORT` is injected by Render and `server.ts` already reads it.
 
-**Never set `ALLOW_DEV_USER_HEADER` here.** It is `true` locally so the web app
-can act as a reader before auth is wired up; in a deployed environment it lets
-any caller impersonate any user.
+**Never set `ALLOW_DEV_USER_HEADER` here.** It is `true` locally so the API
+test suite can act as its fixture users; in a deployed environment it lets any
+caller impersonate any user.
 
 Deploy, then copy the service URL.
 
