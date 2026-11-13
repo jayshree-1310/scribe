@@ -13,11 +13,22 @@ import { useAuth } from '../lib/auth'
  * the flag moved to the server: the old local copy let a refresh mid-flow
  * carry somebody past a form they had not filled in.
  */
-export function RequireAuth({ children }: { children: ReactNode }) {
+export function RequireAuth({
+  children,
+  allowSignedOut = false,
+}: {
+  children: ReactNode
+  /**
+   * Lets a signed-out visitor through: a story or chapter somebody shared a
+   * link to. The onboarding rules below still apply to anybody signed in.
+   */
+  allowSignedOut?: boolean
+}) {
   const { session } = useAuth()
   const location = useLocation()
 
   if (!session) {
+    if (allowSignedOut) return <>{children}</>
     return <Navigate to="/login" replace state={{ from: location.pathname }} />
   }
 

@@ -96,3 +96,23 @@
 .reader__comment-actions-row > .like--inline:hover {
   text-decoration: none;
 }
+
+/* Sign-in prompt — where a signed-out visitor would otherwise see a form ---- */
+
+.signin-prompt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  /* The gap the comment form it replaces leaves above the list. */
+  margin-bottom: var(--space-7);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+}
+
+.signin-prompt p {
+  margin: 0;
+}

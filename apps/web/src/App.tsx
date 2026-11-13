@@ -14,7 +14,7 @@ import { ThemeProvider } from './components/providers/ThemeProvider'
 import { TourProvider } from './components/providers/TourProvider'
 import { ToastProvider } from './components/ui/ToastProvider'
 import { RequireAuth } from './components/RequireAuth'
-import { ShellLayout } from './components/layout/ShellLayout'
+import { ReaderShellLayout, ShellLayout } from './components/layout/ShellLayout'
 
 import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
@@ -121,7 +121,9 @@ const router = createBrowserRouter(
         path="/read/:slug/:chapter"
         handle={{ tour: true }}
         element={
-          <RequireAuth>
+          // Open to signed-out visitors: a shared chapter link should read,
+          // not land on a login wall. The API serves listed stories publicly.
+          <RequireAuth allowSignedOut>
             <ReaderPage />
           </RequireAuth>
         }
@@ -140,16 +142,17 @@ const router = createBrowserRouter(
       */}
       <Route
         handle={{ tour: true }}
-        element={
-          <RequireAuth>
-            <ShellLayout />
-          </RequireAuth>
-        }
+        element={<ReaderShellLayout />}
       >
         <Route path="/home" element={<HomePage />} />
         <Route path="/discover" element={<DiscoverPage />} />
         <Route path="/book/:id" element={<BookDetailPage />} />
-        <Route path="/story/:slug" element={<StoryDetailPage />} />
+        {/* `public`: open to anybody with the link -- see `ReaderShellLayout`. */}
+        <Route
+          path="/story/:slug"
+          handle={{ public: true }}
+          element={<StoryDetailPage />}
+        />
         <Route path="/library" element={<MyLibraryPage />} />
         <Route path="/clubs" element={<ClubsPage />} />
         <Route path="/clubs/:slug" element={<ClubDetailPage />} />

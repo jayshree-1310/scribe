@@ -130,7 +130,9 @@ export function useReadingProgress({
     if (storyId === undefined) return
 
     let active = true
-    reading.getProgress(storyId).then(
+    // A signed-out visitor has no saved place, and asking would only be refused.
+    const load = readerId === null ? Promise.resolve(null) : reading.getProgress(storyId)
+    load.then(
       (progress) => {
         if (active) setSaved({ storyId, progress })
       },
@@ -144,7 +146,7 @@ export function useReadingProgress({
     return () => {
       active = false
     }
-  }, [storyId])
+  }, [storyId, readerId])
 
   /* Restore, once per chapter, after the prose has been laid out. */
   useEffect(() => {
@@ -245,6 +247,8 @@ export function useReadingProgress({
   /* Save. */
   useEffect(() => {
     if (storyId === undefined || chapter === null) return
+    // Nobody to save it for: a signed-out visitor reading a shared link.
+    if (readerId === null) return
     // Refused for *this* reader. A different one — including the one who just
     // signed in — has not been refused anything yet.
     if (blockedForRef.current === readerId) return

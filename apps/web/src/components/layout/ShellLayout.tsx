@@ -1,5 +1,8 @@
 import { Outlet, useMatches } from 'react-router-dom'
+import { useAuth } from '../../lib/auth'
+import { RequireAuth } from '../RequireAuth'
 import { AppShell } from './AppShell'
+import { PublicShell } from './PublicShell'
 
 /**
  * The shell, mounted once per group of routes rather than once per page.
@@ -23,6 +26,8 @@ import { AppShell } from './AppShell'
 /** What a route may say about how it wants to be framed. */
 interface ShellHandle {
   width?: 'default' | 'narrow'
+  /** Open to signed-out visitors; see `ReaderShellLayout`. */
+  public?: boolean
 }
 
 /**
@@ -41,6 +46,40 @@ function widthFrom(matches: ReturnType<typeof useMatches>): 'default' | 'narrow'
 interface ShellLayoutProps {
   /** Chooses the reader navigation or the author studio navigation. */
   variant?: 'reader' | 'author'
+}
+
+/**
+ * The reader's shell group, behind the sign-in gate -- except for a route
+ * whose `handle` says `public: true` (a story's page), which a signed-out
+ * visitor with a link may open. They get the public header and footer rather
+ * than the app shell, whose navigation leads only to pages they cannot open.
+ *
+ * One layout for the whole group rather than a second group for the public
+ * route, so a signed-in reader moving between a story and anything else keeps
+ * the same mounted shell (see above).
+ */
+export function ReaderShellLayout() {
+  const { session } = useAuth()
+  const matches = useMatches()
+  const isPublic = matches.some((match) => (match.handle as ShellHandle | undefined)?.public === true)
+
+  if (!session && isPublic) {
+    return (
+      <PublicShell>
+        {/* The app shell's own content frame, so the page lays out exactly
+            as it does signed in: same width, same gutters. */}
+        <div className="shell__content">
+          <Outlet />
+        </div>
+      </PublicShell>
+    )
+  }
+
+  return (
+    <RequireAuth>
+      <ShellLayout />
+    </RequireAuth>
+  )
 }
 
 export function ShellLayout({ variant = 'reader' }: ShellLayoutProps) {

@@ -5,7 +5,7 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress:** H-1 to H-9, M-1 to M-10, M-12, M-14, L-5, L-6, L-13 and L-19 fixed, and H-10's code side (2026-11-06) — see §8.
+**Fix progress:** H-1 to H-9, M-1 to M-10, M-12 to M-14, L-5, L-6, L-13 and L-19 fixed, and H-10's code side (2026-11-06) — see §8.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -330,12 +330,20 @@ So the list below is not read as "everything is broken":
 - **Fix:** issue a session cookie (no `maxAge`) when unchecked, or remove the
   checkbox.
 
-### M-13 · Signed-out visitors cannot open a shared story link — Confirmed (product)
+### M-13 · Signed-out visitors cannot open a shared story link — Confirmed (product) — **Fixed (opened)**
 - `/story/:slug` and `/read/:slug/:n` redirect anonymous visitors to
   `/login`, although the API serves listed stories publicly and records
   anonymous views. Any link an author shares lands on a login wall.
 - Product decision; noting because the backend was clearly built for public
   reading.
+- **Decided and done:** `/story/:slug` and `/read/:slug/:n` open signed out.
+  The story page uses the public header and footer around the app's own
+  content frame; signed-in readers keep the same mounted shell. Library and
+  rating send visitors to sign in and back; comment forms become a sign-in
+  prompt; likes show read-only; reply, report, bookmarks, reading progress and
+  the AI tools are hidden. Checked in headless Chrome signed out (no
+  redirect, no console errors, no failing calls beyond the one session check)
+  and signed in (unchanged).
 
 ### M-14 · Club ADMINs (not owners) can delete the owner's club — Code review — **Fixed (owner only)**
 - **Where:** `services/clubs.ts:707-713` (`["OWNER", "ADMIN"]`)

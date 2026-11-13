@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { useToast } from '../lib/toast'
 import { coverWash } from '../lib/cover'
@@ -25,6 +25,7 @@ import {
 import { useAuth } from '../lib/auth'
 import { LikeButton } from '../components/engagement/LikeButton'
 import { ReportMenu } from '../components/moderation/ReportMenu'
+import { SignInPrompt } from '../components/engagement/SignInPrompt'
 import { Avatar } from '../components/ui/Avatar'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Card, SectionHead } from '../components/ui/Card'
@@ -59,6 +60,16 @@ export function StoryDetailPage() {
 
   /** The signed-in reader, or null when signed out. */
   const myId = session?.user.id ?? null
+
+  /**
+   * A signed-out visitor can read this page (a shared link), but saving,
+   * rating and commenting need an account: those send them to sign in, and
+   * sign-in sends them back here.
+   */
+  const signedIn = session !== null
+  const navigate = useNavigate()
+  const location = useLocation()
+  const signInFirst = () => navigate('/login', { state: { from: location.pathname } })
 
   const story = useAsync(() => stories.getStory(slug), [slug])
   const storyId = story.data?.id
@@ -410,7 +421,7 @@ export function StoryDetailPage() {
 
               <Button
                 size="lg"
-                onClick={onToggleLibrary}
+                onClick={signedIn ? onToggleLibrary : signInFirst}
                 startIcon={<Icon name={inLibrary ? 'bookmark-filled' : 'bookmark'} />}
               >
                 {inLibrary ? 'In your library' : 'Add to Library'}
@@ -420,7 +431,7 @@ export function StoryDetailPage() {
               {isOwnStory ? null : (
                 <Button
                   size="lg"
-                  onClick={openRateDialog}
+                  onClick={signedIn ? openRateDialog : signInFirst}
                   startIcon={<Icon name="star" />}
                 >
                   {ratings.data?.mine ? `Rated ${ratings.data.mine}` : 'Rate'}
@@ -528,7 +539,7 @@ export function StoryDetailPage() {
                   {isOwnStory ? null : (
                     <Button
                       fullWidth
-                      onClick={openRateDialog}
+                      onClick={signedIn ? openRateDialog : signInFirst}
                       startIcon={<Icon name="star" />}
                     >
                       {summary.mine ? 'Change your rating' : 'Rate this story'}
@@ -557,33 +568,37 @@ export function StoryDetailPage() {
 
       {tab === 'comments' ? (
         <TabPanel id="comments">
-          <form className="comment-form" onSubmit={onPostComment}>
-            <TextField
-              multiline
-              label="Add a comment"
-              placeholder="Share what you thought — no spoilers past the latest chapter."
-              rows={3}
-              value={commentBody}
-              error={commentError ?? undefined}
-              maxLength={COMMENT_MAX_LENGTH}
-              counterMax={COMMENT_MAX_LENGTH}
-              disabled={posting}
-              onChange={(event) => {
-                setCommentBody(event.target.value)
-                setCommentError(null)
-              }}
-            />
-            <div className="comment-form__actions">
-              <Button
-                variant="primary"
-                type="submit"
-                loading={posting}
-                startIcon={<Icon name="send" size="0.95em" />}
-              >
-                Post comment
-              </Button>
-            </div>
-          </form>
+          {signedIn ? (
+            <form className="comment-form" onSubmit={onPostComment}>
+              <TextField
+                multiline
+                label="Add a comment"
+                placeholder="Share what you thought — no spoilers past the latest chapter."
+                rows={3}
+                value={commentBody}
+                error={commentError ?? undefined}
+                maxLength={COMMENT_MAX_LENGTH}
+                counterMax={COMMENT_MAX_LENGTH}
+                disabled={posting}
+                onChange={(event) => {
+                  setCommentBody(event.target.value)
+                  setCommentError(null)
+                }}
+              />
+              <div className="comment-form__actions">
+                <Button
+                  variant="primary"
+                  type="submit"
+                  loading={posting}
+                  startIcon={<Icon name="send" size="0.95em" />}
+                >
+                  Post comment
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <SignInPrompt action="join the discussion" />
+          )}
 
           {comments.status === 'error' ? (
             <ErrorState message={comments.error} onRetry={comments.reload} />
@@ -622,6 +637,7 @@ export function StoryDetailPage() {
                           likeCount={comment.likeCount}
                           likedByMe={comment.likedByMe}
                           noun="this comment"
+                          readOnly={!signedIn}
                         />
                         <span>
                           <Icon name="comment" size="0.9em" />
@@ -638,15 +654,17 @@ export function StoryDetailPage() {
                             {open ? 'Hide replies' : 'Show replies'}
                           </button>
                         ) : null}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setReplyTo(replyTo === comment.id ? null : comment.id)
-                            setReplyBody('')
-                          }}
-                        >
-                          Reply
-                        </button>
+                        {signedIn ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyTo(replyTo === comment.id ? null : comment.id)
+                              setReplyBody('')
+                            }}
+                          >
+                            Reply
+                          </button>
+                        ) : null}
                         {/*
                           Shown only to the one person the API would let
                           delete it. A story's author is not a moderator here
@@ -669,7 +687,7 @@ export function StoryDetailPage() {
                           targetType="COMMENT"
                           targetId={comment.id}
                           noun="comment"
-                          hidden={comment.user.id === myId}
+                          hidden={!signedIn || comment.user.id === myId}
                         />
                       </div>
 
@@ -694,6 +712,7 @@ export function StoryDetailPage() {
                                       likeCount={reply.likeCount}
                                       likedByMe={reply.likedByMe}
                                       noun="this reply"
+                                      readOnly={!signedIn}
                                     />
                                     {reply.user.id === myId ? (
                                       <button
@@ -707,7 +726,7 @@ export function StoryDetailPage() {
                                       targetType="COMMENT"
                                       targetId={reply.id}
                                       noun="reply"
-                                      hidden={reply.user.id === myId}
+                                      hidden={!signedIn || reply.user.id === myId}
                                     />
                                   </div>
                                 </div>
@@ -764,7 +783,8 @@ export function StoryDetailPage() {
         story for its author. Renders nothing when there is no published
         chapter to summarise, or when the summary cannot be loaded.
       */}
-      {data.chapterCount > 0 ? (
+      {/* Both AI sections answer to a signed-in reader. */}
+      {signedIn && data.chapterCount > 0 ? (
         <StorySummaryCard storyKey={data.slug} storyId={data.id} isAuthor={myId === data.author.id} />
       ) : null}
 
@@ -774,7 +794,7 @@ export function StoryDetailPage() {
         starts at "where I've read to" — the server's default from the
         reader's saved position — because from here the page cannot know.
       */}
-      {data.chapterCount > 0 && chapters.status === 'ready' ? (
+      {signedIn && data.chapterCount > 0 && chapters.status === 'ready' ? (
         <section className="page-section" aria-label="Ask this book">
           <SectionHead
             title="Ask this book"

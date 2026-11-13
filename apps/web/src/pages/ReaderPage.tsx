@@ -27,6 +27,7 @@ import {
   commentUserName,
 } from '../types/engagement'
 import { LikeButton } from '../components/engagement/LikeButton'
+import { SignInPrompt } from '../components/engagement/SignInPrompt'
 import { RecapCard } from '../components/ai/RecapCard'
 import { ExplainSheet } from '../components/ai/ExplainSheet'
 import { AskBookSheet } from '../components/ai/AskBookSheet'
@@ -55,6 +56,12 @@ export function ReaderPage() {
   const { preferences, update } = useReaderPrefs()
   const { resolved: appTheme } = useTheme()
   const { session } = useAuth()
+  /**
+   * Signed-out visitors can read a shared chapter. What needs an account --
+   * bookmarks, likes, comments and the AI tools, every one of which answers to
+   * a signed-in caller -- is hidden, or shown without the action.
+   */
+  const signedIn = session !== null
 
   /**
    * The surface to draw. `preferences.theme` may be `auto`, which is a
@@ -276,7 +283,8 @@ export function ReaderPage() {
     // `chapter.data` rather than the `current` alias below, which is declared
     // after the hooks.
     const chapterData = chapter.data
-    if (!chapterData) return
+    // Explaining a passage asks a model on the caller's behalf, which needs one.
+    if (!chapterData || !signedIn) return
 
     const found = readSelection(proseRef.current, chapterData.content)
     if (!found) {
@@ -301,7 +309,7 @@ export function ReaderPage() {
 
     setSelection(found)
     setExplaining(false)
-  }, [chapter.data])
+  }, [chapter.data, signedIn])
 
   // Scroll-linked reading progress.
   useEffect(() => {
@@ -390,27 +398,29 @@ export function ReaderPage() {
         </Link>
 
         <div className="reader__bar-actions" data-tour="reading-controls">
-          <Button
-            variant="ghost"
-            iconOnly
-            aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark this chapter'}
-            aria-pressed={bookmarked}
-            className={cn('reader__bookmark', bookmarked && 'is-on')}
-            onClick={() => {
-              setBookmarked((current) => !current)
-              showToast({
-                message: bookmarked ? 'Bookmark removed.' : 'Bookmarked — find it in your library.',
-              })
-            }}
-            startIcon={<Icon name={bookmarked ? 'bookmark-filled' : 'bookmark'} size="1.1rem" />}
-          />
+          {signedIn ? (
+            <Button
+              variant="ghost"
+              iconOnly
+              aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark this chapter'}
+              aria-pressed={bookmarked}
+              className={cn('reader__bookmark', bookmarked && 'is-on')}
+              onClick={() => {
+                setBookmarked((current) => !current)
+                showToast({
+                  message: bookmarked ? 'Bookmark removed.' : 'Bookmarked — find it in your library.',
+                })
+              }}
+              startIcon={<Icon name={bookmarked ? 'bookmark-filled' : 'bookmark'} size="1.1rem" />}
+            />
+          ) : null}
 
           {/*
             Only once the chapter list has arrived: the sheet's range picker
             is built from it, and a story with nothing readable has nothing
             to ask about.
           */}
-          {storyId && chapters.status === 'ready' && total > 0 ? (
+          {signedIn && storyId && chapters.status === 'ready' && total > 0 ? (
             <Button
               variant="ghost"
               iconOnly
@@ -462,11 +472,13 @@ export function ReaderPage() {
               Renders nothing when there is no previous chapter they can open,
               and never calls a model until they ask it to.
             */}
-            <RecapCard
-              key={`${slug}:${current.number}`}
-              storyKey={slug}
-              chapterNumber={current.number}
-            />
+            {signedIn ? (
+              <RecapCard
+                key={`${slug}:${current.number}`}
+                storyKey={slug}
+                chapterNumber={current.number}
+              />
+            ) : null}
 
             <p className="reader__eyebrow">
               Chapter {current.number}
@@ -550,7 +562,7 @@ export function ReaderPage() {
                   likedByMe={current.likedByMe}
                   variant="pill"
                   noun="this chapter"
-                  readOnly={isOwnStory}
+                  readOnly={isOwnStory || !signedIn}
                 />
 
                 <button
@@ -632,34 +644,38 @@ export function ReaderPage() {
                   <p>Only what readers have said about chapter {current.number}.</p>
                 </header>
 
-                <form className="reader__comment-form" onSubmit={postComment}>
-                  <TextField
-                    multiline
-                    hideLabel
-                    label="Add a comment on this chapter"
-                    placeholder="Share what you thought — no spoilers past this chapter."
-                    rows={3}
-                    value={commentBody}
-                    error={commentError}
-                    maxLength={COMMENT_MAX_LENGTH}
-                    disabled={posting}
-                    onChange={(event) => {
-                      setCommentBody(event.target.value)
-                      setCommentError(undefined)
-                    }}
-                  />
-                  <div className="reader__comment-actions">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      type="submit"
-                      loading={posting}
-                      startIcon={<Icon name="send" size="0.95em" />}
-                    >
-                      Post comment
-                    </Button>
-                  </div>
-                </form>
+                {signedIn ? (
+                  <form className="reader__comment-form" onSubmit={postComment}>
+                    <TextField
+                      multiline
+                      hideLabel
+                      label="Add a comment on this chapter"
+                      placeholder="Share what you thought — no spoilers past this chapter."
+                      rows={3}
+                      value={commentBody}
+                      error={commentError}
+                      maxLength={COMMENT_MAX_LENGTH}
+                      disabled={posting}
+                      onChange={(event) => {
+                        setCommentBody(event.target.value)
+                        setCommentError(undefined)
+                      }}
+                    />
+                    <div className="reader__comment-actions">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        type="submit"
+                        loading={posting}
+                        startIcon={<Icon name="send" size="0.95em" />}
+                      >
+                        Post comment
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <SignInPrompt action="comment on this chapter" />
+                )}
 
                 {comments.status === 'error' ? (
                   <p className="reader__no-comments">{comments.error}</p>
@@ -693,6 +709,7 @@ export function ReaderPage() {
                               likeCount={comment.likeCount}
                               likedByMe={comment.likedByMe}
                               noun="this comment"
+                              readOnly={!signedIn}
                             />
                             {/*
                               The reply count is shown and not acted on: the

@@ -73,6 +73,8 @@ export function Button({
 
 interface ButtonLinkProps extends CommonProps {
   to: string
+  /** Router state for the destination, e.g. where sign-in should return to. */
+  state?: unknown
   'aria-label'?: string
   onClick?: () => void
 }
