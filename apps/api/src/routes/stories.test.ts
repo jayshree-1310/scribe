@@ -441,6 +441,19 @@ describe.skipIf(!available)("GET /api/stories/:slug/related", () => {
     expect(slugs).not.toContain(draft.slug);
   });
 
+  it("puts the best-liked first", async () => {
+    const own = await api.createGenre("related-order");
+    const anchor = await api.createStory({ title: "Anchor", authorId, genreIds: [own] });
+    const liked = await api.createStory({ title: "Liked", authorId, genreIds: [own], likeCount: 50 });
+    const middling = await api.createStory({ title: "Middling", authorId, genreIds: [own], likeCount: 5 });
+    const unloved = await api.createStory({ title: "Unloved", authorId, genreIds: [own], likeCount: 0 });
+
+    const { body } = await api.request(`/api/stories/${anchor.slug}/related`);
+    const slugs = body.stories.map((story: { slug: string }) => story.slug);
+
+    expect(slugs).toEqual([liked.slug, middling.slug, unloved.slug]);
+  });
+
   it("404s on an unknown story", async () => {
     const { status } = await api.request("/api/stories/nope/related");
     expect(status).toBe(404);

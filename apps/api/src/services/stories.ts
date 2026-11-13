@@ -1030,35 +1030,40 @@ export async function getRelatedStories(
   const story = await findStoryRow(slugOrId, viewerId);
   if (!story) throw HttpError.notFound(NOT_FOUND);
 
-  const links = await db.orm.content.StoryGenre.select("genreId")
-    .where((link) => link.storyId.eq(story.id))
-    .all();
-
-  if (links.length === 0) return [];
-
-  const genreIds = links.map((link) => link.genreId);
-  const siblings = await db.orm.content.StoryGenre.select("storyId")
-    .where((link) => link.genreId.in(genreIds))
-    .all();
-
-  const candidateIds = [...new Set(siblings.map((link) => link.storyId))].filter(
-    (storyId) => storyId !== story.id,
+  /**
+   * The best-liked listed stories sharing a genre with this one, chosen in
+   * SQL. It used to load every story id in those genres to filter and sort in
+   * memory, which grew with the catalogue. Drafts are excluded even for their
+   * own author: this rail is a recommendation to a reader, not a view of the
+   * caller's own shelf.
+   */
+  const picked = await db.runtime().query(
+    db.raw.sql`
+      SELECT s."id"
+        FROM "content"."story" AS s
+       WHERE s."id" <> ${story.id}
+         AND s."listedAt" IS NOT NULL
+         AND s."source" = 'SCRIBE'
+         AND EXISTS (
+               SELECT 1
+                 FROM "content"."storyGenre" AS sg
+                WHERE sg."storyId" = s."id"
+                  AND sg."genreId" IN (
+                        SELECT "genreId" FROM "content"."storyGenre" WHERE "storyId" = ${story.id}
+                      )
+             )
+       ORDER BY s."likeCount" DESC, s."id" DESC
+       LIMIT ${limit}::int
+    `.returnsRow({ id: "pg/text@1" }).build(),
   );
 
-  if (candidateIds.length === 0) return [];
+  if (picked.length === 0) return [];
 
-  // Drafts are excluded even for their own author here: this rail is a
-  // recommendation to a reader, not a view of the caller's own shelf.
+  const order = picked.map((row) => row.id);
   const rows = await storiesBase()
-    .where((candidate) => candidate.id.in(candidateIds))
-    .where((candidate) => candidate.listedAt.isNotNull())
-    .where((candidate) => candidate.source.eq("SCRIBE"))
-    .orderBy([
-      (candidate) => candidate.likeCount.desc(),
-      (candidate) => candidate.id.desc(),
-    ])
-    .limit(limit)
+    .where((candidate) => candidate.id.in(order))
     .all();
+  rows.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
 
   return hydrate(rows as StoryRow[], viewerId);
 }
@@ -1099,27 +1104,27 @@ export interface GenreSummary extends StoryGenre {
  * what a reader finds after clicking the chip.
  */
 export async function listGenres(): Promise<GenreSummary[]> {
-  const [genres, links, listed] = await Promise.all([
-    db.orm.content.Genre.select("id", "name", "hue")
-      .orderBy((genre) => genre.name.asc())
-      .all(),
-    db.orm.content.StoryGenre.select("storyId", "genreId").all(),
-    db.orm.content.Story.select("id")
-      .where((story) => story.listedAt.isNotNull())
-      .where((story) => story.source.eq("SCRIBE"))
-      .all(),
-  ]);
+  // Counted in one grouped statement rather than by loading every link and
+  // every listed story to count in memory, which grew with the catalogue on
+  // every request.
+  const rows = await db.runtime().query(
+    db.raw.sql`
+      SELECT g."id", g."name", g."hue", count(s."id")::int AS "storyCount"
+        FROM "content"."genre" AS g
+        LEFT JOIN "content"."storyGenre" AS sg ON sg."genreId" = g."id"
+        LEFT JOIN "content"."story" AS s
+               ON s."id" = sg."storyId"
+              AND s."listedAt" IS NOT NULL
+              AND s."source" = 'SCRIBE'
+       GROUP BY g."id", g."name", g."hue"
+       ORDER BY g."name" ASC
+    `.returnsRow({
+      id: "pg/text@1",
+      name: "pg/text@1",
+      hue: "pg/int4@1",
+      storyCount: "pg/int4@1",
+    }).build(),
+  );
 
-  const listedIds = new Set(listed.map((story) => story.id));
-
-  const counts = new Map<string, number>();
-  for (const link of links) {
-    if (!listedIds.has(link.storyId)) continue;
-    counts.set(link.genreId, (counts.get(link.genreId) ?? 0) + 1);
-  }
-
-  return genres.map((genre) => ({
-    ...genre,
-    storyCount: counts.get(genre.id) ?? 0,
-  }));
+  return rows.map((row) => ({ ...row }));
 }
