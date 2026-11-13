@@ -431,10 +431,11 @@ describe.skipIf(!available)("deleting comments", () => {
 
     expect(status).toBe(204);
 
+    // The thread is gone, so asking for its replies is asking about nothing.
     const replies = await api.request(
       `/api/stories/${story.id}/comments?parentId=${thread}`,
     );
-    expect(replies.body.total).toBe(0);
+    expect(replies.status).toBe(404);
   });
 
   it("answers 404 for a comment that does not exist", async () => {

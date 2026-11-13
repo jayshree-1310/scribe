@@ -956,6 +956,17 @@ export async function listDiscussions(
 
   const parentId = query.parentId;
 
+  // Replies to a hidden thread go with it; see `listComments` in
+  // `services/engagement.ts` for the same rule.
+  if (parentId !== undefined) {
+    const parent = await db.orm.clubs.ClubDiscussion.select("id")
+      .where((row) => row.id.eq(parentId))
+      .where((row) => row.clubId.eq(club.id))
+      .where((row) => row.hiddenAt.isNull())
+      .first();
+    if (!parent) throw HttpError.notFound(DISCUSSION_NOT_FOUND);
+  }
+
   let collection = db.orm.clubs.ClubDiscussion.select(
     "id",
     "clubId",

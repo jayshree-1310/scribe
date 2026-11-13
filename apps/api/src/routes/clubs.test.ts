@@ -775,10 +775,11 @@ describe.skipIf(!available)("discussions", () => {
     });
     expect(deleted.status).toBe(204);
 
+    // The thread is gone, so asking for its replies is asking about nothing.
     const replies = await api.request(
       `/api/clubs/${clubSlug}/discussions?parentId=${threadId}`,
     );
-    expect(replies.body.items).toHaveLength(0);
+    expect(replies.status).toBe(404);
   });
 
   it("deletes a thread with several replies", async () => {

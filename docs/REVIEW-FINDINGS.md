@@ -370,7 +370,7 @@ So the list below is not read as "everything is broken":
 | L-4 | **Fixed.** `/profile/:username` for an unknown user fires 5 requests (profile, stories, clubs, badges…) that all 404 before the page settles; the list requests could wait for the profile. | `apps/web/src/pages/ProfilePage.tsx` | Confirmed (browser) |
 | L-5 | **Fixed.** First-rating race: the comment says a concurrent insert is "caught below and retried as an update", but there is no catch, so a double-submitted first rating can 500 on the unique index. | `services/engagement.ts:915-944` | Code review |
 | L-6 | **Fixed.** A reader's rating bumps `Story.updatedAt`, so "last updated" moves when someone else rates. | `services/engagement.ts:839-845` | Code review |
-| L-7 | `GET …/comments?parentId=<hidden thread>` still lists that thread's replies. | `services/engagement.ts:376-378` | Code review |
+| L-7 | **Fixed** (club threads too). `GET …/comments?parentId=<hidden thread>` still lists that thread's replies. | `services/engagement.ts:376-378` | Code review |
 | L-8 | Anonymous view dedupe is IP + user agent per day: rotating the UA inflates `viewCount`, which drives the Views sort, Trending tie-break and author badges. | `services/analytics.ts:200-215` | Code review |
 | L-9 | Rate limits are check-then-record (comments, discussions, uploads, AI), so parallel requests can exceed them. Use `INCR` first and compare. | `routes/engagement.ts`, `routes/clubs.ts`, `routes/ai.ts` | Code review |
 | L-10 | `POST /api/ai/agent` with someone else's draft `storyId` answers 200 and spends a model call (tools correctly reply "not found"). Authorise the story up-front and 404 before calling the model. | `services/ai/agent-request.ts` | Confirmed |

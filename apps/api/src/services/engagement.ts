@@ -371,6 +371,17 @@ export async function listComments(
   const { parentId, chapterId } = query;
   const threads = parentId === undefined;
 
+  // A hidden thread is gone, and so are its replies: the replies of a thread
+  // nobody can see would otherwise still be listed by its id. Same answer as
+  // for an id that names nothing, so this does not confirm the thread exists.
+  if (!threads) {
+    const parent = await commentsBase()
+      .where((row) => row.id.eq(parentId))
+      .where((row) => row.storyId.eq(storyId))
+      .first();
+    if (!parent) throw HttpError.notFound(COMMENT_NOT_FOUND);
+  }
+
   let collection = commentsBase().where((row) => row.storyId.eq(storyId));
 
   collection = threads

@@ -273,12 +273,14 @@ describe.skipIf(!available)("hidden content", () => {
     expect(await visibleComments(story.slug)).not.toContain(threadId);
 
     // The reply survives -- hiding a thread is not a decision about the
-    // replies underneath it -- but nothing lists it any more, because its
-    // thread is where a reader would have opened it from.
-    const replies = await api.request<{ items: { id: string }[] }>(
+    // replies underneath it, and dismissing the report brings both back --
+    // but nothing lists it any more, because its thread is where a reader
+    // would have opened it from: asking by the thread's id is a 404.
+    const replies = await api.request(
       `/api/stories/${story.slug}/comments?parentId=${threadId}`,
     );
-    expect(replies.body.items.map((item) => item.id)).toContain(replyId);
+    expect(replies.status).toBe(404);
+    expect(replyId).toBeTruthy();
 
     // Reporting something already hidden reads exactly like reporting
     // something that never existed.
@@ -788,5 +790,27 @@ describe.skipIf(!available)("reporting a story or a chapter", () => {
 
     const filed = await fileReport(reporter, { targetType: "STORY", targetId: draft.id });
     expect(filed.status).toBe(404);
+  });
+});
+
+describe.skipIf(!available)("a hidden thread's replies", () => {
+  it("are gone with it, not listed by the thread's id", async () => {
+    const thread = await api.createComment({ storyId: story.id, userId: offender, content: "Hide me." });
+    await api.createComment({ storyId: story.id, userId: other, parentId: thread, content: "A reply." });
+
+    const filed = await fileReport(reporter, { targetType: "COMMENT", targetId: thread });
+    expect((await resolve(moderator, filed.body.report.id, "HIDE")).status).toBe(200);
+
+    const replies = await api.request(`/api/stories/${story.id}/comments?parentId=${thread}`);
+    expect(replies.status).toBe(404);
+
+    const clubThread = await api.createDiscussion({ clubId: club.id, userId: offender, body: "Hide me too." });
+    await api.createDiscussion({ clubId: club.id, userId: reporter, parentId: clubThread });
+
+    const clubFiled = await fileReport(reporter, { targetType: "CLUB_DISCUSSION", targetId: clubThread });
+    expect((await resolve(moderator, clubFiled.body.report.id, "HIDE")).status).toBe(200);
+
+    const clubReplies = await api.request(`/api/clubs/${club.slug}/discussions?parentId=${clubThread}`);
+    expect(clubReplies.status).toBe(404);
   });
 });
