@@ -27,7 +27,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { parseOrThrow } from "../lib/validate.js";
 import { HttpError } from "../lib/http-error.js";
-import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
+import { reserveAttempt } from "../lib/rate-limit.js";
 import {
   getUserId,
   requireUser,
@@ -92,9 +92,10 @@ function likeKey(userId: string): string {
  * avoidable by alternating.
  */
 async function chargeLike(userId: string): Promise<void> {
-  const { limited, retryAfter } = await isRateLimited(
+  const { limited, retryAfter } = await reserveAttempt(
     likeKey(userId),
     LIKE_LIMIT,
+    LIKE_WINDOW_SECONDS,
   );
 
   if (limited) {
@@ -103,8 +104,6 @@ async function chargeLike(userId: string): Promise<void> {
       retryAfter || LIKE_WINDOW_SECONDS,
     );
   }
-
-  await recordAttempt(likeKey(userId), LIKE_WINDOW_SECONDS);
 }
 
 /**
@@ -194,26 +193,24 @@ router.post("/stories/:storyId/comments", requireUser, async (req, res, next) =>
     const body = parseOrThrow(commentBodySchema, req.body);
     const userId = requireUserId(res);
 
-    const { limited, retryAfter } = await isRateLimited(
+    const attempt = await reserveAttempt(
       commentKey(userId),
       COMMENT_LIMIT,
+      COMMENT_WINDOW_SECONDS,
     );
-    if (limited) {
+    if (attempt.limited) {
       throw HttpError.tooManyRequests(
         "You have commented a lot in a short time. Give it a moment and try again.",
-        retryAfter || COMMENT_WINDOW_SECONDS,
+        attempt.retryAfter || COMMENT_WINDOW_SECONDS,
       );
     }
 
+    // Charged only if it lands: a refused request gives the attempt back.
     const comment = await createComment(userId, storyId, {
       content: body.content,
       chapterId: body.chapterId,
       parentId: body.parentId,
-    });
-
-    // Charged only once the comment landed: a rejected post -- no such story,
-    // no such parent -- should not spend the caller's budget.
-    await recordAttempt(commentKey(userId), COMMENT_WINDOW_SECONDS);
+    }).catch(attempt.refundAndRethrow);
 
     res.status(201).json({ comment });
   } catch (error) {

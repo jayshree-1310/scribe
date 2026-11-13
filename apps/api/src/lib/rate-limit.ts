@@ -48,3 +48,63 @@ export async function recordAttempt(
 
   await redis.multi().incr(key).expire(key, windowSeconds, "NX").exec();
 }
+
+export type Reservation = RateLimitStatus & {
+  /** Gives the attempt back: for a request that failed and should not count. */
+  refund: () => Promise<void>;
+  /** `refund`, then rethrows: `await work().catch(attempt.refundAndRethrow)`. */
+  refundAndRethrow: (error: unknown) => Promise<never>;
+};
+
+/**
+ * Counts an attempt and decides in the same step, so concurrent requests
+ * cannot all pass.
+ *
+ * `isRateLimited` then `recordAttempt` is check-then-act: twenty requests sent
+ * at once all read the counter before any of them writes it, and all twenty
+ * get through a limit of five. Here the increment comes first and its result
+ * is the decision -- the sixth request sees 6. An attempt over the limit is
+ * given back at once, so being refused does not extend the lock-out.
+ *
+ * Routes that charge only for work that succeeded (a comment that landed, not
+ * one refused for a missing story) call `refund` when the work throws.
+ */
+export async function reserveAttempt(
+  key: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<Reservation> {
+  await connectRedis();
+
+  const replies = await redis
+    .multi()
+    .incr(key)
+    .expire(key, windowSeconds, "NX")
+    .ttl(key)
+    .exec();
+
+  const count = Number(replies[0]);
+  const ttl = Number(replies[2]);
+  const refund = async () => {
+    await redis.decr(key);
+  };
+
+  const refundAndRethrow = async (error: unknown): Promise<never> => {
+    await refund();
+    throw error;
+  };
+
+  if (count > limit) {
+    await refund();
+    return {
+      limited: true,
+      retryAfter: ttl > 0 ? ttl : 0,
+      refund: async () => {},
+      refundAndRethrow: async (error) => {
+        throw error;
+      },
+    };
+  }
+
+  return { limited: false, retryAfter: 0, refund, refundAndRethrow };
+}

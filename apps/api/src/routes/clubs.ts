@@ -14,7 +14,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { parseOrThrow } from "../lib/validate.js";
 import { HttpError } from "../lib/http-error.js";
-import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
+import { reserveAttempt } from "../lib/rate-limit.js";
 import {
   getUserId,
   requireUser,
@@ -342,25 +342,23 @@ router.post("/:id/discussions", requireUser, async (req, res, next) => {
     const body = parseOrThrow(discussionBodySchema, req.body);
     const userId = requireUserId(res);
 
-    const { limited, retryAfter } = await isRateLimited(
+    const attempt = await reserveAttempt(
       discussionKey(userId),
       DISCUSSION_LIMIT,
+      DISCUSSION_WINDOW_SECONDS,
     );
-    if (limited) {
+    if (attempt.limited) {
       throw HttpError.tooManyRequests(
         "You have posted a lot in a short time. Give it a moment and try again.",
-        retryAfter || DISCUSSION_WINDOW_SECONDS,
+        attempt.retryAfter || DISCUSSION_WINDOW_SECONDS,
       );
     }
 
+    // Charged only if it lands: a refused request gives the attempt back.
     const discussion = await createDiscussion(userId, id, {
       body: body.body,
       parentId: body.parentId,
-    });
-
-    // Charged only once the post succeeded: a rejected post -- not a member,
-    // no such club -- should not spend the caller's budget.
-    await recordAttempt(discussionKey(userId), DISCUSSION_WINDOW_SECONDS);
+    }).catch(attempt.refundAndRethrow);
 
     res.status(201).json({ discussion });
   } catch (error) {

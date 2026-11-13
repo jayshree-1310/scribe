@@ -26,7 +26,7 @@ import express from "express";
 import { z } from "zod";
 import { HttpError } from "../lib/http-error.js";
 import { parseOrThrow } from "../lib/validate.js";
-import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
+import { reserveAttempt } from "../lib/rate-limit.js";
 import { requireUser, requireUserId } from "../middleware/current-user.js";
 import {
   MAX_IMAGE_BYTES,
@@ -59,7 +59,11 @@ router.post("/", imageBody, async (req, res, next) => {
     const { kind } = parseOrThrow(querySchema, req.query);
 
     const key = `uploads:ratelimit:${userId}`;
-    const { limited, retryAfter } = await isRateLimited(key, UPLOAD_LIMIT);
+    const { limited, retryAfter } = await reserveAttempt(
+      key,
+      UPLOAD_LIMIT,
+      WINDOW_SECONDS,
+    );
 
     if (limited) {
       throw HttpError.tooManyRequests(
@@ -67,8 +71,6 @@ router.post("/", imageBody, async (req, res, next) => {
         retryAfter || WINDOW_SECONDS,
       );
     }
-
-    await recordAttempt(key, WINDOW_SECONDS);
 
     // `express.raw` leaves an empty object behind when the content type did
     // not match. For `media` that is the audio/video case and `req` is still

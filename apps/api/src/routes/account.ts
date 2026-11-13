@@ -12,7 +12,7 @@ import express from "express";
 import { z } from "zod";
 import { HttpError } from "../lib/http-error.js";
 import { parseOrThrow } from "../lib/validate.js";
-import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
+import { reserveAttempt } from "../lib/rate-limit.js";
 import { emailSchema, usernameSchema } from "../lib/auth-schemas.js";
 import { clearRefreshCookie } from "../lib/sessions.js";
 import { requireUser, requireUserId } from "../middleware/current-user.js";
@@ -98,7 +98,11 @@ router.post("/avatar", avatarBody, async (req, res, next) => {
     const userId = requireUserId(res);
     const key = `account:ratelimit:avatar:${userId}`;
 
-    const { limited, retryAfter } = await isRateLimited(key, AVATAR_UPLOAD_LIMIT);
+    const { limited, retryAfter } = await reserveAttempt(
+      key,
+      AVATAR_UPLOAD_LIMIT,
+      AVATAR_WINDOW_SECONDS,
+    );
 
     if (limited) {
       throw HttpError.tooManyRequests(
@@ -106,8 +110,6 @@ router.post("/avatar", avatarBody, async (req, res, next) => {
         retryAfter || AVATAR_WINDOW_SECONDS,
       );
     }
-
-    await recordAttempt(key, AVATAR_WINDOW_SECONDS);
 
     // `express.raw` leaves an empty object behind when the content type did
     // not match, which is the "you sent JSON, or nothing" case.

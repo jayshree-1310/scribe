@@ -8,7 +8,7 @@
 
 import { z } from "zod";
 import { HttpError } from "../../lib/http-error.js";
-import { isRateLimited, recordAttempt } from "../../lib/rate-limit.js";
+import { reserveAttempt } from "../../lib/rate-limit.js";
 import { HISTORY_ANSWER_LIMIT, HISTORY_LIMIT, MESSAGE_LIMIT } from "./agent.js";
 import { assertWithinDailyBudget } from "./budget.js";
 
@@ -55,13 +55,12 @@ export type AgentRequest = z.infer<typeof agentRequestSchema>;
  */
 export async function chargeAgentRequest(userId: string): Promise<void> {
   const key = `ai:agent:${userId}`;
-  const status = await isRateLimited(key, AGENT_LIMIT);
+  await assertWithinDailyBudget(userId);
+  const status = await reserveAttempt(key, AGENT_LIMIT, AGENT_WINDOW_SECONDS);
   if (status.limited) {
     throw HttpError.tooManyRequests(
       "You have asked the assistant a lot in a short time. Try again shortly.",
       status.retryAfter,
     );
   }
-  await assertWithinDailyBudget(userId);
-  await recordAttempt(key, AGENT_WINDOW_SECONDS);
 }

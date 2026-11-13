@@ -16,7 +16,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { parseOrThrow } from "../lib/validate.js";
 import { HttpError } from "../lib/http-error.js";
-import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
+import { reserveAttempt } from "../lib/rate-limit.js";
 import {
   getUserId,
   requireUser,
@@ -139,22 +139,20 @@ router.post("/:username/follow", requireUser, async (req, res, next) => {
     const { username } = parseOrThrow(usernameParamSchema, req.params);
     const userId = requireUserId(res);
 
-    const { limited, retryAfter } = await isRateLimited(
+    const attempt = await reserveAttempt(
       followKey(userId),
       FOLLOW_LIMIT,
+      FOLLOW_WINDOW_SECONDS,
     );
-    if (limited) {
+    if (attempt.limited) {
       throw HttpError.tooManyRequests(
         "You have followed a lot of people in a short time. Give it a moment and try again.",
-        retryAfter || FOLLOW_WINDOW_SECONDS,
+        attempt.retryAfter || FOLLOW_WINDOW_SECONDS,
       );
     }
 
-    const state = await followUser(userId, username);
-
-    // Charged only once the follow landed: a rejected attempt -- no such
-    // person, or yourself -- should not spend the caller's budget.
-    await recordAttempt(followKey(userId), FOLLOW_WINDOW_SECONDS);
+    // Charged only if it lands: a refused request gives the attempt back.
+    const state = await followUser(userId, username).catch(attempt.refundAndRethrow);
 
     // 200 rather than 201: following is idempotent, so the response cannot
     // honestly claim to have created something on the second call.

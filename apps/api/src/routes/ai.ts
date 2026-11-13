@@ -13,7 +13,7 @@ import { EventType, type RunErrorEvent } from "@ag-ui/core";
 import { Router, type Response } from "express";
 import { z } from "zod";
 import { HttpError } from "../lib/http-error.js";
-import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
+import { reserveAttempt } from "../lib/rate-limit.js";
 import { parseOrThrow } from "../lib/validate.js";
 import {
   getUserId,
@@ -136,7 +136,7 @@ router.use(async (req, _res, next) => {
     if (limit <= 0) return next();
 
     const key = `ai:baseline:${getUserId(req) ?? `ip:${req.ip ?? "unknown"}`}`;
-    const status = await isRateLimited(key, limit);
+    const status = await reserveAttempt(key, limit, BASELINE_WINDOW_SECONDS);
     if (status.limited) {
       throw HttpError.tooManyRequests(
         "That is a lot of requests to the AI features in a short time. Try again in a few minutes.",
@@ -144,7 +144,6 @@ router.use(async (req, _res, next) => {
         "ai_requests",
       );
     }
-    await recordAttempt(key, BASELINE_WINDOW_SECONDS);
     next();
   } catch (error) {
     next(error);
@@ -280,16 +279,14 @@ const chatSchema = z.object({
 async function chargeChat(userId: string): Promise<void> {
   const key = `ai:chat:${userId}`;
 
-  const status = await isRateLimited(key, CHAT_LIMIT);
+  await assertWithinDailyBudget(userId);
+  const status = await reserveAttempt(key, CHAT_LIMIT, CHAT_WINDOW_SECONDS);
   if (status.limited) {
     throw HttpError.tooManyRequests(
       "You have sent a lot of prompts in a short time. Try again shortly.",
       status.retryAfter,
     );
   }
-
-  await assertWithinDailyBudget(userId);
-  await recordAttempt(key, CHAT_WINDOW_SECONDS);
 }
 
 /**
@@ -407,14 +404,13 @@ router.post("/scribble", requireUser, async (req, res, next) => {
     const { message, context } = parseOrThrow(askSchema, req.body);
 
     const key = `ai:scribble:${userId}`;
-    const status = await isRateLimited(key, SCRIBBLE_LIMIT);
+    const status = await reserveAttempt(key, SCRIBBLE_LIMIT, SCRIBBLE_WINDOW_SECONDS);
     if (status.limited) {
       throw HttpError.tooManyRequests(
         "You have asked Scribble a lot in a short time. Try again shortly.",
         status.retryAfter,
       );
     }
-    await recordAttempt(key, SCRIBBLE_WINDOW_SECONDS);
 
     res.json(
       await ask(
@@ -449,14 +445,13 @@ router.post("/scribble/stream", requireUser, async (req, res, next) => {
     const { message, context } = parseOrThrow(askSchema, req.body);
 
     const key = `ai:scribble:${userId}`;
-    const status = await isRateLimited(key, SCRIBBLE_LIMIT);
+    const status = await reserveAttempt(key, SCRIBBLE_LIMIT, SCRIBBLE_WINDOW_SECONDS);
     if (status.limited) {
       throw HttpError.tooManyRequests(
         "You have asked Scribble a lot in a short time. Try again shortly.",
         status.retryAfter,
       );
     }
-    await recordAttempt(key, SCRIBBLE_WINDOW_SECONDS);
 
     const disconnect = abortOnDisconnect(res);
 
@@ -556,14 +551,13 @@ function toAssistInput(parsed: z.infer<typeof assistSchema>): AssistInput {
 
 async function chargeAssist(userId: string): Promise<void> {
   const key = `ai:assist:${userId}`;
-  const status = await isRateLimited(key, ASSIST_LIMIT);
+  const status = await reserveAttempt(key, ASSIST_LIMIT, ASSIST_WINDOW_SECONDS);
   if (status.limited) {
     throw HttpError.tooManyRequests(
       "You have asked for a lot of help in a short time. Try again shortly.",
       status.retryAfter,
     );
   }
-  await recordAttempt(key, ASSIST_WINDOW_SECONDS);
 }
 
 /**
@@ -666,14 +660,13 @@ const refineSchema = z.object({
 /** Every generation route pays the same toll before it reaches a model. */
 async function chargeGeneration(userId: string): Promise<void> {
   const key = `ai:generate:${userId}`;
-  const status = await isRateLimited(key, GENERATE_LIMIT);
+  const status = await reserveAttempt(key, GENERATE_LIMIT, GENERATE_WINDOW_SECONDS);
   if (status.limited) {
     throw HttpError.tooManyRequests(
       "You have generated a lot in a short time. Try again shortly.",
       status.retryAfter,
     );
   }
-  await recordAttempt(key, GENERATE_WINDOW_SECONDS);
 }
 
 /**
@@ -813,15 +806,14 @@ router.post(
       const { slugOrId, chapterNumber } = parseOrThrow(recapParams, req.params);
 
       const key = `ai:recap:${userId}`;
-      const status = await isRateLimited(key, RECAP_LIMIT);
+      await assertWithinDailyBudget(userId);
+      const status = await reserveAttempt(key, RECAP_LIMIT, RECAP_WINDOW_SECONDS);
       if (status.limited) {
         throw HttpError.tooManyRequests(
           "You have asked for a lot of recaps in a short time. Try again shortly.",
           status.retryAfter,
         );
       }
-      await assertWithinDailyBudget(userId);
-      await recordAttempt(key, RECAP_WINDOW_SECONDS);
 
       const result = await generateChapterRecap(
         slugOrId,
@@ -829,7 +821,6 @@ router.post(
         userId,
         abortOnDisconnect(res).signal,
       );
-
 
       res.json({ available: result.available, recap: result.recap });
     } catch (error) {
@@ -888,15 +879,14 @@ function toExplainInput(
 
 async function chargeExplain(userId: string): Promise<void> {
   const key = `ai:explain:${userId}`;
-  const status = await isRateLimited(key, EXPLAIN_LIMIT);
+  await assertWithinDailyBudget(userId);
+  const status = await reserveAttempt(key, EXPLAIN_LIMIT, EXPLAIN_WINDOW_SECONDS);
   if (status.limited) {
     throw HttpError.tooManyRequests(
       "You have asked about a lot of passages in a short time. Try again shortly.",
       status.retryAfter,
     );
   }
-  await assertWithinDailyBudget(userId);
-  await recordAttempt(key, EXPLAIN_WINDOW_SECONDS);
 }
 
 router.post("/explain", requireUser, async (req, res, next) => {
@@ -1005,15 +995,14 @@ function toAskBookInput(parsed: z.infer<typeof askBookSchema>): AskBookInput {
 
 async function chargeAsk(userId: string): Promise<void> {
   const key = `ai:ask:${userId}`;
-  const status = await isRateLimited(key, ASK_LIMIT);
+  await assertWithinDailyBudget(userId);
+  const status = await reserveAttempt(key, ASK_LIMIT, ASK_WINDOW_SECONDS);
   if (status.limited) {
     throw HttpError.tooManyRequests(
       "You have asked a lot of questions in a short time. Try again shortly.",
       status.retryAfter,
     );
   }
-  await assertWithinDailyBudget(userId);
-  await recordAttempt(key, ASK_WINDOW_SECONDS);
 }
 
 router.post("/ask", requireUser, async (req, res, next) => {
@@ -1102,14 +1091,17 @@ router.post("/conversations", requireUser, async (req, res, next) => {
     const { storyId } = parseOrThrow(startConversationSchema, req.body);
 
     const key = `ai:conversation:create:${userId}`;
-    const status = await isRateLimited(key, CONVERSATION_CREATE_LIMIT);
+    const status = await reserveAttempt(
+      key,
+      CONVERSATION_CREATE_LIMIT,
+      CONVERSATION_CREATE_WINDOW_SECONDS,
+    );
     if (status.limited) {
       throw HttpError.tooManyRequests(
         "You have started a lot of conversations in a short time. Try again shortly.",
         status.retryAfter,
       );
     }
-    await recordAttempt(key, CONVERSATION_CREATE_WINDOW_SECONDS);
 
     res.status(201).json(await createConversation(userId, storyId));
   } catch (error) {
@@ -1256,14 +1248,13 @@ router.get("/search", requireUser, async (req, res, next) => {
     const query = parseOrThrow(searchQuerySchema, req.query);
 
     const key = `ai:search:${userId}`;
-    const status = await isRateLimited(key, SEARCH_LIMIT);
+    const status = await reserveAttempt(key, SEARCH_LIMIT, SEARCH_WINDOW_SECONDS);
     if (status.limited) {
       throw HttpError.tooManyRequests(
         "You have searched a lot in a short time. Try again shortly.",
         status.retryAfter,
       );
     }
-    await recordAttempt(key, SEARCH_WINDOW_SECONDS);
 
     res.json(
       await search(
@@ -1363,15 +1354,18 @@ router.post("/bible/:storyId/refresh", requireUser, async (req, res, next) => {
     const { limit } = parseOrThrow(refreshBodySchema, req.body ?? {});
 
     const key = `ai:bible:${userId}`;
-    const status = await isRateLimited(key, BIBLE_REFRESH_LIMIT);
+    await assertWithinDailyBudget(userId);
+    const status = await reserveAttempt(
+      key,
+      BIBLE_REFRESH_LIMIT,
+      BIBLE_REFRESH_WINDOW_SECONDS,
+    );
     if (status.limited) {
       throw HttpError.tooManyRequests(
         "You have refreshed the story bible a lot in a short time. Try again shortly.",
         status.retryAfter,
       );
     }
-    await assertWithinDailyBudget(userId);
-    await recordAttempt(key, BIBLE_REFRESH_WINDOW_SECONDS);
 
     const result = await refreshBible(
       userId,
@@ -1400,18 +1394,21 @@ router.post("/bible/:storyId/read", requireUser, async (req, res, next) => {
     await assertStoryOwned(userId, storyId);
 
     const key = `ai:bible:${userId}`;
-    const status = await isRateLimited(key, BIBLE_REFRESH_LIMIT);
+    await assertWithinDailyBudget(userId);
+    if (!loadAiConfig().jobs) {
+      throw HttpError.unavailable("Background reading is switched off on this server. Use Refresh instead.");
+    }
+    const status = await reserveAttempt(
+      key,
+      BIBLE_REFRESH_LIMIT,
+      BIBLE_REFRESH_WINDOW_SECONDS,
+    );
     if (status.limited) {
       throw HttpError.tooManyRequests(
         "You have refreshed the story bible a lot in a short time. Try again shortly.",
         status.retryAfter,
       );
     }
-    await assertWithinDailyBudget(userId);
-    if (!loadAiConfig().jobs) {
-      throw HttpError.unavailable("Background reading is switched off on this server. Use Refresh instead.");
-    }
-    await recordAttempt(key, BIBLE_REFRESH_WINDOW_SECONDS);
 
     const jobId = await enqueue(BIBLE_READ_JOB, { storyId }, {
       userId,
@@ -1442,15 +1439,18 @@ const storyKeyParams = z.object({ slugOrId: z.string().trim().min(1).max(200) })
 
 async function chargeSummaryRegenerate(userId: string): Promise<void> {
   const key = `ai:summary:${userId}`;
-  const status = await isRateLimited(key, SUMMARY_REGENERATE_LIMIT);
+  await assertWithinDailyBudget(userId);
+  const status = await reserveAttempt(
+    key,
+    SUMMARY_REGENERATE_LIMIT,
+    SUMMARY_REGENERATE_WINDOW_SECONDS,
+  );
   if (status.limited) {
     throw HttpError.tooManyRequests(
       "You have regenerated a lot of summaries in a short time. Try again shortly.",
       status.retryAfter,
     );
   }
-  await assertWithinDailyBudget(userId);
-  await recordAttempt(key, SUMMARY_REGENERATE_WINDOW_SECONDS);
 }
 
 /**
@@ -1661,22 +1661,24 @@ router.post(
       const { chapterId } = parseOrThrow(chapterIdParams, req.params);
 
       const key = `ai:continuity:${userId}`;
-      const status = await isRateLimited(key, CONTINUITY_LIMIT);
+      await assertWithinDailyBudget(userId);
+      const status = await reserveAttempt(
+        key,
+        CONTINUITY_LIMIT,
+        CONTINUITY_WINDOW_SECONDS,
+      );
       if (status.limited) {
         throw HttpError.tooManyRequests(
           "You have run a lot of continuity checks in a short time. Try again shortly.",
           status.retryAfter,
         );
       }
-      await assertWithinDailyBudget(userId);
-      await recordAttempt(key, CONTINUITY_WINDOW_SECONDS);
 
       const result = await checkChapterNow(
         userId,
         chapterId,
         abortOnDisconnect(res).signal,
       );
-
 
       res.json(result.continuity);
     } catch (error) {

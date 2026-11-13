@@ -15,7 +15,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { parseOrThrow } from "../lib/validate.js";
 import { HttpError } from "../lib/http-error.js";
-import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
+import { reserveAttempt } from "../lib/rate-limit.js";
 import {
   getUserId,
   requireUser,
@@ -215,22 +215,20 @@ router.post("/:id/enter", requireUser, async (req, res, next) => {
     const { id } = parseOrThrow(idParamSchema, req.params);
     const userId = requireUserId(res);
 
-    const { limited, retryAfter } = await isRateLimited(
+    const attempt = await reserveAttempt(
       enterKey(userId),
       ENTER_LIMIT,
+      ENTER_WINDOW_SECONDS,
     );
-    if (limited) {
+    if (attempt.limited) {
       throw HttpError.tooManyRequests(
         "You have entered a lot of challenges in a short time. Give it a moment and try again.",
-        retryAfter || ENTER_WINDOW_SECONDS,
+        attempt.retryAfter || ENTER_WINDOW_SECONDS,
       );
     }
 
-    const entry = await enterChallenge(userId, id);
-
-    // Charged only once the entry landed: a rejected attempt -- closed window,
-    // already entered -- should not spend the caller's budget.
-    await recordAttempt(enterKey(userId), ENTER_WINDOW_SECONDS);
+    // Charged only if it lands: a refused request gives the attempt back.
+    const entry = await enterChallenge(userId, id).catch(attempt.refundAndRethrow);
 
     res.status(201).json({ entry });
   } catch (error) {

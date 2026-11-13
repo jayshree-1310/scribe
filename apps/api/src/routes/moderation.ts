@@ -18,7 +18,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { parseOrThrow } from "../lib/validate.js";
 import { HttpError } from "../lib/http-error.js";
-import { isRateLimited, recordAttempt } from "../lib/rate-limit.js";
+import { reserveAttempt } from "../lib/rate-limit.js";
 import { requireUser, requireUserId } from "../middleware/current-user.js";
 import {
   DETAILS_MAX_LENGTH,
@@ -98,28 +98,25 @@ router.post("/reports", async (req, res, next) => {
     const body = parseOrThrow(reportBodySchema, req.body);
     const userId = requireUserId(res);
 
-    const { limited, retryAfter } = await isRateLimited(
+    const attempt = await reserveAttempt(
       reportKey(userId),
       REPORT_LIMIT,
+      REPORT_WINDOW_SECONDS,
     );
-    if (limited) {
+    if (attempt.limited) {
       throw HttpError.tooManyRequests(
         "You have reported a lot in a short time. Give it a moment and try again.",
-        retryAfter || REPORT_WINDOW_SECONDS,
+        attempt.retryAfter || REPORT_WINDOW_SECONDS,
       );
     }
 
+    // Charged only if it lands: a refused request gives the attempt back.
     const report = await createReport(userId, {
       targetType: body.targetType,
       targetId: body.targetId,
       reason: body.reason,
       details: body.details,
-    });
-
-    // Charged only once the report landed, like the comment limit: a rejected
-    // report -- no such content, already reported -- must not spend the
-    // caller's budget, or a reader who mis-clicks twice is locked out.
-    await recordAttempt(reportKey(userId), REPORT_WINDOW_SECONDS);
+    }).catch(attempt.refundAndRethrow);
 
     res.status(201).json({ report });
   } catch (error) {
