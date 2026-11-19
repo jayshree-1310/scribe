@@ -91,6 +91,11 @@ export function TourProvider({ children }: { children: ReactNode }) {
     userId ? readTourState(userId) : INITIAL_TOUR_STATE,
   )
   const [direction, setDirection] = useState<1 | -1>(1)
+  /**
+   * The tour is open because it was saved open, not because the reader just
+   * started or moved it. Checked once, on its first run: see the run effect.
+   */
+  const [resumed, setResumed] = useState(state.isOpen)
   /** The step whose target has been found; lags `currentStep` while it loads. */
   const [presentedStep, setPresentedStep] = useState<number | null>(null)
 
@@ -106,6 +111,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
     const next = userId ? readTourState(userId) : INITIAL_TOUR_STATE
     setOwner(userId)
     setState(next)
+    setResumed(next.isOpen)
     setWasOpen(next.isOpen)
     setExiting(false)
     setPresentedStep(null)
@@ -200,6 +206,22 @@ export function TourProvider({ children }: { children: ReactNode }) {
             : `/read/${sample.slug}/${sample.chapter}`
       }
 
+      /*
+       * A tour saved open and resumed by a page load goes on only if the
+       * reader is already where its step happens -- a refresh mid-tour.
+       * Arriving anywhere else (a shared link, a new tab, a bookmark) is the
+       * reader going somewhere of their own accord, so the tour steps aside
+       * exactly as it does for back and forward, rather than dragging them
+       * to its page on every load. "Take a tour" starts it again.
+       */
+      if (resumed) {
+        setResumed(false)
+        if (path !== null && window.location.pathname !== path) {
+          setState((current) => ({ ...current, isOpen: false }))
+          return
+        }
+      }
+
       if (path !== null && window.location.pathname !== path) {
         await navigate(path)
         if (signal.aborted) return
@@ -232,7 +254,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
 
     void run()
     return () => controller.abort()
-  }, [running, currentStep, sample, direction, navigate, reveal])
+  }, [running, currentStep, sample, direction, navigate, reveal, resumed])
 
   // Whatever the tour opened, it closes again when it stops.
   useEffect(() => {
@@ -255,6 +277,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   }, [isOpen])
 
   const startTour = useCallback(() => {
+    setResumed(false)
     setDirection(1)
     setPresentedStep(null)
     // A fresh sample per run: what the reader is partway through changes.
@@ -262,6 +285,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const nextStep = useCallback(() => {
+    setResumed(false)
     setDirection(1)
     setState((current) =>
       current.currentStep >= LAST_STEP
@@ -271,6 +295,7 @@ export function TourProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const previousStep = useCallback(() => {
+    setResumed(false)
     setDirection(-1)
     setState((current) => ({ ...current, currentStep: clampStep(current.currentStep - 1) }))
   }, [])
