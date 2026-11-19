@@ -1338,27 +1338,27 @@
 }
 
 .theme-option__preview--light {
-  background-color: #f7f3ee;
+  background-color: #f8f7fb;
 }
 
 .theme-option__preview--light > * {
-  background-color: #241d18;
+  background-color: #1b1922;
 }
 
 .theme-option__preview--dark {
-  background-color: #1a1613;
+  background-color: #131219;
 }
 
 .theme-option__preview--dark > * {
-  background-color: #f2ece4;
+  background-color: #f0eef6;
 }
 
 .theme-option__preview--system {
-  background: linear-gradient(105deg, #f7f3ee 0 50%, #1a1613 50% 100%);
+  background: linear-gradient(105deg, #f8f7fb 0 50%, #131219 50% 100%);
 }
 
 .theme-option__preview--system > * {
-  background: linear-gradient(105deg, #241d18 0 50%, #f2ece4 50% 100%);
+  background: linear-gradient(105deg, #1b1922 0 50%, #f0eef6 50% 100%);
 }
 
 .theme-option__label {

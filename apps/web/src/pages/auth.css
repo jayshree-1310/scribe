@@ -186,9 +186,9 @@
 .auth__aside {
   /* Scoped palette: the panel is ink in both themes, so it needs its own
      foreground values rather than the surface-relative ones. */
-  --ink: #231c17;
-  --ink-text: #f3ede3;
-  --ink-muted: #a1948350;
+  --ink: #211b33;
+  --ink-text: #f1eef8;
+  --ink-muted: #9c94b450;
 
   position: relative;
   display: flex;
@@ -200,7 +200,7 @@
 }
 
 [data-theme='dark'] .auth__aside {
-  --ink: #100e0c;
+  --ink: #0f0d15;
   border-right: 1px solid var(--border);
 }
 

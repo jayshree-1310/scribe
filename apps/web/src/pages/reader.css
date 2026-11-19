@@ -30,16 +30,16 @@
    * The reader's own accent, independent of the app theme for the reason the
    * surface and the ink are: a reading theme is chosen separately, so somebody
    * reading on Paper while the rest of Scribe is in Night mode would otherwise
-   * get the dark theme's pale orange on white — a heart nobody can see. Each
+   * get the dark theme's pale lavender on white — a heart nobody can see. Each
    * theme below picks the pair that is legible against its own page.
    */
-  --read-brand: #a2431b;
+  --read-brand: #6a4cc0;
   /* What sits *on* the accent, for a filled button. Not derivable from the
      accent, and getting it from the app theme is what left "Next chapter" as
-     dark brown on dark orange. */
+     dark text on a dark accent. */
   --read-brand-fg: #ffffff;
-  --read-brand-soft: rgba(162, 67, 27, 0.1);
-  --read-brand-border: rgba(162, 67, 27, 0.35);
+  --read-brand-soft: rgba(106, 76, 192, 0.1);
+  --read-brand-border: rgba(106, 76, 192, 0.35);
 
   min-height: 100dvh;
   background-color: var(--read-bg);
@@ -59,9 +59,9 @@
   --read-ink-soft: #6b5b45;
   --read-rule: rgba(58, 47, 33, 0.16);
   /* Warmer, so the accent sits in the page rather than on top of it. */
-  --read-brand: #9a4415;
-  --read-brand-soft: rgba(154, 68, 21, 0.09);
-  --read-brand-border: rgba(154, 68, 21, 0.32);
+  --read-brand: #6f4597;
+  --read-brand-soft: rgba(111, 69, 151, 0.09);
+  --read-brand-border: rgba(111, 69, 151, 0.32);
 }
 
 .reader[data-reading-theme='dark'] {
@@ -69,12 +69,12 @@
   --read-ink: #e6e2da;
   --read-ink-soft: #a49d92;
   --read-rule: rgba(230, 226, 218, 0.14);
-  --read-brand: #ef9558;
+  --read-brand: #b9a3f5;
   /* The one theme whose accent is lighter than its page, so the label on a
      filled button goes dark rather than white. */
-  --read-brand-fg: #2b1305;
-  --read-brand-soft: rgba(239, 149, 88, 0.14);
-  --read-brand-border: rgba(239, 149, 88, 0.38);
+  --read-brand-fg: #1c1235;
+  --read-brand-soft: rgba(185, 163, 245, 0.14);
+  --read-brand-border: rgba(185, 163, 245, 0.38);
 }
 
 .reader[data-font-size='sm'] { --read-size: 1.0625rem; }

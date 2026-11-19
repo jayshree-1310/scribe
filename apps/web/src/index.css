@@ -75,29 +75,31 @@
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Light palette — warm parchment and ink ------------------------------ */
-  --bg: #faf7f2;
-  --bg-tint: #f2ece1;
+  /* Light palette — lavender mist and ink ------------------------------- */
+  --bg: #f8f7fb;
+  --bg-tint: #efedf6;
   --surface: #ffffff;
-  --surface-2: #fbf9f5;
-  --surface-3: #f4efe6;
-  --surface-hover: #f6f2ea;
-  --border: #e7e1d5;
-  --border-strong: #d3cab8;
+  --surface-2: #fbfafd;
+  --surface-3: #f2f0f8;
+  --surface-hover: #f5f3fa;
+  --border: #e5e2ee;
+  --border-strong: #cfcadd;
 
-  --text: #1c1815;
-  --text-secondary: #574f45;
-  --text-muted: #877d6e;
+  --text: #1b1922;
+  --text-secondary: #524d5f;
+  --text-muted: #7c768a;
 
-  --brand: #a2431b;
-  --brand-hover: #8a3814;
+  --brand: #6a4cc0;
+  --brand-hover: #5a3ea8;
   --brand-fg: #ffffff;
-  --brand-soft: #fbeee5;
-  --brand-border: #eed7c4;
-  --brand-ring: rgba(162, 67, 27, 0.32);
+  --brand-soft: #f1edfc;
+  --brand-border: #ddd4f6;
+  --brand-ring: rgba(106, 76, 192, 0.32);
 
-  --plum: #6d2c56;
-  --plum-soft: #f7e9f1;
+  /* The second accent: a dusty rose that sits beside the violet rather than
+     repeating it. Still called plum, which is what every rule asks for. */
+  --plum: #a23d68;
+  --plum-soft: #fbebf2;
 
   --star: #c98a1e;
   --success: #2c6b45;
@@ -109,45 +111,45 @@
   --danger-fg: #ffffff;
   --danger-soft: #fbeae7;
 
-  --overlay: rgba(28, 24, 21, 0.44);
-  --cover-shade: rgba(28, 24, 21, 0.16);
+  --overlay: rgba(24, 21, 34, 0.44);
+  --cover-shade: rgba(24, 21, 34, 0.16);
 
-  --shadow-sm: 0 1px 2px rgba(43, 34, 24, 0.07);
+  --shadow-sm: 0 1px 2px rgba(34, 27, 56, 0.07);
   --shadow-md:
-    0 1px 3px rgba(43, 34, 24, 0.08), 0 8px 20px -8px rgba(43, 34, 24, 0.16);
+    0 1px 3px rgba(34, 27, 56, 0.08), 0 8px 20px -8px rgba(34, 27, 56, 0.16);
   --shadow-lg:
-    0 4px 14px rgba(43, 34, 24, 0.1), 0 28px 56px -20px rgba(43, 34, 24, 0.3);
-  --shadow-cover: 0 2px 6px rgba(43, 34, 24, 0.16), 0 12px 28px -12px rgba(43, 34, 24, 0.34);
+    0 4px 14px rgba(34, 27, 56, 0.1), 0 28px 56px -20px rgba(34, 27, 56, 0.3);
+  --shadow-cover: 0 2px 6px rgba(34, 27, 56, 0.16), 0 12px 28px -12px rgba(34, 27, 56, 0.34);
 
-  --skeleton-base: #ece7dd;
-  --skeleton-sheen: #f7f4ee;
+  --skeleton-base: #ebe8f2;
+  --skeleton-sheen: #f6f5fa;
 
   color-scheme: light;
 }
 
 [data-theme='dark'] {
-  --bg: #141110;
-  --bg-tint: #1b1816;
-  --surface: #1e1a18;
-  --surface-2: #23201d;
-  --surface-3: #2a2622;
-  --surface-hover: #292522;
-  --border: #332e29;
-  --border-strong: #4b433a;
+  --bg: #131219;
+  --bg-tint: #19171f;
+  --surface: #1c1a23;
+  --surface-2: #211f29;
+  --surface-3: #282530;
+  --surface-hover: #26232e;
+  --border: #312d3b;
+  --border-strong: #48425a;
 
-  --text: #f1ede6;
-  --text-secondary: #b7ada1;
-  --text-muted: #8b8175;
+  --text: #f0eef6;
+  --text-secondary: #b3adc2;
+  --text-muted: #8a8499;
 
-  --brand: #ef9558;
-  --brand-hover: #f5a771;
-  --brand-fg: #2b1305;
-  --brand-soft: #33231a;
-  --brand-border: #4a3325;
-  --brand-ring: rgba(239, 149, 88, 0.36);
+  --brand: #b9a3f5;
+  --brand-hover: #cbbafa;
+  --brand-fg: #1c1235;
+  --brand-soft: #262037;
+  --brand-border: #3b3256;
+  --brand-ring: rgba(185, 163, 245, 0.36);
 
-  --plum: #d98cba;
-  --plum-soft: #351f2c;
+  --plum: #e99bbd;
+  --plum-soft: #381f2d;
 
   --star: #e5b352;
   --success: #6cc294;
@@ -167,8 +169,8 @@
   --shadow-lg: 0 4px 14px rgba(0, 0, 0, 0.5), 0 28px 56px -20px rgba(0, 0, 0, 0.8);
   --shadow-cover: 0 2px 6px rgba(0, 0, 0, 0.5), 0 12px 28px -12px rgba(0, 0, 0, 0.7);
 
-  --skeleton-base: #2a2622;
-  --skeleton-sheen: #34302a;
+  --skeleton-base: #282530;
+  --skeleton-sheen: #322f3b;
 
   color-scheme: dark;
 }

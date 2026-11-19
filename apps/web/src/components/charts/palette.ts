@@ -4,12 +4,13 @@
  * Light and dark are *selected* steps, not an automatic flip, and each pair was
  * checked against its own surface with the palette validator:
  *
- *   light (#ffffff surface): #a2431b / #1a63b8 — CVD ΔE 23.5 protan, 27.5 normal
- *   dark  (#1e1a18 surface): #d9762f / #3f88de — CVD ΔE 24.8 protan, 29.5 normal
+ *   light (#ffffff surface): #6a4cc0 / #0f7b6c
+ *   dark  (#1c1a23 surface): #a68cf0 / #3fb8a3
  *
- * Both pass the lightness band, chroma floor, CVD separation, normal-vision
- * floor and 3:1 contrast checks. Categorical hues are assigned in fixed order
- * and never cycled.
+ * Violet is the brand; the second series is teal rather than the blue it used
+ * to be, because violet and blue collapse into one hue for protan and deutan
+ * readers. Both steps clear 3:1 against their surface. Categorical hues are
+ * assigned in fixed order and never cycled.
  */
 
 export interface ChartTheme {
@@ -21,17 +22,17 @@ export interface ChartTheme {
 }
 
 export const CHART_LIGHT: ChartTheme = {
-  series: ['#a2431b', '#1a63b8'],
-  sequential: '#a2431b',
-  grid: 'rgba(28, 24, 21, 0.09)',
-  axis: 'rgba(28, 24, 21, 0.28)',
+  series: ['#6a4cc0', '#0f7b6c'],
+  sequential: '#6a4cc0',
+  grid: 'rgba(27, 25, 34, 0.09)',
+  axis: 'rgba(27, 25, 34, 0.28)',
 }
 
 export const CHART_DARK: ChartTheme = {
-  series: ['#d9762f', '#3f88de'],
-  sequential: '#d9762f',
-  grid: 'rgba(241, 237, 230, 0.11)',
-  axis: 'rgba(241, 237, 230, 0.3)',
+  series: ['#a68cf0', '#3fb8a3'],
+  sequential: '#a68cf0',
+  grid: 'rgba(240, 238, 246, 0.11)',
+  axis: 'rgba(240, 238, 246, 0.3)',
 }
 
 export function chartTheme(resolved: 'light' | 'dark'): ChartTheme {

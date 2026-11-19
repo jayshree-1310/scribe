@@ -3,7 +3,7 @@
 
    Everything here is built from the design system's own tokens, so the tour
    wears whichever theme Scribe is wearing: the card is a `--surface` panel
-   with the brand's orange edge, the headings are Newsreader, the buttons are
+   with the brand's violet edge, the headings are Newsreader, the buttons are
    `Button`. Only the scrim and the glow are the tour's own.
 
    Layering. The overlay is a modal `<dialog>`, so it sits in the top layer,
