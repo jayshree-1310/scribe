@@ -4,7 +4,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { HttpError } from "../../lib/http-error.js";
+import { HttpError, upstreamDetailOf } from "../../lib/http-error.js";
 import { isAiConfigured, loadAiConfig } from "./config.js";
 import { createOllamaProvider, type FetchLike } from "./ollama.js";
 import {
@@ -217,6 +217,37 @@ describe("Ollama provider", () => {
       status: 503,
       message: expect.stringContaining("ollama pull llama3.2:3b"),
     });
+  });
+
+  /**
+   * The address and the commands above are for whoever runs the server. In
+   * production that is not the reader, so they go to the log instead -- the
+   * live site was telling readers to run `docker compose` (E2E-FINDINGS E-4).
+   */
+  it("tells a production reader only that AI is unavailable, and logs the rest", async () => {
+    const previous = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      const refused = createOllamaProvider(config(), vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }) as unknown as FetchLike);
+      const unpulled = createOllamaProvider(config(), vi.fn(async () =>
+        jsonResponse({ error: "model not found" }, 404),
+      ) as unknown as FetchLike);
+
+      for (const provider of [refused, unpulled]) {
+        const error = await provider
+          .complete({ feature: "chat", system: "s", messages: [] })
+          .catch((caught: unknown) => caught);
+
+        expect(error).toMatchObject({ status: 503, message: expect.stringContaining("unavailable right now") });
+        expect((error as Error).message).not.toMatch(/docker|localhost|ollama/i);
+        // ...and what was withheld is there for the log.
+        expect(upstreamDetailOf(error)).toBeTruthy();
+      }
+    } finally {
+      process.env.NODE_ENV = previous;
+    }
   });
 
   it("does not leak the provider's message on a server error", async () => {

@@ -15,7 +15,7 @@
  *   file speak one `AiUsage` shape.
  */
 
-import { HttpError } from "../../lib/http-error.js";
+import { HttpError, providerErrorCodes } from "../../lib/http-error.js";
 import type { AiConfig, AiEmbedConfig } from "./config.js";
 import type {
   AiCompletion,
@@ -77,10 +77,28 @@ function transportError(
     );
   }
 
+  // The address and the command are for whoever runs the server. In
+  // development that is the reader; in production it is not, and they go to
+  // the log instead (see `upstreamDetailOf`).
+  if (process.env.NODE_ENV === "production") {
+    return withDetail(HttpError.unavailable(UNAVAILABLE), {
+      unreachable: config.baseUrl,
+    });
+  }
+
   return HttpError.unavailable(
     `The model server at ${config.baseUrl} is not reachable. ` +
       "Start it with `docker compose --profile ai up -d ollama`.",
   );
+}
+
+/** What a reader is told in production when the model server cannot serve. */
+const UNAVAILABLE = "AI features are unavailable right now. Please try again later.";
+
+/** Attaches log-only detail, as `responseError` does for a provider's reply. */
+function withDetail(error: HttpError, detail: Record<string, unknown>): HttpError {
+  Object.defineProperty(error, "upstreamDetail", { value: detail, enumerable: false });
+  return error;
 }
 
 /** Maps a non-2xx response. Never forwards the provider's own message. */
@@ -93,7 +111,14 @@ async function responseError(
 
   if (response.status === 404) {
     // Ollama 404s a model it has not pulled, which is configuration rather
-    // than a fault, and the fix is one command.
+    // than a fault, and the fix is one command -- for the operator, so in
+    // production it is logged rather than shown.
+    if (process.env.NODE_ENV === "production") {
+      return withDetail(HttpError.unavailable(UNAVAILABLE), {
+        status: 404,
+        missingModel: model,
+      });
+    }
     return HttpError.unavailable(
       `The model "${model}" is not available. ` +
         `Pull it with \`docker compose exec ollama ollama pull ${model}\`.`,
@@ -112,7 +137,11 @@ async function responseError(
   );
   // Attach for the error handler's log; `toBody` never serialises it.
   Object.defineProperty(error, "upstreamDetail", {
-    value: { status: response.status, body: detail.slice(0, 500) },
+    value: {
+      status: response.status,
+      ...providerErrorCodes(detail),
+      body: detail.slice(0, 500),
+    },
     enumerable: false,
   });
   return error;

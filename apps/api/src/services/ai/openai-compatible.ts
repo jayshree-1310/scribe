@@ -22,7 +22,7 @@
  *   count is present.
  */
 
-import { HttpError } from "../../lib/http-error.js";
+import { HttpError, providerErrorCodes } from "../../lib/http-error.js";
 import type { AiConfig, AiEmbedConfig } from "./config.js";
 import type {
   AiCompletion,
@@ -127,7 +127,11 @@ async function responseError(
     "The model could not complete that request.",
   );
   Object.defineProperty(error, "upstreamDetail", {
-    value: { status: response.status, body: detail.slice(0, 500) },
+    value: {
+      status: response.status,
+      ...providerErrorCodes(detail),
+      body: detail.slice(0, 500),
+    },
     enumerable: false,
   });
   return error;

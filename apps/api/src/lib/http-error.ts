@@ -141,3 +141,48 @@ export class HttpError extends Error {
     };
   }
 }
+
+/**
+ * What a model provider actually said, when an `HttpError` came from one, in
+ * the shape the logs may carry.
+ *
+ * `services/ai/openai-compatible.ts` and `ollama.ts` attach it as a
+ * non-enumerable `upstreamDetail` so it can never reach a response; the logs
+ * have to ask for it, because pino's error serialiser skips non-enumerable
+ * properties. Undefined for any other error.
+ *
+ * The provider's status and its own short error `code` and `type` -- what
+ * tells a request too large from a reply that failed its schema -- are always
+ * included. The raw `body` is not unless `withBody` is set: a provider's
+ * error can quote the prompt, which is a member's unpublished prose, and logs
+ * carry no prompt content by default (`AI_LOG_CONTENT`, never in production).
+ */
+export function upstreamDetailOf(
+  error: unknown,
+  withBody = false,
+): Record<string, unknown> | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const detail = (error as { upstreamDetail?: unknown }).upstreamDetail;
+  if (typeof detail !== "object" || detail === null) return undefined;
+
+  const { body, ...rest } = detail as Record<string, unknown>;
+  return withBody && body !== undefined ? { ...rest, body } : rest;
+}
+
+/**
+ * The provider's own error code and type from an error body, when it is the
+ * usual `{ "error": { "code": ..., "type": ... } }` and they are identifiers.
+ * Anything else -- free text, which can quote the prompt -- is left out.
+ */
+export function providerErrorCodes(body: string): { code?: string; type?: string } {
+  try {
+    const parsed = JSON.parse(body) as { error?: { code?: unknown; type?: unknown } };
+    const identifier = (value: unknown) =>
+      typeof value === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(value) ? value : undefined;
+    const code = identifier(parsed.error?.code);
+    const type = identifier(parsed.error?.type);
+    return { ...(code ? { code } : {}), ...(type ? { type } : {}) };
+  } catch {
+    return {};
+  }
+}

@@ -39,9 +39,13 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { HttpError } from "./http-error.js";
+import { HttpError, upstreamDetailOf } from "./http-error.js";
 import { logger } from "./logger.js";
 import { connectRedis, redis } from "./redis.js";
+import { loadAiConfig } from "../services/ai/config.js";
+
+/** Whether a failed job's log may quote the model provider's reply; see `upstreamDetailOf`. */
+const logContent = () => loadAiConfig().logContent;
 
 export type JobStatus = "queued" | "running" | "done" | "failed" | "dead";
 
@@ -372,13 +376,13 @@ async function runTaken(id: string, signal: AbortSignal): Promise<boolean> {
       job.status = "failed";
       await save(job);
       await redis.zAdd(KEY.delayed, { score: Date.now() + retryDelayMs(job.attempts), value: job.id });
-      log.warn({ err: error }, "job failed; will retry");
+      log.warn({ err: error, upstream: upstreamDetailOf(error, logContent()) }, "job failed; will retry");
     } else {
       job.status = "dead";
       await save(job, DEAD_TTL_SECONDS);
       await redis.rPush(KEY.dead, job.id);
       await clearDedupe(job);
-      log.error({ err: error }, "job dead-lettered");
+      log.error({ err: error, upstream: upstreamDetailOf(error, logContent()) }, "job dead-lettered");
     }
   } finally {
     await redis.lRem(KEY.running, 1, job.id);

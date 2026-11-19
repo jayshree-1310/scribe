@@ -1,7 +1,12 @@
 import type { ErrorRequestHandler, RequestHandler } from "express";
-import { HttpError, type ErrorResponseBody } from "../lib/http-error.js";
+import {
+  HttpError,
+  upstreamDetailOf,
+  type ErrorResponseBody,
+} from "../lib/http-error.js";
 import { logger } from "../lib/logger.js";
 import { db } from "../prisma/db.js";
+import { loadAiConfig } from "../services/ai/config.js";
 import { getUserId } from "./current-user.js";
 
 /** Shape `express.json()` uses to report a malformed or oversized body. */
@@ -94,7 +99,12 @@ const respond: ErrorRequestHandler = (error, req, res, next) => {
   const log = req.log ?? logger;
 
   if (error instanceof HttpError) {
-    if (error.status >= 500) log.error({ err: error }, "Request failed");
+    if (error.status >= 500) {
+      log.error(
+        { err: error, upstream: upstreamDetailOf(error, loadAiConfig().logContent) },
+        "Request failed",
+      );
+    }
     else log.warn({ err: error, code: error.code }, "Request rejected");
 
     if (error.retryAfterSeconds !== undefined) {
