@@ -285,6 +285,13 @@ export function ClubDetailPage() {
                 </Button>
               )}
               <Button iconOnly aria-label="Share this club" startIcon={<Icon name="share" />} />
+              <ReportMenu
+                targetType="CLUB"
+                targetId={data.id}
+                noun="club"
+                size="md"
+                hidden={myId === null || data.membership?.role === 'OWNER'}
+              />
             </div>
           </div>
 

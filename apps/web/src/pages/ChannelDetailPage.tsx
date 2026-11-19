@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
+import { useAuth } from '../lib/auth'
 import { useToast } from '../lib/toast'
 import { formatCount, formatDate, formatRelative } from '../lib/format'
 import * as channelsApi from '../data/channels-api'
@@ -21,6 +22,7 @@ const PAGE_SIZE = 10
 export function ChannelDetailPage() {
   const { slug = '' } = useParams()
   const { showToast } = useToast()
+  const { session } = useAuth()
 
   const channel = useAsync(() => channelsApi.getChannel(slug), [slug])
 
@@ -109,6 +111,7 @@ export function ChannelDetailPage() {
 
   const data = channel.data
   const authorName = channelAuthorName(data.author)
+  const myId = session?.user.id ?? null
 
   async function toggle() {
     setPending(true)
@@ -180,6 +183,13 @@ export function ChannelDetailPage() {
             {data.subscribed ? 'Subscribed' : 'Subscribe'}
           </Button>
           <Button size="lg" iconOnly aria-label="Share channel" startIcon={<Icon name="share" />} />
+          <ReportMenu
+            targetType="CHANNEL"
+            targetId={data.id}
+            noun="channel"
+            size="lg"
+            hidden={myId === null || data.author.id === myId}
+          />
         </div>
       </header>
 

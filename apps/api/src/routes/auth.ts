@@ -415,12 +415,20 @@ router.post("/google", async (req, res) => {
      */
     const uploadedAvatar =
       user.avatarUrl !== null && storage.keyOf(user.avatarUrl) !== null;
+    // A moderator's take-down nulled these on purpose; refilling them from
+    // Google would undo it on the next sign-in.
+    const profileHidden =
+      user.profileHiddenAt !== null && user.profileHiddenAt !== undefined;
 
     await db.orm.auth.User.where((u) => u.id.eq(user!.id)).update({
-      displayName: user.displayName ?? identity.name,
-      avatarUrl: uploadedAvatar
-        ? user.avatarUrl
-        : (identity.picture ?? user.avatarUrl),
+      ...(profileHidden
+        ? {}
+        : {
+            displayName: user.displayName ?? identity.name,
+            avatarUrl: uploadedAvatar
+              ? user.avatarUrl
+              : (identity.picture ?? user.avatarUrl),
+          }),
       emailVerified: true,
     });
   } else {
@@ -445,8 +453,12 @@ router.post("/google", async (req, res) => {
        */
       await db.orm.auth.User.where((u) => u.id.eq(byEmail.id)).update({
         googleId: identity.googleId,
-        displayName: byEmail.displayName ?? identity.name,
-        avatarUrl: byEmail.avatarUrl ?? identity.picture,
+        ...(byEmail.profileHiddenAt !== null && byEmail.profileHiddenAt !== undefined
+          ? {}
+          : {
+              displayName: byEmail.displayName ?? identity.name,
+              avatarUrl: byEmail.avatarUrl ?? identity.picture,
+            }),
         emailVerified: true,
         ...(byEmail.emailVerified ? {} : { passwordHash: null }),
       });

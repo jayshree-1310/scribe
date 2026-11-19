@@ -33,7 +33,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'a674777e0f04c1f19f33123ac7c766a0ff7a78c99af7488a858b12609fde3076'>;
+  StorageHashBase<'0d941e650b2d4a18b2c6d1710cd80323c32e63d95331a3d55f0a723480d89e06'>;
 export type ExecutionHash =
   ExecutionHashBase<'7d2db05d5e947645db9eaad034511ce50b09361a5ca66b23b87121c8110a7737'>;
 export type ProfileHash =
@@ -355,7 +355,15 @@ export type FieldOutputTypes = {
     };
     readonly ModerationDecision: {
       readonly id: CodecTypes['pg/text@1']['output'];
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
+      readonly targetType:
+        | 'COMMENT'
+        | 'CLUB_DISCUSSION'
+        | 'CHANNEL_POST'
+        | 'STORY'
+        | 'CHAPTER'
+        | 'PROFILE'
+        | 'CLUB'
+        | 'CHANNEL';
       readonly targetId: CodecTypes['pg/text@1']['output'];
       readonly outcome: 'ALLOW' | 'REVIEW' | 'REJECT' | 'UNCHECKED';
       readonly category: CodecTypes['pg/text@1']['output'] | null;
@@ -464,6 +472,10 @@ export type FieldOutputTypes = {
       readonly isAuthor: CodecTypes['pg/bool@1']['output'];
       readonly isAdmin: CodecTypes['pg/bool@1']['output'];
       readonly suspendedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly profileHiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly hiddenDisplayName: CodecTypes['pg/text@1']['output'] | null;
+      readonly hiddenAvatarUrl: CodecTypes['pg/text@1']['output'] | null;
+      readonly hiddenBio: CodecTypes['pg/text@1']['output'] | null;
       readonly readingStreak: CodecTypes['pg/int4@1']['output'];
       readonly streakLastReadAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly longestStreak: CodecTypes['pg/int4@1']['output'];
@@ -514,6 +526,7 @@ export type FieldOutputTypes = {
       readonly name: CodecTypes['pg/text@1']['output'];
       readonly slug: CodecTypes['pg/text@1']['output'];
       readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
@@ -539,6 +552,7 @@ export type FieldOutputTypes = {
       readonly name: CodecTypes['pg/text@1']['output'];
       readonly slug: CodecTypes['pg/text@1']['output'];
       readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly creatorId: CodecTypes['pg/text@1']['output'];
       readonly currentStoryId: CodecTypes['pg/text@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
@@ -712,7 +726,15 @@ export type FieldOutputTypes = {
     readonly Report: {
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly reporterId: CodecTypes['pg/text@1']['output'] | null;
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
+      readonly targetType:
+        | 'COMMENT'
+        | 'CLUB_DISCUSSION'
+        | 'CHANNEL_POST'
+        | 'STORY'
+        | 'CHAPTER'
+        | 'PROFILE'
+        | 'CLUB'
+        | 'CHANNEL';
       readonly targetId: CodecTypes['pg/text@1']['output'];
       readonly reason: 'SPAM' | 'HARASSMENT' | 'HATE' | 'SEXUAL' | 'VIOLENCE' | 'SPOILER' | 'OTHER';
       readonly details: CodecTypes['pg/text@1']['output'] | null;
@@ -744,7 +766,15 @@ export type FieldOutputTypes = {
       readonly excerpt: CodecTypes['pg/text@1']['output'] | null;
       readonly href: CodecTypes['pg/text@1']['output'];
       readonly sourceType:
-        'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER' | null;
+        | 'COMMENT'
+        | 'CLUB_DISCUSSION'
+        | 'CHANNEL_POST'
+        | 'STORY'
+        | 'CHAPTER'
+        | 'PROFILE'
+        | 'CLUB'
+        | 'CHANNEL'
+        | null;
       readonly sourceId: CodecTypes['pg/text@1']['output'] | null;
       readonly readAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
@@ -868,7 +898,15 @@ export type FieldInputTypes = {
     };
     readonly ModerationDecision: {
       readonly id: CodecTypes['pg/text@1']['input'];
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
+      readonly targetType:
+        | 'COMMENT'
+        | 'CLUB_DISCUSSION'
+        | 'CHANNEL_POST'
+        | 'STORY'
+        | 'CHAPTER'
+        | 'PROFILE'
+        | 'CLUB'
+        | 'CHANNEL';
       readonly targetId: CodecTypes['pg/text@1']['input'];
       readonly outcome: 'ALLOW' | 'REVIEW' | 'REJECT' | 'UNCHECKED';
       readonly category: CodecTypes['pg/text@1']['input'] | null;
@@ -977,6 +1015,10 @@ export type FieldInputTypes = {
       readonly isAuthor: CodecTypes['pg/bool@1']['input'];
       readonly isAdmin: CodecTypes['pg/bool@1']['input'];
       readonly suspendedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly profileHiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly hiddenDisplayName: CodecTypes['pg/text@1']['input'] | null;
+      readonly hiddenAvatarUrl: CodecTypes['pg/text@1']['input'] | null;
+      readonly hiddenBio: CodecTypes['pg/text@1']['input'] | null;
       readonly readingStreak: CodecTypes['pg/int4@1']['input'];
       readonly streakLastReadAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly longestStreak: CodecTypes['pg/int4@1']['input'];
@@ -1027,6 +1069,7 @@ export type FieldInputTypes = {
       readonly name: CodecTypes['pg/text@1']['input'];
       readonly slug: CodecTypes['pg/text@1']['input'];
       readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
@@ -1052,6 +1095,7 @@ export type FieldInputTypes = {
       readonly name: CodecTypes['pg/text@1']['input'];
       readonly slug: CodecTypes['pg/text@1']['input'];
       readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly creatorId: CodecTypes['pg/text@1']['input'];
       readonly currentStoryId: CodecTypes['pg/text@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
@@ -1225,7 +1269,15 @@ export type FieldInputTypes = {
     readonly Report: {
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly reporterId: CodecTypes['pg/text@1']['input'] | null;
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
+      readonly targetType:
+        | 'COMMENT'
+        | 'CLUB_DISCUSSION'
+        | 'CHANNEL_POST'
+        | 'STORY'
+        | 'CHAPTER'
+        | 'PROFILE'
+        | 'CLUB'
+        | 'CHANNEL';
       readonly targetId: CodecTypes['pg/text@1']['input'];
       readonly reason: 'SPAM' | 'HARASSMENT' | 'HATE' | 'SEXUAL' | 'VIOLENCE' | 'SPOILER' | 'OTHER';
       readonly details: CodecTypes['pg/text@1']['input'] | null;
@@ -1257,7 +1309,15 @@ export type FieldInputTypes = {
       readonly excerpt: CodecTypes['pg/text@1']['input'] | null;
       readonly href: CodecTypes['pg/text@1']['input'];
       readonly sourceType:
-        'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER' | null;
+        | 'COMMENT'
+        | 'CLUB_DISCUSSION'
+        | 'CHANNEL_POST'
+        | 'STORY'
+        | 'CHAPTER'
+        | 'PROFILE'
+        | 'CLUB'
+        | 'CHANNEL'
+        | null;
       readonly sourceId: CodecTypes['pg/text@1']['input'] | null;
       readonly readAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
@@ -1393,7 +1453,15 @@ export type StorageColumnTypes = {
       readonly reportId: CodecTypes['pg/text@1']['output'] | null;
       readonly reviewThreshold: CodecTypes['pg/numeric@1']['output'];
       readonly targetId: CodecTypes['pg/text@1']['output'];
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
+      readonly targetType:
+        | 'COMMENT'
+        | 'CLUB_DISCUSSION'
+        | 'CHANNEL_POST'
+        | 'STORY'
+        | 'CHAPTER'
+        | 'PROFILE'
+        | 'CLUB'
+        | 'CHANNEL';
     };
     readonly moderationScore: {
       readonly category: CodecTypes['pg/text@1']['output'];
@@ -1488,11 +1556,15 @@ export type StorageColumnTypes = {
       readonly email: CodecTypes['pg/text@1']['output'];
       readonly emailVerified: CodecTypes['pg/bool@1']['output'];
       readonly googleId: CodecTypes['pg/text@1']['output'] | null;
+      readonly hiddenAvatarUrl: CodecTypes['pg/text@1']['output'] | null;
+      readonly hiddenBio: CodecTypes['pg/text@1']['output'] | null;
+      readonly hiddenDisplayName: CodecTypes['pg/text@1']['output'] | null;
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly isAdmin: CodecTypes['pg/bool@1']['output'];
       readonly isAuthor: CodecTypes['pg/bool@1']['output'];
       readonly longestStreak: CodecTypes['pg/int4@1']['output'];
       readonly passwordHash: CodecTypes['pg/text@1']['output'] | null;
+      readonly profileHiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly readerLevel: CodecTypes['pg/int4@1']['output'];
       readonly readingStreak: CodecTypes['pg/int4@1']['output'];
       readonly streakLastReadAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
@@ -1538,6 +1610,7 @@ export type StorageColumnTypes = {
       readonly authorId: CodecTypes['pg/text@1']['output'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
       readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly name: CodecTypes['pg/text@1']['output'];
       readonly slug: CodecTypes['pg/text@1']['output'];
@@ -1565,6 +1638,7 @@ export type StorageColumnTypes = {
       readonly creatorId: CodecTypes['pg/text@1']['output'];
       readonly currentStoryId: CodecTypes['pg/text@1']['output'] | null;
       readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly name: CodecTypes['pg/text@1']['output'];
       readonly slug: CodecTypes['pg/text@1']['output'];
@@ -1747,7 +1821,15 @@ export type StorageColumnTypes = {
       readonly resolvedById: CodecTypes['pg/text@1']['output'] | null;
       readonly status: 'OPEN' | 'RESOLVED';
       readonly targetId: CodecTypes['pg/text@1']['output'];
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
+      readonly targetType:
+        | 'COMMENT'
+        | 'CLUB_DISCUSSION'
+        | 'CHANNEL_POST'
+        | 'STORY'
+        | 'CHAPTER'
+        | 'PROFILE'
+        | 'CLUB'
+        | 'CHANNEL';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
   };
@@ -1761,7 +1843,15 @@ export type StorageColumnTypes = {
       readonly readAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly sourceId: CodecTypes['pg/text@1']['output'] | null;
       readonly sourceType:
-        'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER' | null;
+        | 'COMMENT'
+        | 'CLUB_DISCUSSION'
+        | 'CHANNEL_POST'
+        | 'STORY'
+        | 'CHAPTER'
+        | 'PROFILE'
+        | 'CLUB'
+        | 'CHANNEL'
+        | null;
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly type:
         | 'CHANNEL_POST'
@@ -1906,7 +1996,15 @@ export type StorageColumnInputTypes = {
       readonly reportId: CodecTypes['pg/text@1']['input'] | null;
       readonly reviewThreshold: CodecTypes['pg/numeric@1']['input'];
       readonly targetId: CodecTypes['pg/text@1']['input'];
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
+      readonly targetType:
+        | 'COMMENT'
+        | 'CLUB_DISCUSSION'
+        | 'CHANNEL_POST'
+        | 'STORY'
+        | 'CHAPTER'
+        | 'PROFILE'
+        | 'CLUB'
+        | 'CHANNEL';
     };
     readonly moderationScore: {
       readonly category: CodecTypes['pg/text@1']['input'];
@@ -2001,11 +2099,15 @@ export type StorageColumnInputTypes = {
       readonly email: CodecTypes['pg/text@1']['input'];
       readonly emailVerified: CodecTypes['pg/bool@1']['input'];
       readonly googleId: CodecTypes['pg/text@1']['input'] | null;
+      readonly hiddenAvatarUrl: CodecTypes['pg/text@1']['input'] | null;
+      readonly hiddenBio: CodecTypes['pg/text@1']['input'] | null;
+      readonly hiddenDisplayName: CodecTypes['pg/text@1']['input'] | null;
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly isAdmin: CodecTypes['pg/bool@1']['input'];
       readonly isAuthor: CodecTypes['pg/bool@1']['input'];
       readonly longestStreak: CodecTypes['pg/int4@1']['input'];
       readonly passwordHash: CodecTypes['pg/text@1']['input'] | null;
+      readonly profileHiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly readerLevel: CodecTypes['pg/int4@1']['input'];
       readonly readingStreak: CodecTypes['pg/int4@1']['input'];
       readonly streakLastReadAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
@@ -2051,6 +2153,7 @@ export type StorageColumnInputTypes = {
       readonly authorId: CodecTypes['pg/text@1']['input'];
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
       readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'];
       readonly slug: CodecTypes['pg/text@1']['input'];
@@ -2078,6 +2181,7 @@ export type StorageColumnInputTypes = {
       readonly creatorId: CodecTypes['pg/text@1']['input'];
       readonly currentStoryId: CodecTypes['pg/text@1']['input'] | null;
       readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly name: CodecTypes['pg/text@1']['input'];
       readonly slug: CodecTypes['pg/text@1']['input'];
@@ -2260,7 +2364,15 @@ export type StorageColumnInputTypes = {
       readonly resolvedById: CodecTypes['pg/text@1']['input'] | null;
       readonly status: 'OPEN' | 'RESOLVED';
       readonly targetId: CodecTypes['pg/text@1']['input'];
-      readonly targetType: 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER';
+      readonly targetType:
+        | 'COMMENT'
+        | 'CLUB_DISCUSSION'
+        | 'CHANNEL_POST'
+        | 'STORY'
+        | 'CHAPTER'
+        | 'PROFILE'
+        | 'CLUB'
+        | 'CHANNEL';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
   };
@@ -2274,7 +2386,15 @@ export type StorageColumnInputTypes = {
       readonly readAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly sourceId: CodecTypes['pg/text@1']['input'] | null;
       readonly sourceType:
-        'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER' | null;
+        | 'COMMENT'
+        | 'CLUB_DISCUSSION'
+        | 'CHANNEL_POST'
+        | 'STORY'
+        | 'CHAPTER'
+        | 'PROFILE'
+        | 'CLUB'
+        | 'CHANNEL'
+        | null;
       readonly title: CodecTypes['pg/text@1']['input'];
       readonly type:
         | 'CHANNEL_POST'
@@ -3933,6 +4053,26 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-temporal@1';
                   readonly nullable: true;
                 };
+                readonly profileHiddenAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: true;
+                };
+                readonly hiddenDisplayName: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly hiddenAvatarUrl: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly hiddenBio: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
                 readonly readingStreak: {
                   readonly nativeType: 'int4';
                   readonly codecId: 'pg/int4@1';
@@ -4310,6 +4450,11 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/text@1';
                   readonly nullable: true;
                 };
+                readonly hiddenAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: true;
+                };
                 readonly createdAt: {
                   readonly nativeType: 'timestamptz';
                   readonly codecId: 'pg/timestamptz-temporal@1';
@@ -4514,6 +4659,11 @@ type ContractBase = Omit<
                 readonly description: {
                   readonly nativeType: 'text';
                   readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly hiddenAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
                   readonly nullable: true;
                 };
                 readonly creatorId: {
@@ -6454,6 +6604,9 @@ type ContractBase = Omit<
                 'CHANNEL_POST',
                 'STORY',
                 'CHAPTER',
+                'PROFILE',
+                'CLUB',
+                'CHANNEL',
               ];
             };
           };
@@ -8049,6 +8202,25 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-temporal@1';
                 };
               };
+              readonly profileHiddenAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+              readonly hiddenDisplayName: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly hiddenAvatarUrl: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly hiddenBio: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
               readonly readingStreak: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/int4@1' };
@@ -8388,6 +8560,10 @@ type ContractBase = Omit<
                 readonly isAuthor: { readonly column: 'isAuthor' };
                 readonly isAdmin: { readonly column: 'isAdmin' };
                 readonly suspendedAt: { readonly column: 'suspendedAt' };
+                readonly profileHiddenAt: { readonly column: 'profileHiddenAt' };
+                readonly hiddenDisplayName: { readonly column: 'hiddenDisplayName' };
+                readonly hiddenAvatarUrl: { readonly column: 'hiddenAvatarUrl' };
+                readonly hiddenBio: { readonly column: 'hiddenBio' };
                 readonly readingStreak: { readonly column: 'readingStreak' };
                 readonly streakLastReadAt: { readonly column: 'streakLastReadAt' };
                 readonly longestStreak: { readonly column: 'longestStreak' };
@@ -8670,6 +8846,13 @@ type ContractBase = Omit<
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly hiddenAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
               readonly createdAt: {
                 readonly nullable: false;
                 readonly type: {
@@ -8726,6 +8909,7 @@ type ContractBase = Omit<
                 readonly name: { readonly column: 'name' };
                 readonly slug: { readonly column: 'slug' };
                 readonly description: { readonly column: 'description' };
+                readonly hiddenAt: { readonly column: 'hiddenAt' };
                 readonly createdAt: { readonly column: 'createdAt' };
                 readonly updatedAt: { readonly column: 'updatedAt' };
               };
@@ -8874,6 +9058,13 @@ type ContractBase = Omit<
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
               };
+              readonly hiddenAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
               readonly creatorId: {
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -8948,6 +9139,7 @@ type ContractBase = Omit<
                 readonly name: { readonly column: 'name' };
                 readonly slug: { readonly column: 'slug' };
                 readonly description: { readonly column: 'description' };
+                readonly hiddenAt: { readonly column: 'hiddenAt' };
                 readonly creatorId: { readonly column: 'creatorId' };
                 readonly currentStoryId: { readonly column: 'currentStoryId' };
                 readonly createdAt: { readonly column: 'createdAt' };
@@ -10858,6 +11050,9 @@ type ContractBase = Omit<
               { readonly name: 'CHANNEL_POST'; readonly value: 'CHANNEL_POST' },
               { readonly name: 'STORY'; readonly value: 'STORY' },
               { readonly name: 'CHAPTER'; readonly value: 'CHAPTER' },
+              { readonly name: 'PROFILE'; readonly value: 'PROFILE' },
+              { readonly name: 'CLUB'; readonly value: 'CLUB' },
+              { readonly name: 'CHANNEL'; readonly value: 'CHANNEL' },
             ];
           };
           readonly ReportReason: {

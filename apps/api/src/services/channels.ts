@@ -128,7 +128,11 @@ function channelsBase(client: Orm = db) {
     "authorId",
     "createdAt",
     "updatedAt",
-  );
+  )
+    // A channel a moderator took down reads as absent to everybody, its
+    // author included. Every channel read starts here, so this is the whole
+    // filter.
+    .where((channel) => channel.hiddenAt.isNull());
 }
 
 /**

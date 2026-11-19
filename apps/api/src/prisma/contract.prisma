@@ -93,7 +93,9 @@ enum NotificationType {
 /// A reader is not on the list. Every report points at something somebody
 /// wrote, and suspending its author is one of the things a moderator may do
 /// about it -- see `services/moderation.ts` for why that is an action rather
-/// than a fourth target.
+/// than a target. `PROFILE` is not the person either: it is what their
+/// profile says about them (display name, picture, bio), and hiding it
+/// blanks those and nothing else.
 enum ReportTarget {
   @@type("pg/text@1")
 
@@ -104,6 +106,12 @@ enum ReportTarget {
   /// or unpublishing; see `services/moderation.ts`.
   STORY
   CHAPTER
+  /// A profile's display name, avatar and bio; a whole club; a whole
+  /// channel. See `setHidden` in `services/moderation.ts` for what hiding
+  /// each one does.
+  PROFILE
+  CLUB
+  CHANNEL
 }
 
 /// Why a reader says something should not be there.
@@ -237,6 +245,18 @@ namespace auth {
     /// this is read, and the list of write seams that call it is in the
     /// header of `services/moderation.ts`.
     suspendedAt   DateTime?
+
+    /// Set while a moderator has taken this profile's own words and picture
+    /// down (`services/moderation.ts`, target `PROFILE`). Hiding moves
+    /// `displayName`, `avatarUrl` and `bio` into the three columns below and
+    /// nulls them, so every place a name or avatar is drawn falls back to the
+    /// username and monogram without learning a new filter; dismissing the
+    /// report moves them back. The account cannot set new ones while this is
+    /// set. Not a suspension: the account still reads, writes and is listed.
+    profileHiddenAt   DateTime?
+    hiddenDisplayName String?
+    hiddenAvatarUrl   String?
+    hiddenBio         String?
 
     readingStreak Int     @default(0)
 
@@ -991,6 +1011,12 @@ namespace clubs {
 
     description String?
 
+    /// When a moderator took the whole club down -- its name or description,
+    /// usually. A hidden club reads as absent everywhere (`clubsBase` in
+    /// `services/clubs.ts` filters it), to its own members and owner too, until
+    /// a moderator dismisses the report.
+    hiddenAt    DateTime?
+
     /// Who created the club. Kept alongside the `OWNER` membership rather than
     /// replaced by it: ownership transfers (`PATCH /:id/members/:userId`) and
     /// the creator is then no longer the owner, but the historical fact does
@@ -1074,6 +1100,12 @@ namespace channels {
     slug        String   @unique
 
     description String?
+
+    /// A moderator's take-down of the whole channel, as on
+    /// `clubs.BookClub.hiddenAt`: `channelsBase` in `services/channels.ts`
+    /// filters it, so it reads as absent to everybody, its author included.
+    hiddenAt    DateTime?
+
     createdAt   DateTime @default(now())
     updatedAt   DateTime @default(now())
 

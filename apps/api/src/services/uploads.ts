@@ -307,6 +307,8 @@ async function isReferenced(url: string): Promise<boolean> {
   const [row] = await db.runtime().query(
     db.raw.sql`
       SELECT EXISTS (SELECT 1 FROM "auth"."user" WHERE "avatarUrl" = ${url})
+          -- A moderator's take-down keeps the avatar aside to restore.
+          OR EXISTS (SELECT 1 FROM "auth"."user" WHERE "hiddenAvatarUrl" = ${url})
           OR EXISTS (SELECT 1 FROM "content"."story" WHERE "coverUrl" = ${url})
           OR EXISTS (SELECT 1 FROM "content"."multimedia" WHERE "url" = ${url})
           AS "referenced"
@@ -387,6 +389,7 @@ export async function sweepUnreferencedUploads(
         FROM "content"."upload" AS up
        WHERE up."createdAt" < now() - make_interval(hours => ${graceHours}::int)
          AND NOT EXISTS (SELECT 1 FROM "auth"."user" WHERE "avatarUrl" = up."url")
+         AND NOT EXISTS (SELECT 1 FROM "auth"."user" WHERE "hiddenAvatarUrl" = up."url")
          AND NOT EXISTS (SELECT 1 FROM "content"."story" WHERE "coverUrl" = up."url")
          AND NOT EXISTS (SELECT 1 FROM "content"."multimedia" WHERE "url" = up."url")
        ORDER BY up."createdAt"

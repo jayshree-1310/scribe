@@ -10,8 +10,16 @@
  * with the queue that reads it.
  */
 
-/** The three kinds of user-written text that can be reported. */
-export type ReportTarget = 'COMMENT' | 'CLUB_DISCUSSION' | 'CHANNEL_POST' | 'STORY' | 'CHAPTER'
+/** The kinds of user-written content that can be reported. */
+export type ReportTarget =
+  | 'COMMENT'
+  | 'CLUB_DISCUSSION'
+  | 'CHANNEL_POST'
+  | 'STORY'
+  | 'CHAPTER'
+  | 'PROFILE'
+  | 'CLUB'
+  | 'CHANNEL'
 
 export type ReportReason =
   | 'SPAM'
@@ -167,6 +175,9 @@ export const TARGET_LABELS: Record<ReportTarget, string> = {
   CHANNEL_POST: 'Channel post',
   STORY: 'Story',
   CHAPTER: 'Chapter',
+  PROFILE: 'Profile',
+  CLUB: 'Club',
+  CHANNEL: 'Channel',
 }
 
 /**

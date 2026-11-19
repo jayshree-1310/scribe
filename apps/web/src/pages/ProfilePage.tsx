@@ -18,6 +18,7 @@ import { Skeleton } from '../components/ui/Skeleton'
 import { Lightbox } from '../components/ui/Lightbox'
 import { Tabs, TabPanel } from '../components/ui/Tabs'
 import { EmptyState, ErrorState } from '../components/ui/States'
+import { ReportMenu } from '../components/moderation/ReportMenu'
 import { BadgeTile, ClubCard } from '../components/story/Cards'
 import { StoryCard } from '../components/story/StoryCard'
 import { StoryCover } from '../components/story/StoryCover'
@@ -360,6 +361,13 @@ export function ProfilePage() {
                 {following ? 'Following' : 'Follow'}
               </Button>
               <Button iconOnly aria-label="Share profile" startIcon={<Icon name="share" />} />
+              <ReportMenu
+                targetType="PROFILE"
+                targetId={data.id}
+                noun="profile"
+                size="md"
+                hidden={!session}
+              />
             </>
           )}
         </div>

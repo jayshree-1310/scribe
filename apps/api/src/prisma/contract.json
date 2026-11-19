@@ -2541,6 +2541,27 @@
                   "kind": "scalar"
                 }
               },
+              "hiddenAvatarUrl": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "hiddenBio": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "hiddenDisplayName": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -2573,6 +2594,13 @@
                 "nullable": true,
                 "type": {
                   "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "profileHiddenAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
                   "kind": "scalar"
                 }
               },
@@ -3028,6 +3056,15 @@
                 "googleId": {
                   "column": "googleId"
                 },
+                "hiddenAvatarUrl": {
+                  "column": "hiddenAvatarUrl"
+                },
+                "hiddenBio": {
+                  "column": "hiddenBio"
+                },
+                "hiddenDisplayName": {
+                  "column": "hiddenDisplayName"
+                },
                 "id": {
                   "column": "id"
                 },
@@ -3042,6 +3079,9 @@
                 },
                 "passwordHash": {
                   "column": "passwordHash"
+                },
+                "profileHiddenAt": {
+                  "column": "profileHiddenAt"
                 },
                 "readerLevel": {
                   "column": "readerLevel"
@@ -3469,6 +3509,13 @@
                   "kind": "scalar"
                 }
               },
+              "hiddenAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -3555,6 +3602,9 @@
                 },
                 "description": {
                   "column": "description"
+                },
+                "hiddenAt": {
+                  "column": "hiddenAt"
                 },
                 "id": {
                   "column": "id"
@@ -3786,6 +3836,13 @@
                   "kind": "scalar"
                 }
               },
+              "hiddenAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
               "id": {
                 "nullable": false,
                 "type": {
@@ -3890,6 +3947,9 @@
                 },
                 "description": {
                   "column": "description"
+                },
+                "hiddenAt": {
+                  "column": "hiddenAt"
                 },
                 "id": {
                   "column": "id"
@@ -6996,6 +7056,18 @@
               {
                 "name": "CHAPTER",
                 "value": "CHAPTER"
+              },
+              {
+                "name": "PROFILE",
+                "value": "PROFILE"
+              },
+              {
+                "name": "CLUB",
+                "value": "CLUB"
+              },
+              {
+                "name": "CHANNEL",
+                "value": "CHANNEL"
               }
             ]
           }
@@ -8158,8 +8230,8 @@
                   "prefix": "moderationDecision_outcome_check"
                 },
                 {
-                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER')",
-                  "name": "moderationDecision_targetType_check_d2f61544",
+                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER', 'PROFILE', 'CLUB', 'CHANNEL')",
+                  "name": "moderationDecision_targetType_check_4fe6a63e",
                   "prefix": "moderationDecision_targetType_check"
                 }
               ],
@@ -9039,6 +9111,21 @@
                   "nativeType": "text",
                   "nullable": true
                 },
+                "hiddenAvatarUrl": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "hiddenBio": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "hiddenDisplayName": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "id": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -9074,6 +9161,11 @@
                 "passwordHash": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
+                  "nullable": true
+                },
+                "profileHiddenAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
                   "nullable": true
                 },
                 "readerLevel": {
@@ -9521,6 +9613,11 @@
                   "nativeType": "text",
                   "nullable": true
                 },
+                "hiddenAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
                 "id": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -9802,6 +9899,11 @@
                 "description": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
+                  "nullable": true
+                },
+                "hiddenAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
                   "nullable": true
                 },
                 "id": {
@@ -11966,8 +12068,8 @@
                   "prefix": "report_status_check"
                 },
                 {
-                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER')",
-                  "name": "report_targetType_check_d2f61544",
+                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER', 'PROFILE', 'CLUB', 'CHANNEL')",
+                  "name": "report_targetType_check_4fe6a63e",
                   "prefix": "report_targetType_check"
                 }
               ],
@@ -12163,8 +12265,8 @@
             "notification": {
               "checks": [
                 {
-                  "expression": "\"sourceType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER')",
-                  "name": "notification_sourceType_check_800baecb",
+                  "expression": "\"sourceType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER', 'PROFILE', 'CLUB', 'CHANNEL')",
+                  "name": "notification_sourceType_check_f9b36c93",
                   "prefix": "notification_sourceType_check"
                 },
                 {
@@ -12439,7 +12541,10 @@
                 "CLUB_DISCUSSION",
                 "CHANNEL_POST",
                 "STORY",
-                "CHAPTER"
+                "CHAPTER",
+                "PROFILE",
+                "CLUB",
+                "CHANNEL"
               ]
             }
           }
@@ -12448,7 +12553,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "a674777e0f04c1f19f33123ac7c766a0ff7a78c99af7488a858b12609fde3076"
+    "storageHash": "0d941e650b2d4a18b2c6d1710cd80323c32e63d95331a3d55f0a723480d89e06"
   },
   "execution": {
     "executionHash": "7d2db05d5e947645db9eaad034511ce50b09361a5ca66b23b87121c8110a7737",

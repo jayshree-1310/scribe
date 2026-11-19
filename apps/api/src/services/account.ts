@@ -182,6 +182,24 @@ export function getProfile(userId: string): Promise<AccountProfile> {
 }
 
 /**
+ * Refuses a new display name, bio or avatar while a moderator has the
+ * profile's taken down (`setHidden` in `services/moderation.ts`). Without it,
+ * Settings would undo the take-down; the way back is a moderator dismissing
+ * the report, which restores the old ones.
+ */
+async function assertProfileNotHidden(userId: string): Promise<void> {
+  const row = await db.orm.auth.User.select("profileHiddenAt")
+    .where((u) => u.id.eq(userId))
+    .first();
+
+  if (row?.profileHiddenAt !== null && row?.profileHiddenAt !== undefined) {
+    throw HttpError.forbidden(
+      "A moderator has hidden your profile's name, picture and bio, so they cannot be changed for now.",
+    );
+  }
+}
+
+/**
  * Applies a partial profile update.
  *
  * Only the keys present in `update` are written, so a form that sends just the
@@ -193,6 +211,15 @@ export async function updateProfile(
   update: ProfileUpdate,
 ): Promise<AccountProfile> {
   const current = await loadProfile(userId);
+
+  // Clearing is not a change while they are already cleared, so a settings
+  // form that sends every field still saves the username or email beside them.
+  if (
+    (update.displayName !== undefined && update.displayName.length > 0) ||
+    (update.bio !== undefined && update.bio.length > 0)
+  ) {
+    await assertProfileNotHidden(userId);
+  }
 
   const changes: Record<string, unknown> = {};
 
@@ -297,6 +324,8 @@ export async function setAvatar(
       { avatar: "That image is too large. Pick one under 2 MB." },
     );
   }
+
+  await assertProfileNotHidden(userId);
 
   const kind = sniffImage(bytes);
 

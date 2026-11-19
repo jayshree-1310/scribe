@@ -5,10 +5,9 @@ against the dev stack, a headless-browser pass over every web route, and a
 code review of the API and web app. Nothing in the app was changed; this file
 is the list to fix from.
 
-**Fix progress (2026-11-13):** every High, Medium and Low finding is fixed,
+**Fix progress (2026-11-19):** every High, Medium and Low finding is fixed,
 except where noted: H-10 needs the Supabase project unpausing (or a move to
-R2), M-6 needs a Resend key and sending domain to deliver mail, and M-11 covers
-stories and chapters — profiles, clubs and channels are still not reportable.
+R2), and M-6 needs a Resend key and sending domain to deliver mail.
 
 Every finding has an ID so fixes can reference it. **Severity:** High (data
 loss, security, or a core feature that fails outright), Medium (wrong
@@ -320,7 +319,7 @@ So the list below is not read as "everything is broken":
   one). Drafts stay editable and taking things down is never refused. The
   decisions are recorded in `routes/suspension.test.ts`.
 
-### M-11 · Stories, chapters, profiles, clubs and channels cannot be reported — Code review — **Stories and chapters done**
+### M-11 · Stories, chapters, profiles, clubs and channels cannot be reported — Code review — **Fixed**
 - **Where:** `services/moderation.ts` `REPORT_TARGETS = COMMENT |
   CLUB_DISCUSSION | CHANNEL_POST`
 - There is no way to flag an abusive story, chapter, bio/avatar, or club/
@@ -330,8 +329,17 @@ So the list below is not read as "everything is broken":
   moderator `HIDE` that unlists the story or unpublishes the chapter. The
   original `listedAt` / `publishedAt` is kept in `hiddenListedAt` /
   `hiddenPublishedAt` so `DISMISS` restores it exactly, and the author cannot
-  publish again while it is hidden. Drafts cannot be reported. **Still open:**
-  profiles (bio/avatar), clubs and channels.
+  publish again while it is hidden. Drafts cannot be reported.
+- **Done for profiles, clubs and channels** (2026-11-19): `PROFILE`, `CLUB`
+  and `CHANNEL` targets, with a report menu on each page's header. Hiding a
+  profile moves its display name, avatar and bio into `hidden*` columns, so
+  every place they are drawn falls back to the username and monogram; the
+  account cannot set new ones (Settings or a Google sign-in) until a
+  `DISMISS` puts the old ones back, and the upload sweep keeps the hidden
+  avatar's file. Hiding a club or channel takes it down whole -- 404 for
+  everybody, owner included, through the one base query each service reads
+  from -- and deletes the notifications quoting its threads or posts. Threads
+  and posts inside a hidden club or channel cannot be reported.
 
 ### M-12 · "Remember me" on the login form does nothing — Code review — **Fixed**
 - **Where:** `apps/web/src/pages/LoginPage.tsx:25,125`; the argument is

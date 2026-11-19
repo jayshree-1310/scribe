@@ -28,6 +28,13 @@
  *   to learn a new filter. `setHidden` holds the details, and
  *   `services/authoring.ts` refuses the author's Publish while it is set.
  *
+ *   A profile works the same way: hiding it moves the display name, avatar
+ *   and bio into `hidden*` columns, so every place they are drawn falls back
+ *   to the username and monogram; `services/account.ts` refuses new ones
+ *   while it is hidden. A club or channel is taken down whole, and the
+ *   filter for that lives in exactly one place each -- `clubsBase` and
+ *   `channelsBase` -- which every club and channel read goes through.
+ *
  * - **A hidden row's notifications are deleted, not blanked.**
  *   `notifications.Notification.excerpt` is a copy taken at fan-out time, so
  *   hiding the comment it quotes does not touch it -- the abusive reply is
@@ -107,6 +114,9 @@ export const REPORT_TARGETS = [
   "CHANNEL_POST",
   "STORY",
   "CHAPTER",
+  "PROFILE",
+  "CLUB",
+  "CHANNEL",
 ] as const;
 
 export type ReportTarget = (typeof REPORT_TARGETS)[number];
@@ -161,6 +171,9 @@ const TARGET_WORDS: Record<ReportTarget, string> = {
   CHANNEL_POST: "channel post",
   STORY: "story",
   CHAPTER: "chapter",
+  PROFILE: "profile",
+  CLUB: "club",
+  CHANNEL: "channel",
 };
 
 /** The same four fields every other author summary in the app carries. */
@@ -438,14 +451,15 @@ async function loadTargets(
 
     if (rows.length === 0) return [];
 
-    const clubs = await db.orm.clubs.BookClub.select("id", "slug")
+    const clubs = await db.orm.clubs.BookClub.select("id", "slug", "hiddenAt")
       .where((row) => row.id.in(rows.map((item) => item.clubId)))
       .all();
-    const slugs = new Map(clubs.map((club) => [club.id, club.slug]));
+    const byClub = new Map(clubs.map((club) => [club.id, club]));
 
     return rows.flatMap((row) => {
-      const slug = slugs.get(row.clubId);
-      if (slug === undefined) return [];
+      const club = byClub.get(row.clubId);
+      if (club === undefined) return [];
+      const slug = club.slug;
 
       return [
         {
@@ -454,6 +468,8 @@ async function loadTargets(
           body: row.body,
           authorId: row.userId,
           hidden: row.hiddenAt !== null && row.hiddenAt !== undefined,
+          // A thread in a club that was taken down is out of everybody's sight.
+          reachable: club.hiddenAt === null || club.hiddenAt === undefined,
           href: `/clubs/${slug}`,
         },
       ];
@@ -535,6 +551,99 @@ async function loadTargets(
     });
   }
 
+  if (type === "PROFILE") {
+    const rows = await db.orm.auth.User.select(
+      "id",
+      "username",
+      "displayName",
+      "bio",
+      "hiddenDisplayName",
+      "hiddenBio",
+      "profileHiddenAt",
+    )
+      .where((row) => row.id.in(unique))
+      .all();
+
+    return rows.map((row) => {
+      const hidden = row.profileHiddenAt !== null && row.profileHiddenAt !== undefined;
+      // While hidden the words live in the `hidden*` columns, and the queue
+      // still has to show the moderator what was taken down.
+      const name = hidden ? row.hiddenDisplayName : row.displayName;
+      const bio = hidden ? row.hiddenBio : row.bio;
+
+      return {
+        type,
+        id: row.id,
+        body: `${name ?? `@${row.username}`}\n${bio ?? ""}`.trim(),
+        // The profile is its own author: suspending "the author" of a profile
+        // report suspends the account the profile belongs to.
+        authorId: row.id,
+        hidden,
+        href: `/profile/${row.username}`,
+      };
+    });
+  }
+
+  if (type === "CLUB") {
+    const rows = await db.orm.clubs.BookClub.select(
+      "id",
+      "slug",
+      "name",
+      "description",
+      "hiddenAt",
+    )
+      .where((row) => row.id.in(unique))
+      .all();
+
+    if (rows.length === 0) return [];
+
+    // Answerable is whoever owns it now, which is the membership row, not
+    // `creatorId` -- ownership transfers (see `services/clubs.ts`).
+    const owners = await db.orm.clubs.ClubMembership.select("clubId", "userId")
+      .where((row) => row.clubId.in(rows.map((club) => club.id)))
+      .where((row) => row.role.eq("OWNER"))
+      .all();
+    const ownerOf = new Map(owners.map((owner) => [owner.clubId, owner.userId]));
+
+    return rows.flatMap((row) => {
+      const ownerId = ownerOf.get(row.id);
+      if (ownerId === undefined) return [];
+
+      return [
+        {
+          type,
+          id: row.id,
+          body: `${row.name}\n${row.description ?? ""}`.trim(),
+          authorId: ownerId,
+          hidden: row.hiddenAt !== null && row.hiddenAt !== undefined,
+          href: `/clubs/${row.slug}`,
+        },
+      ];
+    });
+  }
+
+  if (type === "CHANNEL") {
+    const rows = await db.orm.channels.BroadcastChannel.select(
+      "id",
+      "slug",
+      "name",
+      "description",
+      "authorId",
+      "hiddenAt",
+    )
+      .where((row) => row.id.in(unique))
+      .all();
+
+    return rows.map((row) => ({
+      type,
+      id: row.id,
+      body: `${row.name}\n${row.description ?? ""}`.trim(),
+      authorId: row.authorId,
+      hidden: row.hiddenAt !== null && row.hiddenAt !== undefined,
+      href: `/channels/${row.slug}`,
+    }));
+  }
+
   const rows = await db.orm.channels.ChannelPost.select(
     "id",
     "title",
@@ -551,6 +660,7 @@ async function loadTargets(
     "id",
     "slug",
     "authorId",
+    "hiddenAt",
   )
     .where((row) => row.id.in(rows.map((post) => post.channelId)))
     .all();
@@ -569,6 +679,8 @@ async function loadTargets(
         body: `${row.title}\n${row.content}`,
         authorId: channel.authorId,
         hidden: row.hiddenAt !== null && row.hiddenAt !== undefined,
+        // A post in a channel that was taken down is out of everybody's sight.
+        reachable: channel.hiddenAt === null || channel.hiddenAt === undefined,
         href: `/channels/${channel.slug}`,
       },
     ];
@@ -643,6 +755,46 @@ async function setHidden(
             `.affectedCount().build(),
       );
       return;
+    /**
+     * A profile is hidden the way a story is: by moving what it says aside,
+     * so every place a name, avatar or bio is drawn falls back to the
+     * username and the monogram with no filter of its own. Guarded the same
+     * way, so a second hide cannot overwrite the kept values with nulls.
+     */
+    case "PROFILE":
+      await tx.query(
+        hiddenAt === null
+          ? db.raw.sql`
+              UPDATE "auth"."user"
+                 SET "displayName" = "hiddenDisplayName", "avatarUrl" = "hiddenAvatarUrl",
+                     "bio" = "hiddenBio", "hiddenDisplayName" = NULL,
+                     "hiddenAvatarUrl" = NULL, "hiddenBio" = NULL, "profileHiddenAt" = NULL
+               WHERE "id" = ${id} AND "profileHiddenAt" IS NOT NULL
+            `.affectedCount().build()
+          : db.raw.sql`
+              UPDATE "auth"."user"
+                 SET "hiddenDisplayName" = "displayName", "hiddenAvatarUrl" = "avatarUrl",
+                     "hiddenBio" = "bio", "displayName" = NULL, "avatarUrl" = NULL,
+                     "bio" = NULL, "profileHiddenAt" = now()
+               WHERE "id" = ${id} AND "profileHiddenAt" IS NULL
+            `.affectedCount().build(),
+      );
+      return;
+    /**
+     * A club or channel goes whole: its name is usually what was objected to,
+     * and there is nothing to blank a name to. `clubsBase` and `channelsBase`
+     * filter on `hiddenAt`, and every club and channel read goes through them.
+     */
+    case "CLUB":
+      await tx.orm.clubs.BookClub.where((row) => row.id.eq(id)).update({
+        hiddenAt,
+      });
+      return;
+    case "CHANNEL":
+      await tx.orm.channels.BroadcastChannel.where((row) => row.id.eq(id)).update({
+        hiddenAt,
+      });
+      return;
   }
 }
 
@@ -666,6 +818,29 @@ async function hideContent(tx: Tx, type: ReportTarget, id: string): Promise<void
     .build();
 
   await tx.query(plan);
+
+  /**
+   * Hiding a club or channel hides everything in it, so the bells quoting its
+   * threads or posts go too -- each would otherwise link to a page that now
+   * 404s.
+   */
+  if (type === "CLUB") {
+    await tx.query(
+      db.raw.sql`
+        DELETE FROM "notifications"."notification"
+         WHERE "sourceType" = 'CLUB_DISCUSSION'
+           AND "sourceId" IN (SELECT "id" FROM "clubs"."clubDiscussion" WHERE "clubId" = ${id})
+      `.affectedCount().build(),
+    );
+  } else if (type === "CHANNEL") {
+    await tx.query(
+      db.raw.sql`
+        DELETE FROM "notifications"."notification"
+         WHERE "sourceType" = 'CHANNEL_POST'
+           AND "sourceId" IN (SELECT "id" FROM "channels"."channelPost" WHERE "channelId" = ${id})
+      `.affectedCount().build(),
+    );
+  }
 }
 
 /* Reports ----------------------------------------------------------------- */

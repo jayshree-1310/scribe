@@ -323,7 +323,10 @@ function clubsBase() {
     "currentStoryId",
     "createdAt",
     "updatedAt",
-  );
+  )
+    // A club a moderator took down reads as absent to everybody, its owner
+    // included. Every club read starts here, so this is the whole filter.
+    .where((club) => club.hiddenAt.isNull());
 }
 
 /* Reads ------------------------------------------------------------------ */

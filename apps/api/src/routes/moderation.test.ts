@@ -814,3 +814,122 @@ describe.skipIf(!available)("a hidden thread's replies", () => {
     expect(clubReplies.status).toBe(404);
   });
 });
+
+/* Profiles, clubs and channels (review M-11) ----------------------------- */
+
+describe.skipIf(!available)("reporting a profile, a club or a channel", () => {
+  it("blanks a profile's name, picture and bio, locks them, and restores them exactly", async () => {
+    const { db } = await import("../prisma/db.js");
+    const target = await api.createUser("mgprofile");
+    await db.orm.auth.User.where((u) => u.id.eq(target)).update({
+      displayName: "Rude Name",
+      bio: "Rude bio.",
+      avatarUrl: "https://example.com/rude.png",
+    });
+    const row = await db.orm.auth.User.select("username")
+      .where((u) => u.id.eq(target))
+      .first();
+    const username = row!.username;
+
+    const filed = await fileReport(reporter, { targetType: "PROFILE", targetId: target });
+    expect(filed.status).toBe(201);
+    expect(filed.body.report.target?.excerpt).toBe("Rude Name\nRude bio.");
+    expect((await resolve(moderator, filed.body.report.id, "HIDE")).status).toBe(200);
+
+    // The profile still exists; what it said about itself does not.
+    const shown = await api.request<{
+      profile: { displayName: string | null; bio: string | null; avatarUrl: string | null };
+    }>(`/api/users/${username}`, { as: reporter });
+    expect(shown.status).toBe(200);
+    expect(shown.body.profile.displayName).toBeNull();
+    expect(shown.body.profile.bio).toBeNull();
+    expect(shown.body.profile.avatarUrl).toBeNull();
+
+    // Settings cannot put new ones up, but can still save other fields.
+    const rewrite = await api.request("/api/account/me", {
+      method: "PATCH",
+      as: target,
+      body: { bio: "Back again." },
+    });
+    expect(rewrite.status).toBe(403);
+    const blank = await api.request("/api/account/me", {
+      method: "PATCH",
+      as: target,
+      body: { bio: "", displayName: "" },
+    });
+    expect(blank.status).toBe(200);
+
+    // The queue still shows the moderator what was taken down.
+    const queued = await queue(moderator, "?status=RESOLVED&targetType=PROFILE");
+    const mine = queued.items.find((item) => item.id === filed.body.report.id);
+    expect(mine?.target?.excerpt).toBe("Rude Name\nRude bio.");
+
+    expect((await resolve(moderator, filed.body.report.id, "DISMISS")).status).toBe(200);
+    const restored = await db.orm.auth.User.select("displayName", "bio", "avatarUrl", "profileHiddenAt")
+      .where((u) => u.id.eq(target))
+      .first();
+    expect(restored).toMatchObject({
+      displayName: "Rude Name",
+      bio: "Rude bio.",
+      avatarUrl: "https://example.com/rude.png",
+      profileHiddenAt: null,
+    });
+  });
+
+  it("takes a whole club down for everybody, its owner included, until dismissed", async () => {
+    const reported = await api.createClub({ name: "Reported Club", creatorId: offender });
+    const thread = await api.createDiscussion({
+      clubId: reported.id,
+      userId: offender,
+      body: "A thread inside it.",
+    });
+
+    const filed = await fileReport(reporter, { targetType: "CLUB", targetId: reported.id });
+    expect(filed.status).toBe(201);
+    expect(filed.body.report.target?.author.id).toBe(offender);
+    expect((await resolve(moderator, filed.body.report.id, "HIDE")).status).toBe(200);
+
+    expect((await api.request(`/api/clubs/${reported.slug}`, { as: reporter })).status).toBe(404);
+    expect((await api.request(`/api/clubs/${reported.slug}`, { as: offender })).status).toBe(404);
+    const joined = await api.request(`/api/clubs/${reported.slug}/join`, {
+      method: "POST",
+      as: other,
+    });
+    expect(joined.status).toBe(404);
+    const listed = await api.request<{ items: { id: string }[] }>(
+      `/api/clubs?search=${encodeURIComponent("Reported Club")}`,
+    );
+    expect(listed.body.items.map((item) => item.id)).not.toContain(reported.id);
+
+    // Nothing inside it can be reported either: nobody can see it.
+    const inner = await fileReport(other, { targetType: "CLUB_DISCUSSION", targetId: thread });
+    expect(inner.status).toBe(404);
+
+    expect((await resolve(moderator, filed.body.report.id, "DISMISS")).status).toBe(200);
+    expect((await api.request(`/api/clubs/${reported.slug}`)).status).toBe(200);
+  });
+
+  it("takes a whole channel down for everybody, its author included, until dismissed", async () => {
+    const reported = await api.createChannel({ name: "Reported Channel", authorId: offender });
+
+    const filed = await fileReport(reporter, { targetType: "CHANNEL", targetId: reported.id });
+    expect(filed.status).toBe(201);
+    expect((await resolve(moderator, filed.body.report.id, "HIDE")).status).toBe(200);
+
+    expect((await api.request(`/api/channels/${reported.slug}`, { as: reporter })).status).toBe(404);
+    const post = await api.request(`/api/channels/${reported.slug}/posts`, {
+      method: "POST",
+      as: offender,
+      body: { title: "Still here", content: "Try and stop me." },
+    });
+    expect(post.status).toBe(404);
+
+    expect((await resolve(moderator, filed.body.report.id, "DISMISS")).status).toBe(200);
+    expect((await api.request(`/api/channels/${reported.slug}`)).status).toBe(200);
+  });
+
+  it("refuses a report on your own profile", async () => {
+    const filed = await fileReport(reporter, { targetType: "PROFILE", targetId: reporter });
+    expect(filed.status).toBe(400);
+  });
+});
