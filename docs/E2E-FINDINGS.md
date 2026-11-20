@@ -155,24 +155,43 @@ PNG the upload test sent (replace it in Settings).
   back/forward. A refresh mid-tour still resumes, and *Take a tour* in the
   account menu starts it again.
 
-### E-6 · Local uploads answer 503 — Low · Open (environment)
+### E-6 · Local uploads answer 503 — Low · Fixed (2026-11-20, local `.env`)
 - Avatar and cover uploads return **503** locally because `apps/api/.env`
   points `S3_*` at the paused Supabase project (review H-10). Production's
   storage works: the avatar and cover uploads succeeded there.
-- **Fix:** point the local `.env` at the live bucket, or unset `S3_BUCKET`
-  for local disk storage.
+- **Cause, on a second look:** the Supabase project is no longer paused; the
+  `scribe-media` bucket the local `.env` names does not exist in it
+  (`NoSuchBucket`). Production uses a different bucket.
+- **Fix:** the `S3_*` lines in `apps/api/.env` are commented out (with a note,
+  not deleted), so local development stores uploads on disk in the
+  `api_uploads` Docker volume — which is also where dev files belong, rather
+  than in the hosted bucket. Verified: `/health` reports `storage.backend:
+  local`, and a cover upload answers 201 and is served. `.env` is not tracked,
+  so this was a local change only; uncomment the lines to test the object
+  store on purpose.
 
-### E-7 · A seeded cover file is missing locally — Low · Open (environment)
+### E-7 · A seeded cover file is missing locally — Low · Fixed (2026-11-20, local data)
 - `/uploads/covers/451c794d-0f99-4ce4-9e4a-e2b05ff2da3c.png` 404s on most
   pages locally (a seeded story whose file is gone). It renders correctly —
   the generated cover shows (review L-2) — but every page logs the 404.
-- **Fix:** clear that story's `coverUrl`, or re-upload the file.
+- The same account (`read_and_ruin_me`) also had a missing avatar,
+  `/uploads/avatars/c9a0bfa2-f3d0-41d1-9669-033f993651bc.jpg`.
+- Neither file exists anywhere on the machine, so both references were
+  cleared in the local database (`content.story.coverUrl` of
+  *the-time-between-us*, and that user's `avatarUrl`). The generated cover and
+  monogram that already showed in their place still do. The old values are
+  recorded here in case the files turn up; re-upload through the app to
+  replace them.
 
-### E-8 · Notification rows place the unread dot inconsistently — Low · Open
+### E-8 · Notification rows place the unread dot inconsistently — Low · Fixed (2026-11-20)
 - On `/notifications` the unread dot sits right after the title text on some
   rows and at the far right edge on others, depending on the title's length
   (visible in the author's notifications screenshot).
-- **Fix:** give the dot a fixed column in the row layout.
+- **Cause:** the text column was sized to its content, so the dot after it
+  landed wherever the title ended.
+- **Fix:** `.notification__body` takes the row's spare width (`flex: 1`), so
+  the dot sits at the right edge on every row — in the bell's dropdown too,
+  which shares the row. Checked on the local `/notifications` page.
 
 ### E-9 · The story editor has no page heading — Low · Open
 - `/author/stories/:slug` renders no `<h1>`; the title is an input. Screen

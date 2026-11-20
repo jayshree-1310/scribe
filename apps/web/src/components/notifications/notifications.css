@@ -39,6 +39,9 @@
 
 .notification__body {
   display: flex;
+  /* Takes the row's spare width, so the unread dot after it sits at the right
+     edge on every row rather than wherever a short title happens to end. */
+  flex: 1;
   flex-direction: column;
   gap: 0.15rem;
   /* Without this a long title refuses to wrap and widens the whole panel. */
