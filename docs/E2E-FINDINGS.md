@@ -193,11 +193,12 @@ PNG the upload test sent (replace it in Settings).
   the dot sits at the right edge on every row — in the bell's dropdown too,
   which shares the row. Checked on the local `/notifications` page.
 
-### E-9 · The story editor has no page heading — Low · Open
+### E-9 · The story editor has no page heading — Low · Fixed (2026-11-20)
 - `/author/stories/:slug` renders no `<h1>`; the title is an input. Screen
   reader users land on a page with no heading to orient by.
-- **Fix:** a visually hidden `<h1>` ("Editing *title*") or label the title
-  input as the page heading.
+- **Fix:** a visually hidden `<h1>` — *"Editing The Lamplighter of
+  Saltmere"*, or *"New story"* — at the top of the editor header. Checked in
+  the browser: present, 1×1 px, nothing visible changes.
 
 ### E-10 · One Render edge address is unreachable from the test network — Low · Open (network)
 - From the network this run used, `216.24.57.16` (one of the two Cloudflare

@@ -1090,6 +1090,11 @@ export function StoryEditorPage() {
       {/* Studio header --------------------------------------------------- */}
       <header className="editor__head">
         <div className="editor__head-main">
+          {/* The visible title is an input, which is not a heading, so the page
+              had none to land on. Named for screen readers only. */}
+          <h1 className="visually-hidden">
+            {storyId === null ? 'New story' : `Editing ${title.trim() || 'untitled story'}`}
+          </h1>
           <p className="editor__crumb">
             {storyId === null ? 'New story' : 'Editing'} ·{' '}
             <StatusBadge tone={status === 'draft' ? 'neutral' : 'brand'}>{status}</StatusBadge>
