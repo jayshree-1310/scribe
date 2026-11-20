@@ -127,14 +127,13 @@ services:
       # model, and Groq serves none. Unset, the API falls back to a local
       # Ollama that does not exist here: /health reports
       # `ai.embed.configured: false` and the boot log says so. The vector
-      # columns are 768 wide, so the model must return 768 dimensions. With a
-      # Google AI Studio key (free tier):
-      #   AI_EMBED_PROVIDER         openai
-      #   AI_EMBED_BASE_URL         https://generativelanguage.googleapis.com/v1beta/openai
-      #   AI_EMBED_MODEL            gemini-embedding-001
-      #   AI_EMBED_SEND_DIMENSIONS  on
-      #   AI_EMBED_API_KEY          the AI Studio key
-      # See docs/DEPLOYMENT.md "AI embeddings" before relying on it.
+      # columns are 768 wide, so the model must return 768 dimensions.
+      # Cloudflare Workers AI's free allocation fits (natively 768 wide):
+      #   AI_EMBED_PROVIDER   openai
+      #   AI_EMBED_BASE_URL   https://api.cloudflare.com/client/v4/accounts/<account id>/ai/v1
+      #   AI_EMBED_MODEL      @cf/baai/bge-base-en-v1.5
+      #   AI_EMBED_API_KEY    a Cloudflare API token (Workers AI template)
+      # See docs/DEPLOYMENT.md "AI embeddings", including the one-off back-fill.
       - key: AI_EMBED_PROVIDER
         sync: false
       - key: AI_EMBED_BASE_URL

@@ -407,8 +407,41 @@ bible fail, and search quietly falls back to keywords. `/health` reports
 `ai.embed.configured: false` and the boot log names the missing settings.
 
 The vector columns are `vector(768)`, so the model must return 768
-dimensions. A free option is Google's Gemini embedding model through its
-OpenAI-compatible endpoint, with a Google AI Studio key:
+dimensions.
+
+### Recommended: Cloudflare Workers AI (free allocation)
+
+`@cf/baai/bge-base-en-v1.5` is natively 768 wide and served on an
+OpenAI-compatible `/v1/embeddings`, so it needs no code and no
+`AI_EMBED_SEND_DIMENSIONS`. Workers AI includes a free daily allocation
+(10,000 "neurons" a day at the time of writing); watch the usage graph in the
+Cloudflare dashboard after the first back-fill.
+
+1. Sign up at `dash.cloudflare.com` and copy the **Account ID** (sidebar, or
+   the id in the dashboard URL).
+2. **My Profile → API Tokens → Create Token**, using the **Workers AI**
+   template.
+3. On `scribe-new` → Environment:
+
+   | Key | Value |
+   | --- | --- |
+   | `AI_EMBED_PROVIDER` | `openai` |
+   | `AI_EMBED_BASE_URL` | `https://api.cloudflare.com/client/v4/accounts/<account id>/ai/v1` |
+   | `AI_EMBED_MODEL` | `@cf/baai/bge-base-en-v1.5` |
+   | `AI_EMBED_API_KEY` | the token (it does not fall back to Groq's key) |
+
+4. After the redeploy, `/health` should show `ai.embed.configured: true`.
+5. Back-fill once (below).
+
+The model reads at most 512 tokens per passage. Chapter chunks aim at ~300
+tokens (`services/ai/chunking.ts`); the longest can run to ~560, and the end of
+those is cut off — slightly less precise retrieval on those passages, nothing
+worse.
+
+### Alternative: Gemini
+
+`gemini-embedding-001` through Google's OpenAI-compatible endpoint, with a free
+Google AI Studio key:
 
 | Key | Value |
 | --- | --- |
@@ -416,19 +449,34 @@ OpenAI-compatible endpoint, with a Google AI Studio key:
 | `AI_EMBED_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai` |
 | `AI_EMBED_MODEL` | `gemini-embedding-001` |
 | `AI_EMBED_SEND_DIMENSIONS` | `on` — the model is 3072 wide unless asked for 768 |
-| `AI_EMBED_API_KEY` | the AI Studio key (it does not fall back to Groq's) |
+| `AI_EMBED_API_KEY` | the AI Studio key |
 
-Google documents the endpoint and the model; whether that endpoint honours the
-`dimensions` parameter is not documented. Check after deploying: ask a
-question with Ask This Book. A model that ignores it answers 3072-wide
-vectors, which the API refuses with *"The embedding model returned 3072
-dimensions, but this database stores 768"* rather than storing them. If that
-happens, use a model that is natively 768 wide instead (for example Jina's
-`jina-embeddings-v2-base-en`) or widen the columns with a migration.
+Google documents the endpoint and the model, but not whether that endpoint
+honours `dimensions`; a model that ignores it answers 3072-wide vectors, which
+the API refuses (*"The embedding model returned 3072 dimensions, but this
+database stores 768"*) rather than storing. Free-tier quotas for this model
+are not clearly published, and 429s have been widely reported.
 
-Then back-fill the passages already published: `pnpm --filter api
-seed:embeddings` with `DATABASE_URL` and the `AI_EMBED_*` values above, or
-let the background worker embed each chapter as it is next published.
+### The one-off back-fill
+
+Chapters published before the embedder existed have no vectors, and the
+search index is built by the same command. From a checkout, with the
+production values (the **direct** Neon URL, as for migrations):
+
+```bash
+cd apps/api
+DOTENV_CONFIG_PATH=/dev/null \
+DATABASE_URL='<MIGRATE_DATABASE_URL>' \
+AI_EMBED_PROVIDER=openai \
+AI_EMBED_BASE_URL='https://api.cloudflare.com/client/v4/accounts/<account id>/ai/v1' \
+AI_EMBED_MODEL='@cf/baai/bge-base-en-v1.5' \
+AI_EMBED_API_KEY='<token>' \
+pnpm seed:embeddings
+```
+
+It is safe to re-run: unchanged chapters cost no model calls. Do not switch
+the model again afterwards without re-embedding everything — vectors from two
+models are not comparable.
 
 ## Uploaded files
 

@@ -97,8 +97,12 @@ PNG the upload test sent (replace it in Settings).
   768-wide vectors, so models that default wider — `gemini-embedding-001` —
   can be used. `render.yaml` lists the `AI_EMBED_*` keys and
   `DEPLOYMENT.md` → *AI embeddings* gives the Gemini recipe.
-- **Still to do by hand:** choose the provider, set the keys on Render, check
-  Ask This Book, and back-fill with `seed:embeddings`. Google does not
+- **Provider chosen 2026-11-20: Cloudflare Workers AI**
+  (`@cf/baai/bge-base-en-v1.5`, natively 768 wide, free daily allocation).
+  `DEPLOYMENT.md` → *AI embeddings* has the steps and the back-fill command.
+- **Still to do by hand:** create the Cloudflare account and API token, set
+  the four `AI_EMBED_*` keys on Render, check `/health` and Ask This Book,
+  then run the one-off back-fill against the production database. Google does not
   document whether its OpenAI-compatible endpoint honours `dimensions`; if it
   does not, the API refuses the 3072-wide reply with a message saying so, and
   a natively 768-wide model is needed instead.
