@@ -67,15 +67,23 @@ describe.skipIf(!available)("GET /api/books", () => {
     expect(body.hasMore).toBe(true);
   });
 
+  /**
+   * Scoped to this run's own genre. Paging the whole catalogue made the test
+   * depend on every other suite: one creating a book between the two requests
+   * shifted page two, and the test failed now and then under the full
+   * parallel run (E2E-FINDINGS E-11).
+   */
   it("returns a second page that does not repeat the first", async () => {
-    const first = await api.request("/api/books?limit=2&page=1");
-    const second = await api.request("/api/books?limit=2&page=2");
+    const first = await api.request(`/api/books?genreId=${genreId}&limit=1&page=1`);
+    const second = await api.request(`/api/books?genreId=${genreId}&limit=1&page=2`);
 
     const firstIds = first.body.items.map((book: { id: string }) => book.id);
     const secondIds = second.body.items.map((book: { id: string }) => book.id);
 
     expect(second.body.page).toBe(2);
     expect(secondIds.some((id: string) => firstIds.includes(id))).toBe(false);
+    // Between them, exactly the genre's two books.
+    expect([...firstIds, ...secondIds].sort()).toEqual([ids["atlas"], ids["compass"]].sort());
   });
 
   it("carries a slug and a count of readable chapters", async () => {

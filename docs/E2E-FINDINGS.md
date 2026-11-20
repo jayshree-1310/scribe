@@ -209,14 +209,20 @@ PNG the upload test sent (replace it in Settings).
 - Not an application bug, and users elsewhere are unlikely to see it — but if
   they report slow first loads, this is where to look. Worth checking from a
   second network, and with Render if it persists.
+- **Re-checked 2026-11-20:** still unreachable from this network on both 443
+  and 80, while `216.24.57.18` answers in ~25 ms. That points at a block or
+  route on this network (a firewall, the ISP) rather than at Render. Nothing
+  to change in the code; check from another network (a phone hotspot) and,
+  if it fails there too, raise it with Render support.
 
-### E-11 · `books.test.ts` pagination test fails under the full parallel suite — Low · Open
+### E-11 · `books.test.ts` pagination test fails under the full parallel suite — Low · Fixed (2026-11-20)
 - *"returns a second page that does not repeat the first"* fails now and then
   when the whole API suite runs in parallel, and passes on its own. Other
   suites create listed stories at the same time, so the book pages it compares
   shift between its two requests. It can turn CI red for no reason.
-- **Fix:** scope the test's listing to fixtures of its own (a genre or search
-  term only this suite uses), so concurrent suites cannot move its pages.
+- **Fix:** the test pages through this run's own genre (two fixture books,
+  one per page) instead of the whole catalogue, and now also checks the two
+  pages together are exactly those books. Full suite green twice in a row.
 
 ---
 
