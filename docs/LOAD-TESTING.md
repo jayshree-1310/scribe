@@ -133,13 +133,23 @@ only the instance that served it. The others catch up within the 30 seconds.
 `READ_CACHE_SECONDS` sets the TTL; `0` turns the cache off, as the test suite
 does.
 
-### 4. Open: recommendations scale with the catalogue
+### 4. Recommendations scale with the catalogue (partly fixed)
 
-`GET /recommendations` costs **~160 ms of Postgres time per request** at 5,000
-listed stories, and the cost is linear in that number. The ranking scores
-every candidate story. Most of the time goes to three correlated subqueries
-run once per candidate: preferred-genre hits, taste weight, and "follows the
-author". Rewriting them as grouped joins is the next change.
+`GET /recommendations` cost **~120–160 ms of Postgres time per request** at
+5,000 listed stories, because the ranking scores every candidate. The plan
+showed most of it in three correlated subqueries run once per candidate:
+preferred-genre hits, taste weight, and "follows the author".
+
+These are now grouped joins computed once. The output is unchanged: rails for
+30 seeded users were byte-identical before and after (stories, order, scores
+and reasons). The query dropped from **~122 ms to ~72 ms** (`EXPLAIN ANALYZE`,
+three runs each).
+
+What remains is still linear in the catalogue: summing chapter word counts
+(~16 ms over 60k chapters) and the numeric scoring of every candidate. The
+next step is a design decision rather than a query fix: cache each reader's
+rail for a few minutes (cleared when they shelve, rate or follow), or
+precompute rails in the background.
 
 ## Re-running
 

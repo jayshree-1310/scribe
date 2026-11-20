@@ -422,27 +422,31 @@ async function rankStories(
                SELECT 1 FROM "signal" AS sig WHERE sig."storyId" = s."id"
              )
     ),
+    -- Genre hits, taste and follows as one grouped pass each, joined to the
+    -- candidates, rather than as subqueries re-run for every candidate: the
+    -- same numbers (preferred, taste and follow are each unique per genre or
+    -- author, so a join cannot double-count) in ~40% less time at 5,000
+    -- stories. See docs/LOAD-TESTING.md.
+    "genreTerms" AS (
+      SELECT sg."storyId",
+             COUNT(p."genreId") AS "hits",
+             SUM(t."weight") AS "taste"
+        FROM "content"."storyGenre" AS sg
+        LEFT JOIN "preferred" AS p ON p."genreId" = sg."genreId"
+        LEFT JOIN "taste" AS t ON t."genreId" = sg."genreId"
+       WHERE p."genreId" IS NOT NULL OR t."genreId" IS NOT NULL
+       GROUP BY sg."storyId"
+    ),
+    "followed" AS (
+      SELECT f."followingId" AS "authorId"
+        FROM "engagement"."follow" AS f
+       WHERE f."followerId" = ${userId}
+    ),
     "measured" AS (
       SELECT c."id",
-             LEAST(
-               (SELECT COUNT(*)
-                  FROM "content"."storyGenre" AS sg
-                  JOIN "preferred" AS p ON p."genreId" = sg."genreId"
-                 WHERE sg."storyId" = c."id"),
-               ${MAX_GENRE_HITS}
-             )::int AS "hits",
-             COALESCE(
-               (SELECT SUM(t."weight")
-                  FROM "content"."storyGenre" AS sg
-                  JOIN "taste" AS t ON t."genreId" = sg."genreId"
-                 WHERE sg."storyId" = c."id"),
-               0
-             ) AS "taste",
-             EXISTS (
-               SELECT 1 FROM "engagement"."follow" AS f
-                WHERE f."followerId" = ${userId}
-                  AND f."followingId" = c."authorId"
-             ) AS "followed",
+             LEAST(COALESCE(gt."hits", 0), ${MAX_GENRE_HITS})::int AS "hits",
+             COALESCE(gt."taste", 0) AS "taste",
+             (fa."authorId" IS NOT NULL) AS "followed",
              COALESCE(c."ratingAverage", 3.0) AS "rating",
              c."viewCount", c."likeCount", c."listedAt",
              COALESCE(w."words", 0) AS "words",
@@ -451,6 +455,8 @@ async function rankStories(
              COALESCE(near."title", '') AS "similarTitle",
              COALESCE(near."via", 0)::int AS "similarVia"
         FROM "candidate" AS c
+        LEFT JOIN "genreTerms" AS gt ON gt."storyId" = c."id"
+        LEFT JOIN "followed" AS fa ON fa."authorId" = c."authorId"
         LEFT JOIN LATERAL (
               SELECT SUM(ch."wordCount")::int AS "words"
                 FROM "content"."chapter" AS ch
