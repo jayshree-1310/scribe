@@ -341,6 +341,12 @@ namespace auth {
     notificationMutes NotificationMute[]
     /// Ask This Book conversations this reader started; see `ai.Conversation`.
     conversations    ai.Conversation[]
+
+    /// Author search matches either name with `ILIKE '%term%'` (see
+    /// `services/stories.ts`). Unindexed that was a scan of every account --
+    /// 50ms at 20,000 users, the costliest statement in the load test.
+    @@index(expression: "username gin_trgm_ops", type: "gin", name: "user_username_trgm")
+    @@index(expression: "\"displayName\" gin_trgm_ops", type: "gin", name: "user_display_name_trgm")
   }
 
   /// One reader's settings: what they want recommended, and what they would
@@ -519,6 +525,20 @@ namespace content {
     storySummaries       ai.StorySummary[]
     /// The average of its published passages; see `ai.StoryVector`.
     storyVector          ai.StoryVector?
+
+    /// One per list sort (see `applySort` in services/stories.ts), each ending
+    /// in `id` because every sort breaks ties on it. Without them every page
+    /// of every sort read and sorted the whole table -- 4.6ms over 5,000
+    /// stories in the load test, and linear in the table. Postgres walks a
+    /// btree backwards, so ascending columns serve the DESC sorts.
+    @@index([likeCount, viewCount, id], name: "story_trending")
+    @@index([listedAt, id], name: "story_newest")
+    @@index([viewCount, id], name: "story_views")
+    @@index([ratingAverage, id], name: "story_rating")
+    /// Title search is `ILIKE '%term%'`, which no btree can serve and a
+    /// trigram index can. Needs `pg_trgm`, which the migration that added
+    /// this index creates.
+    @@index(expression: "title gin_trgm_ops", type: "gin", name: "story_title_trgm")
   }
 
   model Chapter {

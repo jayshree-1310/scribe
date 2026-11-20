@@ -21,7 +21,8 @@
     "uploads:sweep": "tsx src/scripts/sweep-uploads.ts",
     "ai:eval": "tsx src/ai-eval/run.ts",
     "ai:prune-usage": "tsx src/scripts/prune-ai-usage.ts",
-    "ai:ops": "tsx src/scripts/ai-ops.ts"
+    "ai:ops": "tsx src/scripts/ai-ops.ts",
+    "load:test": "tsx src/scripts/load-test.ts"
   },
   "keywords": [],
   "author": "",

@@ -9226,7 +9226,22 @@
                 }
               },
               "foreignKeys": [],
-              "indexes": [],
+              "indexes": [
+                {
+                  "expression": "\"displayName\" gin_trgm_ops",
+                  "name": "user_display_name_trgm_c493f926",
+                  "prefix": "user_display_name_trgm",
+                  "type": "gin",
+                  "unique": false
+                },
+                {
+                  "expression": "username gin_trgm_ops",
+                  "name": "user_username_trgm_c97ac12d",
+                  "prefix": "user_username_trgm",
+                  "type": "gin",
+                  "unique": false
+                }
+              ],
               "primaryKey": {
                 "columns": [
                   "id"
@@ -10720,6 +10735,50 @@
                   ],
                   "name": "story_authorId_idx_e47547ed",
                   "prefix": "story_authorId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "listedAt",
+                    "id"
+                  ],
+                  "name": "story_newest_cc3f9793",
+                  "prefix": "story_newest",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "ratingAverage",
+                    "id"
+                  ],
+                  "name": "story_rating_6ca2f6ee",
+                  "prefix": "story_rating",
+                  "unique": false
+                },
+                {
+                  "expression": "title gin_trgm_ops",
+                  "name": "story_title_trgm_dbf5ca54",
+                  "prefix": "story_title_trgm",
+                  "type": "gin",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "likeCount",
+                    "viewCount",
+                    "id"
+                  ],
+                  "name": "story_trending_a6287633",
+                  "prefix": "story_trending",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "viewCount",
+                    "id"
+                  ],
+                  "name": "story_views_a688e443",
+                  "prefix": "story_views",
                   "unique": false
                 }
               ],
@@ -12581,7 +12640,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "946c00812d2deb2e85bc8d5350ec319d2a7fc45d8f2b3a96a581845709ba723c"
+    "storageHash": "67a9ce00722e0466a1ae2aeb83d8477e70000921add3526342f7117f9f747494"
   },
   "execution": {
     "executionHash": "7d2db05d5e947645db9eaad034511ce50b09361a5ca66b23b87121c8110a7737",

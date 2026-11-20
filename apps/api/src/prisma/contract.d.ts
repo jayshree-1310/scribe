@@ -33,7 +33,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'946c00812d2deb2e85bc8d5350ec319d2a7fc45d8f2b3a96a581845709ba723c'>;
+  StorageHashBase<'67a9ce00722e0466a1ae2aeb83d8477e70000921add3526342f7117f9f747494'>;
 export type ExecutionHash =
   ExecutionHashBase<'7d2db05d5e947645db9eaad034511ce50b09361a5ca66b23b87121c8110a7737'>;
 export type ProfileHash =
@@ -4163,7 +4163,22 @@ type ContractBase = Omit<
                 { readonly columns: readonly ['email'] },
                 { readonly columns: readonly ['googleId'] },
               ];
-              indexes: readonly [];
+              indexes: readonly [
+                {
+                  readonly name: 'user_username_trgm_c97ac12d';
+                  readonly prefix: 'user_username_trgm';
+                  readonly expression: 'username gin_trgm_ops';
+                  readonly unique: false;
+                  readonly type: 'gin';
+                },
+                {
+                  readonly name: 'user_display_name_trgm_c493f926';
+                  readonly prefix: 'user_display_name_trgm';
+                  readonly expression: '"displayName" gin_trgm_ops';
+                  readonly unique: false;
+                  readonly type: 'gin';
+                },
+              ];
               foreignKeys: readonly [];
             };
             readonly userPreference: {
@@ -5281,6 +5296,37 @@ type ContractBase = Omit<
                 { readonly columns: readonly ['isbn'] },
               ];
               indexes: readonly [
+                {
+                  readonly name: 'story_trending_a6287633';
+                  readonly prefix: 'story_trending';
+                  readonly columns: readonly ['likeCount', 'viewCount', 'id'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'story_newest_cc3f9793';
+                  readonly prefix: 'story_newest';
+                  readonly columns: readonly ['listedAt', 'id'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'story_views_a688e443';
+                  readonly prefix: 'story_views';
+                  readonly columns: readonly ['viewCount', 'id'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'story_rating_6ca2f6ee';
+                  readonly prefix: 'story_rating';
+                  readonly columns: readonly ['ratingAverage', 'id'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'story_title_trgm_dbf5ca54';
+                  readonly prefix: 'story_title_trgm';
+                  readonly expression: 'title gin_trgm_ops';
+                  readonly unique: false;
+                  readonly type: 'gin';
+                },
                 {
                   readonly name: 'story_authorId_idx_e47547ed';
                   readonly prefix: 'story_authorId_idx';

@@ -1,0 +1,291 @@
+[
+  {
+    "id": "extension.pg_trgm",
+    "label": "Create extension \"pg_trgm\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create extension \"pg_trgm\"",
+        "sql": "CREATE EXTENSION IF NOT EXISTS \"pg_trgm\""
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "index.user.user_display_name_trgm_c493f926",
+    "label": "Create index \"user_display_name_trgm_c493f926\" on \"user\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "index",
+        "name": "user_display_name_trgm_c493f926",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"user_display_name_trgm_c493f926\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"user_display_name_trgm_c493f926\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"user_display_name_trgm_c493f926\"",
+        "sql": "CREATE INDEX \"user_display_name_trgm_c493f926\" ON \"auth\".\"user\" USING \"gin\" (\"displayName\" gin_trgm_ops)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"user_display_name_trgm_c493f926\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"user_display_name_trgm_c493f926\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.user.user_username_trgm_c97ac12d",
+    "label": "Create index \"user_username_trgm_c97ac12d\" on \"user\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "index",
+        "name": "user_username_trgm_c97ac12d",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"user_username_trgm_c97ac12d\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"user_username_trgm_c97ac12d\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"user_username_trgm_c97ac12d\"",
+        "sql": "CREATE INDEX \"user_username_trgm_c97ac12d\" ON \"auth\".\"user\" USING \"gin\" (username gin_trgm_ops)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"user_username_trgm_c97ac12d\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"auth\".\"user_username_trgm_c97ac12d\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.story.story_newest_cc3f9793",
+    "label": "Create index \"story_newest_cc3f9793\" on \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "story_newest_cc3f9793",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"story_newest_cc3f9793\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story_newest_cc3f9793\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"story_newest_cc3f9793\"",
+        "sql": "CREATE INDEX \"story_newest_cc3f9793\" ON \"content\".\"story\" (\"listedAt\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"story_newest_cc3f9793\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story_newest_cc3f9793\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.story.story_rating_6ca2f6ee",
+    "label": "Create index \"story_rating_6ca2f6ee\" on \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "story_rating_6ca2f6ee",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"story_rating_6ca2f6ee\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story_rating_6ca2f6ee\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"story_rating_6ca2f6ee\"",
+        "sql": "CREATE INDEX \"story_rating_6ca2f6ee\" ON \"content\".\"story\" (\"ratingAverage\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"story_rating_6ca2f6ee\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story_rating_6ca2f6ee\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.story.story_title_trgm_dbf5ca54",
+    "label": "Create index \"story_title_trgm_dbf5ca54\" on \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "story_title_trgm_dbf5ca54",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"story_title_trgm_dbf5ca54\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story_title_trgm_dbf5ca54\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"story_title_trgm_dbf5ca54\"",
+        "sql": "CREATE INDEX \"story_title_trgm_dbf5ca54\" ON \"content\".\"story\" USING \"gin\" (title gin_trgm_ops)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"story_title_trgm_dbf5ca54\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story_title_trgm_dbf5ca54\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.story.story_trending_a6287633",
+    "label": "Create index \"story_trending_a6287633\" on \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "story_trending_a6287633",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"story_trending_a6287633\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story_trending_a6287633\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"story_trending_a6287633\"",
+        "sql": "CREATE INDEX \"story_trending_a6287633\" ON \"content\".\"story\" (\"likeCount\", \"viewCount\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"story_trending_a6287633\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story_trending_a6287633\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.story.story_views_a688e443",
+    "label": "Create index \"story_views_a688e443\" on \"story\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "story_views_a688e443",
+        "table": "story"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"story_views_a688e443\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story_views_a688e443\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"story_views_a688e443\"",
+        "sql": "CREATE INDEX \"story_views_a688e443\" ON \"content\".\"story\" (\"viewCount\", \"id\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"story_views_a688e443\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"story_views_a688e443\""
+        ]
+      }
+    ]
+  }
+]
