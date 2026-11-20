@@ -111,6 +111,18 @@ describe.skipIf(!available)("scheduling a chapter", () => {
     });
     expect(page.body.story.nextRelease).toEqual({ number: 2, scheduledAt: at });
 
+    // The author's own chapter list carries the time on the draft's row;
+    // a reader's list has no such row at all.
+    type Row = { number: number; scheduledAt: string | null };
+    const mine = await api.request<{ chapters: Row[] }>(`/api/stories/${story.slug}/chapters`, {
+      as: author,
+    });
+    expect(mine.body.chapters.find((row) => row.number === 2)?.scheduledAt).toBe(at);
+    const theirs = await api.request<{ chapters: Row[] }>(`/api/stories/${story.slug}/chapters`, {
+      as: reader,
+    });
+    expect(theirs.body.chapters.map((row) => row.number)).toEqual([1]);
+
     // Coming, not here: the chapter itself is still a draft to readers.
     expect(
       (await api.request(`/api/stories/${story.slug}/chapters/2`, { as: reader })).status,

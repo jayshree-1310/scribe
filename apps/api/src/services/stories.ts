@@ -75,6 +75,12 @@ export interface ChapterSummary {
   title: string;
   wordCount: number;
   publishedAt: string | null;
+  /**
+   * When an unpublished chapter is set to go live. Only ever set on a row
+   * the caller can see unpublished, which is to say only for its author --
+   * readers get the release through `StoryDetail.nextRelease` instead.
+   */
+  scheduledAt: string | null;
 }
 
 export interface ChapterMedia {
@@ -747,7 +753,7 @@ export async function listChapters(
   if (!story) throw HttpError.notFound(NOT_FOUND);
 
   const rows = await chaptersVisibleTo(story, viewerId)
-    .select("id", "storyId", "chapterNumber", "title", "wordCount", "publishedAt")
+    .select("id", "storyId", "chapterNumber", "title", "wordCount", "publishedAt", "scheduledAt")
     .orderBy((chapter) => chapter.chapterNumber.asc())
     .all();
 
@@ -758,6 +764,7 @@ export async function listChapters(
     title: row.title,
     wordCount: row.wordCount,
     publishedAt: toIso(row.publishedAt),
+    scheduledAt: toIso(row.scheduledAt),
   }));
 }
 
@@ -795,6 +802,7 @@ export async function getChapter(
       "content",
       "wordCount",
       "publishedAt",
+      "scheduledAt",
     )
     .where((chapter) => chapter.chapterNumber.eq(number))
     .first();
@@ -850,6 +858,7 @@ export async function getChapter(
     content: row.content,
     wordCount: row.wordCount,
     publishedAt: toIso(row.publishedAt),
+    scheduledAt: toIso(row.scheduledAt),
     multimedia: media.map((item) => ({
       id: item.id,
       type: item.type as ChapterMedia["type"],

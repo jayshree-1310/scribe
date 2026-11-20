@@ -88,6 +88,8 @@ export interface ChapterSummary {
   title: string
   wordCount: number
   publishedAt: string | null
+  /** When an unpublished chapter goes live. Only the author sees such rows. */
+  scheduledAt: string | null
 }
 
 export interface ChapterMedia {

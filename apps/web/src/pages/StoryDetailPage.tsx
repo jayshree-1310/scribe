@@ -512,7 +512,12 @@ export function StoryDetailPage() {
                           list endpoint returns no bodies and no media, so a
                           count here would cost a request per row. */}
                       <span className="chapter-row__meta">
-                        {chapter.publishedAt ? formatDate(chapter.publishedAt) : 'Unpublished'} ·{' '}
+                        {chapter.publishedAt
+                          ? formatDate(chapter.publishedAt)
+                          : chapter.scheduledAt
+                            ? `Scheduled for ${formatDayAndTime(chapter.scheduledAt)}`
+                            : 'Unpublished'}{' '}
+                        ·{' '}
                         {readingMinutes(chapter.wordCount)} min read
                       </span>
                     </span>
