@@ -30,6 +30,10 @@ export default defineConfig({
       // Publishing a fixture chapter queues its embedding; with no worker in
       // the suite those jobs would only pile up. The jobs suite turns it on.
       AI_JOBS: "off",
+      // The public read cache would serve one test the page an earlier test
+      // cached, missing fixtures written straight to the database since. Its
+      // own suite turns it on.
+      READ_CACHE_SECONDS: "0",
     },
   },
 });

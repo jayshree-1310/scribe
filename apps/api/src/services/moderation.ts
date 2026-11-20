@@ -96,6 +96,7 @@
 import { Temporal } from "temporal-polyfill";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
+import { invalidateReadCache } from "../lib/read-cache.js";
 import { notify } from "./notifications.js";
 import { assertAdmin, assertNotSuspended } from "./roles.js";
 import { toIso } from "./stories.js";
@@ -1226,6 +1227,9 @@ export async function fileAutomatedReport(
 
   if (input.hide && !target.hidden) {
     await db.transaction((tx) => hideContent(tx, input.targetType, input.targetId));
+    // An automated hide has no moderator request for app.ts to clear the
+    // public read cache after, so it clears it here, once committed.
+    invalidateReadCache();
 
     notify({
       event: "content-hidden",

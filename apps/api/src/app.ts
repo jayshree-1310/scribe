@@ -10,6 +10,7 @@ import cors from "cors";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
 import { logger } from "./lib/logger.js";
+import { invalidateReadCache } from "./lib/read-cache.js";
 import { authenticate } from "./middleware/authenticate.js";
 import { errorHandler, notFoundHandler } from "./middleware/error-handler.js";
 import accountRouter from "./routes/account.js";
@@ -156,6 +157,24 @@ app.use(
     },
   }),
 );
+
+/**
+ * Clears the public read cache after a successful write to anything a story
+ * card or the catalogue shows: an author's stories and chapters, an account's
+ * name and avatar (printed on every card), and a moderator hiding a story or
+ * a profile. On `finish`, so it runs after the handler's transaction has
+ * committed -- see `invalidateReadCache`. Counters (views, likes, ratings)
+ * are deliberately not here: they change on every read and are allowed the
+ * cache's few seconds of lag.
+ */
+app.use(["/api/author", "/api/account", "/api/moderation"], (req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    res.on("finish", () => {
+      if (res.statusCode < 400) invalidateReadCache();
+    });
+  }
+  next();
+});
 
 app.use("/api/account", accountRouter);
 /**

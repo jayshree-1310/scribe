@@ -10,6 +10,7 @@
 import type { Request } from "express";
 import { Router } from "express";
 import { z } from "zod";
+import { readThrough } from "../lib/read-cache.js";
 import { pageSchema, parseOrThrow } from "../lib/validate.js";
 import { getUserId } from "../middleware/current-user.js";
 import {
@@ -26,9 +27,31 @@ import {
   listChapters,
   listGenres,
   listStories,
+  seesPublicView,
 } from "../services/stories.js";
 
 const router = Router();
+
+/**
+ * `load` for this caller, through the shared read cache when the caller sees
+ * what an anonymous reader sees.
+ *
+ * The cached copy is always computed as the anonymous reader, so whoever
+ * fills it cannot leak a draft into it; an author is served `load` with their
+ * own id, uncached. See `seesPublicView` for why that split is exact, and
+ * `lib/read-cache.ts` for how stale a shared copy can be.
+ */
+async function forViewer<T>(
+  req: Request,
+  key: string,
+  load: (viewerId: string | null) => Promise<T>,
+): Promise<T> {
+  const viewerId = getUserId(req);
+  if (await seesPublicView(viewerId)) {
+    return readThrough(`stories:${key}`, () => load(null));
+  }
+  return load(viewerId);
+}
 
 /**
  * Who the analytics log should dedupe this request by.
@@ -102,7 +125,7 @@ const chapterParamSchema = slugParamSchema.extend({
 // Ahead of `/:slug`, which would otherwise match "genres".
 router.get("/genres", async (_req, res, next) => {
   try {
-    res.json({ genres: await listGenres() });
+    res.json({ genres: await readThrough("stories:genres", listGenres) });
   } catch (error) {
     next(error);
   }
@@ -114,17 +137,18 @@ router.get("/", async (req, res, next) => {
   try {
     const query = parseOrThrow(listQuerySchema, req.query);
 
-    const page = await listStories(
-      {
-        search: query.search,
-        genreId: query.genreId,
-        authorId: query.authorId,
-        kidsAppropriate: query.kidsAppropriate,
-        sort: query.sort,
-        page: query.page,
-        limit: query.limit,
-      },
-      getUserId(req),
+    const filters = {
+      search: query.search,
+      genreId: query.genreId,
+      authorId: query.authorId,
+      kidsAppropriate: query.kidsAppropriate,
+      sort: query.sort,
+      page: query.page,
+      limit: query.limit,
+    };
+    // Keyed on the parsed query, so `?page=1` and no page share an entry.
+    const page = await forViewer(req, `list:${JSON.stringify(filters)}`, (viewerId) =>
+      listStories(filters, viewerId),
     );
 
     res.json(page);
@@ -138,7 +162,7 @@ router.get("/", async (req, res, next) => {
 router.get("/:slug", async (req, res, next) => {
   try {
     const { slug } = parseOrThrow(slugParamSchema, req.params);
-    const story = await getStory(slug, getUserId(req));
+    const story = await forViewer(req, `one:${slug}`, (viewerId) => getStory(slug, viewerId));
 
     /**
      * After the story resolved, so a view is only recorded for a story the
@@ -157,7 +181,11 @@ router.get("/:slug", async (req, res, next) => {
 router.get("/:slug/related", async (req, res, next) => {
   try {
     const { slug } = parseOrThrow(slugParamSchema, req.params);
-    res.json({ stories: await getRelatedStories(slug, getUserId(req)) });
+    res.json({
+      stories: await forViewer(req, `related:${slug}`, (viewerId) =>
+        getRelatedStories(slug, viewerId),
+      ),
+    });
   } catch (error) {
     next(error);
   }
@@ -168,12 +196,21 @@ router.get("/:slug/related", async (req, res, next) => {
 router.get("/:slug/chapters", async (req, res, next) => {
   try {
     const { slug } = parseOrThrow(slugParamSchema, req.params);
-    res.json({ chapters: await listChapters(slug, getUserId(req)) });
+    res.json({
+      chapters: await forViewer(req, `chapters:${slug}`, (viewerId) =>
+        listChapters(slug, viewerId),
+      ),
+    });
   } catch (error) {
     next(error);
   }
 });
 
+/**
+ * Not cached, unlike the reads above: a chapter carries a live like count and
+ * the caller's own `likedByMe`, and a reader who likes a chapter and reloads
+ * should see both move.
+ */
 router.get("/:slug/chapters/:number", async (req, res, next) => {
   try {
     const { slug, number } = parseOrThrow(chapterParamSchema, req.params);

@@ -8,6 +8,7 @@
 
 import { Router, type Request } from "express";
 import { z } from "zod";
+import { readThrough } from "../lib/read-cache.js";
 import { pageSchema, parseOrThrow } from "../lib/validate.js";
 import { getUserId } from "../middleware/current-user.js";
 import {
@@ -87,7 +88,7 @@ async function withLibraryStatus(
 
 router.get("/genres", async (_req, res, next) => {
   try {
-    res.json({ genres: await listGenres() });
+    res.json({ genres: await readThrough("books:genres", listGenres) });
   } catch (error) {
     next(error);
   }
@@ -96,7 +97,9 @@ router.get("/genres", async (_req, res, next) => {
 /** Everything the Discover page opens with, in one round trip. */
 router.get("/discover", async (req, res, next) => {
   try {
-    const discover = await getDiscover();
+    // The catalogue is the same for every caller and is cached as such (see
+    // `lib/read-cache.ts`); only the shelf status layered on below is theirs.
+    const discover = await readThrough("books:discover", getDiscover);
 
     // One annotation pass over every book on the page, deduplicated by id.
     const everyBook = [
@@ -130,7 +133,7 @@ router.get("/", async (req, res, next) => {
   try {
     const query = parseOrThrow(listQuerySchema, req.query);
 
-    const page = await listBooks({
+    const filters = {
       search: query.search,
       genreId: query.genreId,
       completed:
@@ -139,7 +142,10 @@ router.get("/", async (req, res, next) => {
       sort: query.sort,
       page: query.page,
       limit: query.limit,
-    });
+    };
+    const page = await readThrough(`books:list:${JSON.stringify(filters)}`, () =>
+      listBooks(filters),
+    );
 
     res.json({ ...page, items: await withLibraryStatus(req, page.items) });
   } catch (error) {
@@ -150,8 +156,9 @@ router.get("/", async (req, res, next) => {
 router.get("/:id", async (req, res, next) => {
   try {
     const { id } = parseOrThrow(idParamSchema, req.params);
-    const [book] = await withLibraryStatus(req, [await getBook(id)]);
-    res.json({ book });
+    const book = await readThrough(`books:one:${id}`, () => getBook(id));
+    const [annotated] = await withLibraryStatus(req, [book]);
+    res.json({ book: annotated });
   } catch (error) {
     next(error);
   }
@@ -160,7 +167,7 @@ router.get("/:id", async (req, res, next) => {
 router.get("/:id/related", async (req, res, next) => {
   try {
     const { id } = parseOrThrow(idParamSchema, req.params);
-    const related = await getRelatedBooks(id);
+    const related = await readThrough(`books:related:${id}`, () => getRelatedBooks(id));
     res.json({ books: await withLibraryStatus(req, related) });
   } catch (error) {
     next(error);

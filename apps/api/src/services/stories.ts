@@ -655,6 +655,30 @@ async function findStoryRow(
   return (byId as StoryRow | undefined) ?? null;
 }
 
+/**
+ * Whether `viewerId` is served story reads exactly as an anonymous reader is.
+ *
+ * The one viewer-dependent thing in a story list, a story's page, its related
+ * rail and its chapter list is authorship: an author also sees their own
+ * drafts and counts their own unpublished chapters (`visibleTo`,
+ * `chapterTotals`, `chaptersVisibleTo`). Someone who has never created a story
+ * gets the public answer, which is what lets `routes/stories.ts` share one
+ * cached copy between them and every anonymous reader.
+ *
+ * Asked fresh on every request -- one probe of the `authorId` index -- because
+ * the answer changes the moment a reader creates their first draft, and a
+ * stale "no" would show that author a 404 for the story they just made.
+ */
+export async function seesPublicView(viewerId: string | null): Promise<boolean> {
+  if (viewerId === null) return true;
+
+  const own = await db.orm.content.Story.select("id")
+    .where((story) => story.authorId.eq(viewerId))
+    .first();
+
+  return own === null || own === undefined;
+}
+
 const NOT_FOUND = "That story could not be found.";
 
 /**

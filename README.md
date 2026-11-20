@@ -76,6 +76,8 @@ current tree rather than in the abstract:
 - `docs/content-model.md` — why there is one work entity (`content.Story`)
   rather than separate `Book` and `Story` models.
 - `docs/DEPLOYMENT.md` — the Render deployment, service by service.
+- `docs/LOAD-TESTING.md` — how to load-test the API against realistic volume,
+  what the first run found, and what was changed because of it.
 
 ## ✨ Features
 

@@ -1,5 +1,6 @@
 import app from "./app.js";
 import { logger } from "./lib/logger.js";
+import { invalidateReadCache } from "./lib/read-cache.js";
 import { db } from "./prisma/db.js";
 import { connectRedis, redis } from "./lib/redis.js";
 import { drainDeferredWrites } from "./services/deferred.js";
@@ -79,7 +80,10 @@ async function start() {
   const release = () =>
     void releaseDueChapters()
       .then((count) => {
-        if (count > 0) logger.info({ count }, "scheduled chapters released");
+        if (count === 0) return;
+        // A released chapter changes its story's chapter count on every card.
+        invalidateReadCache();
+        logger.info({ count }, "scheduled chapters released");
       })
       .catch((error) => logger.warn({ err: error }, "scheduled release failed"));
   release();
