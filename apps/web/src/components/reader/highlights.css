@@ -1,0 +1,250 @@
+/* ==========================================================================
+   Highlights and margin notes
+   Painted in the reading theme's tokens (`--read-*`), like everything else
+   inside `.reader`; see the header of `reader.css`. The marks are drawn with
+   the CSS Custom Highlight API, so the selectors below are `::highlight()`
+   pseudo-elements over ranges, not classes on elements -- nothing is
+   inserted into the prose. Only colour, background and text-decoration
+   apply to them, which is all a highlight needs.
+   ========================================================================== */
+
+.reader {
+  /* Derived from the theme's own brand colour, so Sepia and Night get a
+     highlight in their violet without a token per theme. */
+  --read-highlight: color-mix(in srgb, var(--read-brand) 26%, transparent);
+  --read-highlight-strong: color-mix(in srgb, var(--read-brand) 42%, transparent);
+}
+
+::highlight(scribe-highlight) {
+  background-color: var(--read-highlight);
+}
+
+/* A highlight with a note is underlined as well, so a reader can tell which
+   ones say something before they tap. */
+::highlight(scribe-highlight-note) {
+  background-color: var(--read-highlight);
+  text-decoration: underline dotted var(--read-brand);
+}
+
+/* The one just jumped to from the list, or open in the note sheet. */
+::highlight(scribe-highlight-focus) {
+  background-color: var(--read-highlight-strong);
+}
+
+/* The offer on a selection ---------------------------------------------- */
+
+/*
+ * The explain trigger's pill, holding two actions. Same placement rules as
+ * `.explain-trigger`, which it replaced on the page; see `ReaderPage`.
+ */
+.selection-menu {
+  position: absolute;
+  z-index: 20;
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--read-brand-border);
+  border-radius: var(--radius-full);
+  background-color: var(--read-bg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+}
+
+.selection-menu__action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--read-brand);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.selection-menu__action + .selection-menu__action {
+  border-inline-start: 1px solid var(--read-brand-border);
+}
+
+.selection-menu__action:hover:not(:disabled) {
+  background-color: var(--read-brand-soft);
+}
+
+.selection-menu__action:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Margin notes ------------------------------------------------------------ */
+
+/* Positioning context for the markers, around the prose and nothing else. */
+.reader__prose-wrap {
+  position: relative;
+}
+
+/*
+ * A marker in the right margin beside each highlight that has a note. Also a
+ * real button, so the notes are reachable from the keyboard. Out of the way
+ * on a narrow screen, where there is no margin: the dotted underline still
+ * says a note is there, and a tap on the passage opens it.
+ */
+.reader__margin-note {
+  position: absolute;
+  inset-inline-end: -2.5rem;
+  display: inline-grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid var(--read-brand-border);
+  border-radius: var(--radius-full);
+  background-color: var(--read-bg);
+  color: var(--read-brand);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+.reader__margin-note:hover {
+  background-color: var(--read-brand-soft);
+}
+
+@media (max-width: 56rem) {
+  .reader__margin-note {
+    display: none;
+  }
+}
+
+/* Sheets ------------------------------------------------------------------ */
+
+.highlight-sheet__title {
+  flex: 1;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--read-ink);
+}
+
+.highlight-sheet__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.highlight-sheet__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* The list wants more room than one answer does. */
+.highlights-sheet {
+  max-height: min(60vh, 32rem);
+}
+
+.highlights-sheet .explain-sheet__body {
+  padding-block: var(--space-2) var(--space-1);
+}
+
+.highlights-sheet__group + .highlights-sheet__group {
+  margin-block-start: var(--space-4);
+}
+
+.highlights-sheet__chapter {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--read-ink-soft);
+}
+
+.highlights-sheet__here {
+  font-weight: 400;
+}
+
+.highlights-sheet__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.highlights-sheet__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-inline-start: 2px solid var(--read-brand-border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
+
+button.highlights-sheet__item {
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease);
+}
+
+button.highlights-sheet__item:hover {
+  background-color: var(--read-brand-soft);
+}
+
+.highlights-sheet__item.is-gone {
+  border-inline-start-color: var(--read-rule);
+}
+
+.highlights-sheet__quote {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  font-family: var(--font-reading);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--read-ink);
+}
+
+.is-gone .highlights-sheet__quote {
+  color: var(--read-ink-soft);
+  text-decoration: line-through;
+  text-decoration-color: var(--read-rule);
+}
+
+.highlights-sheet__note {
+  font-size: var(--text-sm);
+  color: var(--read-ink-soft);
+  white-space: pre-wrap;
+}
+
+.highlights-sheet__gone {
+  font-size: var(--text-xs);
+  color: var(--read-ink-soft);
+}
+
+.highlights-sheet__retry {
+  margin-inline-start: var(--space-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--read-brand);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media print {
+  .selection-menu,
+  .reader__margin-note,
+  .highlight-sheet,
+  .highlights-sheet {
+    display: none;
+  }
+}

@@ -100,6 +100,10 @@
       "model": "GenrePreference",
       "namespace": "auth"
     },
+    "highlight": {
+      "model": "Highlight",
+      "namespace": "engagement"
+    },
     "libraryEntry": {
       "model": "LibraryEntry",
       "namespace": "library"
@@ -5924,6 +5928,163 @@
               "table": "follow"
             }
           },
+          "Highlight": {
+            "fields": {
+              "chapterId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "end": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "note": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "quote": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "start": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "storyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "chapter": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "chapterId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Chapter",
+                  "namespace": "content"
+                }
+              },
+              "story": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "storyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Story",
+                  "namespace": "content"
+                }
+              },
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "chapterId": {
+                  "column": "chapterId"
+                },
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "end": {
+                  "column": "end"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "note": {
+                  "column": "note"
+                },
+                "quote": {
+                  "column": "quote"
+                },
+                "start": {
+                  "column": "start"
+                },
+                "storyId": {
+                  "column": "storyId"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "engagement",
+              "table": "highlight"
+            }
+          },
           "Rating": {
             "fields": {
               "createdAt": {
@@ -11529,6 +11690,162 @@
                 }
               ]
             },
+            "highlight": {
+              "columns": {
+                "chapterId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "end": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "note": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "quote": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "start": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": false
+                },
+                "storyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "userId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "engagement",
+                    "tableName": "highlight"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "storyId"
+                    ],
+                    "namespaceId": "engagement",
+                    "tableName": "highlight"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "story"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "chapterId"
+                    ],
+                    "namespaceId": "engagement",
+                    "tableName": "highlight"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "chapter"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "chapterId"
+                  ],
+                  "name": "highlight_chapterId_idx_411dd3d6",
+                  "prefix": "highlight_chapterId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "storyId"
+                  ],
+                  "name": "highlight_storyId_idx_cd452158",
+                  "prefix": "highlight_storyId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "highlight_userId_idx_a489d58a",
+                  "prefix": "highlight_userId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId",
+                    "storyId"
+                  ],
+                  "name": "highlight_userId_storyId_idx_57dae79f",
+                  "prefix": "highlight_userId_storyId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": []
+            },
             "rating": {
               "columns": {
                 "createdAt": {
@@ -12640,10 +12957,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "67a9ce00722e0466a1ae2aeb83d8477e70000921add3526342f7117f9f747494"
+    "storageHash": "32647ea05528d39d6b360a7d0102ad631434e9b7f17877c5c4c378c273b1b5da"
   },
   "execution": {
-    "executionHash": "7d2db05d5e947645db9eaad034511ce50b09361a5ca66b23b87121c8110a7737",
+    "executionHash": "f2f22bb3457f9b0f382c7b5af69a661685249a9714865bf73407d3a01055dcf8",
     "mutations": {
       "defaults": [
         {
@@ -12875,6 +13192,17 @@
             "column": "id",
             "namespace": "content",
             "table": "genre"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "engagement",
+            "table": "highlight"
           }
         },
         {

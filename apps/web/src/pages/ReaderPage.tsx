@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
 import { useReadingProgress } from '../hooks/useReadingProgress'
@@ -33,6 +33,16 @@ import { RecapCard } from '../components/ai/RecapCard'
 import { ExplainSheet } from '../components/ai/ExplainSheet'
 import { AskBookSheet } from '../components/ai/AskBookSheet'
 import { readSelection, type ChapterSelection } from '../lib/chapter-selection'
+import {
+  indexText,
+  paintHighlights,
+  rangeContainsPoint,
+  rangeForQuote,
+} from '../lib/highlight-ranges'
+import * as highlightsApi from '../data/highlights-api'
+import type { SavedHighlight } from '../types/highlights'
+import { HighlightNoteSheet } from '../components/reader/HighlightNoteSheet'
+import { HighlightsSheet } from '../components/reader/HighlightsSheet'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
 import { Avatar } from '../components/ui/Avatar'
@@ -97,6 +107,14 @@ export function ReaderPage() {
   const citedQuote = typeof cited === 'string' && cited.trim() !== '' ? cited : null
 
   /**
+   * A highlight picked from the highlights list in another chapter, which is
+   * opened once this chapter has painted. Router state for the reason a
+   * citation is: it belongs to the one navigation.
+   */
+  const jump = (location.state as { highlight?: unknown } | null)?.highlight
+  const jumpTo = typeof jump === 'string' ? jump : null
+
+  /**
    * Restores the reader's place when a chapter opens and saves it as they
    * scroll, off the same `progress` fraction the bar above is drawn from. A
    * citation is somewhere more specific to be, so it wins over the restore.
@@ -105,7 +123,7 @@ export function ReaderPage() {
     storyId,
     chapter: chapter.data ?? null,
     scrollFraction: progress,
-    skipRestore: citedQuote !== null,
+    skipRestore: citedQuote !== null || jumpTo !== null,
   })
 
   const [focusMode, setFocusMode] = useState(false)
@@ -266,6 +284,15 @@ export function ReaderPage() {
   const [anchorPoint, setAnchorPoint] = useState({ top: 0, left: 0 })
   const [explaining, setExplaining] = useState(false)
 
+  /** The open note sheet: whose, and where its passage ends on the page. */
+  const [noteFor, setNoteFor] = useState<{
+    id: string
+    autoFocus: boolean
+    passageBottom: number
+  } | null>(null)
+  const [listOpen, setListOpen] = useState(false)
+  const [highlighting, setHighlighting] = useState(false)
+
   /** Ask This Book. One sheet at a time: opening it closes the explain sheet. */
   const [asking, setAsking] = useState(false)
   const closeAsk = useCallback(() => setAsking(false), [])
@@ -310,7 +337,262 @@ export function ReaderPage() {
 
     setSelection(found)
     setExplaining(false)
+    setNoteFor(null)
   }, [chapter.data, signedIn])
+
+  /* Highlights and margin notes --------------------------------------- */
+
+  /**
+   * The reader's highlights across the whole story: the list sheet shows all
+   * of them, and the page paints this chapter's.
+   */
+  const fetchedHighlights = useAsync(
+    () =>
+      signedIn && storyId
+        ? highlightsApi.listHighlights(storyId)
+        : Promise.resolve(null),
+    [signedIn, storyId],
+  )
+
+  /**
+   * Changes made on this page, laid over the fetched list rather than
+   * reloading it, so a new highlight paints at once and the list does not
+   * flash empty. Keyed by story, so it lapses on its own when the story
+   * changes and the fetch takes over again.
+   */
+  const [edited, setEdited] = useState<{
+    storyId: string
+    items: SavedHighlight[]
+  } | null>(null)
+  const myHighlights =
+    storyId && edited?.storyId === storyId ? edited.items : fetchedHighlights.data
+
+  const editHighlights = useCallback(
+    (change: (items: SavedHighlight[]) => SavedHighlight[]) => {
+      if (!storyId) return
+      setEdited({
+        storyId,
+        items: change(myHighlights ?? []).sort(
+          (a, b) => a.chapterNumber - b.chapterNumber || a.start - b.start,
+        ),
+      })
+    },
+    [storyId, myHighlights],
+  )
+
+  const chapterData = chapter.data
+  const chapterHighlights = useMemo(
+    () =>
+      (myHighlights ?? []).filter(
+        (highlight) => highlight.found && highlight.chapterId === chapterData?.id,
+      ),
+    [myHighlights, chapterData?.id],
+  )
+
+
+  /** Each painted highlight's range, for hit-testing a tap and for jumping. */
+  const rangesRef = useRef(new Map<string, Range>())
+  const proseWrapRef = useRef<HTMLDivElement | null>(null)
+  const [marginNotes, setMarginNotes] = useState<Array<{ id: string; top: number }>>([])
+
+  /**
+   * Paints this chapter's highlights over the prose, and places a margin
+   * marker beside each one with a note.
+   *
+   * The markers are re-placed whenever the prose changes size -- a font or
+   * width preference, a window resize, an image loading above -- since the
+   * ranges are live but their position on screen is not. The observer's first
+   * call, on `observe`, is the initial placement.
+   */
+  useEffect(() => {
+    const prose = proseRef.current
+    const wrap = proseWrapRef.current
+    if (!prose || !wrap || !chapterData) return
+
+    const index = indexText(prose)
+    const ranges = new Map<string, Range>()
+    for (const highlight of chapterHighlights) {
+      const range = rangeForQuote(
+        index,
+        highlight.quote,
+        highlight.start,
+        chapterData.content.length,
+      )
+      if (range) ranges.set(highlight.id, range)
+    }
+    rangesRef.current = ranges
+
+    const painted = (withNote: boolean) =>
+      chapterHighlights
+        .filter((highlight) => (highlight.note !== null) === withNote)
+        .flatMap((highlight) => ranges.get(highlight.id) ?? [])
+    paintHighlights('scribe-highlight', painted(false))
+    paintHighlights('scribe-highlight-note', painted(true))
+
+    const noted = chapterHighlights.filter(
+      (highlight) => highlight.note !== null && ranges.has(highlight.id),
+    )
+    const place = () => {
+      const origin = wrap.getBoundingClientRect().top
+      setMarginNotes(
+        noted.flatMap((highlight) => {
+          const first = ranges.get(highlight.id)?.getClientRects()[0]
+          return first ? [{ id: highlight.id, top: first.top - origin }] : []
+        }),
+      )
+    }
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place)
+    observer?.observe(wrap)
+
+    return () => {
+      observer?.disconnect()
+      rangesRef.current = new Map()
+      paintHighlights('scribe-highlight', [])
+      paintHighlights('scribe-highlight-note', [])
+    }
+  }, [chapterHighlights, chapterData])
+
+  /** The highlight whose note is open is drawn stronger, so it is clear which. */
+  useEffect(() => {
+    const range = noteFor ? rangesRef.current.get(noteFor.id) : undefined
+    paintHighlights('scribe-highlight-focus', range ? [range] : [])
+    return () => paintHighlights('scribe-highlight-focus', [])
+  }, [noteFor, chapterHighlights])
+
+  /**
+   * Opens a highlight's note sheet. From the list or a margin marker, the
+   * page first scrolls the passage to the upper part of the window; from a
+   * tap on the passage, the reader is already looking at it.
+   */
+  const openNote = useCallback(
+    (id: string, options: { scroll: boolean; autoFocus?: boolean }) => {
+      const range = rangesRef.current.get(id)
+      if (!range) return
+
+      if (options.scroll) {
+        const rect = range.getBoundingClientRect()
+        window.scrollTo({ top: window.scrollY + rect.top - window.innerHeight * 0.3 })
+      }
+
+      setExplaining(false)
+      setSelection(null)
+      setAsking(false)
+      setListOpen(false)
+      setNoteFor({
+        id,
+        autoFocus: options.autoFocus ?? false,
+        passageBottom: range.getBoundingClientRect().bottom + window.scrollY,
+      })
+    },
+    [],
+  )
+
+  /**
+   * Arriving from the list with a highlight to open. Once per navigation:
+   * the effect re-runs as notes are edited, and must not reopen a sheet the
+   * reader has since closed.
+   */
+  const jumpedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (jumpTo === null || jumpedFor.current === location.key) return
+    if (!chapterHighlights.some((highlight) => highlight.id === jumpTo)) return
+
+    const frame = requestAnimationFrame(() => {
+      jumpedFor.current = location.key
+      openNote(jumpTo, { scroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [jumpTo, location.key, chapterHighlights, openNote])
+
+  /** A tap on a highlighted passage opens its note. */
+  const onProseClick = useCallback(
+    (event: React.MouseEvent) => {
+      if (!signedIn) return
+      const selected = window.getSelection()
+      if (selected && !selected.isCollapsed) return
+
+      for (const [id, range] of rangesRef.current) {
+        if (rangeContainsPoint(range, event.clientX, event.clientY)) {
+          openNote(id, { scroll: false })
+          return
+        }
+      }
+    },
+    [signedIn, openNote],
+  )
+
+  /** Keeps the current selection, then opens its note sheet ready to write in. */
+  const highlightSelection = useCallback(async () => {
+    if (!selection || !chapterData) return
+
+    setHighlighting(true)
+    try {
+      const created = await highlightsApi.createHighlight({
+        chapterId: chapterData.id,
+        start: selection.start,
+        end: selection.end,
+      })
+      editHighlights((items) => [
+        ...items.filter((item) => item.id !== created.id),
+        created,
+      ])
+      window.getSelection()?.removeAllRanges()
+      setSelection(null)
+      setNoteFor({
+        id: created.id,
+        autoFocus: true,
+        passageBottom: anchorPoint.top - 8,
+      })
+    } catch (cause) {
+      showToast({
+        tone: 'error',
+        message:
+          cause instanceof Error ? cause.message : 'That could not be highlighted.',
+      })
+    } finally {
+      setHighlighting(false)
+    }
+  }, [selection, chapterData, editHighlights, anchorPoint.top, showToast])
+
+  const saveNote = useCallback(
+    async (id: string, note: string | null) => {
+      const updated = await highlightsApi.updateHighlightNote(id, note)
+      editHighlights((items) =>
+        items.map((item) => (item.id === updated.id ? updated : item)),
+      )
+      setNoteFor(null)
+    },
+    [editHighlights],
+  )
+
+  const removeHighlight = useCallback(
+    async (id: string) => {
+      await highlightsApi.deleteHighlight(id)
+      editHighlights((items) => items.filter((item) => item.id !== id))
+      setNoteFor(null)
+      showToast({ message: 'Highlight removed.' })
+    },
+    [editHighlights, showToast],
+  )
+
+  /** From the list: here if it is in this chapter, else to its chapter. */
+  const pickHighlight = useCallback(
+    (highlight: SavedHighlight) => {
+      setListOpen(false)
+      if (highlight.chapterId === chapterData?.id) {
+        openNote(highlight.id, { scroll: true })
+        return
+      }
+      navigate(`/read/${slug}/${highlight.chapterNumber}`, {
+        state: { highlight: highlight.id },
+      })
+    },
+    [chapterData?.id, openNote, navigate, slug],
+  )
+
+  const closeNote = useCallback(() => setNoteFor(null), [])
+  const closeList = useCallback(() => setListOpen(false), [])
 
   // Scroll-linked reading progress.
   useEffect(() => {
@@ -369,6 +651,9 @@ export function ReaderPage() {
   const isOwnStory = data !== null && data !== undefined && session?.user.id === data.author.id
   const current = chapter.data
   const hue = data?.genres[0]?.hue ?? 268
+  const openHighlight = noteFor
+    ? (myHighlights ?? []).find((highlight) => highlight.id === noteFor.id)
+    : undefined
 
   return (
     <div
@@ -416,6 +701,24 @@ export function ReaderPage() {
             />
           ) : null}
 
+          {signedIn && storyId ? (
+            <Button
+              variant="ghost"
+              iconOnly
+              aria-label="Your highlights"
+              title="Your highlights"
+              aria-pressed={listOpen}
+              onClick={() => {
+                setExplaining(false)
+                setSelection(null)
+                setAsking(false)
+                setNoteFor(null)
+                setListOpen((open) => !open)
+              }}
+              startIcon={<Icon name="highlight" size="1.1rem" />}
+            />
+          ) : null}
+
           {/*
             Only once the chapter list has arrived: the sheet's range picker
             is built from it, and a story with nothing readable has nothing
@@ -431,6 +734,8 @@ export function ReaderPage() {
               onClick={() => {
                 setExplaining(false)
                 setSelection(null)
+                setNoteFor(null)
+                setListOpen(false)
                 setAsking((open) => !open)
               }}
               startIcon={<Icon name="sparkle" size="1.1rem" />}
@@ -502,13 +807,34 @@ export function ReaderPage() {
               headings and emphasis an author formats with are the ones their
               readers get. See `lib/chapter-markdown.tsx`.
             */}
-            <div
-              className="reader__prose"
-              ref={proseRef}
-              onMouseUp={onSelect}
-              onTouchEnd={onSelect}
-            >
-              {renderChapter(current.content, current.multimedia, hue)}
+            <div className="reader__prose-wrap" ref={proseWrapRef}>
+              <div
+                className="reader__prose"
+                ref={proseRef}
+                onMouseUp={onSelect}
+                onTouchEnd={onSelect}
+                onClick={onProseClick}
+              >
+                {renderChapter(current.content, current.multimedia, hue)}
+              </div>
+
+              {/*
+                Beside each highlight with a note. Outside the prose element,
+                so a selection or the highlight index never reads them.
+              */}
+              {marginNotes.map((marker) => (
+                <button
+                  key={marker.id}
+                  type="button"
+                  className="reader__margin-note"
+                  style={{ top: `${marker.top}px` }}
+                  aria-label="Open your note on this passage"
+                  title="Your note"
+                  onClick={() => openNote(marker.id, { scroll: false })}
+                >
+                  <Icon name="comment" size="0.85rem" />
+                </button>
+              ))}
             </div>
 
             {/*
@@ -518,21 +844,45 @@ export function ReaderPage() {
               highlight would be a model call nobody asked for.
             */}
             {selection && !explaining ? (
-              <button
-                type="button"
-                className="explain-trigger"
+              <div
+                className="selection-menu"
+                role="group"
+                aria-label="Selected passage"
                 style={{
                   top: `${anchorPoint.top}px`,
                   left: `${anchorPoint.left}px`,
                 }}
-                onClick={() => {
-                  setAsking(false)
-                  setExplaining(true)
-                }}
               >
-                <Icon name="sparkle" size="0.9em" />
-                Ask about this
-              </button>
+                {/*
+                  Only once the reader's highlights have loaded: the new one
+                  is added to that list, and adding it to nothing would hide
+                  the rest until the next visit.
+                */}
+                {fetchedHighlights.status === 'ready' ? (
+                  <button
+                    type="button"
+                    className="selection-menu__action"
+                    disabled={highlighting}
+                    onClick={() => void highlightSelection()}
+                  >
+                    <Icon name="highlight" size="0.9em" />
+                    Highlight
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="selection-menu__action"
+                  onClick={() => {
+                    setAsking(false)
+                    setListOpen(false)
+                    setNoteFor(null)
+                    setExplaining(true)
+                  }}
+                >
+                  <Icon name="sparkle" size="0.9em" />
+                  Ask about this
+                </button>
+              </div>
             ) : null}
 
             {selection && explaining ? (
@@ -769,6 +1119,36 @@ export function ReaderPage() {
             window.scrollTo({ top: 0 })
           }}
           onClose={closeAsk}
+        />
+      ) : null}
+
+      {/* Highlights ----------------------------------------------------- */}
+      {noteFor && openHighlight ? (
+        <HighlightNoteSheet
+          key={openHighlight.id}
+          highlight={openHighlight}
+          passageBottom={noteFor.passageBottom}
+          autoFocus={noteFor.autoFocus}
+          onSave={(note) => saveNote(openHighlight.id, note)}
+          onRemove={() => removeHighlight(openHighlight.id)}
+          onClose={closeNote}
+        />
+      ) : null}
+
+      {listOpen ? (
+        <HighlightsSheet
+          highlights={myHighlights}
+          status={fetchedHighlights.status}
+          error={fetchedHighlights.error}
+          currentChapterId={current?.id ?? null}
+          onPick={pickHighlight}
+          onRemove={(highlight) => {
+            void removeHighlight(highlight.id).catch(() =>
+              showToast({ tone: 'error', message: 'That highlight could not be removed.' }),
+            )
+          }}
+          onRetry={fetchedHighlights.reload}
+          onClose={closeList}
         />
       ) : null}
 

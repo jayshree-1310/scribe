@@ -28,6 +28,7 @@ import { createHash } from "node:crypto";
 import { db } from "../prisma/db.js";
 import { HttpError } from "../lib/http-error.js";
 import { logger } from "../lib/logger.js";
+import { highlightSummary, type HighlightSummary } from "./highlights.js";
 import { toIso, type StoryStatus } from "./stories.js";
 
 /* Shapes returned to the client ------------------------------------------ */
@@ -145,6 +146,12 @@ export interface StoryAnalytics extends RangeWindow {
   story: StoryPerformance;
   series: SeriesPoint[];
   chapters: ChapterPerformance[];
+  /**
+   * Which passages readers highlighted most. All-time rather than the
+   * window's: a highlight is kept, not a visit, and the question is which
+   * lines landed, not when. Anonymous counts only; see `services/highlights.ts`.
+   */
+  highlights: HighlightSummary;
 }
 
 /* Recording -------------------------------------------------------------- */
@@ -809,10 +816,11 @@ export async function getStoryAnalytics(
   const [story] = await performance(window, { authorId, storyId });
   if (!story) throw HttpError.notFound("That story could not be found.");
 
-  const [points, chapters] = await Promise.all([
+  const [points, chapters, highlights] = await Promise.all([
     series(window, { storyId }),
     chapterBreakdown(window, storyId),
+    highlightSummary(storyId, authorId),
   ]);
 
-  return { ...window, story, series: points, chapters };
+  return { ...window, story, series: points, chapters, highlights };
 }

@@ -58,6 +58,17 @@
   font-weight: 600;
 }
 
+/* A passage readers highlighted, in the reading face, clamped to three lines. */
+.highlight-passage {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  font-family: var(--font-reading);
+  line-height: var(--leading-normal);
+}
+
 .analytics__filters {
   display: flex;
   gap: var(--space-3);

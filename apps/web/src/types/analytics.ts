@@ -108,4 +108,27 @@ export interface StoryAnalytics extends RangeWindow {
   story: StoryPerformance
   series: SeriesPoint[]
   chapters: ChapterPerformance[]
+  /** All-time, not the window's: which lines readers kept. */
+  highlights: HighlightSummary
+}
+
+/**
+ * Which passages readers highlighted most. Anonymous counts only: never who,
+ * never a note, and never the author's own highlights.
+ */
+export interface HighlightSummary {
+  /** Distinct readers with at least one highlight in the story. */
+  readers: number
+  highlights: number
+  passages: HighlightedPassage[]
+}
+
+export interface HighlightedPassage {
+  chapterId: string
+  chapterNumber: number
+  chapterTitle: string
+  /** The span marked most often in the paragraph, as plain text. */
+  quote: string
+  /** Distinct readers who highlighted anything in that paragraph. */
+  readers: number
 }

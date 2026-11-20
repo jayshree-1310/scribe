@@ -19,6 +19,7 @@ export type IconName =
   | 'sun' | 'moon' | 'monitor' | 'menu' | 'share' | 'link'
   | 'image' | 'audio' | 'video' | 'play' | 'upload' | 'type'
   | 'google' | 'eye-off' | 'send' | 'text-size' | 'columns' | 'maximize'
+  | 'highlight'
 
 const PATHS: Record<IconName, ReactElement> = {
   home: <path d="M4 11.5 12 4l8 7.5M6.5 10v10h11V10" />,
@@ -131,6 +132,8 @@ const PATHS: Record<IconName, ReactElement> = {
       <circle cx="12" cy="12" r="1" fill="currentColor" />
     </>
   ),
+  // A marker pen over the line it has drawn.
+  highlight: <path d="m14.5 5 4.5 4.5-7.5 7.5H8v-3.5zM12.5 7l4.5 4.5M4.5 20h15" />,
   quote: <path d="M9 6.5C6.5 8 5.5 10 5.5 13v4.5h5V12H8c0-1.8.5-3.2 2-4.2zM20 6.5c-2.5 1.5-3.5 3.5-3.5 6.5v4.5h5V12H19c0-1.8.5-3.2 2-4.2z" />,
   lock: (
     <>

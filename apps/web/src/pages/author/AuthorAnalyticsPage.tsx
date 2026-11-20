@@ -95,6 +95,7 @@ export function AuthorAnalyticsPage() {
     (storyId === 'all' ? overview.data?.series : detail.data?.series) ?? []
 
   const chapters: ChapterPerformance[] = detail.data?.chapters ?? []
+  const highlights = detail.data?.highlights ?? null
 
   const totals = overview.data?.totals
   const lifetime = overview.data?.lifetime
@@ -260,6 +261,54 @@ export function AuthorAnalyticsPage() {
                           <StatusBadge tone={chapter.published ? 'brand' : 'neutral'}>
                             {chapter.published ? 'Published' : 'Draft'}
                           </StatusBadge>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            </section>
+          ) : null}
+
+          {/* What readers highlighted, only when one story is picked ---- */}
+          {selected ? (
+            <section className="page-section">
+              <SectionHead
+                title="Most highlighted passages"
+                subtitle={
+                  highlights && highlights.readers > 0
+                    ? `${formatCount(highlights.readers)} ${
+                        highlights.readers === 1 ? 'reader has' : 'readers have'
+                      } highlighted this story, all time. Counts only — never who, and never their notes.`
+                    : 'Which lines readers keep. Counts only — never who, and never their notes.'
+                }
+              />
+              <Card padded={false}>
+                {detail.status === 'loading' ? (
+                  <Skeleton height="6rem" radius="var(--radius-md)" />
+                ) : !highlights || highlights.passages.length === 0 ? (
+                  <EmptyState
+                    size="sm"
+                    icon="highlight"
+                    title="No highlights yet"
+                    description="When readers highlight a passage, the ones they mark most show up here."
+                  />
+                ) : (
+                  <ul className="story-rows">
+                    {highlights.passages.map((passage) => (
+                      <li key={`${passage.chapterId}:${passage.quote}`}>
+                        <span className="story-row">
+                          <span className="story-row__main">
+                            <span className="highlight-passage">“{passage.quote}”</span>
+                            <span className="story-row__meta">
+                              Chapter {passage.chapterNumber}. {passage.chapterTitle}
+                            </span>
+                          </span>
+                          <span className="story-row__stat">
+                            <Icon name="highlight" size="0.9em" />
+                            {formatCount(passage.readers)}{' '}
+                            {passage.readers === 1 ? 'reader' : 'readers'}
+                          </span>
                         </span>
                       </li>
                     ))}

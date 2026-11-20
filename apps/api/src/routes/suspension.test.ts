@@ -95,6 +95,11 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
       "library.ts DELETE /:bookId",
       "reading.ts PUT /progress",
       "reading.ts DELETE /progress/:storyId",
+      // Highlights and their notes are private: nobody but the reader sees
+      // them, and authors only ever get anonymous counts.
+      "reading.ts POST /highlights",
+      "reading.ts PATCH /highlights/:id",
+      "reading.ts DELETE /highlights/:id",
       "notifications.ts POST /:id/read",
       "notifications.ts POST /read-all",
       "notifications.ts DELETE /read",

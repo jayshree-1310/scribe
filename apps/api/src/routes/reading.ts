@@ -15,6 +15,14 @@ import {
   listContinueReading,
   recordProgress,
 } from "../services/reading.js";
+import {
+  HIGHLIGHT_LIMIT,
+  NOTE_LIMIT,
+  createHighlight,
+  deleteHighlight,
+  listHighlights,
+  updateHighlight,
+} from "../services/highlights.js";
 
 const router = Router();
 
@@ -81,6 +89,93 @@ router.delete("/progress/:storyId", async (req, res, next) => {
     const { storyId } = parseOrThrow(storyParamSchema, req.params);
 
     await clearProgress(requireUserId(res), storyId);
+
+    res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+/* Highlights and margin notes ------------------------------------------- */
+
+const highlightListQuerySchema = z.object({
+  storyId: z.uuid("That story could not be found."),
+});
+
+const noteSchema = z
+  .string()
+  .max(NOTE_LIMIT, `Keep the note under ${NOTE_LIMIT} characters.`)
+  .nullable();
+
+/**
+ * Offsets into the stored chapter, never the passage itself -- the service
+ * cuts the quote out of the chapter, so a highlight can only ever hold the
+ * author's words. See the header of `services/highlights.ts`.
+ */
+const highlightBodySchema = z
+  .object({
+    chapterId: z.uuid("That chapter could not be found."),
+    start: z.coerce.number().int().min(0),
+    end: z.coerce.number().int().min(1),
+    note: noteSchema.optional(),
+  })
+  .refine((value) => value.end > value.start, {
+    message: "That passage is empty.",
+    path: ["end"],
+  })
+  .refine((value) => value.end - value.start <= HIGHLIGHT_LIMIT, {
+    message: "That passage is too long to highlight.",
+    path: ["end"],
+  });
+
+const highlightUpdateSchema = z.object({ note: noteSchema });
+
+const highlightParamSchema = z.object({
+  id: z.uuid("That highlight could not be found."),
+});
+
+router.get("/highlights", async (req, res, next) => {
+  try {
+    const { storyId } = parseOrThrow(highlightListQuerySchema, req.query);
+
+    const highlights = await listHighlights(requireUserId(res), storyId);
+
+    res.json({ highlights });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/highlights", async (req, res, next) => {
+  try {
+    const body = parseOrThrow(highlightBodySchema, req.body);
+
+    const highlight = await createHighlight(requireUserId(res), body);
+
+    res.status(201).json({ highlight });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/highlights/:id", async (req, res, next) => {
+  try {
+    const { id } = parseOrThrow(highlightParamSchema, req.params);
+    const { note } = parseOrThrow(highlightUpdateSchema, req.body);
+
+    const highlight = await updateHighlight(requireUserId(res), id, note);
+
+    res.json({ highlight });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/highlights/:id", async (req, res, next) => {
+  try {
+    const { id } = parseOrThrow(highlightParamSchema, req.params);
+
+    await deleteHighlight(requireUserId(res), id);
 
     res.status(204).end();
   } catch (error) {

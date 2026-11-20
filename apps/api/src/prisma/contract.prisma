@@ -796,6 +796,50 @@ namespace engagement {
     @@unique([userId, storyId])
   }
 
+  /// A passage a reader highlighted, with an optional private note.
+  ///
+  /// Anchored on the text, not just the offsets. `start`/`end` index into
+  /// `chapter.content` as it was when the highlight was made, and `quote` is
+  /// what sat between them. An author edits chapters after readers have
+  /// highlighted them, so every read re-finds `quote` -- at the old offsets
+  /// if it is still there, else the occurrence nearest them -- and a passage
+  /// the author removed is reported as gone rather than painted over
+  /// whatever text moved into its place. The row is kept either way: the
+  /// note is the reader's writing, and an author who restores the passage
+  /// restores the highlight. See `services/highlights.ts`.
+  ///
+  /// `quote` is cut from the stored chapter by the server, never taken from
+  /// the request, so it can only ever be the author's words.
+  ///
+  /// The note is private: nothing but its writer reads it. Authors see only
+  /// counts of distinct readers per passage, never who, and never a note.
+  model Highlight {
+    id        String   @id @default(uuid())
+    userId    String
+    storyId   String
+    chapterId String
+    start     Int
+    end       Int
+    quote     String
+    note      String?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+
+    user    auth.User
+      @relation(fields: [userId], references: [id], onDelete: Cascade)
+    story   content.Story
+      @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    chapter content.Chapter
+      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+    /// One reader's highlights in one story, which is what the reader's list
+    /// and each chapter's paint read.
+    @@index([userId, storyId])
+    /// Every reader's highlights in one story, for the author's aggregate.
+    @@index([storyId])
+    @@index([chapterId])
+  }
+
   /// One reader following another.
   ///
   /// In `engagement` rather than `auth` for the same reason the rest of this

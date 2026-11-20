@@ -1,8 +1,15 @@
 # Scribe — New features
 
-Feature ideas queued after scheduled chapters, which is being built first.
-Nothing here exists in the codebase yet (checked 2026-11-20). Each entry says
+Feature ideas queued after scheduled chapters, which has landed. Each entry says
 what it is, why it is worth doing, and what it can build on.
+
+| # | Feature                     | Status                    |
+| - | --------------------------- | ------------------------- |
+| 1 | Highlights and margin notes | **Landed** (2026-11-20)   |
+| 2 | Beta readers                | Not started               |
+| 3 | Listen mode                 | Not started               |
+| 4 | Quote cards                 | Not started (needs 1, now there) |
+| 5 | Public reading lists        | Not started               |
 
 ---
 
@@ -24,6 +31,39 @@ for the aggregate view.
 **Open questions:** How a highlight survives the author editing the chapter
 (anchor on text plus offset, and drop the highlight if the passage is gone).
 Whether notes can ever be shared, or stay private only.
+
+**Status: landed (2026-11-20).** How it was built, and how the open questions
+were answered:
+
+- **Data:** `engagement.Highlight` (chapter, `start`/`end`, `quote`, optional
+  `note`). The client sends offsets from `lib/chapter-selection.ts`, as
+  "Explain this passage" does; the server cuts `quote` out of the stored
+  chapter, so it is always the author's words. Routes under
+  `/api/reading/highlights` (list per story, create, edit note, delete);
+  `services/highlights.ts`.
+- **Surviving edits:** every read re-finds `quote` — at the stored offsets,
+  else the nearest occurrence, else reported as gone (`found: false`). Gone
+  highlights are *not deleted*: the note is the reader's writing, so the list
+  keeps it, marked "no longer in the chapter", with a Remove. An author who
+  restores the passage restores the highlight. Exact-text match only, so a note
+  is never painted over a rewritten sentence.
+- **Notes are private only.** No route returns another reader's highlight or
+  note; sharing is left to quote cards (feature 4), which would share the
+  passage, not the note.
+- **Reader UI:** selecting text offers *Highlight* beside *Ask about this*; the
+  passage is painted with the CSS Custom Highlight API (no DOM is inserted
+  into the prose), notes add a dotted underline and a margin marker on wide
+  screens, and a tap on a highlight opens its note in a docked sheet. A top-bar
+  button lists the story's highlights by chapter and jumps to one.
+  `lib/highlight-ranges.ts`, `components/reader/`.
+- **Author view:** the story view of Author analytics shows "Most highlighted
+  passages" — paragraphs ranked by distinct readers, shown by the span marked
+  most often. Counts only: never who, never notes, never the author's own.
+  All-time, not tied to the date range.
+- **Limits:** 2,000 characters per passage, 1,000 per note, 200 highlights per
+  reader per chapter. Highlights are private reading state, so a suspension
+  does not stop them. Deleting a chapter, story or account deletes its
+  highlights (foreign keys cascade).
 
 ---
 

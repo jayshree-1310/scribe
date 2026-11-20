@@ -1,0 +1,323 @@
+[
+  {
+    "id": "table.highlight",
+    "label": "Create table \"highlight\"",
+    "summary": "Creates table \"highlight\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "table",
+        "name": "highlight"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"highlight\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"highlight\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"highlight\"",
+        "sql": "CREATE TABLE \"engagement\".\"highlight\" (\n  \"chapterId\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"end\" int4 NOT NULL,\n  \"id\" text NOT NULL,\n  \"note\" text,\n  \"quote\" text NOT NULL,\n  \"start\" int4 NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"highlight\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"highlight\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.highlight.highlight_chapterId_idx_411dd3d6",
+    "label": "Create index \"highlight_chapterId_idx_411dd3d6\" on \"highlight\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "highlight_chapterId_idx_411dd3d6",
+        "table": "highlight"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"highlight_chapterId_idx_411dd3d6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"highlight_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"highlight_chapterId_idx_411dd3d6\"",
+        "sql": "CREATE INDEX \"highlight_chapterId_idx_411dd3d6\" ON \"engagement\".\"highlight\" (\"chapterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"highlight_chapterId_idx_411dd3d6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"highlight_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.highlight.highlight_storyId_idx_cd452158",
+    "label": "Create index \"highlight_storyId_idx_cd452158\" on \"highlight\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "highlight_storyId_idx_cd452158",
+        "table": "highlight"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"highlight_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"highlight_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"highlight_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"highlight_storyId_idx_cd452158\" ON \"engagement\".\"highlight\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"highlight_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"highlight_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.highlight.highlight_userId_idx_a489d58a",
+    "label": "Create index \"highlight_userId_idx_a489d58a\" on \"highlight\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "highlight_userId_idx_a489d58a",
+        "table": "highlight"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"highlight_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"highlight_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"highlight_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"highlight_userId_idx_a489d58a\" ON \"engagement\".\"highlight\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"highlight_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"highlight_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.highlight.highlight_userId_storyId_idx_57dae79f",
+    "label": "Create index \"highlight_userId_storyId_idx_57dae79f\" on \"highlight\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "index",
+        "name": "highlight_userId_storyId_idx_57dae79f",
+        "table": "highlight"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"highlight_userId_storyId_idx_57dae79f\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"highlight_userId_storyId_idx_57dae79f\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"highlight_userId_storyId_idx_57dae79f\"",
+        "sql": "CREATE INDEX \"highlight_userId_storyId_idx_57dae79f\" ON \"engagement\".\"highlight\" (\"userId\", \"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"highlight_userId_storyId_idx_57dae79f\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"engagement\".\"highlight_userId_storyId_idx_57dae79f\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.highlight.highlight_userId_fkey",
+    "label": "Add foreign key \"highlight_userId_fkey\" on \"highlight\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "highlight_userId_fkey",
+        "table": "highlight"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"highlight_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "highlight_userId_fkey",
+          "engagement",
+          "\"engagement\".\"highlight\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"highlight_userId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"highlight\"\nADD CONSTRAINT \"highlight_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"highlight_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "highlight_userId_fkey",
+          "engagement",
+          "\"engagement\".\"highlight\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.highlight.highlight_storyId_fkey",
+    "label": "Add foreign key \"highlight_storyId_fkey\" on \"highlight\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "highlight_storyId_fkey",
+        "table": "highlight"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"highlight_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "highlight_storyId_fkey",
+          "engagement",
+          "\"engagement\".\"highlight\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"highlight_storyId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"highlight\"\nADD CONSTRAINT \"highlight_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"highlight_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "highlight_storyId_fkey",
+          "engagement",
+          "\"engagement\".\"highlight\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.highlight.highlight_chapterId_fkey",
+    "label": "Add foreign key \"highlight_chapterId_fkey\" on \"highlight\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "foreignKey",
+        "name": "highlight_chapterId_fkey",
+        "table": "highlight"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"highlight_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "highlight_chapterId_fkey",
+          "engagement",
+          "\"engagement\".\"highlight\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"highlight_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"engagement\".\"highlight\"\nADD CONSTRAINT \"highlight_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"highlight_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "highlight_chapterId_fkey",
+          "engagement",
+          "\"engagement\".\"highlight\""
+        ]
+      }
+    ]
+  }
+]
