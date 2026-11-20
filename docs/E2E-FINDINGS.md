@@ -85,6 +85,9 @@ PNG the upload test sent (replace it in Settings).
   `AI_EMBED_DIMENSIONS` and migrate the columns). Groq serves no embedding
   models. Add the keys to `render.yaml` and `DEPLOYMENT.md`, then back-fill
   chapter chunks (`pnpm --filter api seed:embeddings`).
+- **Verified on production 2026-11-20:** `/health` shows `ai.embed.configured:
+  false`, and Ask This Book answers *"Embeddings are not configured on this
+  server"*.
 - **Done in code:** production no longer calls `localhost:11434`: an
   embedder left on a local address counts as unconfigured there, so Ask This
   Book answers at once with *"Embeddings are not configured on this server"*
@@ -119,6 +122,15 @@ PNG the upload test sent (replace it in Settings).
   `request_too_large` confirms the token limit; the fix is then smaller
   sections per extraction call (`services/ai/story-bible.ts`) or a key with a
   higher limit.
+- **2026-11-20:** E-3 is deployed, and a refresh was run on production at
+  **06:20:49 UTC** (the test author's story); it failed the same way (502,
+  3 s). Its `Request failed` line in the Render logs for `scribe-new` now
+  carries `upstream.status` and `upstream.code` — read it to pick the fix.
+  Not done from here: this machine has no Render access. Ruled out so far: a
+  per-request token limit is unlikely (extraction asks for at most 3,000
+  output tokens on a ~600-token chapter), and a rate limit would be a 429,
+  not this 502; a reply that fails the fact schema (`json_validate_failed`)
+  is the other likely cause.
 
 ### E-3 · The model provider's actual error is never logged — Medium · Fixed (2026-11-19)
 - **Where:** `services/ai/openai-compatible.ts` and `services/ai/ollama.ts`
