@@ -466,6 +466,7 @@ production values (the **direct** Neon URL, as for migrations):
 ```bash
 cd apps/api
 DOTENV_CONFIG_PATH=/dev/null \
+NODE_OPTIONS='--dns-result-order=ipv4first --network-family-autoselection-attempt-timeout=2000' \
 DATABASE_URL='<MIGRATE_DATABASE_URL>' \
 AI_EMBED_PROVIDER=openai \
 AI_EMBED_BASE_URL='https://api.cloudflare.com/client/v4/accounts/<account id>/ai/v1' \
@@ -474,7 +475,11 @@ AI_EMBED_API_KEY='<token>' \
 pnpm seed:embeddings
 ```
 
-It is safe to re-run: unchanged chapters cost no model calls. Do not switch
+`NODE_OPTIONS` is the same as on Render, for the same reason: without it Node
+times out racing Neon's IPv4 and IPv6 addresses. Use the direct host (no
+`-pooler`); the command also builds the search index. Don't `source` a file
+holding the URL in a shell — Neon URLs contain `&`, which the shell treats as
+an operator. It is safe to re-run: unchanged chapters cost no model calls. Do not switch
 the model again afterwards without re-embedding everything — vectors from two
 models are not comparable.
 

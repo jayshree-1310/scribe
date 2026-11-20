@@ -71,7 +71,7 @@ PNG the upload test sent (replace it in Settings).
 
 ## 2. Issues
 
-### E-1 · Ask This Book fails on production: no embedder configured — High · Code side fixed (2026-11-20); needs Render settings
+### E-1 · Ask This Book fails on production: no embedder configured — High · Fixed (2026-11-20)
 - **Seen:** `POST /api/ai/ask`, `POST /api/ai/ask/stream` and
   `POST /api/ai/conversations/:id/messages` all answer **503** on production.
 - **Cause:** nothing sets `AI_EMBED_*` on Render, so the API falls back to the
@@ -100,9 +100,18 @@ PNG the upload test sent (replace it in Settings).
 - **Provider chosen 2026-11-20: Cloudflare Workers AI**
   (`@cf/baai/bge-base-en-v1.5`, natively 768 wide, free daily allocation).
   `DEPLOYMENT.md` → *AI embeddings* has the steps and the back-fill command.
-- **Still to do by hand:** create the Cloudflare account and API token, set
-  the four `AI_EMBED_*` keys on Render, check `/health` and Ask This Book,
-  then run the one-off back-fill against the production database. Google does not
+- **Done 2026-11-20:** the `AI_EMBED_*` keys are set on Render (`/health`:
+  `ai.embed.configured: true`, endpoint `api.cloudflare.com`), and the
+  back-fill ran against production: 24 chapters, 250 passages embedded, HNSW
+  index built. Verified on production: semantic search answers `basis:
+  hybrid` and ranks *The Lamplighter of Saltmere* first for "a harbour town
+  where the fog hides the drowned"; Ask This Book answers "Who is Tobias
+  Rayne?" from chapter 3 with a citation — and, scoped to the reader's saved
+  place (chapter 2), declines rather than spoil it.
+- **Running the back-fill from a laptop** needs the direct Neon host (drop
+  `-pooler`) and Render's `NODE_OPTIONS`
+  (`--dns-result-order=ipv4first --network-family-autoselection-attempt-timeout=2000`),
+  or Node times out connecting to Neon. Google does not
   document whether its OpenAI-compatible endpoint honours `dimensions`; if it
   does not, the API refuses the 3072-wide reply with a message saying so, and
   a natively 768-wide model is needed instead.
