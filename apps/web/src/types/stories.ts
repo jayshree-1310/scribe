@@ -54,6 +54,20 @@ export interface Story {
   genres: StoryGenre[]
 }
 
+/**
+ * The next chapter an author has scheduled: its number and when it arrives.
+ * Never its title, which can give the plot away.
+ */
+export interface NextRelease {
+  number: number
+  scheduledAt: string
+}
+
+/** One story's page: a card's fields, plus what is coming next. */
+export interface StoryDetail extends Story {
+  nextRelease: NextRelease | null
+}
+
 export interface StoryPage {
   items: Story[]
   page: number

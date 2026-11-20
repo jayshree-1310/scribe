@@ -29,6 +29,8 @@ export interface AuthoredChapter {
   content: string
   wordCount: number
   publishedAt: string | null
+  /** When a draft is set to go live by itself; null when it is not. */
+  scheduledAt: string | null
   createdAt: string
   updatedAt: string
   /**
@@ -174,6 +176,29 @@ export async function publishChapter(
   const { chapter } = await request<{ chapter: AuthoredChapter }>(
     `/author/chapters/${chapterId}/publish`,
     { method: 'POST' },
+  )
+  return chapter
+}
+
+/** Sets a draft chapter to go live by itself at `at` (ISO with offset). */
+export async function scheduleChapter(
+  chapterId: string,
+  at: string,
+): Promise<AuthoredChapter> {
+  const { chapter } = await request<{ chapter: AuthoredChapter }>(
+    `/author/chapters/${chapterId}/schedule`,
+    { method: 'PUT', body: { at } },
+  )
+  return chapter
+}
+
+/** Takes the schedule off; the chapter stays a draft. */
+export async function unscheduleChapter(
+  chapterId: string,
+): Promise<AuthoredChapter> {
+  const { chapter } = await request<{ chapter: AuthoredChapter }>(
+    `/author/chapters/${chapterId}/schedule`,
+    { method: 'DELETE' },
   )
   return chapter
 }

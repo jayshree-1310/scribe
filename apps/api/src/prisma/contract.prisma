@@ -63,6 +63,11 @@ enum NotificationType {
   CLUB_DISCUSSION
   // A story newly listed by an author the recipient follows.
   NEW_STORY
+  /// A chapter newly published in a story the recipient has on a shelf or has
+  /// started reading. Separate from `NEW_STORY` because the audience is the
+  /// story's readers rather than the author's followers, and either can be
+  /// muted without the other.
+  NEW_CHAPTER
   // A badge the recipient earned. The one type with no actor.
   BADGE_EARNED
   /// A reader or author level the recipient crossed. Like `BADGE_EARNED` it
@@ -533,6 +538,12 @@ namespace content {
     /// and `hiddenPublishedAt` keeps the date for a dismissal to restore.
     hiddenAt          DateTime?
     hiddenPublishedAt DateTime?
+    /// When the author asked for this draft to go live, or null. Set only on
+    /// an unpublished chapter; `releaseDueChapters` in `services/authoring.ts`
+    /// publishes it once the time passes -- with this as its `publishedAt`,
+    /// so a release the tick reaches thirty seconds late still reads as on
+    /// time -- and clears it. Publishing by hand clears it too.
+    scheduledAt       DateTime?
 
     story          Story
       @relation(fields: [storyId], references: [id])
@@ -560,6 +571,8 @@ namespace content {
     continuityEvidence    ai.ContinuityFinding[] @relation("ContinuityFindingEvidence")
 
     @@unique([storyId, chapterNumber])
+    // The release tick's one question: what is due? Mostly nulls, so small.
+    @@index([scheduledAt])
   }
 
   model Multimedia {

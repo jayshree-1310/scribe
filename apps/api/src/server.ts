@@ -8,6 +8,15 @@ import { loadAiConfig } from "./services/ai/config.js";
 import { USAGE_PRUNE_JOB } from "./services/ai/job-schedule.js";
 import { registerAiJobs } from "./services/ai/jobs.js";
 import { sweepUnreferencedUploads } from "./services/uploads.js";
+import { releaseDueChapters } from "./services/authoring.js";
+
+/**
+ * How often scheduled chapters are checked for. Thirty seconds late at worst,
+ * and the chapter still reads as published at its scheduled minute (see
+ * `releaseDueChapters`). In-process like the upload sweep, and safe to run on
+ * every instance: each release is claimed by a single statement.
+ */
+const RELEASE_TICK_MS = 30 * 1000;
 
 /**
  * Queues the daily usage prune, once a day across restarts: the `NX` key is
@@ -59,6 +68,15 @@ async function start() {
   sweep();
   const sweepTimer = setInterval(sweep, 60 * 60 * 1000);
 
+  const release = () =>
+    void releaseDueChapters()
+      .then((count) => {
+        if (count > 0) logger.info({ count }, "scheduled chapters released");
+      })
+      .catch((error) => logger.warn({ err: error }, "scheduled release failed"));
+  release();
+  const releaseTimer = setInterval(release, RELEASE_TICK_MS);
+
   /** Drain in-flight requests, then release database and Redis connections. */
   async function shutdown(signal: string): Promise<void> {
     logger.info({ signal }, "Shutting down");
@@ -72,6 +90,7 @@ async function start() {
       // queued stays in Redis for the next process.
       clearInterval(pruneTimer);
       clearInterval(sweepTimer);
+      clearInterval(releaseTimer);
       try {
         await stopWorker();
       } catch (workerError) {

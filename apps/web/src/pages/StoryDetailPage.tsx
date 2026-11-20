@@ -6,6 +6,7 @@ import { coverWash } from '../lib/cover'
 import {
   formatCount,
   formatDate,
+  formatDayAndTime,
   formatMinutes,
   formatRating,
   formatRelative,
@@ -483,7 +484,11 @@ export function StoryDetailPage() {
               icon="book"
               size="sm"
               title="No chapters published yet"
-              description="Check back — the author has not posted a first chapter."
+              description={
+                data.nextRelease
+                  ? `Chapter ${data.nextRelease.number} arrives ${formatRelative(data.nextRelease.scheduledAt)} · ${formatDayAndTime(data.nextRelease.scheduledAt)}.`
+                  : 'Check back — the author has not posted a first chapter.'
+              }
             />
           ) : chapters.status === 'error' ? (
             <ErrorState message={chapters.error} onRetry={chapters.reload} />
@@ -515,6 +520,30 @@ export function StoryDetailPage() {
                   </Link>
                 </li>
               ))}
+              {/*
+                What is coming, after what is here. Left out when the list
+                already has that number -- the author, who sees their own
+                drafts in this list, would otherwise see the chapter twice.
+              */}
+              {data.nextRelease &&
+              !chapters.data?.some((chapter) => chapter.number === data.nextRelease?.number) ? (
+                <li>
+                  <div className="chapter-row chapter-row--upcoming">
+                    <span className="chapter-row__number">{data.nextRelease.number}</span>
+                    <span className="chapter-row__text">
+                      <span className="chapter-row__title">
+                        Chapter {data.nextRelease.number} arrives{' '}
+                        {formatRelative(data.nextRelease.scheduledAt)}
+                      </span>
+                      <span className="chapter-row__meta">
+                        {formatDayAndTime(data.nextRelease.scheduledAt)} · readers with this
+                        story in their library are notified
+                      </span>
+                    </span>
+                    <Icon name="clock" size="1rem" />
+                  </div>
+                </li>
+              ) : null}
             </ul>
           )}
         </TabPanel>

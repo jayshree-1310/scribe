@@ -56,6 +56,8 @@ export interface AuthoredChapter {
   content: string;
   wordCount: number;
   publishedAt: string | null;
+  /** When a draft is set to go live by itself; null when it is not. */
+  scheduledAt: string | null;
   createdAt: string;
   updatedAt: string;
   /**
@@ -263,6 +265,7 @@ function toChapter(row: {
   content: string;
   wordCount: number;
   publishedAt: unknown;
+  scheduledAt: unknown;
   createdAt: unknown;
   updatedAt: unknown;
 },
@@ -276,6 +279,7 @@ function toChapter(row: {
     content: row.content,
     wordCount: row.wordCount,
     publishedAt: toIso(row.publishedAt),
+    scheduledAt: toIso(row.scheduledAt),
     createdAt: toIso(row.createdAt) ?? new Date(0).toISOString(),
     updatedAt: toIso(row.updatedAt) ?? new Date(0).toISOString(),
     multimedia: media,
@@ -324,6 +328,7 @@ const CHAPTER_COLUMNS = [
   "content",
   "wordCount",
   "publishedAt",
+  "scheduledAt",
   "createdAt",
   "updatedAt",
 ] as const;
@@ -702,39 +707,207 @@ export async function publishChapter(
 
   const timestamp = now();
 
-  const storyId = await db.transaction(async (tx) => {
+  const { storyId, newlyPublished } = await db.transaction(async (tx) => {
     const { chapter } = await ownedChapter(tx, chapterId, userId);
     await assertNotTakenDown(tx, "chapter", chapterId);
+    assertHasWords(chapter.content, "publishing");
 
-    if (chapter.content.trim().length === 0) {
-      throw HttpError.badRequest("This chapter is still empty.", {
-        content: "Write something before publishing this chapter.",
-      });
-    }
+    const newly = chapter.publishedAt === null || chapter.publishedAt === undefined;
 
-    if (chapter.publishedAt === null || chapter.publishedAt === undefined) {
-      await tx.orm.content.Chapter.where((row) => row.id.eq(chapterId)).update({
-        publishedAt: timestamp,
-        updatedAt: timestamp,
-      });
-    }
+    // Publishing by hand overtakes any schedule: the chapter is out now.
+    await tx.orm.content.Chapter.where((row) => row.id.eq(chapterId)).update({
+      ...(newly ? { publishedAt: timestamp } : {}),
+      scheduledAt: null,
+      updatedAt: timestamp,
+    });
 
     await touchStory(tx, chapter.storyId, timestamp);
-    return chapter.storyId;
+    return { storyId: chapter.storyId, newlyPublished: newly };
   });
 
+  await afterChapterPublished(userId, storyId, chapterId, newlyPublished);
+
+  return loadChapter(chapterId);
+}
+
+/** The emptiness rule publishing and scheduling share. */
+function assertHasWords(content: string, doing: "publishing" | "scheduling"): void {
+  if (content.trim().length === 0) {
+    throw HttpError.badRequest("This chapter is still empty.", {
+      content: `Write something before ${doing} this chapter.`,
+    });
+  }
+}
+
+/**
+ * What follows a chapter going live, whoever made it go: the author's
+ * Publish, or the release tick acting on their schedule.
+ */
+async function afterChapterPublished(
+  authorId: string,
+  storyId: string,
+  chapterId: string,
+  newlyPublished: boolean,
+): Promise<void> {
   // Chapters published. Not on `updateChapter`, which is called on every
   // autosave: words written is re-counted by the next publish either way, and
   // eleven aggregates per keystroke is not a trade worth making.
-  evaluateBadges(userId);
+  evaluateBadges(authorId);
+
+  // Readers hear about a release, and only about a release -- the reasoning
+  // `publishStory` gives for `story-listed`: republishing after an unpublish
+  // is a correction, and telling everybody twice is how an author learns not
+  // to fix the typo.
+  if (newlyPublished) {
+    notify({ event: "chapter-published", actorId: authorId, chapterId });
+  }
 
   // Into the search index, off the request path (`ai/jobs.ts`). The handler
   // embeds only if the story is listed, so a chapter of a draft waits.
   void scheduleChapterEmbedding(chapterId, 0);
   // Windows stored before an earlier unpublish count again at once.
   await refreshVectorQuietly(storyId);
+}
+
+/* Scheduled release ------------------------------------------------------ */
+
+/** The soonest a schedule may be set for, so "now" is the Publish button. */
+const SCHEDULE_MIN_LEAD_MS = 60 * 1000;
+/** The furthest ahead, so a typo in the year is caught rather than kept. */
+const SCHEDULE_MAX_LEAD_MS = 366 * 24 * 60 * 60 * 1000;
+
+/**
+ * Sets a draft chapter to go live by itself at `at`.
+ *
+ * Guarded like publishing, because it *is* publishing, deferred: a suspended
+ * author cannot queue up what they could not post, an empty chapter cannot be
+ * scheduled, and neither can one a moderator took down. Rescheduling is the
+ * same call with a new time. A chapter already live has nothing to schedule.
+ */
+export async function scheduleChapter(
+  userId: string,
+  chapterId: string,
+  at: Date,
+): Promise<AuthoredChapter> {
+  await assertNotSuspended(userId);
+
+  const lead = at.getTime() - Date.now();
+  if (lead < SCHEDULE_MIN_LEAD_MS) {
+    throw HttpError.badRequest("Pick a time at least a minute from now.", {
+      at: "Pick a time in the future, or publish it now instead.",
+    });
+  }
+  if (lead > SCHEDULE_MAX_LEAD_MS) {
+    throw HttpError.badRequest("Pick a time within the next year.", {
+      at: "Pick a time within the next year.",
+    });
+  }
+
+  const timestamp = now();
+
+  await db.transaction(async (tx) => {
+    const { chapter } = await ownedChapter(tx, chapterId, userId);
+    await assertNotTakenDown(tx, "chapter", chapterId);
+    assertHasWords(chapter.content, "scheduling");
+
+    if (chapter.publishedAt !== null && chapter.publishedAt !== undefined) {
+      throw HttpError.conflict("This chapter is already published.");
+    }
+
+    await tx.orm.content.Chapter.where((row) => row.id.eq(chapterId)).update({
+      scheduledAt: Temporal.Instant.fromEpochMilliseconds(at.getTime()),
+      updatedAt: timestamp,
+    });
+  });
 
   return loadChapter(chapterId);
+}
+
+/** Takes the schedule off; the chapter stays a draft. Never guarded. */
+export async function unscheduleChapter(
+  userId: string,
+  chapterId: string,
+): Promise<AuthoredChapter> {
+  await db.transaction(async (tx) => {
+    await ownedChapter(tx, chapterId, userId);
+
+    await tx.orm.content.Chapter.where((row) => row.id.eq(chapterId)).update({
+      scheduledAt: null,
+    });
+  });
+
+  return loadChapter(chapterId);
+}
+
+/**
+ * Publishes every chapter whose time has come. Called on a short interval
+ * from `server.ts`; returns how many went out.
+ *
+ * **One statement claims each release**, so two API instances ticking at the
+ * same moment cannot both publish a chapter or both notify its readers: the
+ * `UPDATE ... WHERE "scheduledAt" IS NOT NULL` lands for exactly one of them,
+ * and only the one whose row came back carries on to the side effects.
+ *
+ * The checks publishing makes at request time are made again here, because
+ * the world can change in between: an author suspended since, a chapter
+ * emptied by a later edit, or one a moderator took down. Any of those drops
+ * the schedule instead of publishing, and the chapter stays a draft for the
+ * author to see.
+ */
+export async function releaseDueChapters(limit = 50): Promise<number> {
+  const claimed = await db.runtime().query(
+    db.raw.sql`
+      UPDATE "content"."chapter" AS chapter
+         SET "publishedAt" = CASE
+               WHEN length(btrim(chapter."content")) > 0
+                AND chapter."hiddenAt" IS NULL
+                AND author."suspendedAt" IS NULL
+               THEN chapter."scheduledAt"
+             END,
+             "scheduledAt" = NULL,
+             "updatedAt" = now()
+        FROM "content"."story" AS story
+        JOIN "auth"."user" AS author ON author."id" = story."authorId"
+       WHERE story."id" = chapter."storyId"
+         AND chapter."id" IN (
+               SELECT "id" FROM "content"."chapter"
+                WHERE "scheduledAt" <= now() AND "publishedAt" IS NULL
+                ORDER BY "scheduledAt"
+                LIMIT ${limit}::int
+                FOR UPDATE SKIP LOCKED
+             )
+         AND chapter."scheduledAt" IS NOT NULL
+         AND chapter."publishedAt" IS NULL
+      RETURNING chapter."id", chapter."storyId", story."authorId",
+                chapter."publishedAt" IS NOT NULL AS "released"
+    `
+      .returnsRow({
+        id: "pg/text@1",
+        storyId: "pg/text@1",
+        authorId: "pg/text@1",
+        released: "pg/bool@1",
+      })
+      .build(),
+  );
+
+  let released = 0;
+
+  for (const row of claimed) {
+    if (!row.released) {
+      logger.info({ chapterId: row.id }, "scheduled chapter not released; schedule dropped");
+      continue;
+    }
+
+    released += 1;
+    await db.runtime().query(
+      db.raw.sql`
+        UPDATE "content"."story" SET "updatedAt" = now() WHERE "id" = ${row.storyId}
+      `.affectedCount().build(),
+    );
+    await afterChapterPublished(row.authorId, row.storyId, row.id, true);
+  }
+
+  return released;
 }
 
 export async function unpublishChapter(
@@ -748,6 +921,7 @@ export async function unpublishChapter(
 
     await tx.orm.content.Chapter.where((row) => row.id.eq(chapterId)).update({
       publishedAt: null,
+      scheduledAt: null,
       updatedAt: timestamp,
     });
 

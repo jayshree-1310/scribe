@@ -95,6 +95,7 @@ export const NOTIFICATION_TYPES = [
   "STORY_COMMENT",
   "CLUB_DISCUSSION",
   "NEW_STORY",
+  "NEW_CHAPTER",
   "BADGE_EARNED",
   "LEVEL_UP",
   "CONTENT_HIDDEN",
@@ -180,6 +181,8 @@ export type NotificationEvent =
   | { event: "story-comment"; actorId: string; commentId: string }
   | { event: "club-discussion"; actorId: string; discussionId: string }
   | { event: "story-listed"; actorId: string; storyId: string }
+  /** A chapter went live for the first time, by hand or on its schedule. */
+  | { event: "chapter-published"; actorId: string; chapterId: string }
   | {
       event: "badge-earned";
       userId: string;
@@ -273,6 +276,8 @@ async function fanOut(event: NotificationEvent): Promise<void> {
       return notifyClub(event.discussionId);
     case "story-listed":
       return notifyFollowers(event.storyId);
+    case "chapter-published":
+      return notifyChapterReaders(event.chapterId);
     case "badge-earned":
       return notifyEarner(event.userId, event.name, event.description);
     case "level-up":
@@ -556,6 +561,51 @@ async function notifyFollowers(storyId: string): Promise<void> {
              SELECT 1 FROM "auth"."notificationMute" AS mute
               WHERE mute."userId" = follow."followerId"
                 AND mute."type" = 'NEW_STORY'
+           )
+  `.affectedCount().build();
+
+  await db.runtime().query(plan);
+}
+
+/**
+ * A new chapter, to the story's readers: everybody with it on a shelf or with
+ * reading progress in it, once each, never its author.
+ *
+ * Only for a listed story -- a chapter published into a draft reaches nobody
+ * yet, and listing the story is its own `NEW_STORY` announcement. Records the
+ * chapter as its source, so a moderator taking the chapter down sweeps these
+ * the way it sweeps a hidden comment's.
+ */
+async function notifyChapterReaders(chapterId: string): Promise<void> {
+  const plan = db.raw.sql`
+    INSERT INTO "notifications"."notification"
+      ("id", "userId", "type", "actorId", "title", "excerpt", "href",
+       "sourceType", "sourceId", "createdAt")
+    SELECT gen_random_uuid()::text,
+           reader."userId",
+           'NEW_CHAPTER',
+           story."authorId",
+           story."title",
+           left('Chapter ' || chapter."chapterNumber" || ': ' || chapter."title", ${EXCERPT_LENGTH}),
+           '/read/' || story."slug" || '/' || chapter."chapterNumber",
+           'CHAPTER',
+           chapter."id",
+           now()
+      FROM "content"."chapter" AS chapter
+      JOIN "content"."story" AS story ON story."id" = chapter."storyId"
+      JOIN (
+             SELECT "userId", "storyId" FROM "library"."libraryEntry"
+             UNION
+             SELECT "userId", "storyId" FROM "engagement"."readingHistory"
+           ) AS reader ON reader."storyId" = story."id"
+     WHERE chapter."id" = ${chapterId}
+       AND chapter."publishedAt" IS NOT NULL
+       AND story."listedAt" IS NOT NULL
+       AND reader."userId" <> story."authorId"
+       AND NOT EXISTS (
+             SELECT 1 FROM "auth"."notificationMute" AS mute
+              WHERE mute."userId" = reader."userId"
+                AND mute."type" = 'NEW_CHAPTER'
            )
   `.affectedCount().build();
 

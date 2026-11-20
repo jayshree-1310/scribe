@@ -5,7 +5,7 @@ import { useDebouncedValue } from '../../hooks/useDebouncedValue'
 import { cn } from '../../lib/cn'
 import { useToast } from '../../lib/toast'
 import { ApiError } from '../../lib/api-client'
-import { formatCount, formatFileSize, readingMinutes } from '../../lib/format'
+import { formatCount, formatDayAndTime, formatFileSize, formatMonthDay, readingMinutes } from '../../lib/format'
 import {
   insertMediaToken,
   mediaToken,
@@ -14,6 +14,7 @@ import {
 import * as storiesApi from '../../data/stories-api'
 import * as authoringApi from '../../data/authoring-api'
 import type { AuthoredMedia } from '../../data/authoring-api'
+import { ScheduleChapterDialog } from './ScheduleChapterDialog'
 import {
   ACCEPTED_IMAGE_TYPES,
   ACCEPTED_MEDIA_TYPES,
@@ -61,6 +62,8 @@ interface DraftChapter {
   title: string
   body: string
   published: boolean
+  /** When a draft is set to go live by itself, or null. */
+  scheduledAt: string | null
   dirty: boolean
   /**
    * Attachments as they stand on the server. Unlike the prose these are never
@@ -80,6 +83,7 @@ function blankChapter(number: number): DraftChapter {
     title: `Chapter ${number}`,
     body: '',
     published: false,
+    scheduledAt: null,
     dirty: true,
     media: [],
   }
@@ -275,6 +279,7 @@ export function StoryEditorPage() {
             title: chapter.title,
             body: chapter.content,
             published: chapter.publishedAt !== null,
+            scheduledAt: chapter.scheduledAt,
             dirty: false,
             media: chapter.multimedia,
           }))
@@ -818,32 +823,83 @@ export function StoryEditorPage() {
   async function toggleChapter(chapter: DraftChapter) {
     setChapterBusy(chapter.key)
     try {
-      let id = chapter.id
-
-      if (id === null || chapter.dirty || dirty) {
-        const result = await save({ silent: true })
-        if (result === null) return
-        id =
-          result.chapters.find((entry) => entry.key === chapter.key)?.id ?? id
-      }
-
+      const id = await savedChapterId(chapter)
       if (id === null) return
 
       const result = chapter.published
         ? await authoringApi.unpublishChapter(id)
         : await authoringApi.publishChapter(id)
 
-      setChapters((current) =>
-        current.map((entry) =>
-          entry.key === chapter.key
-            ? { ...entry, published: result.publishedAt !== null }
-            : entry,
-        ),
-      )
+      applyChapterResult(chapter.key, result)
     } catch (cause) {
       showToast({
         tone: 'error',
         message: messageFor(cause, 'We could not change that chapter.'),
+      })
+    } finally {
+      setChapterBusy(null)
+    }
+  }
+
+  /**
+   * The chapter's server id, saving first when anything is pending, so a
+   * publish or a schedule never acts on text that is still only in the
+   * browser. Null when the save failed (it has already said why).
+   */
+  async function savedChapterId(chapter: DraftChapter): Promise<string | null> {
+    let id = chapter.id
+
+    if (id === null || chapter.dirty || dirty) {
+      const result = await save({ silent: true })
+      if (result === null) return null
+      id = result.chapters.find((entry) => entry.key === chapter.key)?.id ?? id
+    }
+
+    return id
+  }
+
+  /** Copies a chapter's publication state back from what the API returned. */
+  function applyChapterResult(key: string, result: authoringApi.AuthoredChapter) {
+    setChapters((current) =>
+      current.map((entry) =>
+        entry.key === key
+          ? {
+              ...entry,
+              published: result.publishedAt !== null,
+              scheduledAt: result.scheduledAt,
+            }
+          : entry,
+      ),
+    )
+  }
+
+  /** The chapter whose release time is being picked, if any. */
+  const [scheduling, setScheduling] = useState<DraftChapter | null>(null)
+
+  /** Throws on failure, so the dialog can show the server's reason. */
+  async function scheduleChapterAt(chapter: DraftChapter, at: string) {
+    const id = await savedChapterId(chapter)
+    if (id === null) return
+
+    const result = await authoringApi.scheduleChapter(id, at)
+    applyChapterResult(chapter.key, result)
+    setScheduling(null)
+    showToast({
+      message: `“${chapter.title || 'Untitled'}” goes live ${formatDayAndTime(at)}.`,
+    })
+  }
+
+  async function cancelSchedule(chapter: DraftChapter) {
+    if (chapter.id === null) return
+
+    setChapterBusy(chapter.key)
+    try {
+      applyChapterResult(chapter.key, await authoringApi.unscheduleChapter(chapter.id))
+      showToast({ message: 'Schedule cancelled. The chapter stays a draft.' })
+    } catch (cause) {
+      showToast({
+        tone: 'error',
+        message: messageFor(cause, 'We could not cancel that schedule.'),
       })
     } finally {
       setChapterBusy(null)
@@ -944,7 +1000,13 @@ export function StoryEditorPage() {
       const { storyId: id } = result
       const current = await authoringApi.listMyChapters(id)
       for (const chapter of current) {
-        if (chapter.publishedAt === null && chapter.content.trim().length > 0) {
+        // A scheduled chapter keeps its release time rather than going out
+        // early with the rest.
+        if (
+          chapter.publishedAt === null &&
+          chapter.scheduledAt === null &&
+          chapter.content.trim().length > 0
+        ) {
           await authoringApi.publishChapter(chapter.id)
         }
       }
@@ -1374,9 +1436,17 @@ export function StoryEditorPage() {
                         <span className="visually-hidden"> continuity warnings</span>
                       </span>
                     ) : null}
-                    <StatusBadge tone={chapter.published ? 'success' : 'neutral'}>
-                      {chapter.published ? 'Live' : 'Draft'}
-                    </StatusBadge>
+                    {chapter.published ? (
+                      <StatusBadge tone="success">Live</StatusBadge>
+                    ) : chapter.scheduledAt ? (
+                      <span title={`Goes live ${formatDayAndTime(chapter.scheduledAt)}`}>
+                        <StatusBadge tone="brand">
+                          {formatMonthDay(chapter.scheduledAt)}
+                        </StatusBadge>
+                      </span>
+                    ) : (
+                      <StatusBadge tone="neutral">Draft</StatusBadge>
+                    )}
                   </button>
 
                   {/*
@@ -1414,8 +1484,30 @@ export function StoryEditorPage() {
                       }
                       onSelect={() => void toggleChapter(chapter)}
                     >
-                      {chapter.published ? 'Unpublish' : 'Publish'}
+                      {chapter.published
+                        ? 'Unpublish'
+                        : chapter.scheduledAt
+                          ? 'Publish now'
+                          : 'Publish'}
                     </MenuItem>
+
+                    {chapter.published ? null : (
+                      <MenuItem
+                        icon={<Icon name="calendar" size="1rem" />}
+                        onSelect={() => setScheduling(chapter)}
+                      >
+                        {chapter.scheduledAt ? 'Change release time' : 'Schedule release'}
+                      </MenuItem>
+                    )}
+
+                    {!chapter.published && chapter.scheduledAt ? (
+                      <MenuItem
+                        icon={<Icon name="close" size="1rem" />}
+                        onSelect={() => void cancelSchedule(chapter)}
+                      >
+                        Cancel schedule
+                      </MenuItem>
+                    ) : null}
 
                     {index > 0 ? (
                       <MenuItem
@@ -1685,10 +1777,20 @@ export function StoryEditorPage() {
         </div>
       </Dialog>
 
+      {scheduling ? (
+        <ScheduleChapterDialog
+          open
+          chapterTitle={scheduling.title}
+          scheduledAt={scheduling.scheduledAt}
+          onClose={() => setScheduling(null)}
+          onSchedule={(at) => scheduleChapterAt(scheduling, at)}
+        />
+      ) : null}
+
       <ConfirmDialog
         open={confirmPublish}
         title={`Publish “${title || 'Untitled story'}”?`}
-        message="Every chapter you have written goes live and the story becomes visible to every reader on Scribe. You can unpublish later."
+        message="Every chapter you have written goes live, except any scheduled for later, and the story becomes visible to every reader on Scribe. You can unpublish later."
         confirmLabel="Publish now"
         tone="primary"
         pending={publishing}

@@ -22,6 +22,7 @@ const TYPE_ICONS: Record<NotificationType, IconName> = {
   STORY_COMMENT: 'comment',
   CLUB_DISCUSSION: 'users',
   NEW_STORY: 'book',
+  NEW_CHAPTER: 'book-open',
   BADGE_EARNED: 'medal',
 }
 
@@ -51,6 +52,9 @@ function describe(notification: Notification): string {
       return `${who} started a thread in ${notification.title}`
     case 'NEW_STORY':
       return `${who} published ${notification.title}`
+    case 'NEW_CHAPTER':
+      // The chapter's number and title are the excerpt drawn underneath.
+      return `New chapter of ${notification.title}`
     case 'BADGE_EARNED':
       // The one with no actor: nobody did this *to* the reader.
       return `You earned ${notification.title}`

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ApiError } from '../../lib/api-client'
+import { isoToLocalInput, localInputToIso } from '../../lib/local-datetime'
 import * as challengesApi from '../../data/challenges-api'
 import { Button } from '../ui/Button'
 import { Dialog } from '../ui/Dialog'
@@ -19,31 +20,8 @@ import './challenge-host.css'
  * A separate edit form would be the same six fields with a different heading,
  * and the day a seventh field is added is the day one of them would not get it.
  *
- * **The datetime conversion is the fiddly part.** `<input type="datetime-local">`
- * yields `2026-04-01T09:00` -- no zone at all -- while the API's schema demands
- * an offset. Reading that string with `new Date` interprets it in the browser's
- * zone, which is what a host means when they type a time: their own clock.
+ * **The datetime conversion is the fiddly part**; see `lib/local-datetime.ts`.
  */
-
-/** ISO with an offset, from what a `datetime-local` input gives. */
-function toIso(local: string): string {
-  return new Date(local).toISOString()
-}
-
-/** And back, because the input cannot parse what `toIso` produced. */
-function toLocalInput(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-
-  // Not `toISOString().slice(...)`: that would shift the value back to UTC and
-  // show the host a different clock from the one they typed into.
-  const pad = (value: number) => String(value).padStart(2, '0')
-
-  return (
-    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
-    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
-  )
-}
 
 interface ChallengeHostDialogProps {
   /** Absent when hosting a new one. */
@@ -68,10 +46,10 @@ export function ChallengeHostDialog({
       : String(challenge.wordTarget),
   )
   const [startsAt, setStartsAt] = useState(
-    challenge ? toLocalInput(challenge.startsAt) : '',
+    challenge ? isoToLocalInput(challenge.startsAt) : '',
   )
   const [endsAt, setEndsAt] = useState(
-    challenge ? toLocalInput(challenge.endsAt) : '',
+    challenge ? isoToLocalInput(challenge.endsAt) : '',
   )
 
   const [pending, setPending] = useState(false)
@@ -102,8 +80,8 @@ export function ChallengeHostDialog({
       prompt: prompt.trim(),
       description: description.trim() ? description.trim() : null,
       wordTarget: wordTarget.trim() ? Number(wordTarget) : null,
-      startsAt: toIso(startsAt),
-      endsAt: toIso(endsAt),
+      startsAt: localInputToIso(startsAt),
+      endsAt: localInputToIso(endsAt),
     }
 
     try {

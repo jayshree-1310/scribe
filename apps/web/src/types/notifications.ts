@@ -17,6 +17,7 @@ export type NotificationType =
   | 'STORY_COMMENT'
   | 'CLUB_DISCUSSION'
   | 'NEW_STORY'
+  | 'NEW_CHAPTER'
   | 'BADGE_EARNED'
 
 /** The same four fields every other author summary carries, and no more. */

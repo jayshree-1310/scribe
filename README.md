@@ -27,6 +27,7 @@ idle, so the first request after a quiet spell takes a while to answer.
 | My Library — shelve, update, remove                                       | **Real API**                         |
 | Stories & chapters — public reading                                       | **Real API**                         |
 | Author studio — stories, chapters, reorder, publish/unpublish, multimedia | **Real API**                         |
+| Scheduled chapters — release at a set time, countdown, readers notified   | **Real API**                         |
 | Uploads — images (`kind=cover`) and chapter audio/video (`kind=media`)    | **Real API**                         |
 | Home feed, public profiles & follows, clubs, channels                     | **Real API**                         |
 | Comments, ratings, reading progress & streak                              | **Real API**                         |
@@ -65,6 +66,8 @@ current tree rather than in the abstract:
   the list of open questions the test suite cannot reach.
 - `docs/AI-BACKLOG.md` — the GenAI roadmap (AI 0 – AI 20). All of it has
   landed.
+- `docs/NEW-FEATURES.md` — product features queued next (highlights, beta
+  readers, listen mode, quote cards, public reading lists). None built yet.
 - `docs/AI-NEXT.md` — the work after it (AI 21 – AI 25), from the CopilotKit
   assessment. All of it has run: AI 21 – AI 24 have landed, and AI 25, the
   CopilotKit trial, was run and then removed.

@@ -12,6 +12,7 @@ import type {
   Chapter,
   ChapterSummary,
   Story,
+  StoryDetail,
   StoryGenreSummary,
   StoryPage,
   StorySort,
@@ -54,8 +55,8 @@ export async function getGenres(): Promise<StoryGenreSummary[]> {
  * The two reads the API counts -- a story view, a chapter read -- carry the
  * product tour's marker while it is on screen. See `lib/tour-preview.ts`.
  */
-export async function getStory(slugOrId: string): Promise<Story> {
-  const { story } = await request<{ story: Story }>(
+export async function getStory(slugOrId: string): Promise<StoryDetail> {
+  const { story } = await request<{ story: StoryDetail }>(
     `/stories/${encodeURIComponent(slugOrId)}`,
     { headers: tourPreviewHeaders() },
   )

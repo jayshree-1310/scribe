@@ -4273,6 +4273,13 @@
                   "kind": "scalar"
                 }
               },
+              "scheduledAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
               "storyId": {
                 "nullable": false,
                 "type": {
@@ -4536,6 +4543,9 @@
                 },
                 "publishedAt": {
                   "column": "publishedAt"
+                },
+                "scheduledAt": {
+                  "column": "scheduledAt"
                 },
                 "storyId": {
                   "column": "storyId"
@@ -6937,6 +6947,10 @@
                 "value": "NEW_STORY"
               },
               {
+                "name": "NEW_CHAPTER",
+                "value": "NEW_CHAPTER"
+              },
+              {
                 "name": "BADGE_EARNED",
                 "value": "BADGE_EARNED"
               },
@@ -8971,8 +8985,8 @@
             "notificationMute": {
               "checks": [
                 {
-                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED')",
-                  "name": "notificationMute_type_check_3a77c5c7",
+                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'NEW_CHAPTER', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED')",
+                  "name": "notificationMute_type_check_fd2b9b0f",
                   "prefix": "notificationMute_type_check"
                 }
               ],
@@ -10304,6 +10318,11 @@
                   "nativeType": "timestamptz",
                   "nullable": true
                 },
+                "scheduledAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
                 "storyId": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -10352,6 +10371,14 @@
                 }
               ],
               "indexes": [
+                {
+                  "columns": [
+                    "scheduledAt"
+                  ],
+                  "name": "chapter_scheduledAt_idx_f69c1204",
+                  "prefix": "chapter_scheduledAt_idx",
+                  "unique": false
+                },
                 {
                   "columns": [
                     "storyId"
@@ -12270,8 +12297,8 @@
                   "prefix": "notification_sourceType_check"
                 },
                 {
-                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED')",
-                  "name": "notification_type_check_3a77c5c7",
+                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'NEW_CHAPTER', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED')",
+                  "name": "notification_type_check_fd2b9b0f",
                   "prefix": "notification_type_check"
                 }
               ],
@@ -12493,6 +12520,7 @@
                 "STORY_COMMENT",
                 "CLUB_DISCUSSION",
                 "NEW_STORY",
+                "NEW_CHAPTER",
                 "BADGE_EARNED",
                 "LEVEL_UP",
                 "CONTENT_HIDDEN",
@@ -12553,7 +12581,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "0d941e650b2d4a18b2c6d1710cd80323c32e63d95331a3d55f0a723480d89e06"
+    "storageHash": "946c00812d2deb2e85bc8d5350ec319d2a7fc45d8f2b3a96a581845709ba723c"
   },
   "execution": {
     "executionHash": "7d2db05d5e947645db9eaad034511ce50b09361a5ca66b23b87121c8110a7737",

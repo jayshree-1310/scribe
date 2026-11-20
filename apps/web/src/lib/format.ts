@@ -5,6 +5,13 @@ const decimal = new Intl.NumberFormat('en')
 const relative = new Intl.RelativeTimeFormat('en', { numeric: 'auto' })
 const shortDate = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', year: 'numeric' })
 const monthDay = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric' })
+const dayAndTime = new Intl.DateTimeFormat('en', {
+  weekday: 'short',
+  month: 'short',
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+})
 
 /** 1200 → "1.2K". Used wherever counts sit inside a card. */
 export function formatCount(value: number): string {
@@ -46,6 +53,12 @@ export function formatRelative(iso: string): string {
 export function formatDate(iso: string): string {
   const date = new Date(iso)
   return Number.isNaN(date.getTime()) ? '' : shortDate.format(date)
+}
+
+/** "Fri, Nov 21, 9:00 AM", in the reader's own zone — for release times. */
+export function formatDayAndTime(iso: string): string {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime()) ? '' : dayAndTime.format(date)
 }
 
 export function formatMonthDay(iso: string): string {

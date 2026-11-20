@@ -181,6 +181,11 @@ const NOTIFICATION_SETTINGS: {
     description: 'When an author you follow lists something new.',
   },
   {
+    type: 'NEW_CHAPTER',
+    label: 'New chapters',
+    description: 'When a story in your library or that you have started gets a new chapter.',
+  },
+  {
     type: 'BADGE_EARNED',
     label: 'Badges',
     description: 'When you earn one.',

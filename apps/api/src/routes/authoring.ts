@@ -25,6 +25,8 @@ import {
   listMyChapters,
   listMyStories,
   publishChapter,
+  scheduleChapter,
+  unscheduleChapter,
   publishStory,
   removeMultimedia,
   reorderChapters,
@@ -271,6 +273,34 @@ router.post("/chapters/:id/publish", async (req, res, next) => {
     const { id } = parseOrThrow(idParamSchema, req.params);
 
     res.json({ chapter: await publishChapter(requireUserId(res), id) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** When a draft chapter should go live by itself. */
+const scheduleSchema = z.object({
+  at: z.iso.datetime({ offset: true, error: "Pick a date and time." }),
+});
+
+router.put("/chapters/:id/schedule", async (req, res, next) => {
+  try {
+    const { id } = parseOrThrow(idParamSchema, req.params);
+    const { at } = parseOrThrow(scheduleSchema, req.body);
+
+    res.json({
+      chapter: await scheduleChapter(requireUserId(res), id, new Date(at)),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/chapters/:id/schedule", async (req, res, next) => {
+  try {
+    const { id } = parseOrThrow(idParamSchema, req.params);
+
+    res.json({ chapter: await unscheduleChapter(requireUserId(res), id) });
   } catch (error) {
     next(error);
   }

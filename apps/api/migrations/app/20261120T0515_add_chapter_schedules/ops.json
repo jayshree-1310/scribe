@@ -1,0 +1,251 @@
+[
+  {
+    "id": "dropCheckConstraint.notificationMute.notificationMute_type_check_3a77c5c7",
+    "label": "Drop check constraint \"notificationMute_type_check_3a77c5c7\" on \"notificationMute\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "checkConstraint",
+        "name": "notificationMute_type_check_3a77c5c7",
+        "table": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notificationMute_type_check_3a77c5c7\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_3a77c5c7",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"notificationMute_type_check_3a77c5c7\"",
+        "sql": "ALTER TABLE \"auth\".\"notificationMute\" DROP CONSTRAINT \"notificationMute_type_check_3a77c5c7\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notificationMute_type_check_3a77c5c7\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_3a77c5c7",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropCheckConstraint.notification.notification_type_check_3a77c5c7",
+    "label": "Drop check constraint \"notification_type_check_3a77c5c7\" on \"notification\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_type_check_3a77c5c7",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_type_check_3a77c5c7\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_3a77c5c7",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"notification_type_check_3a77c5c7\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" DROP CONSTRAINT \"notification_type_check_3a77c5c7\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_type_check_3a77c5c7\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_3a77c5c7",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.content.chapter.scheduledAt",
+    "label": "Add column \"scheduledAt\" to \"chapter\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "column",
+        "name": "scheduledAt",
+        "table": "chapter"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"scheduledAt\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "chapter",
+          "scheduledAt"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"scheduledAt\"",
+        "sql": "ALTER TABLE \"content\".\"chapter\" ADD COLUMN \"scheduledAt\" timestamptz"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"scheduledAt\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "content",
+          "chapter",
+          "scheduledAt"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notificationMute.notificationMute_type_check_fd2b9b0f",
+    "label": "Add check constraint \"notificationMute_type_check_fd2b9b0f\" on \"notificationMute\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "checkConstraint",
+        "name": "notificationMute_type_check_fd2b9b0f",
+        "table": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notificationMute_type_check_fd2b9b0f\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_fd2b9b0f",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notificationMute_type_check_fd2b9b0f\"",
+        "sql": "ALTER TABLE \"auth\".\"notificationMute\" ADD CONSTRAINT \"notificationMute_type_check_fd2b9b0f\" CHECK (\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'NEW_CHAPTER', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notificationMute_type_check_fd2b9b0f\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_fd2b9b0f",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notification.notification_type_check_fd2b9b0f",
+    "label": "Add check constraint \"notification_type_check_fd2b9b0f\" on \"notification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_type_check_fd2b9b0f",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_type_check_fd2b9b0f\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_fd2b9b0f",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notification_type_check_fd2b9b0f\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" ADD CONSTRAINT \"notification_type_check_fd2b9b0f\" CHECK (\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'NEW_CHAPTER', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_type_check_fd2b9b0f\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_fd2b9b0f",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.chapter.chapter_scheduledAt_idx_f69c1204",
+    "label": "Create index \"chapter_scheduledAt_idx_f69c1204\" on \"chapter\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "content",
+        "objectType": "index",
+        "name": "chapter_scheduledAt_idx_f69c1204",
+        "table": "chapter"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"chapter_scheduledAt_idx_f69c1204\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"content\".\"chapter_scheduledAt_idx_f69c1204\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"chapter_scheduledAt_idx_f69c1204\"",
+        "sql": "CREATE INDEX \"chapter_scheduledAt_idx_f69c1204\" ON \"content\".\"chapter\" (\"scheduledAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"chapter_scheduledAt_idx_f69c1204\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"content\".\"chapter_scheduledAt_idx_f69c1204\""
+        ]
+      }
+    ]
+  }
+]

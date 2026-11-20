@@ -39,6 +39,8 @@ const GUARDED = new Set([
   // and description, an edit to a channel post. (Review M-10.)
   "authoring.ts POST /stories/:id/publish",
   "authoring.ts POST /chapters/:id/publish",
+  // Publishing, deferred: a suspended author cannot queue what they could not post.
+  "authoring.ts PUT /chapters/:id/schedule",
   "channels.ts POST /",
   "channels.ts PATCH /:id",
   "channels.ts PATCH /posts/:id",
@@ -109,6 +111,7 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
       "authoring.ts POST /stories/:id/chapters/reorder",
       "authoring.ts DELETE /chapters/:id",
       "authoring.ts POST /chapters/:id/unpublish",
+      "authoring.ts DELETE /chapters/:id/schedule",
       "authoring.ts DELETE /multimedia/:id",
       "channels.ts DELETE /:id",
       "channels.ts DELETE /posts/:id",

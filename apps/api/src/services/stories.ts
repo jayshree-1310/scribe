@@ -692,17 +692,50 @@ export async function countVisibleStoriesBy(
   return totals.total;
 }
 
+/**
+ * The next chapter an author has scheduled, as readers may know it: its
+ * number and when it arrives, never its title, which can give the plot away.
+ */
+export interface NextRelease {
+  number: number;
+  scheduledAt: string;
+}
+
+/** One story's page: the card's fields, plus what is coming next. */
+export interface StoryDetail extends Story {
+  nextRelease: NextRelease | null;
+}
+
 export async function getStory(
   slugOrId: string,
   viewerId: string | null,
-): Promise<Story> {
+): Promise<StoryDetail> {
   const row = await findStoryRow(slugOrId, viewerId);
   if (!row) throw HttpError.notFound(NOT_FOUND);
 
   const [story] = await hydrate([row], viewerId);
   if (!story) throw HttpError.notFound(NOT_FOUND);
 
-  return story;
+  return { ...story, nextRelease: await nextReleaseOf(row.id) };
+}
+
+/**
+ * The soonest scheduled chapter still to come. One indexed probe per story
+ * page; the list endpoints do not carry it, because a card has nowhere to
+ * show it.
+ */
+async function nextReleaseOf(storyId: string): Promise<NextRelease | null> {
+  const row = await db.orm.content.Chapter.select("chapterNumber", "scheduledAt")
+    .where((chapter) => chapter.storyId.eq(storyId))
+    .where((chapter) => chapter.publishedAt.isNull())
+    .where((chapter) => chapter.scheduledAt.isNotNull())
+    .orderBy((chapter) => chapter.scheduledAt.asc())
+    .first();
+
+  const scheduledAt = row ? toIso(row.scheduledAt) : null;
+  if (!row || scheduledAt === null) return null;
+
+  return { number: row.chapterNumber, scheduledAt };
 }
 
 /** Chapters of one story, in reading order, without their bodies. */

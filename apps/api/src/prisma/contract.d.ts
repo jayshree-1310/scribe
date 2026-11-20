@@ -33,7 +33,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'0d941e650b2d4a18b2c6d1710cd80323c32e63d95331a3d55f0a723480d89e06'>;
+  StorageHashBase<'946c00812d2deb2e85bc8d5350ec319d2a7fc45d8f2b3a96a581845709ba723c'>;
 export type ExecutionHash =
   ExecutionHashBase<'7d2db05d5e947645db9eaad034511ce50b09361a5ca66b23b87121c8110a7737'>;
 export type ProfileHash =
@@ -453,6 +453,7 @@ export type FieldOutputTypes = {
         | 'STORY_COMMENT'
         | 'CLUB_DISCUSSION'
         | 'NEW_STORY'
+        | 'NEW_CHAPTER'
         | 'BADGE_EARNED'
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
@@ -589,6 +590,7 @@ export type FieldOutputTypes = {
       readonly publishedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly hiddenPublishedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly scheduledAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
     };
     readonly Genre: {
       readonly id: CodecTypes['pg/text@1']['output'];
@@ -757,6 +759,7 @@ export type FieldOutputTypes = {
         | 'STORY_COMMENT'
         | 'CLUB_DISCUSSION'
         | 'NEW_STORY'
+        | 'NEW_CHAPTER'
         | 'BADGE_EARNED'
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
@@ -996,6 +999,7 @@ export type FieldInputTypes = {
         | 'STORY_COMMENT'
         | 'CLUB_DISCUSSION'
         | 'NEW_STORY'
+        | 'NEW_CHAPTER'
         | 'BADGE_EARNED'
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
@@ -1132,6 +1136,7 @@ export type FieldInputTypes = {
       readonly publishedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly hiddenPublishedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly scheduledAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
     };
     readonly Genre: {
       readonly id: CodecTypes['pg/text@1']['input'];
@@ -1300,6 +1305,7 @@ export type FieldInputTypes = {
         | 'STORY_COMMENT'
         | 'CLUB_DISCUSSION'
         | 'NEW_STORY'
+        | 'NEW_CHAPTER'
         | 'BADGE_EARNED'
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
@@ -1539,6 +1545,7 @@ export type StorageColumnTypes = {
         | 'STORY_COMMENT'
         | 'CLUB_DISCUSSION'
         | 'NEW_STORY'
+        | 'NEW_CHAPTER'
         | 'BADGE_EARNED'
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
@@ -1671,6 +1678,7 @@ export type StorageColumnTypes = {
       readonly hiddenPublishedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly id: CodecTypes['pg/text@1']['output'];
       readonly publishedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly scheduledAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly storyId: CodecTypes['pg/text@1']['output'];
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
@@ -1859,6 +1867,7 @@ export type StorageColumnTypes = {
         | 'STORY_COMMENT'
         | 'CLUB_DISCUSSION'
         | 'NEW_STORY'
+        | 'NEW_CHAPTER'
         | 'BADGE_EARNED'
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
@@ -2082,6 +2091,7 @@ export type StorageColumnInputTypes = {
         | 'STORY_COMMENT'
         | 'CLUB_DISCUSSION'
         | 'NEW_STORY'
+        | 'NEW_CHAPTER'
         | 'BADGE_EARNED'
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
@@ -2214,6 +2224,7 @@ export type StorageColumnInputTypes = {
       readonly hiddenPublishedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly id: CodecTypes['pg/text@1']['input'];
       readonly publishedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly scheduledAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly storyId: CodecTypes['pg/text@1']['input'];
       readonly title: CodecTypes['pg/text@1']['input'];
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
@@ -2402,6 +2413,7 @@ export type StorageColumnInputTypes = {
         | 'STORY_COMMENT'
         | 'CLUB_DISCUSSION'
         | 'NEW_STORY'
+        | 'NEW_CHAPTER'
         | 'BADGE_EARNED'
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
@@ -4991,10 +5003,21 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-temporal@1';
                   readonly nullable: true;
                 };
+                readonly scheduledAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: true;
+                };
               };
               primaryKey: { readonly columns: readonly ['id'] };
               uniques: readonly [{ readonly columns: readonly ['storyId', 'chapterNumber'] }];
               indexes: readonly [
+                {
+                  readonly name: 'chapter_scheduledAt_idx_f69c1204';
+                  readonly prefix: 'chapter_scheduledAt_idx';
+                  readonly columns: readonly ['scheduledAt'];
+                  readonly unique: false;
+                },
                 {
                   readonly name: 'chapter_storyId_idx_cd452158';
                   readonly prefix: 'chapter_storyId_idx';
@@ -6566,6 +6589,7 @@ type ContractBase = Omit<
                 'STORY_COMMENT',
                 'CLUB_DISCUSSION',
                 'NEW_STORY',
+                'NEW_CHAPTER',
                 'BADGE_EARNED',
                 'LEVEL_UP',
                 'CONTENT_HIDDEN',
@@ -9373,6 +9397,13 @@ type ContractBase = Omit<
                   readonly codecId: 'pg/timestamptz-temporal@1';
                 };
               };
+              readonly scheduledAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
             };
             readonly relations: {
               readonly comments: {
@@ -9545,6 +9576,7 @@ type ContractBase = Omit<
                 readonly publishedAt: { readonly column: 'publishedAt' };
                 readonly hiddenAt: { readonly column: 'hiddenAt' };
                 readonly hiddenPublishedAt: { readonly column: 'hiddenPublishedAt' };
+                readonly scheduledAt: { readonly column: 'scheduledAt' };
               };
             };
           };
@@ -11036,6 +11068,7 @@ type ContractBase = Omit<
               { readonly name: 'STORY_COMMENT'; readonly value: 'STORY_COMMENT' },
               { readonly name: 'CLUB_DISCUSSION'; readonly value: 'CLUB_DISCUSSION' },
               { readonly name: 'NEW_STORY'; readonly value: 'NEW_STORY' },
+              { readonly name: 'NEW_CHAPTER'; readonly value: 'NEW_CHAPTER' },
               { readonly name: 'BADGE_EARNED'; readonly value: 'BADGE_EARNED' },
               { readonly name: 'LEVEL_UP'; readonly value: 'LEVEL_UP' },
               { readonly name: 'CONTENT_HIDDEN'; readonly value: 'CONTENT_HIDDEN' },

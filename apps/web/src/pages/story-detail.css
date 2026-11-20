@@ -520,3 +520,22 @@
 [role='tabpanel'] + .page-section {
   margin-top: var(--space-10);
 }
+
+/* A scheduled chapter, listed after the readable ones. Not a link -- there is
+   nothing to open yet -- so it keeps the row's shape without its hover. */
+.chapter-row--upcoming {
+  color: var(--text-secondary);
+}
+
+.chapter-row--upcoming .chapter-row__number {
+  background-color: var(--brand-soft);
+  color: var(--brand);
+}
+
+.chapter-row--upcoming .chapter-row__title {
+  color: var(--brand);
+}
+
+.chapter-row--upcoming:hover {
+  background-color: transparent;
+}
