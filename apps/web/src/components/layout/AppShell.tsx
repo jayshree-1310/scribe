@@ -1,10 +1,11 @@
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useRef, useState, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../lib/auth'
 import { Spinner } from '../ui/Spinner'
 import { useTour } from '../../lib/tour'
+import { usePageTransition } from '../../hooks/usePageTransition'
 import { Icon } from '../ui/Icon'
 import { ScribbleWidget } from '../ai/ScribbleWidget'
 import { MobileNav } from './MobileNav'
@@ -26,6 +27,8 @@ export function AppShell({ children, variant = 'reader', width = 'default' }: Ap
   const [drawerOpen, setDrawerOpen] = useState(false)
   const { session } = useAuth()
   const { registerReveal } = useTour()
+  const mainRef = useRef<HTMLElement>(null)
+  usePageTransition(mainRef)
 
   const base = variant === 'author' ? AUTHOR_NAV : READER_NAV
   // The one section that depends on who is looking. See `ADMIN_NAV`.
@@ -100,9 +103,11 @@ export function AppShell({ children, variant = 'reader', width = 'default' }: Ap
         <TopBar onOpenNav={() => setDrawerOpen(true)} />
         <VerifyEmailBanner />
         {/* Deliberately not keyed on the path. This element persists across
-            navigations — see `ShellLayout` — which is what keeps `page-in` a
-            first-load animation rather than a flash on every link. */}
+            navigations — see `ShellLayout` — so CSS `page-in` runs on first
+            load only; `usePageTransition` replays it on each new page
+            without remounting anything. */}
         <main
+          ref={mainRef}
           className={cn('shell__content', `shell__content--${width}`)}
           id="main"
           data-tour="app"

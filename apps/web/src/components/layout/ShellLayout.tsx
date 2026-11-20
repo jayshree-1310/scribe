@@ -17,7 +17,8 @@ import { PublicShell } from './PublicShell'
  * Here the shell is a layout route: it persists, and only `<Outlet />` changes.
  * Two consequences worth knowing. The `page-in` animation on `.shell__content`
  * now runs once, on first load, because the element it is attached to no longer
- * remounts -- which is what it always should have meant. And the Scribble
+ * remounts -- which is what it always should have meant. (Each later page gets
+ * the same entrance from `usePageTransition`, without a remount.) And the Scribble
  * widget's conversation genuinely does survive navigation now; the comment in
  * `AppShell` claiming it did was true of the widget's position in the tree and
  * false in practice.

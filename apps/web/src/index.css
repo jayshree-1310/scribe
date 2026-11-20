@@ -72,6 +72,7 @@
   --dur-fast: 110ms;
   --dur: 180ms;
   --dur-slow: 280ms;
+  --dur-theme: 360ms;
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 
@@ -341,11 +342,37 @@ hr {
   }
 }
 
+/*
+ * Theme switch (`transitionTheme` in lib/motion.ts). With the View Transitions
+ * API the old and new pages cross-fade; without it, every element's colours
+ * ease across while `.theme-fading` is on the root. `!important` because the
+ * fade must beat each component's own (shorter, hover-only) transitions.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--dur-theme);
+  animation-timing-function: var(--ease);
+}
+
+.theme-fading,
+.theme-fading *,
+.theme-fading *::before,
+.theme-fading *::after {
+  transition:
+    background-color var(--dur-theme) var(--ease),
+    border-color var(--dur-theme) var(--ease),
+    color var(--dur-theme) var(--ease),
+    fill var(--dur-theme) var(--ease),
+    stroke var(--dur-theme) var(--ease),
+    box-shadow var(--dur-theme) var(--ease) !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   :root {
     --dur-fast: 1ms;
     --dur: 1ms;
     --dur-slow: 1ms;
+    --dur-theme: 1ms;
   }
 
   html {
