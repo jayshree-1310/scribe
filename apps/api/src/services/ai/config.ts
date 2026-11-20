@@ -327,6 +327,16 @@ export interface AiEmbedConfig {
    */
   dimensions: number;
   /**
+   * Ask the provider for `dimensions`-wide vectors rather than trusting the
+   * model's native width (`AI_EMBED_SEND_DIMENSIONS=on`). For models whose
+   * output can be shortened -- `gemini-embedding-001` is 3072 wide by default,
+   * OpenAI's `text-embedding-3-*` 1536 -- since the vector columns are fixed
+   * at 768. Off by default: a provider that does not know the parameter may
+   * refuse it. A width that still comes back wrong is rejected before it is
+   * stored (`services/ai/embeddings.ts`).
+   */
+  sendDimensions: boolean;
+  /**
    * How many passages go in one request.
    *
    * Both provider APIs take an array. Batching matters more locally than
@@ -432,6 +442,9 @@ export function loadAiEmbedConfig(): AiEmbedConfig {
     apiKey: process.env["AI_EMBED_API_KEY"]?.trim() || chat.apiKey,
     model: process.env["AI_EMBED_MODEL"]?.trim() || EMBED_DEFAULTS.model,
     dimensions: readInt("AI_EMBED_DIMENSIONS", EMBED_DEFAULTS.dimensions),
+    sendDimensions: ["on", "true", "1"].includes(
+      process.env["AI_EMBED_SEND_DIMENSIONS"]?.trim().toLowerCase() ?? "",
+    ),
     batchSize: Math.max(
       1,
       readInt("AI_EMBED_BATCH_SIZE", EMBED_DEFAULTS.batchSize),
@@ -459,14 +472,56 @@ export function loadAiEmbedConfig(): AiEmbedConfig {
   };
 }
 
-/** Same rule as `isAiConfigured`: only a missing credential is knowable here. */
+/**
+ * Same rule as `isAiConfigured`: only a missing credential is knowable here --
+ * plus one more thing that is, in production: an embedder still pointed at
+ * this machine. The default is the local Ollama container, which a hosted
+ * deployment does not have, and until something sets `AI_EMBED_*` every
+ * embedding call fails (Ask This Book, the story bible, semantic search).
+ */
 export function isAiEmbedConfigured(
   config: AiEmbedConfig = loadAiEmbedConfig(),
 ): boolean {
+  if (process.env["NODE_ENV"] === "production" && isLocalAddress(config.baseUrl)) {
+    return false;
+  }
   if (config.provider === "anthropic" || config.provider === "openai") {
     return config.apiKey !== undefined && config.baseUrl.length > 0;
   }
   return config.baseUrl.length > 0;
+}
+
+function isLocalAddress(baseUrl: string): boolean {
+  try {
+    const host = new URL(baseUrl).hostname;
+    return host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
+  } catch {
+    return false;
+  }
+}
+
+/** The embedder, for `/health`: host only, like `describeAiConfig`. */
+export function describeAiEmbedConfig(config: AiEmbedConfig = loadAiEmbedConfig()): {
+  provider: AiProviderName;
+  model: string;
+  endpoint: string;
+  dimensions: number;
+  configured: boolean;
+} {
+  let endpoint: string;
+  try {
+    endpoint = new URL(config.baseUrl).host;
+  } catch {
+    endpoint = "invalid";
+  }
+
+  return {
+    provider: config.provider,
+    model: config.model,
+    endpoint,
+    dimensions: config.dimensions,
+    configured: isAiEmbedConfigured(config),
+  };
 }
 
 /* Moderation -------------------------------------------------------------- */

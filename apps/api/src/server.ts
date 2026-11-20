@@ -4,7 +4,7 @@ import { db } from "./prisma/db.js";
 import { connectRedis, redis } from "./lib/redis.js";
 import { drainDeferredWrites } from "./services/deferred.js";
 import { enqueue, startWorker, stopWorker } from "./lib/jobs.js";
-import { loadAiConfig } from "./services/ai/config.js";
+import { isAiEmbedConfigured, loadAiConfig } from "./services/ai/config.js";
 import { USAGE_PRUNE_JOB } from "./services/ai/job-schedule.js";
 import { registerAiJobs } from "./services/ai/jobs.js";
 import { sweepUnreferencedUploads } from "./services/uploads.js";
@@ -44,6 +44,14 @@ async function sweepUploadsDaily(): Promise<void> {
 const PORT = Number(process.env.PORT) || 3000;
 
 async function start() {
+  // Said once, loudly, at boot: otherwise the first sign is a reader's
+  // failed question, and nothing in the logs says which setting is missing.
+  if (process.env.NODE_ENV === "production" && !isAiEmbedConfigured()) {
+    logger.error(
+      "AI embeddings are not configured (AI_EMBED_*): Ask This Book, the story bible and semantic search will not work.",
+    );
+  }
+
   await connectRedis();
 
   const server = app.listen(PORT, () => {

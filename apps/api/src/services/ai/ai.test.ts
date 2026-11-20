@@ -5,7 +5,14 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError, upstreamDetailOf } from "../../lib/http-error.js";
-import { isAiConfigured, loadAiConfig } from "./config.js";
+import {
+  describeAiEmbedConfig,
+  isAiConfigured,
+  isAiEmbedConfigured,
+  loadAiConfig,
+  loadAiEmbedConfig,
+} from "./config.js";
+import { createOpenAiCompatibleEmbedder } from "./openai-compatible.js";
 import { createOllamaProvider, type FetchLike } from "./ollama.js";
 import {
   __wrapForTests,
@@ -27,6 +34,12 @@ const ENV_KEYS = [
   "AI_TIMEOUT_MS",
   "AI_MAX_RETRIES",
   "AI_DAILY_TOKEN_BUDGET",
+  "AI_EMBED_PROVIDER",
+  "AI_EMBED_BASE_URL",
+  "AI_EMBED_API_KEY",
+  "AI_EMBED_MODEL",
+  "AI_EMBED_SEND_DIMENSIONS",
+  "NODE_ENV",
 ] as const;
 
 const saved: Record<string, string | undefined> = {};
@@ -58,6 +71,48 @@ describe("AI configuration", () => {
     expect(config.baseUrl).toBe("http://localhost:11434");
     expect(config.apiKey).toBeUndefined();
     expect(isAiConfigured(config)).toBe(true);
+  });
+
+  /**
+   * The embedder's default is the Ollama container on this machine. A hosted
+   * deployment has none, so production treats that default as unconfigured
+   * -- and says so on /health and at boot -- rather than calling localhost
+   * on every question (E2E-FINDINGS E-1).
+   */
+  it("treats an embedder left on localhost as unconfigured in production only", () => {
+    expect(isAiEmbedConfigured(loadAiEmbedConfig())).toBe(true);
+
+    process.env["NODE_ENV"] = "production";
+    expect(isAiEmbedConfigured(loadAiEmbedConfig())).toBe(false);
+    expect(describeAiEmbedConfig().configured).toBe(false);
+
+    process.env["AI_EMBED_PROVIDER"] = "openai";
+    process.env["AI_EMBED_BASE_URL"] = "https://generativelanguage.googleapis.com/v1beta/openai";
+    process.env["AI_EMBED_API_KEY"] = "test-key";
+    expect(describeAiEmbedConfig()).toMatchObject({
+      endpoint: "generativelanguage.googleapis.com",
+      dimensions: 768,
+      configured: true,
+    });
+  });
+
+  it("asks a hosted embedder for 768-wide vectors only when told to", async () => {
+    process.env["AI_EMBED_PROVIDER"] = "openai";
+    process.env["AI_EMBED_BASE_URL"] = "https://embed.example/v1";
+    process.env["AI_EMBED_API_KEY"] = "test-key";
+
+    const bodies: Record<string, unknown>[] = [];
+    const fetchImpl = vi.fn(async (_url: unknown, init?: { body?: unknown }) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return jsonResponse({ data: [{ index: 0, embedding: [0.1] }] });
+    }) as unknown as FetchLike;
+
+    await createOpenAiCompatibleEmbedder(loadAiEmbedConfig(), fetchImpl).embed({ feature: "t", texts: ["a"] });
+    process.env["AI_EMBED_SEND_DIMENSIONS"] = "on";
+    await createOpenAiCompatibleEmbedder(loadAiEmbedConfig(), fetchImpl).embed({ feature: "t", texts: ["a"] });
+
+    expect(bodies[0]).not.toHaveProperty("dimensions");
+    expect(bodies[1]).toMatchObject({ dimensions: 768 });
   });
 
   it("treats a hosted provider without a key as unconfigured", () => {

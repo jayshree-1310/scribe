@@ -397,6 +397,39 @@ copy.
 Re-run the dump commands in that README before any future migration so you
 carry current data rather than the September snapshot.
 
+## AI embeddings
+
+Ask This Book, the story bible and semantic search turn passages into vectors,
+and Groq — the chat provider — serves no embedding model. Left unset, the API
+falls back to the local-development default, an Ollama container on
+`localhost:11434`, which does not exist on Render: Ask This Book and the story
+bible fail, and search quietly falls back to keywords. `/health` reports
+`ai.embed.configured: false` and the boot log names the missing settings.
+
+The vector columns are `vector(768)`, so the model must return 768
+dimensions. A free option is Google's Gemini embedding model through its
+OpenAI-compatible endpoint, with a Google AI Studio key:
+
+| Key | Value |
+| --- | --- |
+| `AI_EMBED_PROVIDER` | `openai` |
+| `AI_EMBED_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai` |
+| `AI_EMBED_MODEL` | `gemini-embedding-001` |
+| `AI_EMBED_SEND_DIMENSIONS` | `on` — the model is 3072 wide unless asked for 768 |
+| `AI_EMBED_API_KEY` | the AI Studio key (it does not fall back to Groq's) |
+
+Google documents the endpoint and the model; whether that endpoint honours the
+`dimensions` parameter is not documented. Check after deploying: ask a
+question with Ask This Book. A model that ignores it answers 3072-wide
+vectors, which the API refuses with *"The embedding model returned 3072
+dimensions, but this database stores 768"* rather than storing them. If that
+happens, use a model that is natively 768 wide instead (for example Jina's
+`jina-embeddings-v2-base-en`) or widen the columns with a migration.
+
+Then back-fill the passages already published: `pnpm --filter api
+seed:embeddings` with `DATABASE_URL` and the `AI_EMBED_*` values above, or
+let the background worker embed each chapter as it is next published.
+
 ## Uploaded files
 
 `createStorage` in `apps/api/src/lib/storage.ts` picks the backend from the

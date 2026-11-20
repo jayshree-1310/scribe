@@ -71,7 +71,7 @@ PNG the upload test sent (replace it in Settings).
 
 ## 2. Issues
 
-### E-1 · Ask This Book fails on production: no embedder configured — High · Open
+### E-1 · Ask This Book fails on production: no embedder configured — High · Code side fixed (2026-11-20); needs Render settings
 - **Seen:** `POST /api/ai/ask`, `POST /api/ai/ask/stream` and
   `POST /api/ai/conversations/:id/messages` all answer **503** on production.
 - **Cause:** nothing sets `AI_EMBED_*` on Render, so the API falls back to the
@@ -85,8 +85,20 @@ PNG the upload test sent (replace it in Settings).
   `AI_EMBED_DIMENSIONS` and migrate the columns). Groq serves no embedding
   models. Add the keys to `render.yaml` and `DEPLOYMENT.md`, then back-fill
   chapter chunks (`pnpm --filter api seed:embeddings`).
-- **Until then:** consider hiding Ask This Book when the embedder is
-  unreachable, the way search falls back.
+- **Done in code:** production no longer calls `localhost:11434`: an
+  embedder left on a local address counts as unconfigured there, so Ask This
+  Book answers at once with *"Embeddings are not configured on this server"*
+  (search still falls back to keywords). `/health` now reports `ai.embed`
+  (provider, model, host, width, `configured`), and the boot log names the
+  missing settings. `AI_EMBED_SEND_DIMENSIONS=on` asks a hosted model for
+  768-wide vectors, so models that default wider — `gemini-embedding-001` —
+  can be used. `render.yaml` lists the `AI_EMBED_*` keys and
+  `DEPLOYMENT.md` → *AI embeddings* gives the Gemini recipe.
+- **Still to do by hand:** choose the provider, set the keys on Render, check
+  Ask This Book, and back-fill with `seed:embeddings`. Google does not
+  document whether its OpenAI-compatible endpoint honours `dimensions`; if it
+  does not, the API refuses the 3072-wide reply with a message saying so, and
+  a natively 768-wide model is needed instead.
 
 ### E-2 · Story bible extraction fails on production — High · Open
 - **Seen:** `POST /api/ai/bible/:storyId/refresh` answers **502** *"The model
@@ -177,6 +189,14 @@ PNG the upload test sent (replace it in Settings).
 - Not an application bug, and users elsewhere are unlikely to see it — but if
   they report slow first loads, this is where to look. Worth checking from a
   second network, and with Render if it persists.
+
+### E-11 · `books.test.ts` pagination test fails under the full parallel suite — Low · Open
+- *"returns a second page that does not repeat the first"* fails now and then
+  when the whole API suite runs in parallel, and passes on its own. Other
+  suites create listed stories at the same time, so the book pages it compares
+  shift between its two requests. It can turn CI red for no reason.
+- **Fix:** scope the test's listing to fixtures of its own (a genre or search
+  term only this suite uses), so concurrent suites cannot move its pages.
 
 ---
 

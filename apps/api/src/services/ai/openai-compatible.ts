@@ -410,7 +410,12 @@ export function createOpenAiCompatibleEmbedder(
             "Content-Type": "application/json",
             Authorization: `Bearer ${config.apiKey ?? ""}`,
           },
-          body: JSON.stringify({ model, input: request.texts }),
+          body: JSON.stringify({
+            model,
+            input: request.texts,
+            // Only on request: see `AiEmbedConfig.sendDimensions`.
+            ...(config.sendDimensions ? { dimensions: config.dimensions } : {}),
+          }),
           signal: signalFor(request, config),
         });
       } catch (cause) {

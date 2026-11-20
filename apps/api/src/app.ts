@@ -39,7 +39,7 @@ import {
   describeStorage,
   storageHealth,
 } from "./lib/storage.js";
-import { describeAiConfig } from "./services/ai/config.js";
+import { describeAiConfig, describeAiEmbedConfig } from "./services/ai/config.js";
 import { aiHealth } from "./services/ai/health.js";
 import { describeMail } from "./lib/mailer.js";
 
@@ -117,7 +117,14 @@ app.get("/health", (_req, res) => {
     // `degraded` or `unknown` -- and never moves the top-level `status`: AI
     // being down must not take an app that works without it out of rotation
     // (Task AI 20, `docs/ai-operations.md`).
-    ai: { ...describeAiConfig(), status: aiHealth() },
+    ai: {
+      ...describeAiConfig(),
+      status: aiHealth(),
+      // The embedder is configured separately (`AI_EMBED_*`) and serves Ask
+      // This Book, the story bible and semantic search; `configured: false`
+      // in production means it is still pointed at a local model server.
+      embed: describeAiEmbedConfig(),
+    },
     // Likewise for uploads: an object store and this instance's own disk are
     // indistinguishable from outside until a file vanishes on the next deploy.
     // `status` is the last write's outcome, and like AI's never moves the

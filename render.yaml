@@ -122,6 +122,29 @@ services:
       # unknown fields.
       - key: AI_REASONING_EFFORT
         value: low
+      # --- Embeddings ---------------------------------------------------
+      # Ask This Book, the story bible and semantic search need an embedding
+      # model, and Groq serves none. Unset, the API falls back to a local
+      # Ollama that does not exist here: /health reports
+      # `ai.embed.configured: false` and the boot log says so. The vector
+      # columns are 768 wide, so the model must return 768 dimensions. With a
+      # Google AI Studio key (free tier):
+      #   AI_EMBED_PROVIDER         openai
+      #   AI_EMBED_BASE_URL         https://generativelanguage.googleapis.com/v1beta/openai
+      #   AI_EMBED_MODEL            gemini-embedding-001
+      #   AI_EMBED_SEND_DIMENSIONS  on
+      #   AI_EMBED_API_KEY          the AI Studio key
+      # See docs/DEPLOYMENT.md "AI embeddings" before relying on it.
+      - key: AI_EMBED_PROVIDER
+        sync: false
+      - key: AI_EMBED_BASE_URL
+        sync: false
+      - key: AI_EMBED_MODEL
+        sync: false
+      - key: AI_EMBED_API_KEY
+        sync: false
+      - key: AI_EMBED_SEND_DIMENSIONS
+        sync: false
 
       - key: JWT_ACCESS_EXPIRES_IN
         value: 15m
