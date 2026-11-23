@@ -7,7 +7,7 @@ what it is, why it is worth doing, and what it can build on.
 | - | --------------------------- | ------------------------- |
 | 1 | Highlights and margin notes | **Landed** (2026-11-20)   |
 | 2 | Beta readers                | **Landed** (2026-11-23)   |
-| 3 | Listen mode                 | Not started               |
+| 3 | Listen mode                 | **Landed** (2026-11-23)   |
 | 4 | Quote cards                 | Not started (needs 1, now there) |
 | 5 | Public reading lists        | Not started               |
 
@@ -151,6 +151,45 @@ so that "continue reading" resumes where listening stopped.
 **Open questions:** Browser voices vary in quality. A later version could
 generate audio with a hosted text-to-speech model and cache it per chapter, but
 that has a per-chapter cost.
+
+**Status: landed (2026-11-23).** Browser speech only, no server change. How it
+was built:
+
+- **Engine:** `Narrator` in `lib/narration.ts` reads a list of blocks (the
+  chapter title, then the prose's paragraphs, headings, quotes and list
+  items; never media captions), and `hooks/useNarration.ts` wraps it for
+  React. Each block is spoken as sentence-sized utterances of at most 180
+  characters, because Chrome silently stops a long utterance after about
+  fifteen seconds with some voices. **Pause cancels** and resume speaks the
+  interrupted sentence again, because `speechSynthesis.pause()`/`resume()`
+  do not work on Chrome for Linux and Android. Every utterance carries a
+  generation number, so the late `end`/`error` of a cancelled one is ignored.
+- **Player:** the headphones button in the reader's top bar opens a bar
+  docked where the other sheets dock (`components/reader/ListenBar.tsx`):
+  play/pause, previous/next paragraph, speed (0.75×–2×) and voice. It starts
+  from the first block on screen, not the top of the chapter. Speed and voice
+  are reader preferences (`listenRate`, `listenVoice`) saved in this browser;
+  only voices for the page language are offered, and a saved voice missing on
+  another device falls back to the default. A new speed or voice applies at
+  once, to the sentence being read.
+- **Following along:** the block being read is marked (`.is-narrating`, the
+  same soft mark as a cited passage), and the page scrolls only when the
+  narration nears the bottom of the window. A reader who scrolls away is
+  left there, with "Back to the narration" in the player. Because the page
+  follows the narration, the reading-progress save follows it too.
+- **Chapters:** at the end of a chapter it pauses briefly and goes on to the
+  next one, from its title; at the end of the story it stops. Moving to
+  another chapter yourself stops the narration. Leaving the reader stops it.
+- **Other sheets:** the bottom of the window holds one sheet at a time. While
+  Ask This Book, the highlights list, a note, feedback or an explanation is
+  open, the player steps aside and the narration carries on; the headphones
+  button brings it back.
+- Works signed out, since nothing leaves the browser. Hidden where the
+  browser has no `speechSynthesis`.
+- **Not done:** no word-by-word highlight (`boundary` events are missing or
+  wrong for many voices), no lock-screen or media-key controls (browser
+  speech is not a media session), and voices are the device's own; hosted
+  text-to-speech remains the later option above.
 
 ---
 

@@ -1,0 +1,104 @@
+/* ==========================================================================
+   Listen mode
+   The player docks where the other reader sheets do (`.explain-sheet` in
+   `components/ai/reader-ai.css`), and takes its tokens from the reading
+   theme through the remap in `pages/reader.css`.
+   ========================================================================== */
+
+.listen-bar {
+  /* One row of controls, not a panel: never taller than it needs to be. */
+  max-height: none;
+}
+
+.listen-bar__inner {
+  /* A little wider than the prose, so the controls fit on one row. */
+  max-width: max(var(--read-measure), 46rem);
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding-block: var(--space-3);
+}
+
+.listen-bar__controls,
+.listen-bar__options {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: none;
+}
+
+.listen-bar__play {
+  border-radius: var(--radius-full);
+}
+
+.listen-bar__status {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 10rem;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--read-ink-soft);
+}
+
+.listen-bar__follow {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--read-brand);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.listen-bar__options .select__control {
+  max-width: 11rem;
+}
+
+/* On a phone: buttons and status on one line, speed and voice under them. */
+@media (max-width: 40rem) {
+  .listen-bar__status {
+    min-width: 0;
+  }
+
+  .listen-bar__options {
+    flex: 1 1 100%;
+  }
+
+  .listen-bar__options .select {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .listen-bar__options .select__control {
+    max-width: none;
+  }
+}
+
+/*
+ * The block being read. The same soft mark as a cited passage (`.is-cited`
+ * in `pages/reader.css`), spread past the text with a shadow so no line moves.
+ */
+.reader__article .is-narrating {
+  background-color: var(--read-brand-soft);
+  box-shadow: 0 0 0 0.35em var(--read-brand-soft);
+  border-radius: var(--radius-sm);
+}
+
+/* Room below the chapter's last line, so the player never covers it. */
+.reader.is-listening .reader__main {
+  padding-block-end: calc(var(--space-16) + 4.5rem);
+}
+
+@media print {
+  .listen-bar {
+    display: none;
+  }
+
+  .reader__article .is-narrating {
+    background: none;
+    box-shadow: none;
+  }
+}

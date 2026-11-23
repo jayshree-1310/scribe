@@ -44,6 +44,10 @@ import type { SavedHighlight } from '../types/highlights'
 import { HighlightNoteSheet } from '../components/reader/HighlightNoteSheet'
 import { HighlightsSheet } from '../components/reader/HighlightsSheet'
 import { BetaFeedbackSheet } from '../components/reader/BetaFeedbackSheet'
+import { ListenBar } from '../components/reader/ListenBar'
+import { useNarration } from '../hooks/useNarration'
+import { LISTEN_RATES, firstVisibleBlock, narrationBlocks } from '../lib/narration'
+import { prefersReducedMotion } from '../lib/motion'
 import '../components/reader/beta.css'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
@@ -60,6 +64,28 @@ import './reader.css'
 
 /** How long a cited passage stays marked: long enough to find, then out of the way. */
 const CITED_HIGHLIGHT_MS = 4000
+
+/** The pause between the end of one chapter's narration and the next one's. */
+const LISTEN_NEXT_CHAPTER_MS = 1200
+
+/**
+ * The part of the window the reader can actually see prose in: below the top
+ * bar (which slides away in focus mode) and above the listen bar.
+ */
+function readingViewport(): { top: number; bottom: number } {
+  const bar = document.querySelector('.reader__bar')?.getBoundingClientRect()
+  const player = document.querySelector('.listen-bar')?.getBoundingClientRect()
+  return {
+    top: Math.max(0, bar?.bottom ?? 0),
+    bottom: player ? player.top : window.innerHeight,
+  }
+}
+
+function inReadingViewport(element: HTMLElement): boolean {
+  const { top, bottom } = readingViewport()
+  const rect = element.getBoundingClientRect()
+  return rect.bottom > top && rect.top < bottom
+}
 
 export function ReaderPage() {
   const { slug = '', chapter: chapterParam = '1' } = useParams()
@@ -131,6 +157,12 @@ export function ReaderPage() {
   const jumpTo = typeof jump === 'string' ? jump : null
 
   /**
+   * Listen mode read the previous chapter to its end and turned the page, so
+   * this one is read from its start. Router state, like a citation.
+   */
+  const listenNext = (location.state as { listen?: unknown } | null)?.listen === true
+
+  /**
    * Restores the reader's place when a chapter opens and saves it as they
    * scroll, off the same `progress` fraction the bar above is drawn from. A
    * citation is somewhere more specific to be, so it wins over the restore.
@@ -139,7 +171,7 @@ export function ReaderPage() {
     storyId,
     chapter: betaUnpublished ? null : (chapter.data ?? null),
     scrollFraction: progress,
-    skipRestore: citedQuote !== null || jumpTo !== null,
+    skipRestore: citedQuote !== null || jumpTo !== null || listenNext,
   })
 
   const [focusMode, setFocusMode] = useState(false)
@@ -630,6 +662,155 @@ export function ReaderPage() {
   const closeNote = useCallback(() => setNoteFor(null), [])
   const closeList = useCallback(() => setListOpen(false), [])
 
+  /* Listen mode ------------------------------------------------------- */
+
+  /**
+   * The chapter read aloud by the browser's own speech, a block at a time,
+   * with the block being read marked on the page and kept in view. Because
+   * the page follows the narration, the reading-progress save follows it
+   * too, and "continue reading" resumes where listening stopped.
+   *
+   * Needs no account: nothing leaves the browser.
+   */
+  const listenRate = (LISTEN_RATES as readonly number[]).includes(preferences.listenRate)
+    ? preferences.listenRate
+    : 1
+  const narration = useNarration(listenRate, preferences.listenVoice)
+  const narrator = narration.narrator
+  const narrationStatus = narration.state.status
+  const narrationIndex = narration.state.index
+
+  /** Whether the player is open. Narration stops when it is closed. */
+  const [listening, setListening] = useState(false)
+  /** The block being read has been scrolled out of view by the reader. */
+  const [away, setAway] = useState(false)
+  const articleRef = useRef<HTMLElement | null>(null)
+  /** The blocks being read, in the narrator's order. */
+  const blocksRef = useRef<HTMLElement[]>([])
+
+  /** Reads this chapter, from a block or from the first one on screen. */
+  const startNarration = useCallback(
+    (from: number | 'visible') => {
+      if (!narrator) return
+      const blocks = narrationBlocks(articleRef.current)
+      blocksRef.current = blocks
+      narrator.load(blocks.map((block) => block.textContent ?? ''))
+      if (blocks.length === 0) return
+
+      const { top, bottom } = readingViewport()
+      setAway(false)
+      narrator.play(from === 'visible' ? firstVisibleBlock(blocks, top, bottom) : from)
+    },
+    [narrator],
+  )
+
+  const toggleNarration = useCallback(() => {
+    if (!narrator) return
+    if (narrationStatus === 'playing') narrator.pause()
+    else if (narrationStatus === 'paused') narrator.resume()
+    else startNarration('visible')
+  }, [narrator, narrationStatus, startNarration])
+
+  const closeListen = useCallback(() => {
+    narrator?.stop()
+    setListening(false)
+  }, [narrator])
+
+  /** Scrolls the block being read into the upper part of the window. */
+  const followNarration = useCallback((block: HTMLElement) => {
+    const { top, bottom } = readingViewport()
+    const rect = block.getBoundingClientRect()
+    window.scrollTo({
+      top: window.scrollY + rect.top - top - (bottom - top) * 0.2,
+      behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+    })
+  }, [])
+
+  const narrating =
+    listening && (narrationStatus === 'playing' || narrationStatus === 'paused')
+
+  /**
+   * Marks the block being read, and keeps it in view -- unless the reader has
+   * scrolled away from it, in which case they are left where they are (with
+   * a way back in the player). The page only moves once the narration nears
+   * the bottom of the window, not on every paragraph.
+   */
+  const followedRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!narrating) {
+      followedRef.current = null
+      return
+    }
+    const block = blocksRef.current[narrationIndex]
+    if (!block) return
+
+    block.classList.add('is-narrating')
+
+    const previous = followedRef.current
+    followedRef.current = block
+    if (previous !== block && (previous === null || inReadingViewport(previous))) {
+      const { top, bottom } = readingViewport()
+      const rect = block.getBoundingClientRect()
+      const roomy = rect.top >= top && rect.bottom <= bottom - (bottom - top) * 0.15
+      if (!roomy) followNarration(block)
+    }
+
+    return () => block.classList.remove('is-narrating')
+  }, [narrating, narrationIndex, followNarration])
+
+  /** Notices the reader scrolling away from the narration, and back. */
+  useEffect(() => {
+    if (!narrating) return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    // Debounced past a smooth scroll, which passes through "away" on its way.
+    const check = () => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        const block = blocksRef.current[narrationIndex]
+        setAway(block ? !inReadingViewport(block) : false)
+      }, 250)
+    }
+    window.addEventListener('scroll', check, { passive: true })
+    check()
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('scroll', check)
+    }
+  }, [narrating, narrationIndex])
+
+  /**
+   * Another chapter is another text: whatever was being read stops. Turning
+   * the page at the end of a chapter starts the next one again, below.
+   */
+  useEffect(() => {
+    return () => {
+      narrator?.stop()
+      blocksRef.current = []
+    }
+  }, [chapterId, narrator])
+
+  /** At the end of a chapter, a short pause, then on to the next one. */
+  useEffect(() => {
+    if (!listening || narrationStatus !== 'finished' || nextNumber === null) return
+    const timer = setTimeout(() => {
+      navigate(`/read/${slug}/${nextNumber}`, { state: { listen: true } })
+      window.scrollTo({ top: 0 })
+    }, LISTEN_NEXT_CHAPTER_MS)
+    return () => clearTimeout(timer)
+  }, [listening, narrationStatus, nextNumber, navigate, slug])
+
+  /** Arriving from that page turn: read this chapter from the top, once. */
+  const continuedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!listenNext || !chapterId || continuedFor.current === location.key) return
+    const frame = requestAnimationFrame(() => {
+      continuedFor.current = location.key
+      setListening(true)
+      startNarration(0)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [listenNext, chapterId, location.key, startNarration])
+
   // Scroll-linked reading progress.
   useEffect(() => {
     let frame = 0
@@ -690,10 +871,26 @@ export function ReaderPage() {
   const openHighlight = noteFor
     ? (myHighlights ?? []).find((highlight) => highlight.id === noteFor.id)
     : undefined
+  /**
+   * The sheets share the bottom of the window. While one of them is open the
+   * listen bar steps aside -- the narration carries on -- and comes back when
+   * it closes.
+   */
+  const otherSheetOpen =
+    asking ||
+    listOpen ||
+    feedbackOpen ||
+    (noteFor !== null && openHighlight !== undefined) ||
+    (selection !== null && explaining)
+  const chosenVoice = narration.voices.some(
+    (voice) => voice.voiceURI === preferences.listenVoice,
+  )
+    ? preferences.listenVoice
+    : null
 
   return (
     <div
-      className={cn('reader', focusMode && 'is-focus')}
+      className={cn('reader', focusMode && 'is-focus', listening && 'is-listening')}
       data-reading-theme={surface}
       data-font-size={preferences.fontSize}
       data-width={preferences.width}
@@ -792,6 +989,33 @@ export function ReaderPage() {
             />
           ) : null}
 
+          {narrator ? (
+            <Button
+              variant="ghost"
+              iconOnly
+              aria-label={listening ? 'Stop listening' : 'Listen to this chapter'}
+              title={listening ? 'Stop listening' : 'Listen to this chapter'}
+              aria-pressed={listening}
+              disabled={!current}
+              onClick={() => {
+                // Hidden behind another sheet counts as closed: bring it back.
+                if (listening && !otherSheetOpen) {
+                  closeListen()
+                  return
+                }
+                setExplaining(false)
+                setSelection(null)
+                setAsking(false)
+                setNoteFor(null)
+                setListOpen(false)
+                setFeedbackOpen(false)
+                setListening(true)
+                if (!narrating) startNarration('visible')
+              }}
+              startIcon={<Icon name="headphones" size="1.1rem" />}
+            />
+          ) : null}
+
           <Button
             variant="ghost"
             iconOnly
@@ -822,7 +1046,7 @@ export function ReaderPage() {
             ))}
           </div>
         ) : (
-          <article className="reader__article">
+          <article className="reader__article" ref={articleRef}>
             {/*
               The returning reader's catch-up, above chapter two and later.
               Renders nothing when there is no previous chapter they can open,
@@ -1221,6 +1445,27 @@ export function ReaderPage() {
           passage={feedbackPassage}
           onClearPassage={clearFeedbackPassage}
           onClose={closeFeedback}
+        />
+      ) : null}
+
+      {/* Listen mode ---------------------------------------------------- */}
+      {listening && narrator && !otherSheetOpen ? (
+        <ListenBar
+          state={narration.state}
+          rate={listenRate}
+          onRate={(listenRate) => update({ listenRate })}
+          voices={narration.voices}
+          voice={chosenVoice}
+          onVoice={(listenVoice) => update({ listenVoice })}
+          onToggle={toggleNarration}
+          onSkip={(delta) => narrator.skip(delta)}
+          away={away}
+          onFollow={() => {
+            const block = blocksRef.current[narrationIndex]
+            if (block) followNarration(block)
+          }}
+          hasNextChapter={nextNumber !== null}
+          onClose={closeListen}
         />
       ) : null}
 

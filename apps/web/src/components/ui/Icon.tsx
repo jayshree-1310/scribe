@@ -19,7 +19,7 @@ export type IconName =
   | 'sun' | 'moon' | 'monitor' | 'menu' | 'share' | 'link'
   | 'image' | 'audio' | 'video' | 'play' | 'upload' | 'type'
   | 'google' | 'eye-off' | 'send' | 'text-size' | 'columns' | 'maximize'
-  | 'highlight'
+  | 'highlight' | 'pause' | 'headphones' | 'skip-back' | 'skip-forward'
 
 const PATHS: Record<IconName, ReactElement> = {
   home: <path d="M4 11.5 12 4l8 7.5M6.5 10v10h11V10" />,
@@ -235,6 +235,10 @@ const PATHS: Record<IconName, ReactElement> = {
   audio: <path d="M4 14v-4h3l4-3.5v11L7 14zM15 9.5a3.5 3.5 0 0 1 0 5M17.5 7a7 7 0 0 1 0 10" />,
   video: <path d="M3.5 6.5h11v11h-11zM14.5 10.5l6-3v9l-6-3z" />,
   play: <path d="M8 5.5 19 12 8 18.5z" />,
+  pause: <path d="M8.5 5.5v13M15.5 5.5v13" />,
+  headphones: <path d="M4.5 17.5V13a7.5 7.5 0 0 1 15 0v4.5M4.5 14.5h3v5h-3zM16.5 14.5h3v5h-3z" />,
+  'skip-back': <path d="M6.5 5.5v13M18 5.5 9.5 12l8.5 6.5z" />,
+  'skip-forward': <path d="M17.5 5.5v13M6 5.5l8.5 6.5L6 18.5z" />,
   upload: <path d="M12 16V4M8.5 7.5 12 4l3.5 3.5M4.5 14v6h15v-6" />,
   type: <path d="M4 6.5h16M12 6.5V20M8.5 20h7" />,
   'text-size': <path d="M3 8h8M7 8v11M13 12h8M17 12v7" />,

@@ -52,6 +52,14 @@ export interface ReaderPreferences {
   fontSize: FontSize
   width: ReadingWidth
   autoplayMultimedia: boolean
+  /** Listen mode's speed, one of `LISTEN_RATES` in `lib/narration.ts`. */
+  listenRate: number
+  /**
+   * Listen mode's voice, by `voiceURI`, or null for the browser's default.
+   * Voices are per device, so one chosen here may be missing on another
+   * browser; the default is used there.
+   */
+  listenVoice: string | null
 }
 
 /** What is actually written to storage: the preferences plus their version. */
@@ -89,6 +97,8 @@ export const DEFAULT_READER_PREFERENCES: ReaderPreferences = {
   fontSize: 'md',
   width: 'medium',
   autoplayMultimedia: false,
+  listenRate: 1,
+  listenVoice: null,
 }
 
 export interface ReaderPrefsContextValue {

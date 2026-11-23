@@ -312,7 +312,8 @@
  * and not at `.btn`.
  */
 .reader__footer,
-.reader__comments {
+.reader__comments,
+.listen-bar {
   --bg: var(--read-bg);
   --bg-tint: color-mix(in srgb, var(--read-ink) 10%, var(--read-bg));
   --surface: var(--read-bg);
