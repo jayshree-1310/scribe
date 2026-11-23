@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   MAX_CHUNK_LENGTH,
+  START_TIMEOUT_MS,
   Narrator,
   narrationBlocks,
   speechChunks,
@@ -13,6 +14,7 @@ class FakeUtterance {
   rate = 1
   lang = ''
   voice: SpeechSynthesisVoice | null = null
+  onstart: (() => void) | null = null
   onend: (() => void) | null = null
   onerror: ((event: { error: string }) => void) | null = null
   constructor(text: string) {
@@ -24,8 +26,10 @@ class FakeUtterance {
  * A speech engine that speaks nothing and remembers everything. `finish()`
  * ends the utterance being spoken, as the browser would; `cancel()` fires the
  * error a real cancel does, so the narrator's guard against it is exercised.
+ * With `starts: false` it accepts utterances and never begins one, which is
+ * how a browser with no working voice behaves.
  */
-function fakeEngine() {
+function fakeEngine({ starts = true } = {}) {
   const spoken: FakeUtterance[] = []
   let speaking: FakeUtterance | null = null
   let cancels = 0
@@ -38,6 +42,7 @@ function fakeEngine() {
       const fake = utterance as unknown as FakeUtterance
       spoken.push(fake)
       speaking = fake
+      if (starts) fake.onstart?.()
     },
     cancel() {
       cancels += 1
@@ -53,8 +58,8 @@ function fakeEngine() {
   }
 }
 
-function setup(texts: string[]) {
-  const engine = fakeEngine()
+function setup(texts: string[], engineOptions?: { starts?: boolean }) {
+  const engine = fakeEngine(engineOptions)
   const states: NarrationState[] = []
   const narrator = new Narrator({
     engine,
@@ -178,7 +183,59 @@ describe('Narrator', () => {
     const { engine, narrator, last } = setup(['One.'])
     narrator.play(0)
     engine.spoken[0].onerror?.({ error: 'synthesis-failed' })
-    expect(last().status).toBe('error')
+    expect(last()).toEqual({ status: 'error', index: 0, total: 1, problem: 'failed' })
+  })
+
+  it('says when the browser wants a tap before speaking', () => {
+    const { engine, narrator, last } = setup(['One.'])
+    narrator.play(0)
+    engine.spoken[0].onerror?.({ error: 'not-allowed' })
+    expect(last().problem).toBe('blocked')
+  })
+
+  describe('when speech never starts', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('gives up and says nothing is being read', () => {
+      vi.useFakeTimers()
+      const { engine, narrator, last } = setup(['One.', 'Two.'], { starts: false })
+      narrator.play(0)
+      vi.advanceTimersByTime(START_TIMEOUT_MS - 1)
+      expect(last().status).toBe('playing')
+
+      vi.advanceTimersByTime(1)
+      expect(last()).toEqual({ status: 'error', index: 0, total: 2, problem: 'silent' })
+      // The stuck utterance is cancelled, so it cannot start late over the message.
+      expect(engine.cancels).toBe(1)
+    })
+
+    it('does not give up on speech that started, however long it runs', () => {
+      vi.useFakeTimers()
+      const { narrator, last } = setup(['One.'])
+      narrator.play(0)
+      vi.advanceTimersByTime(START_TIMEOUT_MS * 5)
+      expect(last().status).toBe('playing')
+    })
+
+    it('does not give up while paused', () => {
+      vi.useFakeTimers()
+      const { narrator, last } = setup(['One.'], { starts: false })
+      narrator.play(0)
+      narrator.pause()
+      vi.advanceTimersByTime(START_TIMEOUT_MS * 2)
+      expect(last().status).toBe('paused')
+    })
+
+    it('clears the problem on the next play', () => {
+      vi.useFakeTimers()
+      const { narrator, last } = setup(['One.'], { starts: false })
+      narrator.play(0)
+      vi.advanceTimersByTime(START_TIMEOUT_MS)
+      narrator.play(0)
+      expect(last()).toEqual({ status: 'playing', index: 0, total: 1 })
+    })
   })
 
   it('stops and rewinds', () => {

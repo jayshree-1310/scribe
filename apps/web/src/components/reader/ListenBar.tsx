@@ -1,7 +1,12 @@
 import { Button } from '../ui/Button'
 import { Icon } from '../ui/Icon'
 import { Select } from '../ui/Select'
-import { LISTEN_RATES, type NarrationState } from '../../lib/narration'
+import { cn } from '../../lib/cn'
+import {
+  LISTEN_RATES,
+  type NarrationProblem,
+  type NarrationState,
+} from '../../lib/narration'
 import '../ai/reader-ai.css'
 import './listen.css'
 
@@ -31,6 +36,14 @@ interface ListenBarProps {
   onClose: () => void
 }
 
+const PROBLEM_TEXT: Record<NarrationProblem, string> = {
+  silent:
+    'Nothing is being read aloud. Your device may have no speech voice ' +
+    'installed, or speech may be turned off. Press play to try again.',
+  blocked: 'Your browser wants a tap before it reads aloud. Press play.',
+  failed: 'Your browser could not read this aloud. Press play to try again, or pick another voice.',
+}
+
 function statusText(state: NarrationState, hasNextChapter: boolean): string {
   const where = `${state.index + 1} of ${state.total}`
   switch (state.status) {
@@ -41,7 +54,7 @@ function statusText(state: NarrationState, hasNextChapter: boolean): string {
     case 'finished':
       return hasNextChapter ? 'On to the next chapter…' : 'That is the end of the story.'
     case 'error':
-      return 'Your browser stopped reading. Press play to try again.'
+      return PROBLEM_TEXT[state.problem ?? 'failed']
     default:
       return 'Reads this chapter aloud from where you are.'
   }
@@ -98,8 +111,14 @@ export function ListenBar({
           />
         </div>
 
-        <p className="listen-bar__status" aria-live="polite">
-          <span>{statusText(state, hasNextChapter)}</span>
+        <p
+          className={cn('listen-bar__status', state.status === 'error' && 'is-problem')}
+          aria-live="polite"
+        >
+          <span>
+            {state.status === 'error' ? <Icon name="alert" size="0.95em" /> : null}
+            {statusText(state, hasNextChapter)}
+          </span>
           {away && started ? (
             <button type="button" className="listen-bar__follow" onClick={onFollow}>
               Back to the narration

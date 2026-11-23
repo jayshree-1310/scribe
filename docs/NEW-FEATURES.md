@@ -184,6 +184,13 @@ was built:
   Ask This Book, the highlights list, a note, feedback or an explanation is
   open, the player steps aside and the narration carries on; the headphones
   button brings it back.
+- **When speech fails** the player says so, in one of three ways
+  (`NarrationProblem`): the browser reported a speech error; it wants a tap
+  first (`not-allowed`); or nothing started within 6 seconds. The last is
+  how Chrome on Linux behaves with speech-dispatcher missing or broken, and
+  how any browser behaves with no voice installed: it accepts the text and
+  then does nothing, and no event reports it. Muted sound, or no output
+  device, cannot be detected, since the browser reports success.
 - Works signed out, since nothing leaves the browser. Hidden where the
   browser has no `speechSynthesis`.
 - **Not done:** no word-by-word highlight (`boundary` events are missing or

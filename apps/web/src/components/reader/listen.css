@@ -42,6 +42,25 @@
   color: var(--read-ink-soft);
 }
 
+/* An error reads as one: in the ink rather than the soft grey, with a mark. */
+.listen-bar__status.is-problem {
+  color: var(--read-ink);
+}
+
+.listen-bar__status.is-problem > span {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+/* The reader's accent, not `--danger`: that one follows the app theme, and
+   is a dark red on the Night surface. */
+.listen-bar__status.is-problem svg {
+  flex: none;
+  margin-block-start: 0.2em;
+  color: var(--read-brand);
+}
+
 .listen-bar__follow {
   align-self: flex-start;
   padding: 0;

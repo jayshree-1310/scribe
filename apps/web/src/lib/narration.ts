@@ -109,13 +109,39 @@ export function speechChunks(text: string, max = MAX_CHUNK_LENGTH): string[] {
 
 export type NarrationStatus = 'idle' | 'playing' | 'paused' | 'finished' | 'error'
 
+/**
+ * Why narration stopped with an error, so the player can say something
+ * useful:
+ *
+ * - `silent`: speech never started (`START_TIMEOUT_MS`). The browser accepted
+ *   the text and then did nothing -- what Chrome on Linux does when
+ *   speech-dispatcher is missing or broken, and what any browser does with
+ *   no voice installed. No event reports it; only the missing `start` does.
+ * - `blocked`: the browser refused to speak without a tap or click first.
+ * - `failed`: the browser reported any other speech error.
+ *
+ * Sound that is muted, or sent to no device, cannot be told apart from
+ * speech that worked: the browser reports success either way.
+ */
+export type NarrationProblem = 'silent' | 'blocked' | 'failed'
+
 export interface NarrationState {
   status: NarrationStatus
   /** The block being read, or last read. */
   index: number
   /** How many blocks there are to read. */
   total: number
+  /** Set when `status` is `error`. */
+  problem?: NarrationProblem
 }
+
+/**
+ * How long an utterance may take to start before the narrator decides speech
+ * is not going to happen. Network voices take a second or two to begin;
+ * twice that is well past a slow start and short enough that the reader is
+ * not left watching a player that says "Reading" over silence.
+ */
+export const START_TIMEOUT_MS = 6000
 
 /** The parts of `speechSynthesis` the narrator uses, so tests can fake them. */
 export interface SpeechEngine {
@@ -146,6 +172,8 @@ export class Narrator {
   private index = 0
   private chunk = 0
   private status: NarrationStatus = 'idle'
+  private problem: NarrationProblem | undefined
+  private watchdog: ReturnType<typeof setTimeout> | undefined
   private generation = 0
   private rate = 1
   private voice: SpeechSynthesisVoice | null = null
@@ -177,6 +205,7 @@ export class Narrator {
     this.index = clamp(from, 0, this.blocks.length - 1)
     this.chunk = 0
     this.status = 'playing'
+    this.problem = undefined
     this.emit()
     this.speakCurrent()
   }
@@ -237,7 +266,13 @@ export class Narrator {
   }
 
   getState(): NarrationState {
-    return { status: this.status, index: this.index, total: this.blocks.length }
+    const state: NarrationState = {
+      status: this.status,
+      index: this.index,
+      total: this.blocks.length,
+    }
+    if (this.status === 'error' && this.problem) state.problem = this.problem
+    return state
   }
 
   private restartChunk(): void {
@@ -263,23 +298,52 @@ export class Narrator {
       utterance.lang = this.options.lang
     }
 
+    utterance.onstart = () => {
+      if (generation !== this.generation) return
+      this.clearWatchdog()
+    }
     utterance.onend = () => {
       if (generation !== this.generation) return
+      this.clearWatchdog()
       this.current = null
       this.advance()
     }
     utterance.onerror = (event) => {
       if (generation !== this.generation) return
-      // What `cancel()` reports. Only reached if something else cancelled
-      // speech -- another tab, the operating system -- so stop cleanly.
       const error = (event as SpeechSynthesisErrorEvent).error
       this.current = null
-      this.status = error === 'interrupted' || error === 'canceled' ? 'paused' : 'error'
-      this.emit()
+      if (error === 'interrupted' || error === 'canceled') {
+        // What `cancel()` reports. Only reached if something else cancelled
+        // speech -- another tab, the operating system -- so stop cleanly.
+        this.clearWatchdog()
+        this.status = 'paused'
+        this.emit()
+        return
+      }
+      this.fail(error === 'not-allowed' ? 'blocked' : 'failed')
     }
+
+    // Armed before `speak`, which may fire `start` synchronously.
+    this.clearWatchdog()
+    this.watchdog = setTimeout(() => {
+      if (generation === this.generation) this.fail('silent')
+    }, START_TIMEOUT_MS)
 
     this.current = utterance
     this.options.engine.speak(utterance)
+  }
+
+  /** Gives up: silences the engine and reports why. */
+  private fail(problem: NarrationProblem): void {
+    this.interrupt()
+    this.status = 'error'
+    this.problem = problem
+    this.emit()
+  }
+
+  private clearWatchdog(): void {
+    clearTimeout(this.watchdog)
+    this.watchdog = undefined
   }
 
   /** On to the next chunk, the next block, or the end. */
@@ -307,6 +371,7 @@ export class Narrator {
   /** Silences whatever is being spoken, without reporting a change. */
   private interrupt(): void {
     this.generation += 1
+    this.clearWatchdog()
     if (this.current !== null) {
       this.current = null
       this.options.engine.cancel()
