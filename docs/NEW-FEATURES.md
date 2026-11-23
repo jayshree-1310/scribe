@@ -6,7 +6,7 @@ what it is, why it is worth doing, and what it can build on.
 | # | Feature                     | Status                    |
 | - | --------------------------- | ------------------------- |
 | 1 | Highlights and margin notes | **Landed** (2026-11-20)   |
-| 2 | Beta readers                | Not started               |
+| 2 | Beta readers                | **Landed** (2026-11-23)   |
 | 3 | Listen mode                 | Not started               |
 | 4 | Quote cards                 | Not started (needs 1, now there) |
 | 5 | Public reading lists        | Not started               |
@@ -84,6 +84,53 @@ separate private thread type.
 **Open questions:** Invite by username or by a share token (a link anyone can
 open). Whether beta feedback carries over once the chapter is published, or is
 deleted.
+
+**Status: landed (2026-11-23).** How it was built, and how the open questions
+were answered:
+
+- **Invite by private link** (chosen over usernames). A story has at most one
+  link (`beta.Link`, a 144-bit token). A signed-in reader who opens
+  `/beta/:token` sees the story's card and joins with a button
+  (`beta.Reader`), so a link preview or a stray click joins nobody. Signed-out
+  visitors sign in first and come back. Making the link again returns the
+  same one. **Turning it off** deletes the link and every reader who joined;
+  a new link is a new token. The author can also remove one reader, and a
+  reader can leave from the story page.
+- **What a beta reader sees.** The whole story, drafts included: every
+  chapter except one a moderator took down; a take-down of the story shuts
+  them out too. The rule is `StoryAccess` (`author` / `beta` / `reader`) in
+  `services/stories.ts`, beside every other visibility rule. The shared
+  30-second story cache is bypassed for beta readers, as for authors
+  (`seesPublicView`).
+- **Public engagement stays closed on unpublished work.** Comments, likes,
+  ratings, the library, Ask This Book and story summaries keep the old rule
+  (`findVisibleStoryId` / `findVisibleChapter` admit beta readers only when a
+  caller passes `{ beta: true }`). Highlights and Explain this passage, which
+  are private, do. Beta reads of anything unpublished record no view, read or
+  reading progress, so they reach neither the author's analytics nor the
+  reader's streaks and badges.
+- **Feedback** (`beta.Feedback`) is per chapter, optionally on a passage: the
+  reader selects text and picks *Feedback*, and the server cuts the quote from
+  the chapter by offsets, as for highlights. The top-bar pen button and the
+  "Beta read" banner open the same sheet, which lists the reader's own notes
+  on the chapter to edit or delete. Only beta readers can write it (not the
+  author, not an uninvited reader); writing and editing are refused while
+  suspended. The author is notified (`BETA_FEEDBACK`, mutable in Settings);
+  the notification names the chapter and does not quote the feedback, so a
+  deleted note leaves no copy behind.
+- **Kept after publishing**, and after the reader leaves or is removed: it is
+  the author's to delete, and the writer's while they are still in the beta.
+  It never becomes a public comment. Deleting the story, chapter or either
+  account deletes it (foreign keys cascade).
+- **Author page:** `/author/stories/:slug/beta` (from the editor's *Beta
+  readers* button) has the link with copy and turn-off, the readers with how
+  many notes each left, and the feedback grouped by chapter, marked draft or
+  published.
+- **Limits:** 4,000 characters per note, 2,000 per quoted passage, 100 notes
+  per reader per chapter.
+- **Not done:** the author cannot reply to feedback, and a reader who signs
+  up (rather than signs in) from an invite link lands on Home after
+  onboarding, not back on the invite.
 
 ---
 

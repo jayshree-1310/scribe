@@ -41,6 +41,7 @@ import { NotificationsPage } from './pages/NotificationsPage'
 import { ChannelsPage } from './pages/ChannelsPage'
 import { ChannelDetailPage } from './pages/ChannelDetailPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { BetaInvitePage } from './pages/BetaInvitePage'
 import { SettingsPage } from './pages/SettingsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 
@@ -60,6 +61,7 @@ const AuthorAnalyticsPage = lazy(() => import('./pages/author/AuthorAnalyticsPag
 const AuthorChannelsPage = lazy(() => import('./pages/author/AuthorChannelsPage').then((m) => ({ default: m.AuthorChannelsPage })))
 const StoryEditorPage = lazy(() => import('./pages/author/StoryEditorPage').then((m) => ({ default: m.StoryEditorPage })))
 const StoryBiblePage = lazy(() => import('./pages/author/StoryBiblePage').then((m) => ({ default: m.StoryBiblePage })))
+const BetaReadersPage = lazy(() => import('./pages/author/BetaReadersPage').then((m) => ({ default: m.BetaReadersPage })))
 
 /**
  * A data router rather than `<BrowserRouter>`: `useBlocker` — which Settings
@@ -173,6 +175,13 @@ const router = createBrowserRouter(
           element={<ChannelDetailPage />}
         />
         <Route path="/badges" element={<BadgesPage />} />
+        {/* An author's invite link. Needs an account: a beta reader is a
+            person the author can see and remove. */}
+        <Route
+          path="/beta/:token"
+          handle={{ width: 'narrow' }}
+          element={<BetaInvitePage />}
+        />
         <Route
           path="/notifications"
           handle={{ width: 'narrow' }}
@@ -222,6 +231,7 @@ const router = createBrowserRouter(
         <Route path="/author/ideas" element={<IdeaStudioPage />} />
         <Route path="/author/stories/:slug" element={<StoryEditorPage />} />
         <Route path="/author/stories/:slug/bible" element={<StoryBiblePage />} />
+        <Route path="/author/stories/:slug/beta" element={<BetaReadersPage />} />
         <Route path="/author/analytics" element={<AuthorAnalyticsPage />} />
         <Route path="/author/channels" element={<AuthorChannelsPage />} />
       </Route>

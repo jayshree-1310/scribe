@@ -87,6 +87,18 @@ function isTourPreview(req: Request): boolean {
 }
 
 /**
+ * Whether this read is of something not yet public: a draft story, or an
+ * unpublished chapter. Only its author and its beta readers can make one.
+ * The author's own visit is already left out by the recording SQL; a beta
+ * reader's is left out here, so a preview read counts toward neither the
+ * author's analytics nor the reader's badges -- the same reasoning as the
+ * tour's.
+ */
+function isUnpublishedRead(publishedAt: string | null): boolean {
+  return publishedAt === null;
+}
+
+/**
  * `req.query` values arrive as strings. Coercion lives in the schema so a bad
  * `page=abc` is a 400 with a field message rather than a silent `NaN`.
  */
@@ -170,7 +182,9 @@ router.get("/:slug", async (req, res, next) => {
      * returns `void` by design, so this line cannot delay the response or
      * turn a counter's failure into a failed read.
      */
-    if (!isTourPreview(req)) recordStoryView(story.id, visitor(req));
+    if (!isTourPreview(req) && !isUnpublishedRead(story.listedAt)) {
+      recordStoryView(story.id, visitor(req));
+    }
 
     res.json({ story });
   } catch (error) {
@@ -220,7 +234,9 @@ router.get("/:slug/chapters/:number", async (req, res, next) => {
     // "somebody read this" the API can observe. See `engagement.ChapterRead`.
     // Not for the product tour, which is showing the reader off rather than
     // reading -- see `TOUR_PREVIEW_HEADER`.
-    if (!isTourPreview(req)) recordChapterRead(chapter.id, visitor(req));
+    if (!isTourPreview(req) && !isUnpublishedRead(chapter.publishedAt)) {
+      recordChapterRead(chapter.id, visitor(req));
+    }
 
     res.json({ chapter });
   } catch (error) {

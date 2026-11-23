@@ -63,9 +63,16 @@ export interface NextRelease {
   scheduledAt: string
 }
 
+/**
+ * How the caller reads a story: as its author, as a beta reader the author
+ * invited (who also sees unpublished chapters), or as anybody.
+ */
+export type StoryAccess = 'author' | 'beta' | 'reader'
+
 /** One story's page: a card's fields, plus what is coming next. */
 export interface StoryDetail extends Story {
   nextRelease: NextRelease | null
+  access: StoryAccess
 }
 
 export interface StoryPage {

@@ -100,6 +100,7 @@ export const NOTIFICATION_TYPES = [
   "LEVEL_UP",
   "CONTENT_HIDDEN",
   "REPORT_RESOLVED",
+  "BETA_FEEDBACK",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -214,7 +215,9 @@ export type NotificationEvent =
       userId: string;
       title: string;
       description: string;
-    };
+    }
+  /** A beta reader left feedback on a story; see `services/beta.ts`. */
+  | { event: "beta-feedback"; actorId: string; feedbackId: string };
 
 /* Fan-out ---------------------------------------------------------------- */
 
@@ -304,7 +307,44 @@ async function fanOut(event: NotificationEvent): Promise<void> {
         event.description,
         "/notifications",
       );
+    case "beta-feedback":
+      return notifyBetaFeedback(event.feedbackId);
   }
+}
+
+/**
+ * Beta feedback, to the story's author.
+ *
+ * The excerpt names the chapter rather than quoting the feedback. Feedback
+ * is private between its writer and the author, and the writer can delete it;
+ * a quoted copy in the author's notifications would outlive that delete,
+ * with nothing to sweep it by.
+ */
+async function notifyBetaFeedback(feedbackId: string): Promise<void> {
+  const plan = db.raw.sql`
+    INSERT INTO "notifications"."notification"
+      ("id", "userId", "type", "actorId", "title", "excerpt", "href", "createdAt")
+    SELECT gen_random_uuid()::text,
+           story."authorId",
+           'BETA_FEEDBACK',
+           feedback."userId",
+           story."title",
+           left('Chapter ' || chapter."chapterNumber" || ': ' || chapter."title", ${EXCERPT_LENGTH}),
+           '/author/stories/' || story."slug" || '/beta',
+           now()
+      FROM "beta"."feedback" AS feedback
+      JOIN "content"."story" AS story ON story."id" = feedback."storyId"
+      JOIN "content"."chapter" AS chapter ON chapter."id" = feedback."chapterId"
+     WHERE feedback."id" = ${feedbackId}
+       AND story."authorId" <> feedback."userId"
+       AND NOT EXISTS (
+             SELECT 1 FROM "auth"."notificationMute" AS mute
+              WHERE mute."userId" = story."authorId"
+                AND mute."type" = 'BETA_FEEDBACK'
+           )
+  `.affectedCount().build();
+
+  await db.runtime().query(plan);
 }
 
 /**

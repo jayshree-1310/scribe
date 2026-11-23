@@ -231,7 +231,7 @@ export async function listHighlights(
   userId: string,
   storySlugOrId: string,
 ): Promise<Highlight[]> {
-  const storyId = await findVisibleStoryId(storySlugOrId, userId);
+  const storyId = await findVisibleStoryId(storySlugOrId, userId, { beta: true });
   if (storyId === null) throw HttpError.notFound("That story could not be found.");
 
   const rows = await db.orm.engagement.Highlight.select(...ROW_FIELDS)
@@ -242,6 +242,7 @@ export async function listHighlights(
   const visible = await findVisibleChapterIds(
     [...new Set(rows.map((row) => row.chapterId))],
     userId,
+    { beta: true },
   );
 
   return hydrate(rows.filter((row) => visible.has(row.chapterId)));
@@ -275,7 +276,7 @@ export async function createHighlight(
   userId: string,
   input: HighlightInput,
 ): Promise<Highlight> {
-  const chapter = await findVisibleChapterText(input.chapterId, userId);
+  const chapter = await findVisibleChapterText(input.chapterId, userId, { beta: true });
   if (chapter === null) throw HttpError.notFound(CHAPTER_NOT_FOUND);
 
   if (input.start < 0 || input.end <= input.start || input.end > chapter.content.length) {

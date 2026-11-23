@@ -51,6 +51,9 @@ const GUARDED = new Set([
   "authoring.ts PATCH /stories/:id",
   "authoring.ts PATCH /chapters/:id",
   "authoring.ts POST /chapters/:id/multimedia",
+  // Beta feedback is private, but it is text that reaches another person.
+  "beta.ts POST /feedback",
+  "beta.ts PATCH /feedback/:id",
 ]);
 
 /**
@@ -123,6 +126,11 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
       "clubs.ts DELETE /:id",
       "clubs.ts PUT /:id/current-read",
       "clubs.ts DELETE /discussions/:id",
+      // Sharing a draft with readers the author chose publishes nothing.
+      "beta.ts POST /stories/:storyId/link",
+      "beta.ts DELETE /stories/:storyId/link",
+      "beta.ts DELETE /stories/:storyId/readers/:userId",
+      "beta.ts DELETE /feedback/:id",
     ].map((route) => [route, "a draft nobody sees, an order, a pointer, or removing it"]),
 
     // Joining, leaving, following: membership rather than speech.
@@ -135,6 +143,8 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
       "channels.ts DELETE /:id/subscribe",
       "users.ts POST /:username/follow",
       "users.ts DELETE /:username/follow",
+      "beta.ts POST /invites/:token/join",
+      "beta.ts DELETE /stories/:storyId/membership",
     ].map((route) => [route, "membership and follows, which carry no text"]),
 
     // Ratings and entries: a number and a pointer, neither of them prose.

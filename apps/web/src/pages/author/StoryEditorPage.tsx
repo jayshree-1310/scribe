@@ -1139,6 +1139,14 @@ export function StoryEditorPage() {
               Story bible
             </ButtonLink>
           ) : null}
+          {slug && !isNew ? (
+            <ButtonLink
+              to={`/author/stories/${slug}/beta`}
+              startIcon={<Icon name="users" size="1em" />}
+            >
+              Beta readers
+            </ButtonLink>
+          ) : null}
           <Button
             onClick={() => setMode(mode === 'write' ? 'preview' : 'write')}
             startIcon={<Icon name="eye" size="1em" />}

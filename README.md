@@ -29,6 +29,7 @@ idle, so the first request after a quiet spell takes a while to answer.
 | Author studio — stories, chapters, reorder, publish/unpublish, multimedia | **Real API**                         |
 | Scheduled chapters — release at a set time, countdown, readers notified   | **Real API**                         |
 | Highlights & private margin notes; authors see top passages anonymously  | **Real API**                         |
+| Beta readers — invite link to drafts; feedback only the author sees      | **Real API**                         |
 | Uploads — images (`kind=cover`) and chapter audio/video (`kind=media`)    | **Real API**                         |
 | Home feed, public profiles & follows, clubs, channels                     | **Real API**                         |
 | Comments, ratings, reading progress & streak                              | **Real API**                         |
@@ -68,8 +69,8 @@ current tree rather than in the abstract:
 - `docs/AI-BACKLOG.md` — the GenAI roadmap (AI 0 – AI 20). All of it has
   landed.
 - `docs/NEW-FEATURES.md` — product features queued next (highlights, beta
-  readers, listen mode, quote cards, public reading lists). Highlights have
-  landed; the other four are not built yet.
+  readers, listen mode, quote cards, public reading lists). Highlights and
+  beta readers have landed; the other three are not built yet.
 - `docs/AI-NEXT.md` — the work after it (AI 21 – AI 25), from the CopilotKit
   assessment. All of it has run: AI 21 – AI 24 have landed, and AI 25, the
   CopilotKit trial, was run and then removed.

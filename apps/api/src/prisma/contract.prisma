@@ -84,6 +84,9 @@ enum NotificationType {
   /// reporter rather than to the author, which is what makes it a different
   /// type from `CONTENT_HIDDEN` and not a second recipient of it.
   REPORT_RESOLVED
+  /// A beta reader left feedback on the recipient's story. Addressed to the
+  /// author only: the feedback itself is private to the two of them.
+  BETA_FEEDBACK
 }
 
 /// Which of the three kinds of user-written text a row is about.
@@ -955,6 +958,89 @@ namespace engagement {
     @@index([storyId, day])
     // The per-chapter breakdown on one story's page.
     @@index([chapterId, day])
+  }
+}
+
+/// Beta reading: an author shares unpublished work with readers they chose,
+/// and hears back privately. See `services/beta.ts`.
+///
+/// Its own namespace because every row here widens who may read a draft, and
+/// that is a different kind of fact from anything in `engagement`. The one
+/// place that reads these rows to decide visibility is `services/stories.ts`.
+namespace beta {
+  /// A story's invite link. At most one per story: the token *is* the
+  /// invitation, so a story either has a live link or it does not.
+  ///
+  /// Revoking deletes this row and every `Reader` of the story with it (see
+  /// `revokeLink`); a new link is a new token, so an old one forwarded
+  /// somewhere stays dead.
+  ///
+  /// Stored as written rather than hashed, unlike a password-reset token:
+  /// the author has to be able to copy the link again later, and what it
+  /// grants -- reading a draft the author chose to share -- is the author's
+  /// to give away.
+  model Link {
+    storyId   String   @id
+    token     String   @unique
+    createdAt DateTime @default(now())
+
+    story content.Story
+      @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  }
+
+  /// One reader who joined a story's beta through its link.
+  ///
+  /// The pair is the key, as with `engagement.ChapterLike`: joining twice is
+  /// the same fact. A row here lets the reader read the story's unpublished
+  /// chapters (not ones a moderator took down) and leave `Feedback`.
+  model Reader {
+    storyId  String
+    userId   String
+    joinedAt DateTime @default(now())
+
+    story content.Story
+      @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    user  auth.User
+      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([storyId, userId])
+    /// "Is this viewer a beta reader of anything?", asked by the story read
+    /// cache on every signed-in story read; see `seesPublicView`.
+    @@index([userId])
+  }
+
+  /// A beta reader's note to the author about one chapter, optionally on one
+  /// passage of it.
+  ///
+  /// Private: read by the author of the story and by its writer, nobody
+  /// else. It is kept when the chapter is published and when the reader
+  /// leaves or is removed -- it is the author's to delete, and the writer's.
+  ///
+  /// `quote` is cut from the stored chapter by the server, as a highlight's
+  /// is, so it can only ever be the author's own words. It is a copy and is
+  /// not re-anchored: feedback is about the draft as it was read.
+  model Feedback {
+    id        String   @id @default(uuid())
+    storyId   String
+    chapterId String
+    userId    String
+    body      String
+    quote     String?
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now())
+
+    story   content.Story
+      @relation(fields: [storyId], references: [id], onDelete: Cascade)
+    chapter content.Chapter
+      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+    user    auth.User
+      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    /// Everything said about one story, which is the author's view.
+    @@index([storyId, createdAt])
+    /// One reader's own notes on one story.
+    @@index([userId, storyId])
+    @@index([chapterId])
   }
 }
 

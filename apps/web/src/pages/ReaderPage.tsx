@@ -43,6 +43,8 @@ import * as highlightsApi from '../data/highlights-api'
 import type { SavedHighlight } from '../types/highlights'
 import { HighlightNoteSheet } from '../components/reader/HighlightNoteSheet'
 import { HighlightsSheet } from '../components/reader/HighlightsSheet'
+import { BetaFeedbackSheet } from '../components/reader/BetaFeedbackSheet'
+import '../components/reader/beta.css'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
 import { Avatar } from '../components/ui/Avatar'
@@ -95,6 +97,20 @@ export function ReaderPage() {
   )
 
 
+  /**
+   * A beta reader: somebody the author invited to read unpublished chapters
+   * (`StoryAccess`). On anything not yet public they get a feedback channel
+   * to the author instead of the public one -- comments, likes and ratings
+   * stay closed on unpublished work -- and the read is kept out of their
+   * reading progress, which feeds streaks and badges.
+   */
+  const betaRead = story.data?.access === 'beta'
+  const betaDraftStory = betaRead && story.data?.status === 'draft'
+  const betaUnpublished =
+    betaRead &&
+    chapter.data !== null &&
+    (betaDraftStory || chapter.data.publishedAt === null)
+
   const [progress, setProgress] = useState(0)
 
   /**
@@ -121,7 +137,7 @@ export function ReaderPage() {
    */
   useReadingProgress({
     storyId,
-    chapter: chapter.data ?? null,
+    chapter: betaUnpublished ? null : (chapter.data ?? null),
     scrollFraction: progress,
     skipRestore: citedQuote !== null || jumpTo !== null,
   })
@@ -296,6 +312,25 @@ export function ReaderPage() {
   /** Ask This Book. One sheet at a time: opening it closes the explain sheet. */
   const [asking, setAsking] = useState(false)
   const closeAsk = useCallback(() => setAsking(false), [])
+
+  /** Beta feedback, and the passage it is about when opened from a selection. */
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [feedbackPassage, setFeedbackPassage] = useState<ChapterSelection | null>(null)
+  const closeFeedback = useCallback(() => {
+    setFeedbackOpen(false)
+    setFeedbackPassage(null)
+  }, [])
+  const clearFeedbackPassage = useCallback(() => setFeedbackPassage(null), [])
+  const openFeedback = useCallback((passage: ChapterSelection | null) => {
+    setExplaining(false)
+    setSelection(null)
+    setAsking(false)
+    setNoteFor(null)
+    setListOpen(false)
+    if (passage) window.getSelection()?.removeAllRanges()
+    setFeedbackPassage(passage)
+    setFeedbackOpen(true)
+  }, [])
 
   /**
    * Offers the trigger when the reader has highlighted something explicable.
@@ -479,6 +514,7 @@ export function ReaderPage() {
       setSelection(null)
       setAsking(false)
       setListOpen(false)
+      setFeedbackOpen(false)
       setNoteFor({
         id,
         autoFocus: options.autoFocus ?? false,
@@ -713,6 +749,7 @@ export function ReaderPage() {
                 setSelection(null)
                 setAsking(false)
                 setNoteFor(null)
+                setFeedbackOpen(false)
                 setListOpen((open) => !open)
               }}
               startIcon={<Icon name="highlight" size="1.1rem" />}
@@ -724,7 +761,7 @@ export function ReaderPage() {
             is built from it, and a story with nothing readable has nothing
             to ask about.
           */}
-          {signedIn && storyId && chapters.status === 'ready' && total > 0 ? (
+          {signedIn && storyId && chapters.status === 'ready' && total > 0 && !betaDraftStory ? (
             <Button
               variant="ghost"
               iconOnly
@@ -736,9 +773,22 @@ export function ReaderPage() {
                 setSelection(null)
                 setNoteFor(null)
                 setListOpen(false)
+                setFeedbackOpen(false)
                 setAsking((open) => !open)
               }}
               startIcon={<Icon name="sparkle" size="1.1rem" />}
+            />
+          ) : null}
+
+          {betaRead && storyId ? (
+            <Button
+              variant="ghost"
+              iconOnly
+              aria-label="Feedback for the author"
+              title="Feedback for the author"
+              aria-pressed={feedbackOpen}
+              onClick={() => (feedbackOpen ? closeFeedback() : openFeedback(null))}
+              startIcon={<Icon name="pen" size="1.1rem" />}
             />
           ) : null}
 
@@ -778,12 +828,33 @@ export function ReaderPage() {
               Renders nothing when there is no previous chapter they can open,
               and never calls a model until they ask it to.
             */}
-            {signedIn ? (
+            {signedIn && !betaDraftStory ? (
               <RecapCard
                 key={`${slug}:${current.number}`}
                 storyKey={slug}
                 chapterNumber={current.number}
               />
+            ) : null}
+
+            {betaUnpublished ? (
+              <div className="reader__beta" role="note">
+                <span className="reader__beta-label">
+                  <Icon name="lock" size="0.95em" />
+                  Beta read
+                </span>
+                <span>
+                  {betaDraftStory ? 'This story is' : 'This chapter is'} not
+                  published yet. Your feedback goes only to{' '}
+                  {data ? storyAuthorName(data.author) : 'the author'}.
+                </span>
+                <button
+                  type="button"
+                  className="reader__beta-action"
+                  onClick={() => openFeedback(null)}
+                >
+                  Leave feedback
+                </button>
+              </div>
             ) : null}
 
             <p className="reader__eyebrow">
@@ -869,6 +940,16 @@ export function ReaderPage() {
                     Highlight
                   </button>
                 ) : null}
+                {betaRead ? (
+                  <button
+                    type="button"
+                    className="selection-menu__action"
+                    onClick={() => openFeedback(selection)}
+                  >
+                    <Icon name="pen" size="0.9em" />
+                    Feedback
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="selection-menu__action"
@@ -876,6 +957,7 @@ export function ReaderPage() {
                     setAsking(false)
                     setListOpen(false)
                     setNoteFor(null)
+                    setFeedbackOpen(false)
                     setExplaining(true)
                   }}
                 >
@@ -913,33 +995,39 @@ export function ReaderPage() {
                   likedByMe={current.likedByMe}
                   variant="pill"
                   noun="this chapter"
-                  readOnly={isOwnStory || !signedIn}
+                  readOnly={isOwnStory || !signedIn || betaUnpublished}
                 />
 
-                <button
-                  type="button"
-                  className={cn(
-                    'reader__toggle',
-                    showComments && 'is-open',
-                  )}
-                  aria-expanded={showComments}
-                  onClick={() => setShowComments((open) => !open)}
-                >
-                  <Icon name="comment" size="1em" />
-                  <span>
-                    {commentTotal === null
-                      ? 'Comments'
-                      : commentTotal === 1
-                        ? '1 comment'
-                        : `${formatCount(commentTotal)} comments`}
-                  </span>
-                </button>
+                {/*
+                  Comments are public, so they stay closed on a chapter that is
+                  not: a beta reader has the feedback sheet instead.
+                */}
+                {betaUnpublished ? null : (
+                  <button
+                    type="button"
+                    className={cn(
+                      'reader__toggle',
+                      showComments && 'is-open',
+                    )}
+                    aria-expanded={showComments}
+                    onClick={() => setShowComments((open) => !open)}
+                  >
+                    <Icon name="comment" size="1em" />
+                    <span>
+                      {commentTotal === null
+                        ? 'Comments'
+                        : commentTotal === 1
+                          ? '1 comment'
+                          : `${formatCount(commentTotal)} comments`}
+                    </span>
+                  </button>
+                )}
 
                 <ReportMenu
                   targetType="CHAPTER"
                   targetId={current.id}
                   noun="chapter"
-                  hidden={!signedIn || isOwnStory}
+                  hidden={!signedIn || isOwnStory || betaUnpublished}
                 />
               </div>
 
@@ -995,7 +1083,7 @@ export function ReaderPage() {
             </footer>
 
             {/* Comments ------------------------------------------------- */}
-            {showComments ? (
+            {showComments && !betaUnpublished ? (
               <section className="reader__comments" aria-label="Chapter comments">
                 <header className="reader__comments-head">
                   <h2>Comments on this chapter</h2>
@@ -1119,6 +1207,20 @@ export function ReaderPage() {
             window.scrollTo({ top: 0 })
           }}
           onClose={closeAsk}
+        />
+      ) : null}
+
+      {/* Beta feedback -------------------------------------------------- */}
+      {feedbackOpen && betaRead && storyId && current ? (
+        <BetaFeedbackSheet
+          key={current.id}
+          storyId={storyId}
+          chapterId={current.id}
+          chapterNumber={current.number}
+          authorName={data ? storyAuthorName(data.author) : 'the author'}
+          passage={feedbackPassage}
+          onClearPassage={clearFeedbackPassage}
+          onClose={closeFeedback}
         />
       ) : null}
 

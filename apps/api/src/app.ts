@@ -19,6 +19,7 @@ import analyticsRouter from "./routes/analytics.js";
 import authRouter from "./routes/auth.js";
 import authSecurityRouter from "./routes/auth-security.js";
 import authoringRouter from "./routes/authoring.js";
+import betaRouter from "./routes/beta.js";
 import booksRouter from "./routes/books.js";
 import challengesRouter from "./routes/challenges.js";
 import channelsRouter from "./routes/channels.js";
@@ -193,6 +194,12 @@ app.use("/api/author", authoringRouter);
  * authoring paths above; see the header of `routes/analytics.ts`.
  */
 app.use("/api/author", analyticsRouter);
+/**
+ * Beta readers: invite links, joining, and private feedback. Its own prefix
+ * because both sides use it -- the author managing readers and the readers
+ * joining -- and neither belongs under `/api/author`.
+ */
+app.use("/api/beta", betaRouter);
 app.use("/api/books", booksRouter);
 app.use("/api/challenges", challengesRouter);
 app.use("/api/channels", channelsRouter);

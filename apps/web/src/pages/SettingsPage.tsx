@@ -166,6 +166,11 @@ const NOTIFICATION_SETTINGS: {
     description: 'When a reader says something about something you wrote.',
   },
   {
+    type: 'BETA_FEEDBACK',
+    label: 'Beta feedback',
+    description: 'When a beta reader you invited leaves feedback on a draft.',
+  },
+  {
     type: 'CHANNEL_POST',
     label: 'Channel posts',
     description: 'New announcements from channels you subscribe to.',

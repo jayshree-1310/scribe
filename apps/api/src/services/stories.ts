@@ -276,6 +276,7 @@ type StoryCollection = ReturnType<typeof storiesBase>;
 async function hydrate(
   rows: StoryRow[],
   viewerId: string | null,
+  betaStoryIds: ReadonlySet<string> = new Set(),
 ): Promise<Story[]> {
   if (rows.length === 0) return [];
 
@@ -287,7 +288,7 @@ async function hydrate(
       .where((user) => user.id.in(authorIds))
       .all(),
     db.orm.content.StoryGenre.where((link) => link.storyId.in(storyIds)).all(),
-    chapterTotals(rows, viewerId),
+    chapterTotals(rows, viewerId, betaStoryIds),
     ratingTotals(storyIds),
   ]);
 
@@ -337,19 +338,24 @@ async function hydrate(
 /**
  * Chapter counts and summed word counts, keyed by story.
  *
- * Split by whether the caller authored the story, because the two groups count
- * different chapters: one query for the caller's own stories (all chapters),
- * one for everyone else's (published only).
+ * Split by how the caller reads each story (`StoryAccess`), because the groups
+ * count different chapters: the caller's own stories (all chapters), stories
+ * they beta-read (all but taken-down ones), and everyone else's (published
+ * only).
  */
 async function chapterTotals(
   rows: StoryRow[],
   viewerId: string | null,
+  betaStoryIds: ReadonlySet<string>,
 ): Promise<Map<string, Pick<StoryTotals, "chapterCount" | "wordCount">>> {
   const own = viewerId === null
     ? []
     : rows.filter((row) => row.authorId === viewerId).map((row) => row.id);
+  const beta = rows
+    .filter((row) => !own.includes(row.id) && betaStoryIds.has(row.id))
+    .map((row) => row.id);
   const others = rows
-    .filter((row) => !own.includes(row.id))
+    .filter((row) => !own.includes(row.id) && !beta.includes(row.id))
     .map((row) => row.id);
 
   const totals = new Map<
@@ -372,6 +378,15 @@ async function chapterTotals(
           chapter.storyId.in(others),
         )
           .where((chapter) => chapter.publishedAt.isNotNull())
+          .groupBy("storyId")
+          .aggregate((aggregate) => ({
+            chapters: aggregate.count(),
+            words: aggregate.sum("wordCount"),
+          })),
+    beta.length === 0
+      ? []
+      : db.orm.content.Chapter.where((chapter) => chapter.storyId.in(beta))
+          .where((chapter) => chapter.hiddenAt.isNull())
           .groupBy("storyId")
           .aggregate((aggregate) => ({
             chapters: aggregate.count(),
@@ -655,28 +670,159 @@ async function findStoryRow(
   return (byId as StoryRow | undefined) ?? null;
 }
 
+/* Beta readers ----------------------------------------------------------- */
+
+/**
+ * How the caller reads one story, which decides the chapters they see:
+ *
+ * - `author`: every chapter, as before.
+ * - `beta`: a reader the author let in through the story's invite link
+ *   (`beta.Reader`, `services/beta.ts`). Every chapter a moderator has not
+ *   taken down, published or not -- a draft story included.
+ * - `reader`: published chapters of a listed story.
+ *
+ * Beta access is for *reading*. Comments, likes and ratings are public, so
+ * the lookups behind them (`findVisibleStoryId`, `findVisibleChapter`) leave
+ * beta readers out unless the caller opts in with `{ beta: true }` -- a
+ * public comment on a draft would be published the day the draft is.
+ */
+export type StoryAccess = "author" | "beta" | "reader";
+
+export interface BetaOption {
+  /** Count the caller's beta access; see `StoryAccess`. */
+  beta?: boolean;
+}
+
+async function isBetaReader(storyId: string, viewerId: string): Promise<boolean> {
+  const row = await db.orm.beta.Reader.select("userId")
+    .where((reader) => reader.storyId.eq(storyId))
+    .where((reader) => reader.userId.eq(viewerId))
+    .first();
+  return row !== null && row !== undefined;
+}
+
+/**
+ * A story by slug or id with no visibility filter, for a beta reader: one
+ * written here, and not taken down by a moderator. A take-down shuts beta
+ * readers out too, exactly as it shuts out the public.
+ */
+async function findBetaStoryRow(slugOrId: string): Promise<StoryRow | null> {
+  const base = storiesBase()
+    .where((story) => story.source.eq("SCRIBE"))
+    .where((story) => story.hiddenAt.isNull());
+
+  const row = await base.where((story) => story.slug.eq(slugOrId)).first();
+  if (row) return row as StoryRow;
+  if (!UUID.test(slugOrId)) return null;
+
+  const byId = await base.where((story) => story.id.eq(slugOrId)).first();
+  return (byId as StoryRow | undefined) ?? null;
+}
+
+/**
+ * A story's card as a beta reader would see it, before visibility is asked.
+ *
+ * For the invite page only (`services/beta.ts`), which has to show somebody
+ * holding a valid invite link what they are about to join -- usually a draft
+ * they cannot otherwise see. The link is the authorisation; a taken-down
+ * story has no card to show.
+ */
+export async function getBetaStoryCard(storyId: string): Promise<Story | null> {
+  const row = await findBetaStoryRow(storyId);
+  if (!row) return null;
+
+  const [story] = await hydrate([row], null, new Set([row.id]));
+  return story ?? null;
+}
+
+interface ReadableStory {
+  row: StoryRow;
+  access: StoryAccess;
+}
+
+/**
+ * The story `slugOrId` names and how the caller reads it, or null when they
+ * may not see it at all.
+ *
+ * `findStoryRow` stays the rule for everybody but beta readers; this only
+ * adds them, and only when asked to.
+ */
+async function findReadableStory(
+  slugOrId: string,
+  viewerId: string | null,
+  options: BetaOption = {},
+): Promise<ReadableStory | null> {
+  const row = await findStoryRow(slugOrId, viewerId);
+  if (row) {
+    if (row.authorId === viewerId) return { row, access: "author" };
+    if (options.beta && viewerId !== null && (await isBetaReader(row.id, viewerId))) {
+      return { row, access: "beta" };
+    }
+    return { row, access: "reader" };
+  }
+
+  if (!options.beta || viewerId === null) return null;
+
+  const draft = await findBetaStoryRow(slugOrId);
+  if (draft && (await isBetaReader(draft.id, viewerId))) {
+    return { row: draft, access: "beta" };
+  }
+  return null;
+}
+
+/** The chapters of one story that `access` admits. */
+function chaptersFor(storyId: string, access: StoryAccess) {
+  const chapters = db.orm.content.Chapter.where((chapter) =>
+    chapter.storyId.eq(storyId),
+  );
+
+  if (access === "author") return chapters;
+  // A take-down unpublishes and sets `hiddenAt`; a beta reader gets every
+  // other chapter, drafts included.
+  if (access === "beta") return chapters.where((chapter) => chapter.hiddenAt.isNull());
+  return chapters.where((chapter) => chapter.publishedAt.isNotNull());
+}
+
+/** `chaptersFor`'s rule, for one chapter already loaded. */
+function chapterAdmits(
+  chapter: { publishedAt: unknown; hiddenAt: unknown },
+  access: StoryAccess,
+): boolean {
+  if (access === "author") return true;
+  if (access === "beta") return chapter.hiddenAt === null || chapter.hiddenAt === undefined;
+  return chapter.publishedAt !== null && chapter.publishedAt !== undefined;
+}
+
 /**
  * Whether `viewerId` is served story reads exactly as an anonymous reader is.
  *
- * The one viewer-dependent thing in a story list, a story's page, its related
- * rail and its chapter list is authorship: an author also sees their own
- * drafts and counts their own unpublished chapters (`visibleTo`,
- * `chapterTotals`, `chaptersVisibleTo`). Someone who has never created a story
- * gets the public answer, which is what lets `routes/stories.ts` share one
- * cached copy between them and every anonymous reader.
+ * The viewer-dependent things in a story list, a story's page, its related
+ * rail and its chapter list are authorship and beta reading: an author also
+ * sees their own drafts and counts their own unpublished chapters
+ * (`visibleTo`, `chapterTotals`, `chaptersFor`), and a beta reader sees the
+ * drafts they were invited to. Someone who is neither gets the public answer,
+ * which is what lets `routes/stories.ts` share one cached copy between them
+ * and every anonymous reader.
  *
- * Asked fresh on every request -- one probe of the `authorId` index -- because
- * the answer changes the moment a reader creates their first draft, and a
- * stale "no" would show that author a 404 for the story they just made.
+ * Asked fresh on every request -- one probe each of the `authorId` and
+ * `beta.reader.userId` indexes -- because the answer changes the moment a
+ * reader creates their first draft or joins a beta, and a stale "no" would
+ * show them a 404 for the story they just made or joined.
  */
 export async function seesPublicView(viewerId: string | null): Promise<boolean> {
   if (viewerId === null) return true;
 
-  const own = await db.orm.content.Story.select("id")
-    .where((story) => story.authorId.eq(viewerId))
-    .first();
+  // A beta reader is served a story's drafts, so neither may share the copy.
+  const [own, beta] = await Promise.all([
+    db.orm.content.Story.select("id")
+      .where((story) => story.authorId.eq(viewerId))
+      .first(),
+    db.orm.beta.Reader.select("storyId")
+      .where((reader) => reader.userId.eq(viewerId))
+      .first(),
+  ]);
 
-  return own === null || own === undefined;
+  return (own === null || own === undefined) && (beta === null || beta === undefined);
 }
 
 const NOT_FOUND = "That story could not be found.";
@@ -690,13 +836,18 @@ const NOT_FOUND = "That story could not be found.";
  * through `findStoryRow` rather than re-implementing the check is the point:
  * `visibleTo` is the one place a draft is hidden, and a second copy of that
  * rule is exactly how a draft's comments would leak.
+ *
+ * Beta readers are admitted only with `{ beta: true }`: comments and ratings
+ * are public, and must not be left on a draft. Highlights, which are private,
+ * pass it.
  */
 export async function findVisibleStoryId(
   slugOrId: string,
   viewerId: string | null,
+  options: BetaOption = {},
 ): Promise<string | null> {
-  const row = await findStoryRow(slugOrId, viewerId);
-  return row?.id ?? null;
+  const found = await findReadableStory(slugOrId, viewerId, options);
+  return found?.row.id ?? null;
 }
 
 /**
@@ -734,19 +885,30 @@ export interface NextRelease {
 /** One story's page: the card's fields, plus what is coming next. */
 export interface StoryDetail extends Story {
   nextRelease: NextRelease | null;
+  /**
+   * How the caller reads it; see `StoryAccess`. `reader` on the shared
+   * cached copy, which is only ever served to callers for whom that is true
+   * (`seesPublicView`).
+   */
+  access: StoryAccess;
 }
 
 export async function getStory(
   slugOrId: string,
   viewerId: string | null,
 ): Promise<StoryDetail> {
-  const row = await findStoryRow(slugOrId, viewerId);
-  if (!row) throw HttpError.notFound(NOT_FOUND);
+  const found = await findReadableStory(slugOrId, viewerId, { beta: true });
+  if (!found) throw HttpError.notFound(NOT_FOUND);
+  const { row, access } = found;
 
-  const [story] = await hydrate([row], viewerId);
+  const [story] = await hydrate(
+    [row],
+    viewerId,
+    access === "beta" ? new Set([row.id]) : undefined,
+  );
   if (!story) throw HttpError.notFound(NOT_FOUND);
 
-  return { ...story, nextRelease: await nextReleaseOf(row.id) };
+  return { ...story, nextRelease: await nextReleaseOf(row.id), access };
 }
 
 /**
@@ -773,10 +935,10 @@ export async function listChapters(
   slugOrId: string,
   viewerId: string | null,
 ): Promise<ChapterSummary[]> {
-  const story = await findStoryRow(slugOrId, viewerId);
+  const story = await findReadableStory(slugOrId, viewerId, { beta: true });
   if (!story) throw HttpError.notFound(NOT_FOUND);
 
-  const rows = await chaptersVisibleTo(story, viewerId)
+  const rows = await chaptersFor(story.row.id, story.access)
     .select("id", "storyId", "chapterNumber", "title", "wordCount", "publishedAt", "scheduledAt")
     .orderBy((chapter) => chapter.chapterNumber.asc())
     .all();
@@ -792,30 +954,20 @@ export async function listChapters(
   }));
 }
 
-/**
- * An unpublished chapter is visible to its author and to nobody else, so an
- * author previewing a draft reads it through the same endpoint the audience
- * will use.
- */
-function chaptersVisibleTo(story: StoryRow, viewerId: string | null) {
-  const chapters = db.orm.content.Chapter.where((chapter) =>
-    chapter.storyId.eq(story.id),
-  );
-
-  return story.authorId === viewerId
-    ? chapters
-    : chapters.where((chapter) => chapter.publishedAt.isNotNull());
-}
-
 export async function getChapter(
   slugOrId: string,
   number: number,
   viewerId: string | null,
 ): Promise<Chapter> {
-  const story = await findStoryRow(slugOrId, viewerId);
+  /**
+   * An unpublished chapter is visible to its author and the story's beta
+   * readers, so an author previewing a draft -- and a reader they invited --
+   * read it through the same endpoint the audience will use.
+   */
+  const story = await findReadableStory(slugOrId, viewerId, { beta: true });
   if (!story) throw HttpError.notFound(NOT_FOUND);
 
-  const visible = chaptersVisibleTo(story, viewerId);
+  const visible = chaptersFor(story.row.id, story.access);
 
   const row = await visible
     .select(
@@ -902,30 +1054,33 @@ export async function getChapter(
  * Exported for `services/engagement.ts`, which has to answer "may this caller
  * see this chapter?" before accepting a like on it -- the same reason
  * `findVisibleStoryId` above is exported, and answered the same way: through
- * `findStoryRow` and the `publishedAt` rule `chaptersVisibleTo` applies, so
+ * `findReadableStory` and the rule `chaptersFor` applies, so
  * the two places a draft chapter is hidden cannot drift apart.
  */
 export async function findVisibleChapter(
   chapterId: string,
   viewerId: string | null,
+  options: BetaOption = {},
 ): Promise<{ id: string; storyId: string; number: number } | null> {
   const chapter = await db.orm.content.Chapter.select(
     "id",
     "storyId",
     "chapterNumber",
     "publishedAt",
+    "hiddenAt",
   )
     .where((row) => row.id.eq(chapterId))
     .first();
 
   if (!chapter) return null;
 
-  // A draft story hides its chapters from everybody but its author, and this
-  // is where that is decided for every caller.
-  const story = await findStoryRow(chapter.storyId, viewerId);
+  // A draft story hides its chapters from everybody but its author (and, with
+  // `beta`, its beta readers), and this is where that is decided for every
+  // caller.
+  const story = await findReadableStory(chapter.storyId, viewerId, options);
   if (!story) return null;
 
-  if (chapter.publishedAt === null && story.authorId !== viewerId) return null;
+  if (!chapterAdmits(chapter, story.access)) return null;
 
   return {
     id: chapter.id,
@@ -943,7 +1098,7 @@ export async function findVisibleChapter(
  * in two queries; a page of search results can name fifty chapters, so this
  * asks it of all of them in two queries total.
  *
- * The rule is the one `chaptersVisibleTo` applies, over stories `visibleTo`
+ * The rule is the one `chaptersFor` applies, over stories `visibleTo`
  * admits: a chapter is readable when its story is visible to the caller and
  * the chapter is published -- or the caller wrote it. Ids that name nothing
  * are simply absent from the answer.
@@ -951,6 +1106,7 @@ export async function findVisibleChapter(
 export async function findVisibleChapterIds(
   chapterIds: string[],
   viewerId: string | null,
+  options: BetaOption = {},
 ): Promise<Set<string>> {
   if (chapterIds.length === 0) return new Set();
 
@@ -958,6 +1114,7 @@ export async function findVisibleChapterIds(
     "id",
     "storyId",
     "publishedAt",
+    "hiddenAt",
   )
     .where((chapter) => chapter.id.in(chapterIds))
     .all();
@@ -969,20 +1126,40 @@ export async function findVisibleChapterIds(
     .where((story) => story.id.in(storyIds))
     .all();
 
-  const authorByStory = new Map(
-    stories.map((story) => [story.id, story.authorId]),
+  const accessByStory = new Map<string, StoryAccess>(
+    stories.map((story) => [
+      story.id,
+      story.authorId === viewerId ? "author" : "reader",
+    ]),
   );
+
+  // The same widening `findReadableStory` makes, for a batch: stories the
+  // caller beta-reads, unless a moderator took them down.
+  if (options.beta && viewerId !== null) {
+    const memberships = await db.orm.beta.Reader.select("storyId")
+      .where((reader) => reader.userId.eq(viewerId))
+      .where((reader) => reader.storyId.in(storyIds))
+      .all();
+    const candidates = memberships
+      .map((membership) => membership.storyId)
+      .filter((storyId) => accessByStory.get(storyId) !== "author");
+
+    if (candidates.length > 0) {
+      const open = await db.orm.content.Story.select("id")
+        .where((story) => story.id.in(candidates))
+        .where((story) => story.hiddenAt.isNull())
+        .all();
+      for (const story of open) accessByStory.set(story.id, "beta");
+    }
+  }
 
   return new Set(
     chapters
       .filter((chapter) => {
         // Absent from the map means the story itself is hidden from this
         // caller, which hides every chapter in it, published or not.
-        if (!authorByStory.has(chapter.storyId)) return false;
-        return (
-          chapter.publishedAt !== null ||
-          authorByStory.get(chapter.storyId) === viewerId
-        );
+        const access = accessByStory.get(chapter.storyId);
+        return access !== undefined && chapterAdmits(chapter, access);
       })
       .map((chapter) => chapter.id),
   );
@@ -1019,10 +1196,10 @@ export async function findPreviousVisibleChapter(
   title: string;
   content: string;
 } | null> {
-  const story = await findStoryRow(slugOrId, viewerId);
+  const story = await findReadableStory(slugOrId, viewerId);
   if (!story) throw HttpError.notFound(NOT_FOUND);
 
-  const row = await chaptersVisibleTo(story, viewerId)
+  const row = await chaptersFor(story.row.id, story.access)
     .select("id", "chapterNumber", "title", "content")
     .where((chapter) => chapter.chapterNumber.lt(chapterNumber))
     .orderBy((chapter) => chapter.chapterNumber.desc())
@@ -1056,6 +1233,7 @@ export async function findPreviousVisibleChapter(
 export async function findVisibleChapterText(
   chapterId: string,
   viewerId: string | null,
+  options: BetaOption = {},
 ): Promise<{
   id: string;
   storyId: string;
@@ -1065,7 +1243,7 @@ export async function findVisibleChapterText(
 } | null> {
   // The visibility decision itself is not repeated here -- it is the function
   // above, so the draft rule has exactly one implementation.
-  const visible = await findVisibleChapter(chapterId, viewerId);
+  const visible = await findVisibleChapter(chapterId, viewerId, options);
   if (!visible) return null;
 
   const row = await db.orm.content.Chapter.select("title", "content")

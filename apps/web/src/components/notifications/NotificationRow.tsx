@@ -24,6 +24,7 @@ const TYPE_ICONS: Record<NotificationType, IconName> = {
   NEW_STORY: 'book',
   NEW_CHAPTER: 'book-open',
   BADGE_EARNED: 'medal',
+  BETA_FEEDBACK: 'lock',
 }
 
 /**
@@ -58,6 +59,10 @@ function describe(notification: Notification): string {
     case 'BADGE_EARNED':
       // The one with no actor: nobody did this *to* the reader.
       return `You earned ${notification.title}`
+    case 'BETA_FEEDBACK':
+      // The chapter is the excerpt underneath; the feedback itself is private
+      // and is read on the story's beta page.
+      return `${who} left beta feedback on ${notification.title}`
   }
 }
 

@@ -116,6 +116,27 @@
   margin-top: var(--space-6);
 }
 
+/* Shown to a beta reader: what they can read, where feedback goes, a way out. */
+.detail__beta {
+  margin-top: var(--space-4);
+  max-width: 60ch;
+}
+
+.detail__beta-leave {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.detail__beta-leave:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .detail__tabs {
   margin-bottom: var(--space-6);
 }

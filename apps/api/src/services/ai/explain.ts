@@ -132,7 +132,7 @@ export async function resolveSelection(
   userId: string | null,
   input: ExplainInput,
 ): Promise<ExplainContext> {
-  const chapter = await findVisibleChapterText(input.chapterId, userId);
+  const chapter = await findVisibleChapterText(input.chapterId, userId, { beta: true });
   // The same answer for a chapter that does not exist and one this caller may
   // not read: a distinguishable 403 would confirm that a draft exists.
   if (!chapter) throw HttpError.notFound("That chapter could not be found.");

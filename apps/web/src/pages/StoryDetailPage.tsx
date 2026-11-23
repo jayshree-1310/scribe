@@ -13,6 +13,7 @@ import {
 } from '../lib/format'
 import * as stories from '../data/stories-api'
 import * as engagement from '../data/engagement-api'
+import * as betaApi from '../data/beta-api'
 import {
   STORY_STATUS_LABELS,
   readingMinutes,
@@ -37,7 +38,7 @@ import { RatingInput, Stars } from '../components/ui/Rating'
 import { Skeleton } from '../components/ui/Skeleton'
 import { Tabs, TabPanel } from '../components/ui/Tabs'
 import { TextField } from '../components/ui/TextField'
-import { EmptyState, ErrorState } from '../components/ui/States'
+import { EmptyState, ErrorState, InlineNotice } from '../components/ui/States'
 import { StoryCard, StoryCardSkeleton } from '../components/story/StoryCard'
 import { StoryCover } from '../components/story/StoryCover'
 import { RatingBars } from '../components/charts/RatingBars'
@@ -75,13 +76,42 @@ export function StoryDetailPage() {
   const story = useAsync(() => stories.getStory(slug), [slug])
   const storyId = story.data?.id
 
+  /**
+   * A beta reader on a story that is still a draft. Ratings, comments, the
+   * library and the AI panels are all public-facing, and stay closed until
+   * the story is listed; a beta reader talks to the author through feedback
+   * in the reader instead. On a listed story a beta reader is also an
+   * ordinary reader, so nothing is hidden there.
+   */
+  const betaDraft = story.data?.access === 'beta' && story.data.status === 'draft'
+  const [leaving, setLeaving] = useState(false)
+
+  /** Leaves the beta. Feedback already sent stays with the author. */
+  async function onLeaveBeta() {
+    if (!storyId) return
+    setLeaving(true)
+    try {
+      await betaApi.leaveBeta(storyId)
+      showToast({ message: 'You have left the beta. Your feedback stays with the author.' })
+      if (betaDraft) navigate('/home', { replace: true })
+      else story.reload()
+    } catch (cause) {
+      showToast({
+        tone: 'error',
+        message: cause instanceof Error ? cause.message : 'You could not leave. Try again.',
+      })
+    } finally {
+      setLeaving(false)
+    }
+  }
+
   const chapters = useAsync(
     () => (storyId ? stories.getChapters(storyId) : Promise.resolve([])),
     [storyId],
   )
   const similar = useAsync(
-    () => (storyId ? stories.getRelatedStories(storyId) : Promise.resolve([])),
-    [storyId],
+    () => (storyId && !betaDraft ? stories.getRelatedStories(storyId) : Promise.resolve([])),
+    [storyId, betaDraft],
   )
 
   /**
@@ -91,15 +121,15 @@ export function StoryDetailPage() {
    * ratings query should only hold up the bars it draws.
    */
   const ratings = useAsync(
-    () => (storyId ? engagement.getRatings(storyId) : Promise.resolve(null)),
-    [storyId],
+    () => (storyId && !betaDraft ? engagement.getRatings(storyId) : Promise.resolve(null)),
+    [storyId, betaDraft],
   )
   const comments = useAsync(
     () =>
-      storyId
+      storyId && !betaDraft
         ? engagement.listComments(storyId, { limit: 20 })
         : Promise.resolve(null),
-    [storyId],
+    [storyId, betaDraft],
   )
 
   /** The thread whose replies are open, and its loaded replies. */
@@ -420,16 +450,18 @@ export function StoryDetailPage() {
                 </ButtonLink>
               )}
 
-              <Button
-                size="lg"
-                onClick={signedIn ? onToggleLibrary : signInFirst}
-                startIcon={<Icon name={inLibrary ? 'bookmark-filled' : 'bookmark'} />}
-              >
-                {inLibrary ? 'In your library' : 'Add to Library'}
-              </Button>
+              {betaDraft ? null : (
+                <Button
+                  size="lg"
+                  onClick={signedIn ? onToggleLibrary : signInFirst}
+                  startIcon={<Icon name={inLibrary ? 'bookmark-filled' : 'bookmark'} />}
+                >
+                  {inLibrary ? 'In your library' : 'Add to Library'}
+                </Button>
+              )}
 
               {/* Authors cannot score their own story; the API refuses it. */}
-              {isOwnStory ? null : (
+              {isOwnStory || betaDraft ? null : (
                 <Button
                   size="lg"
                   onClick={signedIn ? openRateDialog : signInFirst}
@@ -439,22 +471,43 @@ export function StoryDetailPage() {
                 </Button>
               )}
 
-              <Button
-                size="lg"
-                iconOnly
-                aria-label="Share this story"
-                onClick={onShare}
-                startIcon={<Icon name="share" />}
-              />
+              {betaDraft ? null : (
+                <Button
+                  size="lg"
+                  iconOnly
+                  aria-label="Share this story"
+                  onClick={onShare}
+                  startIcon={<Icon name="share" />}
+                />
+              )}
 
               <ReportMenu
                 targetType="STORY"
                 targetId={data.id}
                 noun="story"
                 size="lg"
-                hidden={!signedIn || isOwnStory}
+                hidden={!signedIn || isOwnStory || betaDraft}
               />
             </div>
+
+            {data.access === 'beta' ? (
+              <div className="detail__beta">
+                <InlineNotice icon="lock">
+                  You are a beta reader of this story, so you can read its
+                  unpublished chapters too. Use <strong>Feedback</strong> in
+                  the reader to tell {authorName} what you think; only they
+                  see it.{' '}
+                  <button
+                    type="button"
+                    className="detail__beta-leave"
+                    disabled={leaving}
+                    onClick={() => void onLeaveBeta()}
+                  >
+                    Leave the beta
+                  </button>
+                </InlineNotice>
+              </div>
+            ) : null}
           </div>
         </div>
       </header>
@@ -462,7 +515,7 @@ export function StoryDetailPage() {
       {/* Tabs ----------------------------------------------------------- */}
       <div className="detail__tabs">
         <Tabs
-          items={TABS.map((item) =>
+          items={TABS.filter((item) => !betaDraft || item.id === 'chapters').map((item) =>
             item.id === 'chapters'
               ? { ...item, count: data.chapterCount }
               : item.id === 'comments'
@@ -826,7 +879,7 @@ export function StoryDetailPage() {
         chapter to summarise, or when the summary cannot be loaded.
       */}
       {/* Both AI sections answer to a signed-in reader. */}
-      {signedIn && data.chapterCount > 0 ? (
+      {signedIn && data.chapterCount > 0 && !betaDraft ? (
         <StorySummaryCard storyKey={data.slug} storyId={data.id} isAuthor={myId === data.author.id} />
       ) : null}
 
@@ -836,7 +889,7 @@ export function StoryDetailPage() {
         starts at "where I've read to" — the server's default from the
         reader's saved position — because from here the page cannot know.
       */}
-      {signedIn && data.chapterCount > 0 && chapters.status === 'ready' ? (
+      {signedIn && data.chapterCount > 0 && chapters.status === 'ready' && !betaDraft ? (
         <section className="page-section" aria-label="Ask this book">
           <SectionHead
             title="Ask this book"
@@ -874,26 +927,28 @@ export function StoryDetailPage() {
       </section>
 
       {/* Similar -------------------------------------------------------- */}
-      <section className="page-section">
-        <SectionHead title="Readers also enjoyed" />
-        {similar.status === 'error' ? (
-          <ErrorState message={similar.error} onRetry={similar.reload} />
-        ) : similar.status === 'loading' ? (
-          <div className="story-grid">
-            {Array.from({ length: 4 }, (_, index) => (
-              <StoryCardSkeleton key={index} />
-            ))}
-          </div>
-        ) : similar.data?.length === 0 ? (
-          <EmptyState icon="book" size="sm" title="Nothing similar yet" />
-        ) : (
-          <div className="story-grid">
-            {similar.data?.map((item) => (
-              <StoryCard key={item.id} story={item} />
-            ))}
-          </div>
-        )}
-      </section>
+      {betaDraft ? null : (
+        <section className="page-section">
+          <SectionHead title="Readers also enjoyed" />
+          {similar.status === 'error' ? (
+            <ErrorState message={similar.error} onRetry={similar.reload} />
+          ) : similar.status === 'loading' ? (
+            <div className="story-grid">
+              {Array.from({ length: 4 }, (_, index) => (
+                <StoryCardSkeleton key={index} />
+              ))}
+            </div>
+          ) : similar.data?.length === 0 ? (
+            <EmptyState icon="book" size="sm" title="Nothing similar yet" />
+          ) : (
+            <div className="story-grid">
+              {similar.data?.map((item) => (
+                <StoryCard key={item.id} story={item} />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Rating dialog -------------------------------------------------- */}
       <Dialog

@@ -1,0 +1,200 @@
+/**
+ * Beta readers: the invite link card, the readers list and the feedback
+ * grouped by chapter. Built from the same tokens and furniture as the story
+ * bible (`story-bible.css`).
+ */
+
+.beta__loading {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.beta__section-title {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.beta__note {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.beta__note--spaced {
+  margin-top: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+/* Link -------------------------------------------------------------------- */
+
+.beta__link {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
+}
+
+.beta__link-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.beta__link-head > div:first-child {
+  display: grid;
+  gap: var(--space-1);
+  max-width: 60ch;
+}
+
+.beta__link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.beta__link-url {
+  flex: 1 1 16rem;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.beta__link-url:focus-visible {
+  outline: 2px solid var(--brand-ring);
+  outline-offset: 1px;
+}
+
+.beta__link-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Readers ----------------------------------------------------------------- */
+
+.beta__readers {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.beta__reader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--surface);
+}
+
+.beta__reader-body {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+
+/* Feedback ---------------------------------------------------------------- */
+
+.beta__group + .beta__group {
+  margin-top: var(--space-6);
+}
+
+.beta__chapter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-md);
+}
+
+.beta__feedback {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.beta__note-card {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.beta__note-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.beta__note-delete {
+  margin-inline-start: auto;
+}
+
+.beta__quote {
+  margin: 0;
+  padding-inline-start: var(--space-3);
+  border-inline-start: 3px solid var(--brand-border);
+  color: var(--text-secondary);
+  font-family: var(--font-reading);
+  font-style: italic;
+  line-height: var(--leading-relaxed);
+}
+
+.beta__body {
+  margin: 0;
+  line-height: var(--leading-relaxed);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Invite page ------------------------------------------------------------- */
+
+.beta-invite {
+  display: grid;
+  gap: var(--space-5);
+  max-width: 36rem;
+  margin: var(--space-8) auto 0;
+}
+
+.beta-invite__story {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.beta-invite__cover {
+  flex: none;
+  width: 5.5rem;
+}
+
+.beta-invite__meta {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.beta-invite__title {
+  margin: 0;
+  font-size: var(--text-2xl);
+}
+
+.beta-invite__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}

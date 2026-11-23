@@ -1,0 +1,871 @@
+[
+  {
+    "id": "schema.beta",
+    "label": "Create schema \"beta\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"beta\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"beta\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "dropCheckConstraint.notificationMute.notificationMute_type_check_fd2b9b0f",
+    "label": "Drop check constraint \"notificationMute_type_check_fd2b9b0f\" on \"notificationMute\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "checkConstraint",
+        "name": "notificationMute_type_check_fd2b9b0f",
+        "table": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notificationMute_type_check_fd2b9b0f\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_fd2b9b0f",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"notificationMute_type_check_fd2b9b0f\"",
+        "sql": "ALTER TABLE \"auth\".\"notificationMute\" DROP CONSTRAINT \"notificationMute_type_check_fd2b9b0f\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notificationMute_type_check_fd2b9b0f\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_fd2b9b0f",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropCheckConstraint.notification.notification_type_check_fd2b9b0f",
+    "label": "Drop check constraint \"notification_type_check_fd2b9b0f\" on \"notification\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_type_check_fd2b9b0f",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_type_check_fd2b9b0f\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_fd2b9b0f",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"notification_type_check_fd2b9b0f\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" DROP CONSTRAINT \"notification_type_check_fd2b9b0f\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_type_check_fd2b9b0f\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_fd2b9b0f",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.feedback",
+    "label": "Create table \"feedback\"",
+    "summary": "Creates table \"feedback\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "table",
+        "name": "feedback"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"feedback\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"feedback\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"feedback\"",
+        "sql": "CREATE TABLE \"beta\".\"feedback\" (\n  \"body\" text NOT NULL,\n  \"chapterId\" text NOT NULL,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"quote\" text,\n  \"storyId\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"feedback\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"feedback\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.link",
+    "label": "Create table \"link\"",
+    "summary": "Creates table \"link\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "table",
+        "name": "link"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"link\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"link\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"link\"",
+        "sql": "CREATE TABLE \"beta\".\"link\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"token\" text NOT NULL,\n  PRIMARY KEY (\"storyId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"link\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"link\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.reader",
+    "label": "Create table \"reader\"",
+    "summary": "Creates table \"reader\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "table",
+        "name": "reader"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"reader\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"reader\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"reader\"",
+        "sql": "CREATE TABLE \"beta\".\"reader\" (\n  \"joinedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"storyId\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"storyId\", \"userId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"reader\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"reader\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notificationMute.notificationMute_type_check_8fc7182a",
+    "label": "Add check constraint \"notificationMute_type_check_8fc7182a\" on \"notificationMute\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "checkConstraint",
+        "name": "notificationMute_type_check_8fc7182a",
+        "table": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notificationMute_type_check_8fc7182a\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_8fc7182a",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notificationMute_type_check_8fc7182a\"",
+        "sql": "ALTER TABLE \"auth\".\"notificationMute\" ADD CONSTRAINT \"notificationMute_type_check_8fc7182a\" CHECK (\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'NEW_CHAPTER', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED', 'BETA_FEEDBACK'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notificationMute_type_check_8fc7182a\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_8fc7182a",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.link.link_token_key",
+    "label": "Add unique constraint on \"link\" (token)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "unique",
+        "name": "link_token_key",
+        "table": "link"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"link_token_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "link_token_key",
+          "beta",
+          "\"beta\".\"link\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"link_token_key\"",
+        "sql": "ALTER TABLE \"beta\".\"link\" ADD CONSTRAINT \"link_token_key\" UNIQUE (\"token\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"link_token_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "link_token_key",
+          "beta",
+          "\"beta\".\"link\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notification.notification_type_check_8fc7182a",
+    "label": "Add check constraint \"notification_type_check_8fc7182a\" on \"notification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_type_check_8fc7182a",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_type_check_8fc7182a\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_8fc7182a",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notification_type_check_8fc7182a\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" ADD CONSTRAINT \"notification_type_check_8fc7182a\" CHECK (\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'NEW_CHAPTER', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED', 'BETA_FEEDBACK'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_type_check_8fc7182a\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_8fc7182a",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.feedback.feedback_chapterId_idx_411dd3d6",
+    "label": "Create index \"feedback_chapterId_idx_411dd3d6\" on \"feedback\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "index",
+        "name": "feedback_chapterId_idx_411dd3d6",
+        "table": "feedback"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"feedback_chapterId_idx_411dd3d6\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"feedback_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"feedback_chapterId_idx_411dd3d6\"",
+        "sql": "CREATE INDEX \"feedback_chapterId_idx_411dd3d6\" ON \"beta\".\"feedback\" (\"chapterId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"feedback_chapterId_idx_411dd3d6\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"feedback_chapterId_idx_411dd3d6\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.feedback.feedback_storyId_createdAt_idx_90880359",
+    "label": "Create index \"feedback_storyId_createdAt_idx_90880359\" on \"feedback\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "index",
+        "name": "feedback_storyId_createdAt_idx_90880359",
+        "table": "feedback"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"feedback_storyId_createdAt_idx_90880359\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"feedback_storyId_createdAt_idx_90880359\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"feedback_storyId_createdAt_idx_90880359\"",
+        "sql": "CREATE INDEX \"feedback_storyId_createdAt_idx_90880359\" ON \"beta\".\"feedback\" (\"storyId\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"feedback_storyId_createdAt_idx_90880359\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"feedback_storyId_createdAt_idx_90880359\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.feedback.feedback_storyId_idx_cd452158",
+    "label": "Create index \"feedback_storyId_idx_cd452158\" on \"feedback\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "index",
+        "name": "feedback_storyId_idx_cd452158",
+        "table": "feedback"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"feedback_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"feedback_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"feedback_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"feedback_storyId_idx_cd452158\" ON \"beta\".\"feedback\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"feedback_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"feedback_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.feedback.feedback_userId_idx_a489d58a",
+    "label": "Create index \"feedback_userId_idx_a489d58a\" on \"feedback\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "index",
+        "name": "feedback_userId_idx_a489d58a",
+        "table": "feedback"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"feedback_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"feedback_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"feedback_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"feedback_userId_idx_a489d58a\" ON \"beta\".\"feedback\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"feedback_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"feedback_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.feedback.feedback_userId_storyId_idx_57dae79f",
+    "label": "Create index \"feedback_userId_storyId_idx_57dae79f\" on \"feedback\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "index",
+        "name": "feedback_userId_storyId_idx_57dae79f",
+        "table": "feedback"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"feedback_userId_storyId_idx_57dae79f\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"feedback_userId_storyId_idx_57dae79f\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"feedback_userId_storyId_idx_57dae79f\"",
+        "sql": "CREATE INDEX \"feedback_userId_storyId_idx_57dae79f\" ON \"beta\".\"feedback\" (\"userId\", \"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"feedback_userId_storyId_idx_57dae79f\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"feedback_userId_storyId_idx_57dae79f\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.reader.reader_storyId_idx_cd452158",
+    "label": "Create index \"reader_storyId_idx_cd452158\" on \"reader\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "index",
+        "name": "reader_storyId_idx_cd452158",
+        "table": "reader"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"reader_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"reader_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"reader_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"reader_storyId_idx_cd452158\" ON \"beta\".\"reader\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"reader_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"reader_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.reader.reader_userId_idx_a489d58a",
+    "label": "Create index \"reader_userId_idx_a489d58a\" on \"reader\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "index",
+        "name": "reader_userId_idx_a489d58a",
+        "table": "reader"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"reader_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"reader_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"reader_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"reader_userId_idx_a489d58a\" ON \"beta\".\"reader\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"reader_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"beta\".\"reader_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.feedback.feedback_storyId_fkey",
+    "label": "Add foreign key \"feedback_storyId_fkey\" on \"feedback\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "foreignKey",
+        "name": "feedback_storyId_fkey",
+        "table": "feedback"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"feedback_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "feedback_storyId_fkey",
+          "beta",
+          "\"beta\".\"feedback\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"feedback_storyId_fkey\"",
+        "sql": "ALTER TABLE \"beta\".\"feedback\"\nADD CONSTRAINT \"feedback_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"feedback_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "feedback_storyId_fkey",
+          "beta",
+          "\"beta\".\"feedback\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.feedback.feedback_chapterId_fkey",
+    "label": "Add foreign key \"feedback_chapterId_fkey\" on \"feedback\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "foreignKey",
+        "name": "feedback_chapterId_fkey",
+        "table": "feedback"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"feedback_chapterId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "feedback_chapterId_fkey",
+          "beta",
+          "\"beta\".\"feedback\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"feedback_chapterId_fkey\"",
+        "sql": "ALTER TABLE \"beta\".\"feedback\"\nADD CONSTRAINT \"feedback_chapterId_fkey\"\nFOREIGN KEY (\"chapterId\")\nREFERENCES \"content\".\"chapter\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"feedback_chapterId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "feedback_chapterId_fkey",
+          "beta",
+          "\"beta\".\"feedback\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.feedback.feedback_userId_fkey",
+    "label": "Add foreign key \"feedback_userId_fkey\" on \"feedback\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "foreignKey",
+        "name": "feedback_userId_fkey",
+        "table": "feedback"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"feedback_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "feedback_userId_fkey",
+          "beta",
+          "\"beta\".\"feedback\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"feedback_userId_fkey\"",
+        "sql": "ALTER TABLE \"beta\".\"feedback\"\nADD CONSTRAINT \"feedback_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"feedback_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "feedback_userId_fkey",
+          "beta",
+          "\"beta\".\"feedback\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.link.link_storyId_fkey",
+    "label": "Add foreign key \"link_storyId_fkey\" on \"link\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "foreignKey",
+        "name": "link_storyId_fkey",
+        "table": "link"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"link_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "link_storyId_fkey",
+          "beta",
+          "\"beta\".\"link\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"link_storyId_fkey\"",
+        "sql": "ALTER TABLE \"beta\".\"link\"\nADD CONSTRAINT \"link_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"link_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "link_storyId_fkey",
+          "beta",
+          "\"beta\".\"link\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.reader.reader_storyId_fkey",
+    "label": "Add foreign key \"reader_storyId_fkey\" on \"reader\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "foreignKey",
+        "name": "reader_storyId_fkey",
+        "table": "reader"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"reader_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "reader_storyId_fkey",
+          "beta",
+          "\"beta\".\"reader\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"reader_storyId_fkey\"",
+        "sql": "ALTER TABLE \"beta\".\"reader\"\nADD CONSTRAINT \"reader_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"reader_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "reader_storyId_fkey",
+          "beta",
+          "\"beta\".\"reader\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.reader.reader_userId_fkey",
+    "label": "Add foreign key \"reader_userId_fkey\" on \"reader\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "beta",
+        "objectType": "foreignKey",
+        "name": "reader_userId_fkey",
+        "table": "reader"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"reader_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "reader_userId_fkey",
+          "beta",
+          "\"beta\".\"reader\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"reader_userId_fkey\"",
+        "sql": "ALTER TABLE \"beta\".\"reader\"\nADD CONSTRAINT \"reader_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"reader_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "reader_userId_fkey",
+          "beta",
+          "\"beta\".\"reader\""
+        ]
+      }
+    ]
+  }
+]
