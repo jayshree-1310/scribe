@@ -88,6 +88,8 @@ export interface StoryInput {
   genreIds?: string[] | undefined;
   kidsAppropriate?: boolean | undefined;
   isCompleted?: boolean | undefined;
+  /** Whether readers may make quote cards from the story; see `Story.quoteCards`. */
+  quoteCards?: boolean | undefined;
 }
 
 export interface ChapterInput {
@@ -466,6 +468,7 @@ export async function createStory(
       coverUrl: input.coverUrl ?? null,
       kidsAppropriate: input.kidsAppropriate ?? false,
       isCompleted: input.isCompleted ?? false,
+      quoteCards: input.quoteCards ?? true,
       createdAt: timestamp,
       updatedAt: timestamp,
     });
@@ -554,6 +557,9 @@ export async function updateStory(
     }
     if (input.isCompleted !== undefined) {
       changes["isCompleted"] = input.isCompleted;
+    }
+    if (input.quoteCards !== undefined) {
+      changes["quoteCards"] = input.quoteCards;
     }
 
     await tx.orm.content.Story.where((row) => row.id.eq(storyId)).update(changes);

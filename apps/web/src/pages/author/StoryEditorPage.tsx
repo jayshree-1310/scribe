@@ -182,6 +182,7 @@ export function StoryEditorPage() {
   const [genreIds, setGenreIds] = useState<string[]>([])
   const [kidsAppropriate, setKidsAppropriate] = useState(false)
   const [isCompleted, setIsCompleted] = useState(false)
+  const [quoteCards, setQuoteCards] = useState(true)
   const [coverUrl, setCoverUrl] = useState<string | null>(null)
 
   /* Chapters ---------------------------------------------------------- */
@@ -293,6 +294,7 @@ export function StoryEditorPage() {
     setGenreIds(story.genres.map((genre) => genre.id))
     setKidsAppropriate(story.kidsAppropriate)
     setIsCompleted(story.isCompleted)
+    setQuoteCards(story.quoteCards)
     setCoverUrl(story.coverUrl)
     setChapters(seeded)
     setActiveKey(seeded[0]!.key)
@@ -340,6 +342,7 @@ export function StoryEditorPage() {
         genreIds,
         kidsAppropriate,
         isCompleted,
+        quoteCards,
       }
 
       let id = storyId
@@ -441,6 +444,7 @@ export function StoryEditorPage() {
     genreIds,
     kidsAppropriate,
     isCompleted,
+    quoteCards,
     order: chapters.map((chapter) => chapter.key),
     chapters: chapters.map((chapter) => [chapter.title, chapter.body]),
   })
@@ -1676,6 +1680,16 @@ export function StoryEditorPage() {
               }}
               label="The story is complete"
               description="Tells readers no more chapters are coming."
+            />
+
+            <Switch
+              checked={quoteCards}
+              onChange={(value) => {
+                setQuoteCards(value)
+                setDirty(true)
+              }}
+              label="Allow quote cards"
+              description="Readers can share a passage they highlighted as an image that credits you and links to the chapter."
             />
           </div>
         </div>

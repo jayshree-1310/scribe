@@ -5132,6 +5132,13 @@
                   "kind": "scalar"
                 }
               },
+              "quoteCards": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
               "ratingAverage": {
                 "nullable": true,
                 "type": {
@@ -5521,6 +5528,9 @@
                 },
                 "publisher": {
                   "column": "publisher"
+                },
+                "quoteCards": {
+                  "column": "quoteCards"
                 },
                 "ratingAverage": {
                   "column": "ratingAverage"
@@ -11401,6 +11411,15 @@
                   "nativeType": "text",
                   "nullable": true
                 },
+                "quoteCards": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
                 "ratingAverage": {
                   "codecId": "pg/numeric@1",
                   "nativeType": "numeric",
@@ -13546,7 +13565,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "3ad9268a9017de126b9cf31583c92e8d3f02d321e4afba3e1419b5b5e2b8cfe4"
+    "storageHash": "887bfebcdcd0e8e0fbdf2cdc394b8a165961a6c2a10acee96766c5094dd0c138"
   },
   "execution": {
     "executionHash": "9dddf0f2060c166b12802b6cad095535b1fd702a5ea68a7df5005f17e8c169d3",

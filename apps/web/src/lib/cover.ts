@@ -26,15 +26,38 @@ function hashOf(seed: string): number {
   return Math.abs(hash)
 }
 
-export function coverArt(seed: string, hue: number): CoverArt {
+/**
+ * The colours a generated cover is made of, before they become CSS. The quote
+ * card (`lib/quote-card.ts`) paints the same cover on a canvas, which takes
+ * colour stops rather than a `background` string.
+ */
+export interface CoverPalette {
+  variant: CoverArt['variant']
+  /** The three gradient stops, lightest first. */
+  mid: string
+  dark: string
+  deep: string
+  ink: string
+  accent: string
+}
+
+export function coverPalette(seed: string, hue: number): CoverPalette {
   const hash = hashOf(seed)
-  const variant = ((hash % 4) + 1) as CoverArt['variant']
   const drift = (hash % 26) - 13
   const second = (hue + 34 + drift + 360) % 360
 
-  const dark = `hsl(${hue} 46% 21%)`
-  const mid = `hsl(${second} 40% 34%)`
-  const deep = `hsl(${hue} 52% 14%)`
+  return {
+    variant: ((hash % 4) + 1) as CoverArt['variant'],
+    mid: `hsl(${second} 40% 34%)`,
+    dark: `hsl(${hue} 46% 21%)`,
+    deep: `hsl(${hue} 52% 14%)`,
+    ink: `hsl(${hue} 34% 95%)`,
+    accent: `hsl(${second} 62% 72%)`,
+  }
+}
+
+export function coverArt(seed: string, hue: number): CoverArt {
+  const { variant, mid, dark, deep, ink, accent } = coverPalette(seed, hue)
 
   const background =
     variant === 1
@@ -45,12 +68,7 @@ export function coverArt(seed: string, hue: number): CoverArt {
           ? `linear-gradient(190deg, ${dark} 0%, ${deep} 46%, ${mid} 100%)`
           : `conic-gradient(from 210deg at 76% 18%, ${mid} 0deg, ${dark} 150deg, ${deep} 300deg, ${mid} 360deg)`
 
-  return {
-    background,
-    ink: `hsl(${hue} 34% 95%)`,
-    accent: `hsl(${second} 62% 72%)`,
-    variant,
-  }
+  return { background, ink, accent, variant }
 }
 
 /**

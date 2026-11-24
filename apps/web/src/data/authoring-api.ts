@@ -56,6 +56,8 @@ export interface StoryDraft {
   genreIds?: string[]
   kidsAppropriate?: boolean
   isCompleted?: boolean
+  /** Whether readers may make quote cards from the story. */
+  quoteCards?: boolean
 }
 
 /* Stories ---------------------------------------------------------------- */

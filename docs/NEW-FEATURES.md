@@ -8,7 +8,7 @@ what it is, why it is worth doing, and what it can build on.
 | 1 | Highlights and margin notes | **Landed** (2026-11-20)   |
 | 2 | Beta readers                | **Landed** (2026-11-23)   |
 | 3 | Listen mode                 | **Landed** (2026-11-23)   |
-| 4 | Quote cards                 | Not started (needs 1, now there) |
+| 4 | Quote cards                 | **Landed** (2026-11-24)   |
 | 5 | Public reading lists        | Not started               |
 
 ---
@@ -214,6 +214,50 @@ Share buttons on the story and reader pages. The image can be drawn client-side
 on a `<canvas>`, so no server rendering is needed.
 
 **Open questions:** Whether authors can opt a story out of quote sharing.
+
+**Status: landed (2026-11-24).** How it was built, and how the open question
+was answered:
+
+- **Where:** a highlight's note sheet (tap a highlight, or pick it from the
+  highlights list) has a *Quote card* button. It opens a dialog with the card,
+  a choice of two styles (*Violet*, dark; *Paper*, light, both in Scribe's
+  own colours), and three ways out: *Share* through the system share sheet
+  where the browser can share a file, *Download* as a PNG, and *Copy link*.
+  Desktop Chrome on Linux and Firefox cannot share files, so there the
+  download and the link are what is offered.
+- **The card** (`lib/quote-card.ts`) is a 1080×1080 PNG drawn on a
+  `<canvas>` in the reader's browser: the passage, the opening quote mark,
+  the Scribe lockup, the cover, the story title, "by" the author, the
+  chapter, and the chapter's address. The passage is printed as the reader
+  saw it (emphasis markers, heading and quote prefixes and attachment tokens
+  dropped; each source line its own paragraph) and set as large as the card
+  allows, from 64px down to 34px. A passage too long for that is cut after
+  the last word that fits, with an ellipsis, and the dialog says so.
+- **The cover:** uploaded artwork is drawn cropped to the frame, as
+  `StoryCover` crops it. It is fetched with CORS, because an image from
+  another origin would taint the canvas and the card could not be exported;
+  a store that does not send CORS headers, or a cover that fails to load,
+  gets the generated cover instead (same palette per variant, from
+  `coverPalette` in `lib/cover.ts`), as `StoryCover` falls back. The R2
+  bucket in production needs a CORS rule allowing `GET` from the web app's
+  origin for uploaded covers to appear on cards.
+- **The link** opens the chapter (`/read/:slug/:number`) from its start, for
+  anyone, signed in or not. It does not carry the passage: the card already
+  shows it.
+- **Only shareable work.** A card is offered on a published chapter of a
+  listed story. Not on a draft, a scheduled chapter, or anything a beta
+  reader sees before it is published, since the link would not open for
+  anyone else and the draft is not the reader's to share.
+- **Authors can opt out**, per story: *Allow quote cards* in the story
+  editor (on by default), stored as `content.Story.quoteCards` and returned
+  on every story. Off hides the button for every reader. The card is drawn
+  in the browser from text the reader can already see, so this is a request
+  honoured by the app, not a lock: it cannot stop a screenshot.
+- **The note never goes on the card.** Notes stay private, as feature 1
+  promised; the card shares the author's words and nothing of the reader's.
+- **Not done:** no other sizes (a story-shaped 9:16 card, a 1.91:1 link
+  preview), no "copy image" to the clipboard, and the link does not scroll to
+  the passage.
 
 ---
 

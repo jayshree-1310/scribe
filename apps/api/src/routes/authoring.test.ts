@@ -326,6 +326,41 @@ describe.skipIf(!available)("PATCH /api/author/stories/:id", () => {
 
     expect(status).toBe(400);
   });
+
+  it("allows quote cards until the author turns them off, which readers see", async () => {
+    const story = await newStory({ title: title("Quotable") });
+    expect(story.quoteCards).toBe(true);
+
+    const chapter = await newChapter(story.id, {
+      title: "One",
+      content: "The lamp was lit at dusk.",
+    });
+    await api.request(`/api/author/chapters/${chapter.id}/publish`, {
+      method: "POST",
+      as: authorId,
+    });
+    await api.request(`/api/author/stories/${story.id}/publish`, {
+      method: "POST",
+      as: authorId,
+    });
+
+    const before = await api.request(`/api/stories/${story.slug}`);
+    expect(before.body.story.quoteCards).toBe(true);
+
+    const { body } = await api.request(`/api/author/stories/${story.id}`, {
+      method: "PATCH",
+      as: authorId,
+      body: { quoteCards: false },
+    });
+    expect(body.story.quoteCards).toBe(false);
+
+    // Anonymous, so the public read cache is in play: the write cleared it.
+    const after = await api.request(`/api/stories/${story.slug}`);
+    expect(after.body.story.quoteCards).toBe(false);
+
+    const created = await newStory({ title: title("Unquotable"), quoteCards: false });
+    expect(created.quoteCards).toBe(false);
+  });
 });
 
 describe.skipIf(!available)("DELETE /api/author/stories/:id", () => {

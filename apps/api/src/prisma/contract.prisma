@@ -494,6 +494,11 @@ namespace content {
     ratingAverage   Decimal?
     ratingCount     Int      @default(0)
     kidsAppropriate Boolean  @default(false)
+    /// Whether readers may make a quote card (a shareable image of a passage
+    /// they highlighted) from this story. On unless the author turns it off.
+    /// The card is drawn in the reader's browser, so this hides the action;
+    /// it cannot stop a screenshot.
+    quoteCards      Boolean  @default(true)
 
     // Publication metadata. Optional: works serialised on Scribe have no
     // publisher or ISBN, while catalogued editions do.

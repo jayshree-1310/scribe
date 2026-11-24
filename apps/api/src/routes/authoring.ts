@@ -79,6 +79,7 @@ const createStorySchema = z.object({
   genreIds: genreIdsSchema.optional(),
   kidsAppropriate: z.boolean().optional(),
   isCompleted: z.boolean().optional(),
+  quoteCards: z.boolean().optional(),
 });
 
 // Every field optional, but not *all* of them: an empty PATCH is a form that

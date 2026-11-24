@@ -44,6 +44,7 @@ import type { SavedHighlight } from '../types/highlights'
 import { HighlightNoteSheet } from '../components/reader/HighlightNoteSheet'
 import { HighlightsSheet } from '../components/reader/HighlightsSheet'
 import { BetaFeedbackSheet } from '../components/reader/BetaFeedbackSheet'
+import { QuoteCardDialog } from '../components/reader/QuoteCardDialog'
 import { ListenBar } from '../components/reader/ListenBar'
 import { useNarration } from '../hooks/useNarration'
 import { LISTEN_RATES, firstVisibleBlock, narrationBlocks } from '../lib/narration'
@@ -340,6 +341,18 @@ export function ReaderPage() {
   } | null>(null)
   const [listOpen, setListOpen] = useState(false)
   const [highlighting, setHighlighting] = useState(false)
+  /**
+   * The highlight a quote card is being made from. Kept after the dialog
+   * closes, so the card is still drawn while it animates out.
+   */
+  const [quoteCard, setQuoteCard] = useState<{
+    highlight: SavedHighlight
+    open: boolean
+  } | null>(null)
+  const closeQuoteCard = useCallback(
+    () => setQuoteCard((card) => (card ? { ...card, open: false } : null)),
+    [],
+  )
 
   /** Ask This Book. One sheet at a time: opening it closes the explain sheet. */
   const [asking, setAsking] = useState(false)
@@ -871,6 +884,17 @@ export function ReaderPage() {
   const openHighlight = noteFor
     ? (myHighlights ?? []).find((highlight) => highlight.id === noteFor.id)
     : undefined
+  /**
+   * Quote cards are offered on published chapters of a listed story whose
+   * author allows them. Only there does the card's link open for whoever
+   * sees it -- and a beta reader's draft is not the reader's to share.
+   */
+  const quoteCardsOffered =
+    data?.quoteCards === true &&
+    data.status !== 'draft' &&
+    current !== null &&
+    current !== undefined &&
+    current.publishedAt !== null
   /**
    * The sheets share the bottom of the window. While one of them is open the
    * listen bar steps aside -- the narration carries on -- and comes back when
@@ -1478,7 +1502,21 @@ export function ReaderPage() {
           autoFocus={noteFor.autoFocus}
           onSave={(note) => saveNote(openHighlight.id, note)}
           onRemove={() => removeHighlight(openHighlight.id)}
+          onQuoteCard={
+            quoteCardsOffered
+              ? () => setQuoteCard({ highlight: openHighlight, open: true })
+              : undefined
+          }
           onClose={closeNote}
+        />
+      ) : null}
+
+      {data && quoteCard ? (
+        <QuoteCardDialog
+          open={quoteCard.open}
+          highlight={quoteCard.highlight}
+          story={data}
+          onClose={closeQuoteCard}
         />
       ) : null}
 

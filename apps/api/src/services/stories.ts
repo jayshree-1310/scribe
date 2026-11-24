@@ -50,6 +50,12 @@ export interface Story {
   status: StoryStatus;
   isCompleted: boolean;
   kidsAppropriate: boolean;
+  /**
+   * Whether readers may make quote cards from this story. The author's
+   * choice, on unless they turn it off; the reader hides the action when
+   * false.
+   */
+  quoteCards: boolean;
   viewCount: number;
   likeCount: number;
   ratingAverage: number | null;
@@ -174,6 +180,7 @@ interface StoryRow {
   source: string;
   isCompleted: boolean;
   kidsAppropriate: boolean;
+  quoteCards: boolean;
   viewCount: number;
   likeCount: number;
   ratingAverage: unknown;
@@ -213,6 +220,7 @@ function toStory(
     status: statusOf(row),
     isCompleted: row.isCompleted,
     kidsAppropriate: row.kidsAppropriate,
+    quoteCards: row.quoteCards,
     viewCount: row.viewCount,
     likeCount: row.likeCount,
     // Ratings written since Task 3 win over the denormalised column, which
@@ -251,6 +259,7 @@ function storiesBase() {
     "source",
     "isCompleted",
     "kidsAppropriate",
+    "quoteCards",
     "viewCount",
     "likeCount",
     "ratingAverage",

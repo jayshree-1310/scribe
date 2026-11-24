@@ -38,6 +38,8 @@ export interface Story {
   status: StoryStatus
   isCompleted: boolean
   kidsAppropriate: boolean
+  /** Whether readers may make quote cards from this story; the author's choice. */
+  quoteCards: boolean
   viewCount: number
   likeCount: number
   ratingAverage: number | null

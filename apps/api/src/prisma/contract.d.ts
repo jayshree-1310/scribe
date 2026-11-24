@@ -33,7 +33,7 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'3ad9268a9017de126b9cf31583c92e8d3f02d321e4afba3e1419b5b5e2b8cfe4'>;
+  StorageHashBase<'887bfebcdcd0e8e0fbdf2cdc394b8a165961a6c2a10acee96766c5094dd0c138'>;
 export type ExecutionHash =
   ExecutionHashBase<'9dddf0f2060c166b12802b6cad095535b1fd702a5ea68a7df5005f17e8c169d3'>;
 export type ProfileHash =
@@ -648,6 +648,7 @@ export type FieldOutputTypes = {
       readonly ratingAverage: CodecTypes['pg/numeric@1']['output'] | null;
       readonly ratingCount: CodecTypes['pg/int4@1']['output'];
       readonly kidsAppropriate: CodecTypes['pg/bool@1']['output'];
+      readonly quoteCards: CodecTypes['pg/bool@1']['output'];
       readonly isbn: CodecTypes['pg/text@1']['output'] | null;
       readonly publisher: CodecTypes['pg/text@1']['output'] | null;
       readonly publishedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
@@ -1230,6 +1231,7 @@ export type FieldInputTypes = {
       readonly ratingAverage: CodecTypes['pg/numeric@1']['input'] | null;
       readonly ratingCount: CodecTypes['pg/int4@1']['input'];
       readonly kidsAppropriate: CodecTypes['pg/bool@1']['input'];
+      readonly quoteCards: CodecTypes['pg/bool@1']['input'];
       readonly isbn: CodecTypes['pg/text@1']['input'] | null;
       readonly publisher: CodecTypes['pg/text@1']['input'] | null;
       readonly publishedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
@@ -1809,6 +1811,7 @@ export type StorageColumnTypes = {
       readonly pageCount: CodecTypes['pg/int4@1']['output'] | null;
       readonly publishedAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
       readonly publisher: CodecTypes['pg/text@1']['output'] | null;
+      readonly quoteCards: CodecTypes['pg/bool@1']['output'];
       readonly ratingAverage: CodecTypes['pg/numeric@1']['output'] | null;
       readonly ratingCount: CodecTypes['pg/int4@1']['output'];
       readonly slug: CodecTypes['pg/text@1']['output'];
@@ -2391,6 +2394,7 @@ export type StorageColumnInputTypes = {
       readonly pageCount: CodecTypes['pg/int4@1']['input'] | null;
       readonly publishedAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
       readonly publisher: CodecTypes['pg/text@1']['input'] | null;
+      readonly quoteCards: CodecTypes['pg/bool@1']['input'];
       readonly ratingAverage: CodecTypes['pg/numeric@1']['input'] | null;
       readonly ratingCount: CodecTypes['pg/int4@1']['input'];
       readonly slug: CodecTypes['pg/text@1']['input'];
@@ -5636,6 +5640,15 @@ type ContractBase = Omit<
                   readonly default: {
                     readonly kind: 'literal';
                     readonly value: DefaultLiteralValue<'pg/bool@1', false>;
+                  };
+                };
+                readonly quoteCards: {
+                  readonly nativeType: 'bool';
+                  readonly codecId: 'pg/bool@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/bool@1', true>;
                   };
                 };
                 readonly isbn: {
@@ -10509,6 +10522,10 @@ type ContractBase = Omit<
                 readonly nullable: false;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
               };
+              readonly quoteCards: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+              };
               readonly isbn: {
                 readonly nullable: true;
                 readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
@@ -10759,6 +10776,7 @@ type ContractBase = Omit<
                 readonly ratingAverage: { readonly column: 'ratingAverage' };
                 readonly ratingCount: { readonly column: 'ratingCount' };
                 readonly kidsAppropriate: { readonly column: 'kidsAppropriate' };
+                readonly quoteCards: { readonly column: 'quoteCards' };
                 readonly isbn: { readonly column: 'isbn' };
                 readonly publisher: { readonly column: 'publisher' };
                 readonly publishedAt: { readonly column: 'publishedAt' };

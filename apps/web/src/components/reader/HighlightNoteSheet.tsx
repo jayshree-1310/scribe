@@ -30,6 +30,11 @@ interface HighlightNoteSheetProps {
   autoFocus?: boolean
   onSave: (note: string | null) => Promise<void>
   onRemove: () => Promise<void>
+  /**
+   * Opens the quote card for this passage. Absent where a card is not
+   * offered: a draft, or a story whose author turned quote cards off.
+   */
+  onQuoteCard?: () => void
   onClose: () => void
 }
 
@@ -39,6 +44,7 @@ export function HighlightNoteSheet({
   autoFocus = false,
   onSave,
   onRemove,
+  onQuoteCard,
   onClose,
 }: HighlightNoteSheetProps) {
   const [draft, setDraft] = useState(highlight.note ?? '')
@@ -50,7 +56,8 @@ export function HighlightNoteSheet({
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
+      // A dialog opened over the sheet (the quote card) owns Escape.
+      if (event.key === 'Escape' && !document.querySelector('dialog[open]')) onClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -96,6 +103,16 @@ export function HighlightNoteSheet({
         <div className="explain-sheet__head">
           <Icon name="highlight" className="explain-sheet__mark" size="0.95rem" />
           <h2 className="highlight-sheet__title">Your highlight</h2>
+          {onQuoteCard ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onQuoteCard}
+              startIcon={<Icon name="share" size="0.95em" />}
+            >
+              Quote card
+            </Button>
+          ) : null}
           <Button
             variant="ghost"
             size="sm"

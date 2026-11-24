@@ -1,0 +1,67 @@
+/* ==========================================================================
+   Quote card dialog
+   A dialog, not a reader sheet, so it is drawn in the app's tokens rather
+   than the reading theme's (`--read-*`): it sits in the top layer, above
+   the page's own surface. The card itself is an image with its own colours.
+   ========================================================================== */
+
+.quote-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* Square like the image, so nothing jumps when the preview replaces the
+   placeholder or a new style is drawn. */
+.quote-card__frame {
+  display: grid;
+  place-items: center;
+  width: min(100%, 26rem);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--surface-3);
+  box-shadow: var(--shadow-md);
+}
+
+.quote-card__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.quote-card__loading {
+  display: block;
+}
+
+.quote-card__error {
+  margin: 0;
+  padding: var(--space-5);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.quote-card__retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.quote-card__retry:hover {
+  text-decoration: underline;
+}
+
+.quote-card__note {
+  max-width: 26rem;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  text-align: center;
+}

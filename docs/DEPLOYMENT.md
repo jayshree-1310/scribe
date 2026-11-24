@@ -522,6 +522,12 @@ Make the bucket readable through its own configuration — an R2 public bucket o
 a custom domain, an S3 bucket policy — rather than per-object ACLs, which R2
 does not implement and rejects.
 
+Give the bucket a CORS rule too: allow `GET` from the web app's origin (the
+`CORS_ORIGIN` value). Pages show covers with plain `<img>` tags and do not need
+it, but a quote card draws the cover on a canvas and has to fetch it with
+CORS. Without the rule, cards still work, but they show the generated cover
+instead of the uploaded one (`docs/NEW-FEATURES.md`, feature 4).
+
 `PUBLIC_UPLOAD_BASE_URL` only applies to the local backend and is ignored once
 a bucket is set, since `S3_PUBLIC_BASE_URL` already gives absolute URLs.
 
