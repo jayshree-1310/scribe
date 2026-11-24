@@ -330,25 +330,12 @@
   }
 }
 
-/* The reader's sheet ------------------------------------------------------ */
+/* The reader's panel ------------------------------------------------------ */
 
 /*
- * The explain sheet's shell (`.explain-sheet*` in `reader-ai.css`), taller:
- * an answer plus its passages is more than a definition, and the sheet still
- * has exactly one scroll region.
+ * The reader's side panel (`.explain-sheet*` in `reader-ai.css`), with
+ * exactly one scroll region, the panel's body.
  */
-.explain-sheet.ask-sheet {
-  max-height: min(75vh, 40rem);
-}
-
-.ask-sheet__title {
-  flex: 1;
-  margin: 0;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--read-ink);
-}
-
 .ask-sheet .explain-sheet__body {
   padding-block: var(--space-3) var(--space-1);
 }

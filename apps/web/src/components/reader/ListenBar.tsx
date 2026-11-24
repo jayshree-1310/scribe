@@ -78,8 +78,8 @@ export function ListenBar({
   const started = state.status === 'playing' || state.status === 'paused'
 
   return (
-    <aside className="explain-sheet listen-bar" aria-label="Listen to this chapter">
-      <div className="explain-sheet__inner listen-bar__inner">
+    <aside className="listen-bar" aria-label="Listen to this chapter">
+      <div className="listen-bar__inner">
         <div className="listen-bar__controls">
           <Button
             variant="ghost"

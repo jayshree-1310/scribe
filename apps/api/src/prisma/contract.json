@@ -5911,6 +5911,20 @@
                   "kind": "scalar"
                 }
               },
+              "paragraphStart": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/int4@1",
+                  "kind": "scalar"
+                }
+              },
+              "paragraphText": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
               "parentId": {
                 "nullable": true,
                 "type": {
@@ -6048,6 +6062,12 @@
                 },
                 "id": {
                   "column": "id"
+                },
+                "paragraphStart": {
+                  "column": "paragraphStart"
+                },
+                "paragraphText": {
+                  "column": "paragraphText"
                 },
                 "parentId": {
                   "column": "parentId"
@@ -11972,6 +11992,16 @@
                   "nativeType": "text",
                   "nullable": false
                 },
+                "paragraphStart": {
+                  "codecId": "pg/int4@1",
+                  "nativeType": "int4",
+                  "nullable": true
+                },
+                "paragraphText": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
                 "parentId": {
                   "codecId": "pg/text@1",
                   "nativeType": "text",
@@ -13565,7 +13595,7 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "887bfebcdcd0e8e0fbdf2cdc394b8a165961a6c2a10acee96766c5094dd0c138"
+    "storageHash": "b720b6732b227b2bfa239bdf5cfe49a6a9e3a8e0e5db3f47994dfe9c16f07d18"
   },
   "execution": {
     "executionHash": "9dddf0f2060c166b12802b6cad095535b1fd702a5ea68a7df5005f17e8c169d3",

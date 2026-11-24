@@ -423,6 +423,10 @@ async function notifyCommentParent(commentId: string): Promise<void> {
            left(reply."content", ${EXCERPT_LENGTH}),
            CASE
              WHEN chapter."id" IS NULL THEN '/story/' || story."slug"
+             -- A thread on one paragraph: the link opens that paragraph's
+             -- comments rather than leaving the reader to find it.
+             WHEN parent."paragraphStart" IS NOT NULL THEN
+               '/read/' || story."slug" || '/' || chapter."chapterNumber" || '?comment=' || parent."id"
              ELSE '/read/' || story."slug" || '/' || chapter."chapterNumber"
            END,
            'COMMENT',
@@ -478,6 +482,8 @@ async function notifyStoryAuthor(commentId: string): Promise<void> {
            left(comment."content", ${EXCERPT_LENGTH}),
            CASE
              WHEN chapter."id" IS NULL THEN '/story/' || story."slug"
+             WHEN comment."paragraphStart" IS NOT NULL THEN
+               '/read/' || story."slug" || '/' || chapter."chapterNumber" || '?comment=' || comment."id"
              ELSE '/read/' || story."slug" || '/' || chapter."chapterNumber"
            END,
            'COMMENT',

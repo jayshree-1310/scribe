@@ -389,12 +389,32 @@ async function loadTargets(
       "userId",
       "storyId",
       "chapterId",
+      "parentId",
+      "paragraphStart",
       "hiddenAt",
     )
       .where((row) => row.id.in(unique))
       .all();
 
     if (rows.length === 0) return [];
+
+    /**
+     * Which threads are on one paragraph, so the link opens that paragraph's
+     * comments: a thread says so itself, and a reply through its thread.
+     */
+    const parentIds = [
+      ...new Set(rows.flatMap((row) => (row.parentId === null ? [] : [row.parentId]))),
+    ];
+    const paragraphThreads = new Set(
+      rows.flatMap((row) => (row.paragraphStart === null ? [] : [row.id])),
+    );
+    if (parentIds.length > 0) {
+      const parents = await db.orm.engagement.Comment.select("id")
+        .where((row) => row.id.in(parentIds))
+        .where((row) => row.paragraphStart.isNotNull())
+        .all();
+      for (const parent of parents) paragraphThreads.add(parent.id);
+    }
 
     const stories = await db.orm.content.Story.select("id", "slug")
       .where((row) => row.id.in(rows.map((comment) => comment.storyId)))
@@ -422,6 +442,7 @@ async function loadTargets(
 
       const chapterNumber =
         row.chapterId === null ? undefined : numbers.get(row.chapterId);
+      const thread = row.parentId ?? row.id;
 
       return [
         {
@@ -433,7 +454,9 @@ async function loadTargets(
           href:
             chapterNumber === undefined
               ? `/story/${slug}`
-              : `/read/${slug}/${chapterNumber}`,
+              : paragraphThreads.has(thread)
+                ? `/read/${slug}/${chapterNumber}?comment=${thread}`
+                : `/read/${slug}/${chapterNumber}`,
         },
       ];
     });

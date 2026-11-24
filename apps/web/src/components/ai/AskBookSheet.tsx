@@ -1,7 +1,5 @@
-import { useEffect } from 'react'
 import type { ChapterSummary } from '../../types/stories'
-import { Button } from '../ui/Button'
-import { Icon } from '../ui/Icon'
+import { ReaderPanel } from '../reader/ReaderPanel'
 import { AskBookPanel } from './AskBookPanel'
 import './reader-ai.css'
 import './ask.css'
@@ -9,10 +7,9 @@ import './ask.css'
 /**
  * Ask This Book inside the reader.
  *
- * The explain sheet's shell — docked to the bottom, the reading measure wide,
- * one scroll region — for the reasons that shell exists: a panel floating over
- * the page covers the text, and the reader is in the middle of it. See
- * `ExplainSheet`.
+ * In the reader's side panel (`ReaderPanel`), with one scroll region, for
+ * the reasons that shell exists: a panel floating over the page covers the
+ * text, and the reader is in the middle of it.
  *
  * The range follows the chapter being read rather than the saved position:
  * the reader is *here*, which is the most accurate answer to "how far have
@@ -41,46 +38,25 @@ export function AskBookSheet({
   onCite,
   onClose,
 }: AskBookSheetProps) {
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
   return (
-    <aside
-      className="explain-sheet ask-sheet"
-      role="dialog"
-      aria-label="Ask this book"
+    <ReaderPanel
+      label="Ask this book"
+      icon="sparkle"
+      title="Ask this book"
+      className="ask-sheet"
+      onClose={onClose}
     >
-      <div className="explain-sheet__inner">
-        <div className="explain-sheet__head">
-          <Icon name="sparkle" className="explain-sheet__mark" size="0.95rem" />
-          <h2 className="ask-sheet__title">Ask this book</h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            aria-label="Close"
-            onClick={onClose}
-            startIcon={<Icon name="close" size="1rem" />}
-          />
-        </div>
-
-        <div className="explain-sheet__body">
-          <AskBookPanel
-            storyId={storyId}
-            storySlug={storySlug}
-            chapters={chapters}
-            defaultUpTo={chapterNumber}
-            variant="reader"
-            onCite={onCite}
-            autoFocus
-          />
-        </div>
+      <div className="explain-sheet__body">
+        <AskBookPanel
+          storyId={storyId}
+          storySlug={storySlug}
+          chapters={chapters}
+          defaultUpTo={chapterNumber}
+          variant="reader"
+          onCite={onCite}
+          autoFocus
+        />
       </div>
-    </aside>
+    </ReaderPanel>
   )
 }

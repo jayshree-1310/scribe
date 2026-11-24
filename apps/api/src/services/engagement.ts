@@ -43,6 +43,7 @@ import { HttpError } from "../lib/http-error.js";
 import { moderate } from "./ai/moderation.js";
 import { evaluateBadges } from "./gamification.js";
 import { notify } from "./notifications.js";
+import { paragraphForPost, threadIdsOnParagraph } from "./paragraph-comments.js";
 import { assertNotSuspended } from "./roles.js";
 import { findVisibleChapter, findVisibleStoryId, toIso } from "./stories.js";
 
@@ -356,6 +357,13 @@ export interface CommentQuery {
    * so the thread has already established the scope.
    */
   chapterId?: string | undefined;
+  /**
+   * With `chapterId`, lists the threads on the paragraph that now starts at
+   * this offset in the chapter. Without it, paragraph threads are left out:
+   * the story's and the chapter's lists are for comments on the story and
+   * the chapter, and a paragraph's conversation lives beside its paragraph.
+   */
+  paragraph?: number | undefined;
   page: number;
   limit: number;
 }
@@ -390,6 +398,14 @@ export async function listComments(
 
   if (threads && chapterId !== undefined) {
     collection = collection.where((row) => row.chapterId.eq(chapterId));
+  }
+
+  if (threads && chapterId !== undefined && query.paragraph !== undefined) {
+    const ids = await threadIdsOnParagraph(chapterId, viewerId, query.paragraph);
+    if (ids.length === 0) return emptyPage(query.page, query.limit);
+    collection = collection.where((row) => row.id.in(ids));
+  } else if (threads) {
+    collection = collection.where((row) => row.paragraphStart.isNull());
   }
 
   const totals = await collection.aggregate((aggregate) => ({
@@ -430,6 +446,11 @@ export interface CommentInput {
   content: string;
   /** Attaches the comment to one chapter. Ignored when replying. */
   chapterId?: string | undefined;
+  /**
+   * With `chapterId`, starts a thread on the paragraph beginning at this
+   * offset in the chapter. Ignored when replying: a reply joins its thread.
+   */
+  paragraph?: number | undefined;
   parentId?: string | undefined;
 }
 
@@ -454,6 +475,8 @@ export async function createComment(
   const commentId = await db.transaction(async (tx) => {
     let parentId: string | null = null;
     let chapterId: string | null = null;
+    let paragraphStart: number | null = null;
+    let paragraphText: string | null = null;
 
     if (input.parentId !== undefined) {
       const parent = await tx.orm.engagement.Comment.select(
@@ -493,6 +516,19 @@ export async function createComment(
       }
 
       chapterId = chapter.id;
+
+      if (input.paragraph !== undefined) {
+        // Cut from the stored chapter, never taken from the request, so the
+        // line a thread is anchored on is always the author's.
+        const paragraph = await paragraphForPost(chapter.id, userId, input.paragraph);
+        if (!paragraph) {
+          throw HttpError.badRequest(
+            "That paragraph is not in the chapter any more. Reload and try again.",
+          );
+        }
+        paragraphStart = paragraph.start;
+        paragraphText = paragraph.text;
+      }
     }
 
     const created = await tx.orm.engagement.Comment.select("id").create({
@@ -500,6 +536,8 @@ export async function createComment(
       userId,
       chapterId,
       parentId,
+      paragraphStart,
+      paragraphText,
       content: input.content,
       createdAt: timestamp,
       updatedAt: timestamp,

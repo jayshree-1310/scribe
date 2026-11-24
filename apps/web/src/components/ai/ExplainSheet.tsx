@@ -1,21 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { streamExplain, type ExplainMode } from '../../data/ai-api'
 import { ApiError } from '../../lib/api-client'
-import { Button } from '../ui/Button'
-import { Icon } from '../ui/Icon'
+import { ReaderPanel } from '../reader/ReaderPanel'
 import type { ChapterSelection } from '../../lib/chapter-selection'
 import './reader-ai.css'
 
 /**
  * "What does this mean?" — the reader's counterpart to the writing assistant.
  *
- * A sheet docked to the bottom of the viewport rather than a popover beside
- * the selection, which is the shape every e-reader converged on for lookup and
- * for the same reason: a panel that floats next to a highlight covers the
- * sentence the reader is asking about, and it has to be small to avoid
- * covering more, which leaves a long answer wrapping seven words to a line. A
- * sheet is out of the way by construction and has the full reading width to
- * answer in.
+ * In the reader's side panel (`ReaderPanel`) rather than a popover beside the
+ * selection: a panel that floats next to a highlight covers the sentence the
+ * reader is asking about, and it has to be small to avoid covering more, which
+ * leaves a long answer wrapping seven words to a line. The side panel is out
+ * of the way by construction, and the chapter slides over to keep the passage
+ * beside it.
  *
  * **There is exactly one scroll region**, `.explain-sheet__body`. Nested
  * scrollbars — a capped quote inside a capped answer inside a scrolling page —
@@ -43,20 +41,10 @@ const MODES: ReadonlyArray<{ mode: ExplainMode; label: string; hint: string }> =
 interface ExplainSheetProps {
   chapterId: string
   selection: ChapterSelection
-  /**
-   * Where the selection ends, in page coordinates, so the sheet can scroll it
-   * clear of itself. The sheet does not otherwise position against it.
-   */
-  selectionBottom: number
   onClose: () => void
 }
 
-export function ExplainSheet({
-  chapterId,
-  selection,
-  selectionBottom,
-  onClose,
-}: ExplainSheetProps) {
+export function ExplainSheet({ chapterId, selection, onClose }: ExplainSheetProps) {
   /**
    * Opens on `explain` and runs it immediately, rather than waiting for a
    * second click.
@@ -74,7 +62,6 @@ export function ExplainSheet({
   const [error, setError] = useState<string | null>(null)
 
   const pending = useRef<AbortController | null>(null)
-  const sheetRef = useRef<HTMLElement | null>(null)
   /** The one scroll region; reset to the top when a new mode is asked for. */
   const bodyRef = useRef<HTMLDivElement | null>(null)
 
@@ -150,106 +137,51 @@ export function ExplainSheet({
   // stops generating for a reader who has gone.
   useEffect(() => () => pending.current?.abort(), [])
 
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  /**
-   * Scrolls the highlight clear of the sheet, if the sheet would cover it.
-   *
-   * The reason for choosing a sheet over a popover was that it does not cover
-   * the passage — which is true everywhere except the bottom of the viewport,
-   * where it would. A highlight in the last few lines is exactly the case a
-   * reader hits at the end of a chapter, so it is worth the dozen lines.
-   */
-  useEffect(() => {
-    const sheet = sheetRef.current
-    if (!sheet) return
-
-    const sheetTop = window.scrollY + window.innerHeight - sheet.offsetHeight
-    const margin = 24
-    if (selectionBottom > sheetTop - margin) {
-      window.scrollTo({
-        top: window.scrollY + (selectionBottom - sheetTop) + margin * 2,
-        behavior: 'smooth',
-      })
-    }
-  }, [selectionBottom])
-
   return (
-    <aside
-      ref={sheetRef}
-      className="explain-sheet"
-      role="dialog"
-      aria-label="Explain this passage"
+    <ReaderPanel
+      label="Explain this passage"
+      icon="sparkle"
+      onClose={onClose}
+      head={
+        <div className="explain-sheet__tabs" role="group" aria-label="What to ask">
+          {MODES.map((option) => (
+            <button
+              key={option.mode}
+              type="button"
+              className={`explain-sheet__tab${mode === option.mode ? ' is-on' : ''}`}
+              title={option.hint}
+              disabled={status === 'streaming'}
+              onClick={() => run(option.mode)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      }
     >
-      <div className="explain-sheet__inner">
-        <div className="explain-sheet__head">
-          <Icon name="sparkle" className="explain-sheet__mark" size="0.95rem" />
+      <div className="explain-sheet__body" ref={bodyRef}>
+        {/*
+          Clamped to two lines rather than scrollable: this is here so the
+          reader can see what is being answered, and the full text is on the
+          page beside the panel.
+        */}
+        <blockquote className="explain-sheet__passage">{selection.text}</blockquote>
 
-          <div
-            className="explain-sheet__tabs"
-            role="group"
-            aria-label="What to ask"
-          >
-            {MODES.map((option) => (
-              <button
-                key={option.mode}
-                type="button"
-                className={`explain-sheet__tab${
-                  mode === option.mode ? ' is-on' : ''
-                }`}
-                title={option.hint}
-                disabled={status === 'streaming'}
-                onClick={() => run(option.mode)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            aria-label="Close"
-            onClick={onClose}
-            startIcon={<Icon name="close" size="1rem" />}
-          />
-        </div>
-
-        <div className="explain-sheet__body" ref={bodyRef}>
-          {/*
-            Clamped to two lines rather than scrollable: this is here so the
-            reader can see what is being answered, and the full text is on the
-            page behind the sheet.
-          */}
-          <blockquote className="explain-sheet__passage">
-            {selection.text}
-          </blockquote>
-
-          {status === 'streaming' && answer.length === 0 ? (
-            <p className="explain-sheet__hint">Thinking…</p>
-          ) : null}
-
-          {error ? <p className="explain-sheet__error">{error}</p> : null}
-
-          {answer.length > 0 ? (
-            <p className="explain-sheet__answer">{answer}</p>
-          ) : null}
-        </div>
-
-        {status === 'done' ? (
-          <p className="explain-sheet__note">
-            AI-generated. It has read only this passage and the text around it,
-            not the rest of the story.
-          </p>
+        {status === 'streaming' && answer.length === 0 ? (
+          <p className="explain-sheet__hint">Thinking…</p>
         ) : null}
+
+        {error ? <p className="explain-sheet__error">{error}</p> : null}
+
+        {answer.length > 0 ? <p className="explain-sheet__answer">{answer}</p> : null}
       </div>
-    </aside>
+
+      {status === 'done' ? (
+        <p className="explain-sheet__note">
+          AI-generated. It has read only this passage and the text around it,
+          not the rest of the story.
+        </p>
+      ) : null}
+    </ReaderPanel>
   )
 }

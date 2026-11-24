@@ -10,6 +10,7 @@ what it is, why it is worth doing, and what it can build on.
 | 3 | Listen mode                 | **Landed** (2026-11-23)   |
 | 4 | Quote cards                 | **Landed** (2026-11-24)   |
 | 5 | Public reading lists        | Not started               |
+| 6 | Paragraph comments          | **Landed** (2026-11-24)   |
 
 ---
 
@@ -53,7 +54,8 @@ were answered:
 - **Reader UI:** selecting text offers *Highlight* beside *Ask about this*; the
   passage is painted with the CSS Custom Highlight API (no DOM is inserted
   into the prose), notes add a dotted underline and a margin marker on wide
-  screens, and a tap on a highlight opens its note in a docked sheet. A top-bar
+  screens, and a tap on a highlight opens its note in a docked sheet (since
+  feature 6, the left side panel). A top-bar
   button lists the story's highlights by chapter and jumps to one.
   `lib/highlight-ranges.ts`, `components/reader/`.
 - **Author view:** the story view of Author analytics shows "Most highlighted
@@ -165,7 +167,7 @@ was built:
   do not work on Chrome for Linux and Android. Every utterance carries a
   generation number, so the late `end`/`error` of a cancelled one is ignored.
 - **Player:** the headphones button in the reader's top bar opens a bar
-  docked where the other sheets dock (`components/reader/ListenBar.tsx`):
+  docked to the bottom of the window (`components/reader/ListenBar.tsx`):
   play/pause, previous/next paragraph, speed (0.75×–2×) and voice. It starts
   from the first block on screen, not the top of the chapter. Speed and voice
   are reader preferences (`listenRate`, `listenVoice`) saved in this browser;
@@ -278,3 +280,70 @@ any other user text.
 
 **Open questions:** Whether lists can include catalogue books as well as Scribe
 stories. A cap on list length.
+
+---
+
+## 6. Paragraph comments
+
+**What:** Public comments on one paragraph of a chapter. Hovering a paragraph
+shows a comment marker beside it; a paragraph that already has comments always
+shows its count. Clicking it opens the paragraph's conversation in a side panel
+on the left.
+
+**Why:** Chapter comments are about the whole chapter. Readers react to a
+line, a twist or an image, and want to answer each other there. Unlike a
+highlight's note, these are public.
+
+**Builds on:** Story comments (`engagement.Comment`), so a paragraph comment
+has replies, likes, reports, moderation, notifications and rate limits from the
+start; and the anchoring highlights use (feature 1), so comments follow their
+paragraph through an author's edits.
+
+**Status: landed (2026-11-24).** How it was built:
+
+- **A paragraph comment is a comment** with `paragraphStart` and
+  `paragraphText` set: where the paragraph's line began in the chapter and the
+  line itself, cut from the stored chapter by the server. Only threads carry
+  them; a reply belongs to its thread.
+- **A paragraph is one rendered line of prose**: a paragraph, list item or
+  block quote; headings and attachments take no comments. The rules live twice,
+  in `services/paragraph-comments.ts` (to check what is posted) and
+  `lib/chapter-paragraphs.ts` (to find the blocks on the page), and a test on
+  each side pins them to the same fixture, which the web test checks against
+  the real renderer. The reader pairs blocks with lines by order, and shows no
+  markers on a chapter where the two disagree.
+- **Re-anchored on every read**: the stored line at its old place, else the
+  identical line nearest it, else the most similar line (60% of words shared,
+  five words or more), so a typo fix does not orphan a conversation. A thread
+  whose paragraph was rewritten is kept and not shown, and comes back if the
+  paragraph does.
+- **Kept apart from the chapter's comments.** The comments at the end of a
+  chapter and on the story page's Comments tab are about the chapter and the
+  story; paragraph threads are left out of both lists and their counts.
+- **API:** `GET /api/chapters/:id/paragraph-comments` returns the count per
+  paragraph (threads plus replies), and `?comment=<id>` also says which
+  paragraph that comment is on. `GET /api/stories/:id/comments?chapterId=&paragraph=`
+  lists one paragraph's threads; `POST` the same route with `paragraph` starts
+  one. Public reads, like the other comment lists; closed on chapters that are
+  not public yet, beta reads included.
+- **Links open the paragraph.** The author's and the replied-to reader's
+  notifications, and the moderation queue, link to
+  `/read/:slug/:n?comment=<thread>`, which opens that paragraph's panel and
+  scrolls to it.
+- **On screen:** with a mouse, a marker in the left margin on hover, or always
+  with a count. On a touch screen every paragraph shows its marker, in a slim
+  right gutter. Selecting text also offers *Comment*, which is the keyboard's
+  way in.
+
+**All reader panels moved to the left side panel** at the same time. Explain,
+Ask This Book, the highlights list, a highlight's note and beta feedback were
+bottom sheets; they now open in one shell (`components/reader/ReaderPanel.tsx`),
+one at a time. On a wide screen it docks below the top bar and the chapter
+slides right so the passage stays beside it; below 64rem it covers the page
+and leads with a Back button. The listen player stays docked at the bottom and
+steps aside while a panel is open. The panels now take the reading theme's
+tokens, so their fields match a Sepia page when the app is in Night mode.
+
+**Not done:** no paragraph comments on headings, no notification to the other
+commenters on a paragraph, and no "most discussed paragraphs" for authors
+(their analytics count paragraph comments with the rest).

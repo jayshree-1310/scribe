@@ -15,6 +15,7 @@ import type {
   Comment,
   CommentPage,
   LikeSummary,
+  ParagraphCommentSummary,
   RatingSummary,
 } from '../types/engagement'
 
@@ -25,6 +26,11 @@ export interface CommentFilters {
   parentId?: string
   /** Narrows to one chapter's threads, for the reader's side panel. */
   chapterId?: string
+  /**
+   * With `chapterId`, the threads on the paragraph starting at this offset.
+   * Without it, paragraph threads are left out of the list.
+   */
+  paragraph?: number
   page?: number
   limit?: number
 }
@@ -40,6 +46,8 @@ export async function listComments(
       query: {
         parentId: filters.parentId,
         chapterId: filters.chapterId,
+        paragraph:
+          filters.paragraph === undefined ? undefined : String(filters.paragraph),
         page: filters.page === undefined ? undefined : String(filters.page),
         limit: filters.limit === undefined ? undefined : String(filters.limit),
       },
@@ -51,6 +59,8 @@ export interface CommentInput {
   content: string
   /** Attaches the comment to one chapter. Ignored by the API when replying. */
   chapterId?: string
+  /** With `chapterId`, starts a thread on the paragraph beginning here. */
+  paragraph?: number
   /** Replies are one level deep: replying to a reply lands on its thread. */
   parentId?: string
 }
@@ -64,6 +74,20 @@ export async function postComment(
     { method: 'POST', body: input },
   )
   return comment
+}
+
+/**
+ * How many comments each paragraph of a chapter has. `focus` names a comment
+ * a link pointed at, and the answer says which paragraph it is on.
+ */
+export async function getParagraphComments(
+  chapterId: string,
+  focus?: string,
+): Promise<ParagraphCommentSummary> {
+  return request<ParagraphCommentSummary>(
+    `/chapters/${encodeURIComponent(chapterId)}/paragraph-comments`,
+    { query: { comment: focus } },
+  )
 }
 
 /** The comment's own author only; anyone else gets a 403. */

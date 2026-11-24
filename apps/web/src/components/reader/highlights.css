@@ -116,15 +116,7 @@
   }
 }
 
-/* Sheets ------------------------------------------------------------------ */
-
-.highlight-sheet__title {
-  flex: 1;
-  margin: 0;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--read-ink);
-}
+/* Panels ------------------------------------------------------------------ */
 
 .highlight-sheet__form {
   display: flex;
@@ -136,11 +128,6 @@
   display: flex;
   justify-content: space-between;
   gap: var(--space-2);
-}
-
-/* The list wants more room than one answer does. */
-.highlights-sheet {
-  max-height: min(60vh, 32rem);
 }
 
 .highlights-sheet .explain-sheet__body {

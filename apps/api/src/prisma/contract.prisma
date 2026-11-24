@@ -678,6 +678,21 @@ namespace engagement {
     parentId  String?
     content   String
 
+    /// For a thread on one paragraph of its chapter rather than on the
+    /// chapter as a whole: where that paragraph's line began in
+    /// `chapter.content` when the thread was started, and the line itself.
+    /// Null on a story or chapter comment, and on every reply -- a reply
+    /// belongs to its thread. Paragraph threads are kept out of the story's
+    /// and the chapter's comment lists; the reader shows them beside their
+    /// paragraph instead.
+    ///
+    /// Anchored on the text, as `Highlight` is, because authors edit chapters
+    /// after readers have commented: every read re-finds the line, and a
+    /// thread whose paragraph was rewritten past recognition is kept but not
+    /// shown. See `services/paragraph-comments.ts`.
+    paragraphStart Int?
+    paragraphText  String?
+
     /// When a moderator hid this, or null for a visible comment. The row
     /// stays so a wrong call is one update away from being reversed, and
     /// every public read path filters on it -- see `services/moderation.ts`

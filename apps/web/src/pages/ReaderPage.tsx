@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react'
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAsync } from '../hooks/useAsync'
+import { useMediaQuery } from '../hooks/useMediaQuery'
 import { useReadingProgress } from '../hooks/useReadingProgress'
 import { cn } from '../lib/cn'
 import { useToast } from '../lib/toast'
@@ -25,6 +34,7 @@ import { readingMinutes, storyAuthorName } from '../types/stories'
 import {
   COMMENT_MAX_LENGTH,
   commentUserName,
+  type ParagraphCommentSummary,
 } from '../types/engagement'
 import { LikeButton } from '../components/engagement/LikeButton'
 import { SignInPrompt } from '../components/engagement/SignInPrompt'
@@ -44,12 +54,15 @@ import type { SavedHighlight } from '../types/highlights'
 import { HighlightNoteSheet } from '../components/reader/HighlightNoteSheet'
 import { HighlightsSheet } from '../components/reader/HighlightsSheet'
 import { BetaFeedbackSheet } from '../components/reader/BetaFeedbackSheet'
+import { ParagraphCommentsPanel } from '../components/reader/ParagraphCommentsPanel'
+import { paragraphBlocks } from '../lib/chapter-paragraphs'
 import { QuoteCardDialog } from '../components/reader/QuoteCardDialog'
 import { ListenBar } from '../components/reader/ListenBar'
 import { useNarration } from '../hooks/useNarration'
 import { LISTEN_RATES, firstVisibleBlock, narrationBlocks } from '../lib/narration'
 import { prefersReducedMotion } from '../lib/motion'
 import '../components/reader/beta.css'
+import '../components/reader/paragraph-comments.css'
 import { Button, ButtonLink } from '../components/ui/Button'
 import { Icon } from '../components/ui/Icon'
 import { Avatar } from '../components/ui/Avatar'
@@ -87,6 +100,42 @@ function inReadingViewport(element: HTMLElement): boolean {
   const rect = element.getBoundingClientRect()
   return rect.bottom > top && rect.top < bottom
 }
+
+/**
+ * The reader's side panel, if one is open (see `ReaderPanel`). One at a time:
+ * opening one replaces whichever was open.
+ *
+ * The panels about something in one chapter -- a passage, a highlight, a
+ * paragraph -- carry that chapter's id, and are not drawn once the reader has
+ * turned the page. Ask This Book and the highlights list are about the story,
+ * and stay open across chapters.
+ */
+type ReaderPanelState =
+  | { kind: 'explain'; chapterId: string; selection: ChapterSelection }
+  | { kind: 'ask' }
+  | { kind: 'highlights' }
+  | { kind: 'note'; chapterId: string; id: string; autoFocus: boolean }
+  | { kind: 'feedback'; chapterId: string; passage: ChapterSelection | null }
+  | { kind: 'paragraph'; chapterId: string; start: number }
+
+/** One paragraph's marker: where it goes, and what the panel quotes. */
+interface ParagraphMark {
+  start: number
+  end: number
+  /** Relative to the prose wrapper. */
+  top: number
+  bottom: number
+  /** The height of the paragraph's first line, to centre the marker on. */
+  line: number
+  text: string
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** How far past the prose the pointer still counts as over a paragraph: its marker. */
+const MARKER_REACH_PX = 72
+
+const NO_MARKS: ParagraphMark[] = []
 
 export function ReaderPage() {
   const { slug = '', chapter: chapterParam = '1' } = useParams()
@@ -164,6 +213,16 @@ export function ReaderPage() {
   const listenNext = (location.state as { listen?: unknown } | null)?.listen === true
 
   /**
+   * A paragraph comment a link points at (`?comment=`), from a notification
+   * or the moderation queue. In the URL rather than router state because it
+   * arrives from outside the page; its paragraph is opened once the counts
+   * say where it is.
+   */
+  const [searchParams] = useSearchParams()
+  const linkedParam = searchParams.get('comment')
+  const linkedComment = linkedParam !== null && UUID.test(linkedParam) ? linkedParam : null
+
+  /**
    * Restores the reader's place when a chapter opens and saves it as they
    * scroll, off the same `progress` fraction the bar above is drawn from. A
    * citation is somewhere more specific to be, so it wins over the restore.
@@ -172,7 +231,8 @@ export function ReaderPage() {
     storyId,
     chapter: betaUnpublished ? null : (chapter.data ?? null),
     scrollFraction: progress,
-    skipRestore: citedQuote !== null || jumpTo !== null || listenNext,
+    skipRestore:
+      citedQuote !== null || jumpTo !== null || listenNext || linkedComment !== null,
   })
 
   const [focusMode, setFocusMode] = useState(false)
@@ -331,16 +391,15 @@ export function ReaderPage() {
 
   const [selection, setSelection] = useState<ChapterSelection | null>(null)
   const [anchorPoint, setAnchorPoint] = useState({ top: 0, left: 0 })
-  const [explaining, setExplaining] = useState(false)
-
-  /** The open note sheet: whose, and where its passage ends on the page. */
-  const [noteFor, setNoteFor] = useState<{
-    id: string
-    autoFocus: boolean
-    passageBottom: number
-  } | null>(null)
-  const [listOpen, setListOpen] = useState(false)
   const [highlighting, setHighlighting] = useState(false)
+
+  const [panel, setPanel] = useState<ReaderPanelState | null>(null)
+  const closePanel = useCallback(() => setPanel(null), [])
+  /** Opens a panel in place of whichever was open, and drops the selection's offer. */
+  const openPanel = useCallback((next: ReaderPanelState) => {
+    setSelection(null)
+    setPanel(next)
+  }, [])
   /**
    * The highlight a quote card is being made from. Kept after the dialog
    * closes, so the card is still drawn while it animates out.
@@ -354,28 +413,23 @@ export function ReaderPage() {
     [],
   )
 
-  /** Ask This Book. One sheet at a time: opening it closes the explain sheet. */
-  const [asking, setAsking] = useState(false)
-  const closeAsk = useCallback(() => setAsking(false), [])
-
-  /** Beta feedback, and the passage it is about when opened from a selection. */
-  const [feedbackOpen, setFeedbackOpen] = useState(false)
-  const [feedbackPassage, setFeedbackPassage] = useState<ChapterSelection | null>(null)
-  const closeFeedback = useCallback(() => {
-    setFeedbackOpen(false)
-    setFeedbackPassage(null)
-  }, [])
-  const clearFeedbackPassage = useCallback(() => setFeedbackPassage(null), [])
-  const openFeedback = useCallback((passage: ChapterSelection | null) => {
-    setExplaining(false)
-    setSelection(null)
-    setAsking(false)
-    setNoteFor(null)
-    setListOpen(false)
-    if (passage) window.getSelection()?.removeAllRanges()
-    setFeedbackPassage(passage)
-    setFeedbackOpen(true)
-  }, [])
+  /**
+   * Beta feedback, about the passage selected when it was opened from a
+   * selection. The passage is cleared from the panel rather than the panel
+   * closed, so the reader can write about the whole chapter instead.
+   */
+  const chapterKey = chapter.data?.id ?? ''
+  const openFeedback = useCallback(
+    (passage: ChapterSelection | null) => {
+      if (passage) window.getSelection()?.removeAllRanges()
+      openPanel({ kind: 'feedback', chapterId: chapterKey, passage })
+    },
+    [openPanel, chapterKey],
+  )
+  const clearFeedbackPassage = useCallback(
+    () => setPanel((open) => (open?.kind === 'feedback' ? { ...open, passage: null } : open)),
+    [],
+  )
 
   /**
    * Offers the trigger when the reader has highlighted something explicable.
@@ -397,7 +451,7 @@ export function ReaderPage() {
     const found = readSelection(proseRef.current, chapterData.content)
     if (!found) {
       setSelection(null)
-      setExplaining(false)
+      setPanel((open) => (open?.kind === 'explain' ? null : open))
       return
     }
 
@@ -416,8 +470,8 @@ export function ReaderPage() {
     }
 
     setSelection(found)
-    setExplaining(false)
-    setNoteFor(null)
+    // A new selection is a new question: the answer to the last one goes.
+    setPanel((open) => (open?.kind === 'explain' || open?.kind === 'note' ? null : open))
   }, [chapter.data, signedIn])
 
   /* Highlights and margin notes --------------------------------------- */
@@ -534,14 +588,15 @@ export function ReaderPage() {
   }, [chapterHighlights, chapterData])
 
   /** The highlight whose note is open is drawn stronger, so it is clear which. */
+  const noteId = panel?.kind === 'note' ? panel.id : null
   useEffect(() => {
-    const range = noteFor ? rangesRef.current.get(noteFor.id) : undefined
+    const range = noteId ? rangesRef.current.get(noteId) : undefined
     paintHighlights('scribe-highlight-focus', range ? [range] : [])
     return () => paintHighlights('scribe-highlight-focus', [])
-  }, [noteFor, chapterHighlights])
+  }, [noteId, chapterHighlights])
 
   /**
-   * Opens a highlight's note sheet. From the list or a margin marker, the
+   * Opens a highlight's note panel. From the list or a margin marker, the
    * page first scrolls the passage to the upper part of the window; from a
    * tap on the passage, the reader is already looking at it.
    */
@@ -555,18 +610,15 @@ export function ReaderPage() {
         window.scrollTo({ top: window.scrollY + rect.top - window.innerHeight * 0.3 })
       }
 
-      setExplaining(false)
-      setSelection(null)
-      setAsking(false)
-      setListOpen(false)
-      setFeedbackOpen(false)
-      setNoteFor({
+      if (!chapterData) return
+      openPanel({
+        kind: 'note',
+        chapterId: chapterData.id,
         id,
         autoFocus: options.autoFocus ?? false,
-        passageBottom: range.getBoundingClientRect().bottom + window.scrollY,
       })
     },
-    [],
+    [chapterData, openPanel],
   )
 
   /**
@@ -619,12 +671,7 @@ export function ReaderPage() {
         created,
       ])
       window.getSelection()?.removeAllRanges()
-      setSelection(null)
-      setNoteFor({
-        id: created.id,
-        autoFocus: true,
-        passageBottom: anchorPoint.top - 8,
-      })
+      openPanel({ kind: 'note', chapterId: chapterData.id, id: created.id, autoFocus: true })
     } catch (cause) {
       showToast({
         tone: 'error',
@@ -634,7 +681,7 @@ export function ReaderPage() {
     } finally {
       setHighlighting(false)
     }
-  }, [selection, chapterData, editHighlights, anchorPoint.top, showToast])
+  }, [selection, chapterData, editHighlights, openPanel, showToast])
 
   const saveNote = useCallback(
     async (id: string, note: string | null) => {
@@ -642,7 +689,7 @@ export function ReaderPage() {
       editHighlights((items) =>
         items.map((item) => (item.id === updated.id ? updated : item)),
       )
-      setNoteFor(null)
+      setPanel((open) => (open?.kind === 'note' && open.id === id ? null : open))
     },
     [editHighlights],
   )
@@ -651,7 +698,8 @@ export function ReaderPage() {
     async (id: string) => {
       await highlightsApi.deleteHighlight(id)
       editHighlights((items) => items.filter((item) => item.id !== id))
-      setNoteFor(null)
+      // Only the note's own panel: one removed from the list leaves the list open.
+      setPanel((open) => (open?.kind === 'note' && open.id === id ? null : open))
       showToast({ message: 'Highlight removed.' })
     },
     [editHighlights, showToast],
@@ -660,11 +708,11 @@ export function ReaderPage() {
   /** From the list: here if it is in this chapter, else to its chapter. */
   const pickHighlight = useCallback(
     (highlight: SavedHighlight) => {
-      setListOpen(false)
       if (highlight.chapterId === chapterData?.id) {
         openNote(highlight.id, { scroll: true })
         return
       }
+      setPanel(null)
       navigate(`/read/${slug}/${highlight.chapterNumber}`, {
         state: { highlight: highlight.id },
       })
@@ -672,8 +720,207 @@ export function ReaderPage() {
     [chapterData?.id, openNote, navigate, slug],
   )
 
-  const closeNote = useCallback(() => setNoteFor(null), [])
-  const closeList = useCallback(() => setListOpen(false), [])
+  /* Paragraph comments ------------------------------------------------ */
+
+  /**
+   * Public comments on one paragraph, opened from a marker beside it. Closed
+   * where the chapter's own comments are: on a chapter that is not public.
+   * Readable signed out, like the chapter's comments; writing needs an
+   * account, which the panel asks for.
+   */
+  const paragraphCommentsOn = chapterData !== null && chapterData !== undefined && !betaUnpublished
+  const commentChapterId = paragraphCommentsOn ? chapterData.id : null
+
+  /**
+   * How many comments each paragraph has, and where a linked one is. Only
+   * the markers' counts hang on it: while it loads, or if it fails, every
+   * paragraph reads as uncommented and can still be opened and written on.
+   */
+  const paragraphFetch = useAsync(
+    () =>
+      commentChapterId
+        ? engagement.getParagraphComments(commentChapterId, linkedComment ?? undefined)
+        : Promise.resolve(null),
+    [commentChapterId, linkedComment],
+  )
+  const paragraphSummary = paragraphFetch.status === 'ready' ? paragraphFetch.data : null
+
+  /**
+   * Comments posted or deleted on this page, over the fetched counts rather
+   * than refetching them, so a marker never blinks out. Tied to the fetch
+   * they were made against, so a fresh one -- another chapter, or this one
+   * again later -- is never counted twice.
+   */
+  const [countEdits, setCountEdits] = useState<{
+    base: ParagraphCommentSummary
+    delta: Record<number, number>
+  } | null>(null)
+  const paragraphCounts = useMemo(() => {
+    const counts = new Map<number, number>()
+    const base = paragraphSummary
+    for (const item of base?.paragraphs ?? []) counts.set(item.start, item.count)
+    if (base && countEdits?.base === base) {
+      for (const [start, delta] of Object.entries(countEdits.delta)) {
+        const at = Number(start)
+        counts.set(at, Math.max(0, (counts.get(at) ?? 0) + delta))
+      }
+    }
+    return counts
+  }, [paragraphSummary, countEdits])
+  const changeParagraphCount = useCallback(
+    (start: number, delta: number) => {
+      const base = paragraphSummary
+      if (!base) return
+      setCountEdits((current) => {
+        const edits = current?.base === base ? current.delta : {}
+        return { base, delta: { ...edits, [start]: (edits[start] ?? 0) + delta } }
+      })
+    },
+    [paragraphSummary],
+  )
+
+  /**
+   * Each commentable paragraph's place on the page, for its marker; and its
+   * element, for marking the one whose comments are open. Re-measured
+   * whenever the prose changes size -- a font or width preference, the panel
+   * sliding the text over, an image loading above -- as the margin notes are.
+   * Keyed by chapter, so the last chapter's markers are never drawn over this
+   * one while it is measured.
+   */
+  const paragraphElementsRef = useRef(new Map<number, HTMLElement>())
+  const [paragraphMarks, setParagraphMarks] = useState<{
+    chapterId: string
+    items: ParagraphMark[]
+  } | null>(null)
+
+  useEffect(() => {
+    const prose = proseRef.current
+    const wrap = proseWrapRef.current
+    if (!prose || !wrap || !chapterData || !paragraphCommentsOn) return
+
+    const blocks = paragraphBlocks(prose, chapterData.content)
+    paragraphElementsRef.current = new Map(blocks.map((block) => [block.start, block.element]))
+
+    const place = () => {
+      const origin = wrap.getBoundingClientRect().top
+      setParagraphMarks({
+        chapterId: chapterData.id,
+        items: blocks.map((block) => {
+          const rect = block.element.getBoundingClientRect()
+          const line = Number.parseFloat(getComputedStyle(block.element).lineHeight)
+          return {
+            start: block.start,
+            end: block.end,
+            top: rect.top - origin,
+            bottom: rect.bottom - origin,
+            line: Number.isFinite(line) ? line : 0,
+            text: block.element.textContent ?? '',
+          }
+        }),
+      })
+    }
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place)
+    observer?.observe(wrap)
+
+    return () => {
+      observer?.disconnect()
+      paragraphElementsRef.current = new Map()
+    }
+  }, [chapterData, paragraphCommentsOn])
+
+  const marks =
+    paragraphCommentsOn && paragraphMarks?.chapterId === chapterData.id
+      ? paragraphMarks.items
+      : NO_MARKS
+
+  /**
+   * With a mouse, a paragraph nobody has commented on shows its marker only
+   * while the pointer is over it, or over the margin beside it. On a touch
+   * screen there is no hover, so every marker shows.
+   */
+  const canHover = useMediaQuery('(hover: hover) and (pointer: fine)')
+  const [hoveredParagraph, setHoveredParagraph] = useState<number | null>(null)
+  const onReaderPointer = useCallback(
+    (event: React.MouseEvent) => {
+      const wrap = proseWrapRef.current
+      if (!wrap || !canHover || marks.length === 0) return
+      const rect = wrap.getBoundingClientRect()
+      const inside =
+        event.clientX >= rect.left - MARKER_REACH_PX && event.clientX <= rect.right + 24
+      const y = event.clientY - rect.top
+      // Half a paragraph gap either side, so the marker does not flicker
+      // off between two paragraphs.
+      const over = inside
+        ? marks.find((mark) => y >= mark.top - 12 && y < mark.bottom + 12)
+        : undefined
+      setHoveredParagraph(over?.start ?? null)
+    },
+    [canHover, marks],
+  )
+
+  const openParagraph =
+    panel?.kind === 'paragraph' && panel.chapterId === chapterData?.id ? panel.start : null
+
+  const openParagraphComments = useCallback(
+    (start: number) => {
+      if (!chapterData) return
+      window.getSelection()?.removeAllRanges()
+      openPanel({ kind: 'paragraph', chapterId: chapterData.id, start })
+    },
+    [chapterData, openPanel],
+  )
+
+  /** The paragraph whose comments are open is marked, so it is clear which. */
+  useEffect(() => {
+    if (openParagraph === null) return
+    const element = paragraphElementsRef.current.get(openParagraph)
+    if (!element) return
+    element.classList.add('is-commenting')
+    return () => element.classList.remove('is-commenting')
+  }, [openParagraph, marks])
+
+  /**
+   * Arriving by a link to a paragraph comment: open its paragraph and bring
+   * it into view, once per navigation. Keyed on when the markers were placed
+   * for this chapter rather than on the markers themselves, which are
+   * re-measured as the text slides over and would cancel the scroll.
+   */
+  const marksPlacedFor = paragraphMarks?.chapterId ?? null
+  const linkedFor = useRef<string | null>(null)
+  useEffect(() => {
+    const focus = paragraphSummary?.focus ?? null
+    if (focus === null || !chapterData || marksPlacedFor !== chapterData.id) return
+    if (linkedFor.current === location.key) return
+    const element = paragraphElementsRef.current.get(focus)
+    if (!element) return
+
+    let settle: ReturnType<typeof setTimeout> | undefined
+    const frame = requestAnimationFrame(() => {
+      linkedFor.current = location.key
+      openPanel({ kind: 'paragraph', chapterId: chapterData.id, start: focus })
+      // After the text has slid over, which moves the paragraph.
+      settle = setTimeout(() => element.scrollIntoView({ block: 'center' }), 260)
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+      clearTimeout(settle)
+    }
+  }, [paragraphSummary, marksPlacedFor, chapterData, location.key, openPanel])
+
+  /**
+   * The top bar's height, for the side panel to dock below it. Measured
+   * because the bar's height follows its contents.
+   */
+  const barRef = useRef<HTMLElement | null>(null)
+  const [barHeight, setBarHeight] = useState(0)
+  useEffect(() => {
+    const bar = barRef.current
+    if (!bar || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => setBarHeight(bar.offsetHeight))
+    observer.observe(bar)
+    return () => observer.disconnect()
+  }, [])
 
   /* Listen mode ------------------------------------------------------- */
 
@@ -881,9 +1128,10 @@ export function ReaderPage() {
   const isOwnStory = data !== null && data !== undefined && session?.user.id === data.author.id
   const current = chapter.data
   const hue = data?.genres[0]?.hue ?? 268
-  const openHighlight = noteFor
-    ? (myHighlights ?? []).find((highlight) => highlight.id === noteFor.id)
-    : undefined
+  const openHighlight =
+    panel?.kind === 'note' && panel.chapterId === current?.id
+      ? (myHighlights ?? []).find((highlight) => highlight.id === panel.id)
+      : undefined
   /**
    * Quote cards are offered on published chapters of a listed story whose
    * author allows them. Only there does the card's link open for whoever
@@ -895,17 +1143,124 @@ export function ReaderPage() {
     current !== null &&
     current !== undefined &&
     current.publishedAt !== null
+
+  /** The open panel, drawn; null when there is none, or it is not for this chapter. */
+  let panelNode: ReactNode = null
+  if (panel && current && storyId) {
+    switch (panel.kind) {
+      case 'explain':
+        if (panel.chapterId === current.id) {
+          panelNode = (
+            <ExplainSheet
+              key={`${panel.selection.start}:${panel.selection.end}`}
+              chapterId={current.id}
+              selection={panel.selection}
+              onClose={closePanel}
+            />
+          )
+        }
+        break
+      case 'ask':
+        // Not keyed by chapter: turning the page with the panel open keeps
+        // the conversation, and its range follows the chapter being read
+        // until the reader picks one themselves.
+        panelNode = (
+          <AskBookSheet
+            storyId={storyId}
+            storySlug={slug}
+            chapters={chapters.data ?? []}
+            chapterNumber={current.number}
+            onCite={() => {
+              setPanel(null)
+              window.scrollTo({ top: 0 })
+            }}
+            onClose={closePanel}
+          />
+        )
+        break
+      case 'highlights':
+        panelNode = (
+          <HighlightsSheet
+            highlights={myHighlights}
+            status={fetchedHighlights.status}
+            error={fetchedHighlights.error}
+            currentChapterId={current.id}
+            onPick={pickHighlight}
+            onRemove={(highlight) => {
+              void removeHighlight(highlight.id).catch(() =>
+                showToast({ tone: 'error', message: 'That highlight could not be removed.' }),
+              )
+            }}
+            onRetry={fetchedHighlights.reload}
+            onClose={closePanel}
+          />
+        )
+        break
+      case 'note':
+        if (openHighlight) {
+          panelNode = (
+            <HighlightNoteSheet
+              key={openHighlight.id}
+              highlight={openHighlight}
+              autoFocus={panel.autoFocus}
+              onSave={(note) => saveNote(openHighlight.id, note)}
+              onRemove={() => removeHighlight(openHighlight.id)}
+              onQuoteCard={
+                quoteCardsOffered
+                  ? () => setQuoteCard({ highlight: openHighlight, open: true })
+                  : undefined
+              }
+              onClose={closePanel}
+            />
+          )
+        }
+        break
+      case 'feedback':
+        if (betaRead) {
+          panelNode = (
+            <BetaFeedbackSheet
+              key={current.id}
+              storyId={storyId}
+              chapterId={current.id}
+              chapterNumber={current.number}
+              authorName={data ? storyAuthorName(data.author) : 'the author'}
+              passage={panel.chapterId === current.id ? panel.passage : null}
+              onClearPassage={clearFeedbackPassage}
+              onClose={closePanel}
+            />
+          )
+        }
+        break
+      case 'paragraph': {
+        const start = panel.start
+        if (panel.chapterId === current.id && paragraphCommentsOn) {
+          panelNode = (
+            <ParagraphCommentsPanel
+              key={`${current.id}:${start}`}
+              storyId={storyId}
+              chapterId={current.id}
+              paragraph={start}
+              quote={marks.find((mark) => mark.start === start)?.text ?? ''}
+              signedIn={signedIn}
+              viewerId={session?.user.id ?? null}
+              onCountChange={(delta) => changeParagraphCount(start, delta)}
+              onClose={closePanel}
+            />
+          )
+        }
+        break
+      }
+    }
+  }
   /**
-   * The sheets share the bottom of the window. While one of them is open the
-   * listen bar steps aside -- the narration carries on -- and comes back when
-   * it closes.
+   * The listen bar keeps the bottom of the window; while a panel is open it
+   * steps aside -- the narration carries on -- and comes back when it closes.
    */
-  const otherSheetOpen =
-    asking ||
-    listOpen ||
-    feedbackOpen ||
-    (noteFor !== null && openHighlight !== undefined) ||
-    (selection !== null && explaining)
+  const otherSheetOpen = panelNode !== null
+  /** The paragraph a selection starts in, for the selection menu's Comment. */
+  const selectionParagraph = selection
+    ? marks.find((mark) => selection.start >= mark.start && selection.start <= mark.end)
+    : undefined
   const chosenVoice = narration.voices.some(
     (voice) => voice.voiceURI === preferences.listenVoice,
   )
@@ -914,7 +1269,13 @@ export function ReaderPage() {
 
   return (
     <div
-      className={cn('reader', focusMode && 'is-focus', listening && 'is-listening')}
+      className={cn(
+        'reader',
+        focusMode && 'is-focus',
+        listening && 'is-listening',
+        otherSheetOpen && 'has-panel',
+      )}
+      style={{ '--reader-bar-height': `${barHeight}px` } as CSSProperties}
       data-reading-theme={surface}
       data-font-size={preferences.fontSize}
       data-width={preferences.width}
@@ -932,7 +1293,7 @@ export function ReaderPage() {
       </div>
 
       {/* Top bar -------------------------------------------------------- */}
-      <header className="reader__bar">
+      <header className="reader__bar" ref={barRef}>
         <Link className="reader__back" to={`/story/${slug}`}>
           <Icon name="chevron-left" size="1.1rem" />
           <span className="reader__back-text">
@@ -964,15 +1325,10 @@ export function ReaderPage() {
               iconOnly
               aria-label="Your highlights"
               title="Your highlights"
-              aria-pressed={listOpen}
-              onClick={() => {
-                setExplaining(false)
-                setSelection(null)
-                setAsking(false)
-                setNoteFor(null)
-                setFeedbackOpen(false)
-                setListOpen((open) => !open)
-              }}
+              aria-pressed={panel?.kind === 'highlights'}
+              onClick={() =>
+                panel?.kind === 'highlights' ? closePanel() : openPanel({ kind: 'highlights' })
+              }
               startIcon={<Icon name="highlight" size="1.1rem" />}
             />
           ) : null}
@@ -988,15 +1344,10 @@ export function ReaderPage() {
               iconOnly
               aria-label="Ask this book"
               title="Ask this book"
-              aria-pressed={asking}
-              onClick={() => {
-                setExplaining(false)
-                setSelection(null)
-                setNoteFor(null)
-                setListOpen(false)
-                setFeedbackOpen(false)
-                setAsking((open) => !open)
-              }}
+              aria-pressed={panel?.kind === 'ask'}
+              onClick={() =>
+                panel?.kind === 'ask' ? closePanel() : openPanel({ kind: 'ask' })
+              }
               startIcon={<Icon name="sparkle" size="1.1rem" />}
             />
           ) : null}
@@ -1007,8 +1358,8 @@ export function ReaderPage() {
               iconOnly
               aria-label="Feedback for the author"
               title="Feedback for the author"
-              aria-pressed={feedbackOpen}
-              onClick={() => (feedbackOpen ? closeFeedback() : openFeedback(null))}
+              aria-pressed={panel?.kind === 'feedback'}
+              onClick={() => (panel?.kind === 'feedback' ? closePanel() : openFeedback(null))}
               startIcon={<Icon name="pen" size="1.1rem" />}
             />
           ) : null}
@@ -1022,17 +1373,13 @@ export function ReaderPage() {
               aria-pressed={listening}
               disabled={!current}
               onClick={() => {
-                // Hidden behind another sheet counts as closed: bring it back.
+                // Stepped aside for a panel counts as closed: bring it back.
                 if (listening && !otherSheetOpen) {
                   closeListen()
                   return
                 }
-                setExplaining(false)
+                setPanel(null)
                 setSelection(null)
-                setAsking(false)
-                setNoteFor(null)
-                setListOpen(false)
-                setFeedbackOpen(false)
                 setListening(true)
                 if (!narrating) startNarration('visible')
               }}
@@ -1060,7 +1407,12 @@ export function ReaderPage() {
       </header>
 
       {/* Chapter -------------------------------------------------------- */}
-      <main className="reader__main" id="main">
+      <main
+        className="reader__main"
+        id="main"
+        onMouseMove={onReaderPointer}
+        onMouseLeave={() => setHoveredParagraph(null)}
+      >
         {chapter.status === 'loading' || !current ? (
           <div className="reader__article">
             <Skeleton width="40%" height="1rem" />
@@ -1126,7 +1478,10 @@ export function ReaderPage() {
               headings and emphasis an author formats with are the ones their
               readers get. See `lib/chapter-markdown.tsx`.
             */}
-            <div className="reader__prose-wrap" ref={proseWrapRef}>
+            <div
+              className={cn('reader__prose-wrap', paragraphCommentsOn && 'has-paragraph-comments')}
+              ref={proseWrapRef}
+            >
               <div
                 className="reader__prose"
                 ref={proseRef}
@@ -1154,6 +1509,48 @@ export function ReaderPage() {
                   <Icon name="comment" size="0.85rem" />
                 </button>
               ))}
+
+              {/*
+                Beside each paragraph, the way into its public comments, and
+                how many there are. Outside the prose element for the reason
+                the margin notes are.
+              */}
+              {marks.map((mark) => {
+                const count = paragraphCounts.get(mark.start) ?? 0
+                const active = openParagraph === mark.start
+                if (canHover && count === 0 && !active && hoveredParagraph !== mark.start) {
+                  return null
+                }
+                const label =
+                  count === 0
+                    ? 'Comment on this paragraph'
+                    : `${count === 1 ? '1 comment' : `${formatCount(count)} comments`} on this paragraph`
+
+                return (
+                  <button
+                    key={mark.start}
+                    type="button"
+                    className={cn(
+                      'reader__paragraph-comment',
+                      count > 0 && 'has-comments',
+                      active && 'is-active',
+                    )}
+                    style={
+                      {
+                        top: `${mark.top}px`,
+                        ...(mark.line > 0 ? { '--pc-line': `${mark.line}px` } : {}),
+                      } as CSSProperties
+                    }
+                    aria-label={label}
+                    title={label}
+                    aria-expanded={active}
+                    onClick={() => (active ? closePanel() : openParagraphComments(mark.start))}
+                  >
+                    <Icon name="comment" size="0.9rem" />
+                    {count > 0 ? <span>{formatCount(count)}</span> : null}
+                  </button>
+                )
+              })}
             </div>
 
             {/*
@@ -1162,7 +1559,7 @@ export function ReaderPage() {
               keep their place, by accident — and opening a panel on every
               highlight would be a model call nobody asked for.
             */}
-            {selection && !explaining ? (
+            {selection ? (
               <div
                 className="selection-menu"
                 role="group"
@@ -1198,33 +1595,32 @@ export function ReaderPage() {
                     Feedback
                   </button>
                 ) : null}
+                {/*
+                  The keyboard's way to a paragraph's comments, and the
+                  only way to one nobody has commented on yet: with a mouse,
+                  that paragraph's marker shows only on hover.
+                */}
+                {selectionParagraph ? (
+                  <button
+                    type="button"
+                    className="selection-menu__action"
+                    onClick={() => openParagraphComments(selectionParagraph.start)}
+                  >
+                    <Icon name="comment" size="0.9em" />
+                    Comment
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="selection-menu__action"
-                  onClick={() => {
-                    setAsking(false)
-                    setListOpen(false)
-                    setNoteFor(null)
-                    setFeedbackOpen(false)
-                    setExplaining(true)
-                  }}
+                  onClick={() =>
+                    openPanel({ kind: 'explain', chapterId: current.id, selection })
+                  }
                 >
                   <Icon name="sparkle" size="0.9em" />
                   Ask about this
                 </button>
               </div>
-            ) : null}
-
-            {selection && explaining ? (
-              <ExplainSheet
-                chapterId={current.id}
-                selection={selection}
-                selectionBottom={anchorPoint.top}
-                onClose={() => {
-                  setExplaining(false)
-                  setSelection(null)
-                }}
-              />
             ) : null}
 
             {/* Chapter footer ------------------------------------------- */}
@@ -1439,38 +1835,8 @@ export function ReaderPage() {
         )}
       </main>
 
-      {/*
-        Not keyed by chapter: turning the page with the sheet open keeps the
-        conversation, and its range follows the chapter being read until the
-        reader picks one themselves.
-      */}
-      {asking && storyId && current ? (
-        <AskBookSheet
-          storyId={storyId}
-          storySlug={slug}
-          chapters={chapters.data ?? []}
-          chapterNumber={current.number}
-          onCite={() => {
-            setAsking(false)
-            window.scrollTo({ top: 0 })
-          }}
-          onClose={closeAsk}
-        />
-      ) : null}
-
-      {/* Beta feedback -------------------------------------------------- */}
-      {feedbackOpen && betaRead && storyId && current ? (
-        <BetaFeedbackSheet
-          key={current.id}
-          storyId={storyId}
-          chapterId={current.id}
-          chapterNumber={current.number}
-          authorName={data ? storyAuthorName(data.author) : 'the author'}
-          passage={feedbackPassage}
-          onClearPassage={clearFeedbackPassage}
-          onClose={closeFeedback}
-        />
-      ) : null}
+      {/* The side panel ------------------------------------------------- */}
+      {panelNode}
 
       {/* Listen mode ---------------------------------------------------- */}
       {listening && narrator && !otherSheetOpen ? (
@@ -1493,47 +1859,13 @@ export function ReaderPage() {
         />
       ) : null}
 
-      {/* Highlights ----------------------------------------------------- */}
-      {noteFor && openHighlight ? (
-        <HighlightNoteSheet
-          key={openHighlight.id}
-          highlight={openHighlight}
-          passageBottom={noteFor.passageBottom}
-          autoFocus={noteFor.autoFocus}
-          onSave={(note) => saveNote(openHighlight.id, note)}
-          onRemove={() => removeHighlight(openHighlight.id)}
-          onQuoteCard={
-            quoteCardsOffered
-              ? () => setQuoteCard({ highlight: openHighlight, open: true })
-              : undefined
-          }
-          onClose={closeNote}
-        />
-      ) : null}
-
+      {/* Quote card ----------------------------------------------------- */}
       {data && quoteCard ? (
         <QuoteCardDialog
           open={quoteCard.open}
           highlight={quoteCard.highlight}
           story={data}
           onClose={closeQuoteCard}
-        />
-      ) : null}
-
-      {listOpen ? (
-        <HighlightsSheet
-          highlights={myHighlights}
-          status={fetchedHighlights.status}
-          error={fetchedHighlights.error}
-          currentChapterId={current?.id ?? null}
-          onPick={pickHighlight}
-          onRemove={(highlight) => {
-            void removeHighlight(highlight.id).catch(() =>
-              showToast({ tone: 'error', message: 'That highlight could not be removed.' }),
-            )
-          }}
-          onRetry={fetchedHighlights.reload}
-          onClose={closeList}
         />
       ) : null}
 

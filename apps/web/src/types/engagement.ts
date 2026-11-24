@@ -34,6 +34,22 @@ export interface Comment {
   user: CommentUser
 }
 
+/** One paragraph's comment count, keyed by where the paragraph starts in its chapter. */
+export interface ParagraphCommentCount {
+  start: number
+  /** Threads and their replies. */
+  count: number
+}
+
+/**
+ * Mirrors `ParagraphCommentSummary` in `services/paragraph-comments.ts`:
+ * the chapter's commented paragraphs, and where a linked comment sits.
+ */
+export interface ParagraphCommentSummary {
+  paragraphs: ParagraphCommentCount[]
+  focus: number | null
+}
+
 export interface CommentPage {
   items: Comment[]
   page: number

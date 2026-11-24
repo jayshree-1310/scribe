@@ -49,6 +49,7 @@ import {
   unlikeComment,
   upsertRating,
 } from "../services/engagement.js";
+import { paragraphCommentSummary } from "../services/paragraph-comments.js";
 
 const router = Router();
 
@@ -128,12 +129,30 @@ const likeTargetParamSchema = z.object({
   id: z.uuid("That could not be found."),
 });
 
-const listQuerySchema = z.object({
-  /** A thread id lists that thread's replies; absent lists the threads. */
-  parentId: z.uuid().optional(),
-  chapterId: z.uuid().optional(),
-  page: pageSchema,
-  limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(20),
+/** A paragraph is named by where it starts in its chapter, so it needs the chapter. */
+const PARAGRAPH_NEEDS_CHAPTER = {
+  message: "A paragraph is named within a chapter: send chapterId with it.",
+  path: ["paragraph"],
+};
+
+const listQuerySchema = z
+  .object({
+    /** A thread id lists that thread's replies; absent lists the threads. */
+    parentId: z.uuid().optional(),
+    chapterId: z.uuid().optional(),
+    /** With `chapterId`, the threads on one paragraph of it. */
+    paragraph: z.coerce.number().int().min(0).optional(),
+    page: pageSchema,
+    limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(20),
+  })
+  .refine(
+    (query) => query.paragraph === undefined || query.chapterId !== undefined,
+    PARAGRAPH_NEEDS_CHAPTER,
+  );
+
+const paragraphSummaryQuerySchema = z.object({
+  /** A comment a link points at, whose paragraph the answer locates. */
+  comment: z.uuid().optional(),
 });
 
 /**
@@ -147,8 +166,13 @@ const commentBodySchema = z.object({
     .min(1, "Write something before posting.")
     .max(COMMENT_MAX_LENGTH, "That comment is too long."),
   chapterId: z.uuid().optional(),
+  /** With `chapterId`, starts a thread on the paragraph beginning here. */
+  paragraph: z.number().int().min(0).optional(),
   parentId: z.uuid().optional(),
-});
+}).refine(
+  (body) => body.paragraph === undefined || body.chapterId !== undefined || body.parentId !== undefined,
+  PARAGRAPH_NEEDS_CHAPTER,
+);
 
 /**
  * Whole scores only. A half-star average is something the API computes; it is
@@ -175,6 +199,7 @@ router.get("/stories/:storyId/comments", async (req, res, next) => {
       {
         parentId: query.parentId,
         chapterId: query.chapterId,
+        paragraph: query.paragraph,
         page: query.page,
         limit: query.limit,
       },
@@ -209,10 +234,27 @@ router.post("/stories/:storyId/comments", requireUser, async (req, res, next) =>
     const comment = await createComment(userId, storyId, {
       content: body.content,
       chapterId: body.chapterId,
+      paragraph: body.paragraph,
       parentId: body.parentId,
     }).catch(attempt.refundAndRethrow);
 
     res.status(201).json({ comment });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * How many comments each paragraph of a chapter has, for the reader's
+ * paragraph markers. Public, like the comment lists: a chapter anyone may
+ * read has paragraph comments anyone may read.
+ */
+router.get("/chapters/:id/paragraph-comments", async (req, res, next) => {
+  try {
+    const { id } = parseOrThrow(likeTargetParamSchema, req.params);
+    const query = parseOrThrow(paragraphSummaryQuerySchema, req.query);
+
+    res.json(await paragraphCommentSummary(id, getUserId(req), query.comment));
   } catch (error) {
     next(error);
   }

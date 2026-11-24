@@ -1,0 +1,86 @@
+[
+  {
+    "id": "column.engagement.comment.paragraphStart",
+    "label": "Add column \"paragraphStart\" to \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "column",
+        "name": "paragraphStart",
+        "table": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"paragraphStart\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "engagement",
+          "comment",
+          "paragraphStart"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"paragraphStart\"",
+        "sql": "ALTER TABLE \"engagement\".\"comment\" ADD COLUMN \"paragraphStart\" int4"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"paragraphStart\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "engagement",
+          "comment",
+          "paragraphStart"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "column.engagement.comment.paragraphText",
+    "label": "Add column \"paragraphText\" to \"comment\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "engagement",
+        "objectType": "column",
+        "name": "paragraphText",
+        "table": "comment"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"paragraphText\" is missing",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "engagement",
+          "comment",
+          "paragraphText"
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"paragraphText\"",
+        "sql": "ALTER TABLE \"engagement\".\"comment\" ADD COLUMN \"paragraphText\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"paragraphText\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"information_schema\".\"columns\" WHERE (\"table_schema\" = $1 AND \"table_name\" = $2 AND \"column_name\" = $3)) AS \"result\"",
+        "params": [
+          "engagement",
+          "comment",
+          "paragraphText"
+        ]
+      }
+    ]
+  }
+]

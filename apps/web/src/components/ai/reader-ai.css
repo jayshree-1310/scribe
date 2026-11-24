@@ -112,39 +112,47 @@
   color: var(--read-ink-soft);
 }
 
-/* Explain ---------------------------------------------------------------- */
+/* The reader's side panel ------------------------------------------------- */
 
 /*
- * A sheet docked to the bottom of the viewport.
+ * The shell every reader panel opens in (`components/reader/ReaderPanel.tsx`):
+ * Explain, Ask This Book, the highlights list, a highlight's note, beta
+ * feedback and a paragraph's comments. Named for Explain, its first user.
  *
- * It replaced a popover anchored beside the selection, for two reasons that
- * are worth not rediscovering: a floating panel covers the sentence it is
- * explaining, and staying small enough not to cover more left long answers
+ * Docked to the left, from under the top bar to the foot of the window, and
+ * the chapter slides right to make room (`.reader.has-panel` in `reader.css`)
+ * so the passage stays beside it. These were bottom sheets once; a sheet
+ * covers the last lines in the window, which is usually where the reader's
+ * eye is. On a narrow screen there is no room beside the text, so the panel
+ * takes the whole page, and its header leads with Back.
+ *
+ * The panel replaced a popover anchored beside the selection before that, for
+ * two reasons worth not rediscovering: a floating panel covers the sentence it
+ * is about, and staying small enough not to cover more left long answers
  * wrapping at seven words a line.
  */
 .explain-sheet {
   position: fixed;
-  inset-inline: 0;
-  inset-block-end: 0;
+  inset-block: var(--reader-bar-height, 0px) 0;
+  inset-inline-start: 0;
   z-index: 45;
 
   display: flex;
   flex-direction: column;
-  /* Modest on purpose: a sheet taller than this starts being the page. */
-  max-height: min(45vh, 24rem);
+  width: var(--reader-panel-width);
 
   background-color: var(--read-bg);
-  border-block-start: 1px solid var(--read-rule);
-  box-shadow: 0 -0.5rem 2rem rgb(0 0 0 / 22%);
+  border-inline-end: 1px solid var(--read-rule);
+  box-shadow: 0.5rem 0 2rem rgb(0 0 0 / 12%);
   font-family: var(--font-sans);
   color: var(--read-ink);
 
-  animation: explain-rise var(--dur) var(--ease);
+  animation: reader-panel-in var(--dur) var(--ease);
 }
 
-@keyframes explain-rise {
+@keyframes reader-panel-in {
   from {
-    transform: translateY(100%);
+    transform: translateX(-100%);
   }
 }
 
@@ -154,16 +162,52 @@
   }
 }
 
-/* The sheet spans the window; its contents align with the prose column. */
 .explain-sheet__inner {
   display: flex;
   flex-direction: column;
+  flex: 1;
   /* `min-height: 0` is what lets the body below actually scroll. */
   min-height: 0;
-  width: 100%;
-  max-width: var(--read-measure);
-  margin-inline: auto;
   padding: var(--space-3) var(--space-5) var(--space-4);
+}
+
+/* Back on a narrow screen, where the panel is the whole page; the close
+   mark beside a docked one. */
+.explain-sheet__back {
+  display: none;
+}
+
+.explain-sheet__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--read-ink);
+}
+
+@media (max-width: 63.99rem) {
+  .explain-sheet {
+    inset: 0;
+    z-index: 60;
+    width: auto;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .explain-sheet__inner {
+    padding-inline: var(--space-4);
+  }
+
+  .explain-sheet .explain-sheet__back {
+    display: inline-flex;
+    margin-inline-start: calc(-1 * var(--space-2));
+  }
+
+  .explain-sheet__mark,
+  .explain-sheet .explain-sheet__close {
+    display: none;
+  }
 }
 
 .explain-sheet__head {

@@ -25,6 +25,8 @@
   --read-rule: rgba(34, 32, 28, 0.14);
   --read-measure: 38rem;
   --read-size: 1.1875rem;
+  /* The side panel's width when it docks beside the text; see `reader-ai.css`. */
+  --reader-panel-width: 24rem;
 
   /*
    * The reader's own accent, independent of the app theme for the reason the
@@ -178,6 +180,19 @@
 
 .reader__main {
   padding: var(--space-10) var(--space-5) var(--space-16);
+  transition: padding-inline-start var(--dur) var(--ease);
+}
+
+/*
+ * The chapter slides right while a side panel is open beside it, so the
+ * passage the panel is about stays in view. Below this width the panel covers
+ * the page instead (`reader-ai.css`), and nothing here moves. The extra room
+ * past the panel is for the paragraph markers in the left margin.
+ */
+@media (min-width: 64rem) {
+  .reader.has-panel .reader__main {
+    padding-inline-start: calc(var(--reader-panel-width) + var(--space-12));
+  }
 }
 
 .reader__article {
@@ -313,7 +328,8 @@
  */
 .reader__footer,
 .reader__comments,
-.listen-bar {
+.listen-bar,
+.explain-sheet {
   --bg: var(--read-bg);
   --bg-tint: color-mix(in srgb, var(--read-ink) 10%, var(--read-bg));
   --surface: var(--read-bg);
