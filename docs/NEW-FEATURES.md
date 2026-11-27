@@ -55,7 +55,7 @@ were answered:
   passage is painted with the CSS Custom Highlight API (no DOM is inserted
   into the prose), notes add a dotted underline and a margin marker on wide
   screens, and a tap on a highlight opens its note in a docked sheet (since
-  feature 6, the left side panel). A top-bar
+  feature 6, the side panel on the right). A top-bar
   button lists the story's highlights by chapter and jumps to one.
   `lib/highlight-ranges.ts`, `components/reader/`.
 - **Author view:** the story view of Author analytics shows "Most highlighted
@@ -288,7 +288,7 @@ stories. A cap on list length.
 **What:** Public comments on one paragraph of a chapter. Hovering a paragraph
 shows a comment marker beside it; a paragraph that already has comments always
 shows its count. Clicking it opens the paragraph's conversation in a side panel
-on the left.
+on the right.
 
 **Why:** Chapter comments are about the whole chapter. Readers react to a
 line, a twist or an image, and want to answer each other there. Unlike a
@@ -335,12 +335,12 @@ paragraph through an author's edits.
   right gutter. Selecting text also offers *Comment*, which is the keyboard's
   way in.
 
-**All reader panels moved to the left side panel** at the same time. Explain,
+**All reader panels moved to a side panel** at the same time. Explain,
 Ask This Book, the highlights list, a highlight's note and beta feedback were
 bottom sheets; they now open in one shell (`components/reader/ReaderPanel.tsx`),
-one at a time. On a wide screen it docks below the top bar and the chapter
-slides right so the passage stays beside it; below 64rem it covers the page
-and leads with a Back button. The listen player stays docked at the bottom and
+one at a time. On a wide screen it docks on the right, below the top bar, and
+the chapter slides left so the passage stays beside it; below 64rem it covers
+the page and leads with a Back button. The listen player stays docked at the bottom and
 steps aside while a panel is open. The panels now take the reading theme's
 tokens, so their fields match a Sepia page when the app is in Night mode.
 

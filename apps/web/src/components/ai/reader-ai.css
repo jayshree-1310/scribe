@@ -119,8 +119,8 @@
  * Explain, Ask This Book, the highlights list, a highlight's note, beta
  * feedback and a paragraph's comments. Named for Explain, its first user.
  *
- * Docked to the left, from under the top bar to the foot of the window, and
- * the chapter slides right to make room (`.reader.has-panel` in `reader.css`)
+ * Docked to the right, from under the top bar to the foot of the window, and
+ * the chapter slides left to make room (`.reader.has-panel` in `reader.css`)
  * so the passage stays beside it. These were bottom sheets once; a sheet
  * covers the last lines in the window, which is usually where the reader's
  * eye is. On a narrow screen there is no room beside the text, so the panel
@@ -134,7 +134,7 @@
 .explain-sheet {
   position: fixed;
   inset-block: var(--reader-bar-height, 0px) 0;
-  inset-inline-start: 0;
+  inset-inline-end: 0;
   z-index: 45;
 
   display: flex;
@@ -142,8 +142,8 @@
   width: var(--reader-panel-width);
 
   background-color: var(--read-bg);
-  border-inline-end: 1px solid var(--read-rule);
-  box-shadow: 0.5rem 0 2rem rgb(0 0 0 / 12%);
+  border-inline-start: 1px solid var(--read-rule);
+  box-shadow: -0.5rem 0 2rem rgb(0 0 0 / 12%);
   font-family: var(--font-sans);
   color: var(--read-ink);
 
@@ -152,7 +152,7 @@
 
 @keyframes reader-panel-in {
   from {
-    transform: translateX(-100%);
+    transform: translateX(100%);
   }
 }
 

@@ -9,8 +9,8 @@ import '../ai/reader-ai.css'
  * Explain, Ask This Book, the highlights list, a highlight's note, beta
  * feedback and a paragraph's comments.
  *
- * Docked to the left of the window on a wide screen, below the reader's top
- * bar, and the chapter slides right to make room (`.reader.has-panel` in
+ * Docked to the right of the window on a wide screen, below the reader's top
+ * bar, and the chapter slides left to make room (`.reader.has-panel` in
  * `reader.css`), so the passage a panel is about stays in view beside it.
  * These used to be bottom sheets; a sheet covers the lines at the foot of the
  * window, which is where a reader's eye usually is.

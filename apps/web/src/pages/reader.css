@@ -180,18 +180,21 @@
 
 .reader__main {
   padding: var(--space-10) var(--space-5) var(--space-16);
-  transition: padding-inline-start var(--dur) var(--ease);
+  transition:
+    padding-inline-start var(--dur) var(--ease),
+    padding-inline-end var(--dur) var(--ease);
 }
 
 /*
- * The chapter slides right while a side panel is open beside it, so the
- * passage the panel is about stays in view. Below this width the panel covers
- * the page instead (`reader-ai.css`), and nothing here moves. The extra room
- * past the panel is for the paragraph markers in the left margin.
+ * The chapter slides left while a side panel is open beside it on the right,
+ * so the passage the panel is about stays in view. Below this width the panel
+ * covers the page instead (`reader-ai.css`), and nothing here moves. The room
+ * kept on each side of the text is for the markers in its margins: a
+ * paragraph's comments on the left, a highlight's note on the right.
  */
 @media (min-width: 64rem) {
   .reader.has-panel .reader__main {
-    padding-inline-start: calc(var(--reader-panel-width) + var(--space-12));
+    padding-inline: var(--space-12) calc(var(--reader-panel-width) + var(--space-12));
   }
 }
 

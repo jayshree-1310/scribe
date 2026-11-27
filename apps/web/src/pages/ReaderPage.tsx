@@ -458,13 +458,19 @@ export function ReaderPage() {
     const range = window.getSelection()?.getRangeAt(0)
     const rect = range?.getBoundingClientRect()
     if (rect) {
+      // A side panel docked on the right is the edge of the page while it is
+      // open. One covering a narrow screen starts at 0, and leaves no text to
+      // select anyway.
+      const rightEdge =
+        document.querySelector('.reader .explain-sheet')?.getBoundingClientRect().left ||
+        window.innerWidth
       setAnchorPoint({
         top: rect.bottom + window.scrollY + 8,
-        // Clamped so a selection near the right edge does not open a panel
-        // half off the screen.
+        // Clamped so a selection near the right edge does not open a menu
+        // half off the screen, or half under the side panel.
         left: Math.max(
           12,
-          Math.min(rect.left + window.scrollX, window.innerWidth - 360),
+          Math.min(rect.left + window.scrollX, rightEdge - 360),
         ),
       })
     }
