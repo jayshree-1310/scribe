@@ -186,6 +186,11 @@ const NOTIFICATION_SETTINGS: {
     description: 'When an author you follow lists something new.',
   },
   {
+    type: 'LIST_ADDITION',
+    label: 'Reading lists you follow',
+    description: 'When a story is added to a list you follow.',
+  },
+  {
     type: 'NEW_CHAPTER',
     label: 'New chapters',
     description: 'When a story in your library or that you have started gets a new chapter.',

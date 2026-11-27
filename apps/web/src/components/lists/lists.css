@@ -1,0 +1,291 @@
+/* Reading lists ------------------------------------------------------------
+   Layered on the channel card and channel hero (`story.css`, `pages.css`)
+   and the shelf item (`books.css`); only what a list adds lives here. */
+
+/* Card: a fan of the newest covers above the channel card's text. */
+
+.list-card__covers {
+  display: flex;
+  align-items: flex-end;
+  min-height: 5rem;
+  padding-inline-start: var(--space-1);
+}
+
+.list-card__cover {
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--dur) var(--ease-out);
+}
+
+.list-card__cover + .list-card__cover {
+  margin-inline-start: calc(var(--space-4) * -1);
+}
+
+.list-card__cover:nth-child(2) { transform: translateY(-2px); }
+.list-card__cover:nth-child(3) { transform: translateY(-4px); }
+.list-card__cover:nth-child(4) { transform: translateY(-6px); }
+
+@media (hover: hover) {
+  .list-card:hover .list-card__cover + .list-card__cover {
+    margin-inline-start: calc(var(--space-2) * -1);
+  }
+}
+
+.list-card__empty {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  aspect-ratio: 2 / 3;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+}
+
+/* Hero ------------------------------------------------------------------- */
+
+.list-hero__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+/* Entries ---------------------------------------------------------------- */
+
+.list-entries {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list-entry {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-5);
+  align-items: start;
+  padding-block: var(--space-5);
+  border-bottom: 1px solid var(--border);
+}
+
+.list-entry__cover {
+  display: block;
+  transition: transform var(--dur) var(--ease-out);
+}
+
+.list-entry__cover:hover {
+  transform: translateY(-2px);
+}
+
+.list-entry__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.list-entry__note {
+  max-width: 62ch;
+  margin: var(--space-2) 0 0;
+  padding-inline-start: var(--space-4);
+  border-inline-start: 2px solid var(--brand-border);
+  color: var(--text-secondary);
+  font-family: var(--font-reading);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+  white-space: pre-line;
+}
+
+.list-entry__note-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 62ch;
+  margin-top: var(--space-2);
+}
+
+.list-entry__note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.list-entry__actions {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.list-entries__foot {
+  margin-top: var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 40rem) {
+  .list-entry {
+    grid-template-columns: auto 1fr;
+    gap: var(--space-4);
+  }
+
+  .list-entry__actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+
+  .list-entry .cover--sm {
+    --cover-w: 4rem;
+  }
+}
+
+/* Discover rail ---------------------------------------------------------- */
+
+.list-rail__link {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.list-rail__link:hover {
+  text-decoration: underline;
+}
+
+/* Browse pager ----------------------------------------------------------- */
+
+.list-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+}
+
+.list-pager__label {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* Add to list dialog ----------------------------------------------------- */
+
+.add-to-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: min(22rem, 45vh);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.add-to-list__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background-color: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease);
+}
+
+.add-to-list__row:hover:not(:disabled) {
+  background-color: var(--surface-hover);
+}
+
+.add-to-list__row:focus-visible {
+  outline: 2px solid var(--brand-ring);
+  outline-offset: 2px;
+}
+
+.add-to-list__row:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.add-to-list__row.is-on {
+  border-color: var(--brand-border);
+  background-color: var(--brand-soft);
+}
+
+.add-to-list__check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+}
+
+.add-to-list__row.is-on .add-to-list__check {
+  border-color: var(--brand);
+  background-color: var(--brand);
+  color: var(--brand-fg);
+}
+
+.add-to-list__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.add-to-list__name {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-to-list__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.add-to-list__empty {
+  color: var(--text-secondary);
+}
+
+.add-to-list__new {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.add-to-list__new > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-to-list__foot {
+  margin-top: var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.add-to-list__foot a {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+@media (max-width: 30rem) {
+  .add-to-list__new {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

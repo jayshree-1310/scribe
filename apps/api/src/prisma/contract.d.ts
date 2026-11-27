@@ -33,9 +33,9 @@ import type {
 } from '@prisma/orm-postgres/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'b720b6732b227b2bfa239bdf5cfe49a6a9e3a8e0e5db3f47994dfe9c16f07d18'>;
+  StorageHashBase<'4e78549436ca508aadd25c219590f1319eb21efef8b109ce2a8dcf696ab8fc73'>;
 export type ExecutionHash =
-  ExecutionHashBase<'9dddf0f2060c166b12802b6cad095535b1fd702a5ea68a7df5005f17e8c169d3'>;
+  ExecutionHashBase<'ffafbe3d81d58e97699bc97bebe635f595dae50bcfd81e69f743275c2341080a'>;
 export type ProfileHash =
   ProfileHashBase<'3916f444a8a17ad749191acf9e08dad97d1a327b88c2f1d45d12f240296aa8b2'>;
 
@@ -363,7 +363,8 @@ export type FieldOutputTypes = {
         | 'CHAPTER'
         | 'PROFILE'
         | 'CLUB'
-        | 'CHANNEL';
+        | 'CHANNEL'
+        | 'READING_LIST';
       readonly targetId: CodecTypes['pg/text@1']['output'];
       readonly outcome: 'ALLOW' | 'REVIEW' | 'REJECT' | 'UNCHECKED';
       readonly category: CodecTypes['pg/text@1']['output'] | null;
@@ -458,7 +459,8 @@ export type FieldOutputTypes = {
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
         | 'REPORT_RESOLVED'
-        | 'BETA_FEEDBACK';
+        | 'BETA_FEEDBACK'
+        | 'LIST_ADDITION';
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
     readonly User: {
@@ -762,6 +764,32 @@ export type FieldOutputTypes = {
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
   };
+  readonly lists: {
+    readonly ListEntry: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly listId: CodecTypes['pg/text@1']['output'];
+      readonly storyId: CodecTypes['pg/text@1']['output'];
+      readonly note: CodecTypes['pg/text@1']['output'] | null;
+      readonly addedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    };
+    readonly ListFollower: {
+      readonly listId: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+      readonly followedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    };
+    readonly ReadingList: {
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly slug: CodecTypes['pg/text@1']['output'];
+      readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly isPublic: CodecTypes['pg/bool@1']['output'];
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    };
+  };
   readonly moderation: {
     readonly Report: {
       readonly id: CodecTypes['pg/text@1']['output'];
@@ -774,7 +802,8 @@ export type FieldOutputTypes = {
         | 'CHAPTER'
         | 'PROFILE'
         | 'CLUB'
-        | 'CHANNEL';
+        | 'CHANNEL'
+        | 'READING_LIST';
       readonly targetId: CodecTypes['pg/text@1']['output'];
       readonly reason: 'SPAM' | 'HARASSMENT' | 'HATE' | 'SEXUAL' | 'VIOLENCE' | 'SPOILER' | 'OTHER';
       readonly details: CodecTypes['pg/text@1']['output'] | null;
@@ -802,7 +831,8 @@ export type FieldOutputTypes = {
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
         | 'REPORT_RESOLVED'
-        | 'BETA_FEEDBACK';
+        | 'BETA_FEEDBACK'
+        | 'LIST_ADDITION';
       readonly actorId: CodecTypes['pg/text@1']['output'] | null;
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly excerpt: CodecTypes['pg/text@1']['output'] | null;
@@ -816,6 +846,7 @@ export type FieldOutputTypes = {
         | 'PROFILE'
         | 'CLUB'
         | 'CHANNEL'
+        | 'READING_LIST'
         | null;
       readonly sourceId: CodecTypes['pg/text@1']['output'] | null;
       readonly readAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
@@ -948,7 +979,8 @@ export type FieldInputTypes = {
         | 'CHAPTER'
         | 'PROFILE'
         | 'CLUB'
-        | 'CHANNEL';
+        | 'CHANNEL'
+        | 'READING_LIST';
       readonly targetId: CodecTypes['pg/text@1']['input'];
       readonly outcome: 'ALLOW' | 'REVIEW' | 'REJECT' | 'UNCHECKED';
       readonly category: CodecTypes['pg/text@1']['input'] | null;
@@ -1043,7 +1075,8 @@ export type FieldInputTypes = {
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
         | 'REPORT_RESOLVED'
-        | 'BETA_FEEDBACK';
+        | 'BETA_FEEDBACK'
+        | 'LIST_ADDITION';
       readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
     readonly User: {
@@ -1347,6 +1380,32 @@ export type FieldInputTypes = {
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
   };
+  readonly lists: {
+    readonly ListEntry: {
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly listId: CodecTypes['pg/text@1']['input'];
+      readonly storyId: CodecTypes['pg/text@1']['input'];
+      readonly note: CodecTypes['pg/text@1']['input'] | null;
+      readonly addedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+    };
+    readonly ListFollower: {
+      readonly listId: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+      readonly followedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+    };
+    readonly ReadingList: {
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly slug: CodecTypes['pg/text@1']['input'];
+      readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly isPublic: CodecTypes['pg/bool@1']['input'];
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+    };
+  };
   readonly moderation: {
     readonly Report: {
       readonly id: CodecTypes['pg/text@1']['input'];
@@ -1359,7 +1418,8 @@ export type FieldInputTypes = {
         | 'CHAPTER'
         | 'PROFILE'
         | 'CLUB'
-        | 'CHANNEL';
+        | 'CHANNEL'
+        | 'READING_LIST';
       readonly targetId: CodecTypes['pg/text@1']['input'];
       readonly reason: 'SPAM' | 'HARASSMENT' | 'HATE' | 'SEXUAL' | 'VIOLENCE' | 'SPOILER' | 'OTHER';
       readonly details: CodecTypes['pg/text@1']['input'] | null;
@@ -1387,7 +1447,8 @@ export type FieldInputTypes = {
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
         | 'REPORT_RESOLVED'
-        | 'BETA_FEEDBACK';
+        | 'BETA_FEEDBACK'
+        | 'LIST_ADDITION';
       readonly actorId: CodecTypes['pg/text@1']['input'] | null;
       readonly title: CodecTypes['pg/text@1']['input'];
       readonly excerpt: CodecTypes['pg/text@1']['input'] | null;
@@ -1401,6 +1462,7 @@ export type FieldInputTypes = {
         | 'PROFILE'
         | 'CLUB'
         | 'CHANNEL'
+        | 'READING_LIST'
         | null;
       readonly sourceId: CodecTypes['pg/text@1']['input'] | null;
       readonly readAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
@@ -1545,7 +1607,8 @@ export type StorageColumnTypes = {
         | 'CHAPTER'
         | 'PROFILE'
         | 'CLUB'
-        | 'CHANNEL';
+        | 'CHANNEL'
+        | 'READING_LIST';
     };
     readonly moderationScore: {
       readonly category: CodecTypes['pg/text@1']['output'];
@@ -1628,7 +1691,8 @@ export type StorageColumnTypes = {
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
         | 'REPORT_RESOLVED'
-        | 'BETA_FEEDBACK';
+        | 'BETA_FEEDBACK'
+        | 'LIST_ADDITION';
       readonly userId: CodecTypes['pg/text@1']['output'];
     };
     readonly user: {
@@ -1932,6 +1996,32 @@ export type StorageColumnTypes = {
       readonly userId: CodecTypes['pg/text@1']['output'];
     };
   };
+  readonly lists: {
+    readonly listEntry: {
+      readonly addedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly listId: CodecTypes['pg/text@1']['output'];
+      readonly note: CodecTypes['pg/text@1']['output'] | null;
+      readonly storyId: CodecTypes['pg/text@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+    };
+    readonly listFollower: {
+      readonly followedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly listId: CodecTypes['pg/text@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+    };
+    readonly readingList: {
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly description: CodecTypes['pg/text@1']['output'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['output'] | null;
+      readonly id: CodecTypes['pg/text@1']['output'];
+      readonly isPublic: CodecTypes['pg/bool@1']['output'];
+      readonly name: CodecTypes['pg/text@1']['output'];
+      readonly slug: CodecTypes['pg/text@1']['output'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
+      readonly userId: CodecTypes['pg/text@1']['output'];
+    };
+  };
   readonly moderation: {
     readonly report: {
       readonly action: 'DISMISS' | 'HIDE' | 'SUSPEND' | null;
@@ -1953,7 +2043,8 @@ export type StorageColumnTypes = {
         | 'CHAPTER'
         | 'PROFILE'
         | 'CLUB'
-        | 'CHANNEL';
+        | 'CHANNEL'
+        | 'READING_LIST';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['output'];
     };
   };
@@ -1975,6 +2066,7 @@ export type StorageColumnTypes = {
         | 'PROFILE'
         | 'CLUB'
         | 'CHANNEL'
+        | 'READING_LIST'
         | null;
       readonly title: CodecTypes['pg/text@1']['output'];
       readonly type:
@@ -1988,7 +2080,8 @@ export type StorageColumnTypes = {
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
         | 'REPORT_RESOLVED'
-        | 'BETA_FEEDBACK';
+        | 'BETA_FEEDBACK'
+        | 'LIST_ADDITION';
       readonly userId: CodecTypes['pg/text@1']['output'];
     };
   };
@@ -2130,7 +2223,8 @@ export type StorageColumnInputTypes = {
         | 'CHAPTER'
         | 'PROFILE'
         | 'CLUB'
-        | 'CHANNEL';
+        | 'CHANNEL'
+        | 'READING_LIST';
     };
     readonly moderationScore: {
       readonly category: CodecTypes['pg/text@1']['input'];
@@ -2213,7 +2307,8 @@ export type StorageColumnInputTypes = {
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
         | 'REPORT_RESOLVED'
-        | 'BETA_FEEDBACK';
+        | 'BETA_FEEDBACK'
+        | 'LIST_ADDITION';
       readonly userId: CodecTypes['pg/text@1']['input'];
     };
     readonly user: {
@@ -2517,6 +2612,32 @@ export type StorageColumnInputTypes = {
       readonly userId: CodecTypes['pg/text@1']['input'];
     };
   };
+  readonly lists: {
+    readonly listEntry: {
+      readonly addedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly listId: CodecTypes['pg/text@1']['input'];
+      readonly note: CodecTypes['pg/text@1']['input'] | null;
+      readonly storyId: CodecTypes['pg/text@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+    };
+    readonly listFollower: {
+      readonly followedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly listId: CodecTypes['pg/text@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+    };
+    readonly readingList: {
+      readonly createdAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly description: CodecTypes['pg/text@1']['input'] | null;
+      readonly hiddenAt: CodecTypes['pg/timestamptz-temporal@1']['input'] | null;
+      readonly id: CodecTypes['pg/text@1']['input'];
+      readonly isPublic: CodecTypes['pg/bool@1']['input'];
+      readonly name: CodecTypes['pg/text@1']['input'];
+      readonly slug: CodecTypes['pg/text@1']['input'];
+      readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
+      readonly userId: CodecTypes['pg/text@1']['input'];
+    };
+  };
   readonly moderation: {
     readonly report: {
       readonly action: 'DISMISS' | 'HIDE' | 'SUSPEND' | null;
@@ -2538,7 +2659,8 @@ export type StorageColumnInputTypes = {
         | 'CHAPTER'
         | 'PROFILE'
         | 'CLUB'
-        | 'CHANNEL';
+        | 'CHANNEL'
+        | 'READING_LIST';
       readonly updatedAt: CodecTypes['pg/timestamptz-temporal@1']['input'];
     };
   };
@@ -2560,6 +2682,7 @@ export type StorageColumnInputTypes = {
         | 'PROFILE'
         | 'CLUB'
         | 'CHANNEL'
+        | 'READING_LIST'
         | null;
       readonly title: CodecTypes['pg/text@1']['input'];
       readonly type:
@@ -2573,7 +2696,8 @@ export type StorageColumnInputTypes = {
         | 'LEVEL_UP'
         | 'CONTENT_HIDDEN'
         | 'REPORT_RESOLVED'
-        | 'BETA_FEEDBACK';
+        | 'BETA_FEEDBACK'
+        | 'LIST_ADDITION';
       readonly userId: CodecTypes['pg/text@1']['input'];
     };
   };
@@ -6858,6 +6982,251 @@ type ContractBase = Omit<
           };
         };
       };
+      readonly lists: {
+        readonly id: 'lists';
+        readonly kind: 'postgres-schema';
+        readonly entries: {
+          readonly table: {
+            readonly listEntry: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly listId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly storyId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly note: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly addedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly updatedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['listId', 'storyId'] }];
+              indexes: readonly [
+                {
+                  readonly name: 'listEntry_listId_addedAt_idx_959c2581';
+                  readonly prefix: 'listEntry_listId_addedAt_idx';
+                  readonly columns: readonly ['listId', 'addedAt'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'listEntry_storyId_idx_cd452158';
+                  readonly prefix: 'listEntry_storyId_idx';
+                  readonly columns: readonly ['storyId'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'listEntry_listId_idx_0033d367';
+                  readonly prefix: 'listEntry_listId_idx';
+                  readonly columns: readonly ['listId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'lists' & NamespaceId;
+                    readonly tableName: 'listEntry';
+                    readonly columns: readonly ['listId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'lists' & NamespaceId;
+                    readonly tableName: 'readingList';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'lists' & NamespaceId;
+                    readonly tableName: 'listEntry';
+                    readonly columns: readonly ['storyId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'content' & NamespaceId;
+                    readonly tableName: 'story';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
+            readonly listFollower: {
+              columns: {
+                readonly listId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly userId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly followedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+              };
+              primaryKey: { readonly columns: readonly ['listId', 'userId'] };
+              uniques: readonly [];
+              indexes: readonly [
+                {
+                  readonly name: 'listFollower_userId_followedAt_idx_c7eecc26';
+                  readonly prefix: 'listFollower_userId_followedAt_idx';
+                  readonly columns: readonly ['userId', 'followedAt'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'listFollower_listId_idx_0033d367';
+                  readonly prefix: 'listFollower_listId_idx';
+                  readonly columns: readonly ['listId'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'listFollower_userId_idx_a489d58a';
+                  readonly prefix: 'listFollower_userId_idx';
+                  readonly columns: readonly ['userId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'lists' & NamespaceId;
+                    readonly tableName: 'listFollower';
+                    readonly columns: readonly ['listId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'lists' & NamespaceId;
+                    readonly tableName: 'readingList';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+                {
+                  readonly source: {
+                    readonly namespaceId: 'lists' & NamespaceId;
+                    readonly tableName: 'listFollower';
+                    readonly columns: readonly ['userId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'auth' & NamespaceId;
+                    readonly tableName: 'user';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
+            readonly readingList: {
+              columns: {
+                readonly id: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly userId: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly name: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly slug: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: false;
+                };
+                readonly description: {
+                  readonly nativeType: 'text';
+                  readonly codecId: 'pg/text@1';
+                  readonly nullable: true;
+                };
+                readonly isPublic: {
+                  readonly nativeType: 'bool';
+                  readonly codecId: 'pg/bool@1';
+                  readonly nullable: false;
+                  readonly default: {
+                    readonly kind: 'literal';
+                    readonly value: DefaultLiteralValue<'pg/bool@1', true>;
+                  };
+                };
+                readonly hiddenAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: true;
+                };
+                readonly createdAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+                readonly updatedAt: {
+                  readonly nativeType: 'timestamptz';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                  readonly nullable: false;
+                  readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
+                };
+              };
+              primaryKey: { readonly columns: readonly ['id'] };
+              uniques: readonly [{ readonly columns: readonly ['slug'] }];
+              indexes: readonly [
+                {
+                  readonly name: 'readingList_userId_createdAt_idx_f726f04a';
+                  readonly prefix: 'readingList_userId_createdAt_idx';
+                  readonly columns: readonly ['userId', 'createdAt'];
+                  readonly unique: false;
+                },
+                {
+                  readonly name: 'readingList_userId_idx_a489d58a';
+                  readonly prefix: 'readingList_userId_idx';
+                  readonly columns: readonly ['userId'];
+                  readonly unique: false;
+                },
+              ];
+              foreignKeys: readonly [
+                {
+                  readonly source: {
+                    readonly namespaceId: 'lists' & NamespaceId;
+                    readonly tableName: 'readingList';
+                    readonly columns: readonly ['userId'];
+                  };
+                  readonly target: {
+                    readonly namespaceId: 'auth' & NamespaceId;
+                    readonly tableName: 'user';
+                    readonly columns: readonly ['id'];
+                  };
+                },
+              ];
+            };
+          };
+        };
+      };
       readonly moderation: {
         readonly id: 'moderation';
         readonly kind: 'postgres-schema';
@@ -7163,6 +7532,7 @@ type ContractBase = Omit<
                 'CONTENT_HIDDEN',
                 'REPORT_RESOLVED',
                 'BETA_FEEDBACK',
+                'LIST_ADDITION',
               ];
             };
             readonly ReadingStatus: {
@@ -7200,6 +7570,7 @@ type ContractBase = Omit<
                 'PROFILE',
                 'CLUB',
                 'CHANNEL',
+                'READING_LIST',
               ];
             };
           };
@@ -7304,6 +7675,15 @@ type ContractBase = Omit<
     readonly libraryEntry: {
       readonly namespace: 'library' & NamespaceId;
       readonly model: 'LibraryEntry';
+    };
+    readonly readingList: {
+      readonly namespace: 'lists' & NamespaceId;
+      readonly model: 'ReadingList';
+    };
+    readonly listEntry: { readonly namespace: 'lists' & NamespaceId; readonly model: 'ListEntry' };
+    readonly listFollower: {
+      readonly namespace: 'lists' & NamespaceId;
+      readonly model: 'ListFollower';
     };
     readonly notification: {
       readonly namespace: 'notifications' & NamespaceId;
@@ -11697,6 +12077,203 @@ type ContractBase = Omit<
           };
         };
       };
+      readonly lists: {
+        readonly models: {
+          readonly ListEntry: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly listId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly storyId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly note: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly addedAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+              readonly updatedAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+            };
+            readonly relations: {
+              readonly list: {
+                readonly to: {
+                  readonly namespace: 'lists' & NamespaceId;
+                  readonly model: 'ReadingList';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['listId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly story: {
+                readonly to: {
+                  readonly namespace: 'content' & NamespaceId;
+                  readonly model: 'Story';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['storyId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'listEntry';
+              readonly namespaceId: 'lists';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly listId: { readonly column: 'listId' };
+                readonly storyId: { readonly column: 'storyId' };
+                readonly note: { readonly column: 'note' };
+                readonly addedAt: { readonly column: 'addedAt' };
+                readonly updatedAt: { readonly column: 'updatedAt' };
+              };
+            };
+          };
+          readonly ListFollower: {
+            readonly fields: {
+              readonly listId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly followedAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+            };
+            readonly relations: {
+              readonly list: {
+                readonly to: {
+                  readonly namespace: 'lists' & NamespaceId;
+                  readonly model: 'ReadingList';
+                };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['listId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+              readonly user: {
+                readonly to: { readonly namespace: 'auth' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['userId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'listFollower';
+              readonly namespaceId: 'lists';
+              readonly fields: {
+                readonly listId: { readonly column: 'listId' };
+                readonly userId: { readonly column: 'userId' };
+                readonly followedAt: { readonly column: 'followedAt' };
+              };
+            };
+          };
+          readonly ReadingList: {
+            readonly fields: {
+              readonly id: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly userId: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly name: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly slug: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly description: {
+                readonly nullable: true;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
+              };
+              readonly isPublic: {
+                readonly nullable: false;
+                readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/bool@1' };
+              };
+              readonly hiddenAt: {
+                readonly nullable: true;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+              readonly createdAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+              readonly updatedAt: {
+                readonly nullable: false;
+                readonly type: {
+                  readonly kind: 'scalar';
+                  readonly codecId: 'pg/timestamptz-temporal@1';
+                };
+              };
+            };
+            readonly relations: {
+              readonly user: {
+                readonly to: { readonly namespace: 'auth' & NamespaceId; readonly model: 'User' };
+                readonly cardinality: 'N:1';
+                readonly on: {
+                  readonly localFields: readonly ['userId'];
+                  readonly targetFields: readonly ['id'];
+                };
+              };
+            };
+            readonly storage: {
+              readonly table: 'readingList';
+              readonly namespaceId: 'lists';
+              readonly fields: {
+                readonly id: { readonly column: 'id' };
+                readonly userId: { readonly column: 'userId' };
+                readonly name: { readonly column: 'name' };
+                readonly slug: { readonly column: 'slug' };
+                readonly description: { readonly column: 'description' };
+                readonly isPublic: { readonly column: 'isPublic' };
+                readonly hiddenAt: { readonly column: 'hiddenAt' };
+                readonly createdAt: { readonly column: 'createdAt' };
+                readonly updatedAt: { readonly column: 'updatedAt' };
+              };
+            };
+          };
+        };
+      };
       readonly moderation: {
         readonly models: {
           readonly Report: {
@@ -11945,6 +12522,7 @@ type ContractBase = Omit<
               { readonly name: 'CONTENT_HIDDEN'; readonly value: 'CONTENT_HIDDEN' },
               { readonly name: 'REPORT_RESOLVED'; readonly value: 'REPORT_RESOLVED' },
               { readonly name: 'BETA_FEEDBACK'; readonly value: 'BETA_FEEDBACK' },
+              { readonly name: 'LIST_ADDITION'; readonly value: 'LIST_ADDITION' },
             ];
           };
           readonly ReportTarget: {
@@ -11958,6 +12536,7 @@ type ContractBase = Omit<
               { readonly name: 'PROFILE'; readonly value: 'PROFILE' },
               { readonly name: 'CLUB'; readonly value: 'CLUB' },
               { readonly name: 'CHANNEL'; readonly value: 'CHANNEL' },
+              { readonly name: 'READING_LIST'; readonly value: 'READING_LIST' },
             ];
           };
           readonly ReportReason: {
@@ -12226,6 +12805,14 @@ type ContractBase = Omit<
         },
         {
           readonly ref: {
+            readonly namespace: 'lists';
+            readonly table: 'listEntry';
+            readonly column: 'id';
+          };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
+        {
+          readonly ref: {
             readonly namespace: 'ai';
             readonly table: 'moderationDecision';
             readonly column: 'id';
@@ -12260,6 +12847,14 @@ type ContractBase = Omit<
           readonly ref: {
             readonly namespace: 'engagement';
             readonly table: 'readingHistory';
+            readonly column: 'id';
+          };
+          readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };
+        },
+        {
+          readonly ref: {
+            readonly namespace: 'lists';
+            readonly table: 'readingList';
             readonly column: 'id';
           };
           readonly onCreate: { readonly kind: 'generator'; readonly id: 'uuidv4' };

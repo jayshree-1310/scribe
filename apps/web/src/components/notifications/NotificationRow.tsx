@@ -25,6 +25,7 @@ const TYPE_ICONS: Record<NotificationType, IconName> = {
   NEW_CHAPTER: 'book-open',
   BADGE_EARNED: 'medal',
   BETA_FEEDBACK: 'lock',
+  LIST_ADDITION: 'list',
 }
 
 /**
@@ -63,6 +64,10 @@ function describe(notification: Notification): string {
       // The chapter is the excerpt underneath; the feedback itself is private
       // and is read on the story's beta page.
       return `${who} left beta feedback on ${notification.title}`
+    case 'LIST_ADDITION':
+      // The story is the excerpt underneath. Coalesced server-side: one per
+      // list until it is read, however many were added.
+      return `${who} added to ${notification.title}`
   }
 }
 

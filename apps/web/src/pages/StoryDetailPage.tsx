@@ -27,6 +27,7 @@ import {
 import { useAuth } from '../lib/auth'
 import { LikeButton } from '../components/engagement/LikeButton'
 import { ReportMenu } from '../components/moderation/ReportMenu'
+import { AddToListButton } from '../components/lists/AddToListButton'
 import { SignInPrompt } from '../components/engagement/SignInPrompt'
 import { Avatar } from '../components/ui/Avatar'
 import { Button, ButtonLink } from '../components/ui/Button'
@@ -469,6 +470,11 @@ export function StoryDetailPage() {
                 >
                   {ratings.data?.mine ? `Rated ${ratings.data.mine}` : 'Rate'}
                 </Button>
+              )}
+
+              {/* Only what anybody can open goes on a list: never a draft. */}
+              {betaDraft || data.listedAt === null ? null : (
+                <AddToListButton storyId={data.id} storyTitle={data.title} />
               )}
 
               {betaDraft ? null : (

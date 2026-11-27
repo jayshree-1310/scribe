@@ -40,6 +40,8 @@ import { BadgesPage } from './pages/BadgesPage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { ChannelsPage } from './pages/ChannelsPage'
 import { ChannelDetailPage } from './pages/ChannelDetailPage'
+import { ReadingListsPage } from './pages/ReadingListsPage'
+import { ReadingListPage } from './pages/ReadingListPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { BetaInvitePage } from './pages/BetaInvitePage'
 import { SettingsPage } from './pages/SettingsPage'
@@ -173,6 +175,14 @@ const router = createBrowserRouter(
           path="/channels/:slug"
           handle={{ width: 'narrow' }}
           element={<ChannelDetailPage />}
+        />
+        <Route path="/lists" element={<ReadingListsPage />} />
+        {/* `public`: a shared list opens for anybody with the link, as a
+            story's page does. The API answers only for public lists. */}
+        <Route
+          path="/lists/:slug"
+          handle={{ public: true, width: 'narrow' }}
+          element={<ReadingListPage />}
         />
         <Route path="/badges" element={<BadgesPage />} />
         {/* An author's invite link. Needs an account: a beta reader is a

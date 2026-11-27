@@ -116,6 +116,14 @@
       "model": "Link",
       "namespace": "beta"
     },
+    "listEntry": {
+      "model": "ListEntry",
+      "namespace": "lists"
+    },
+    "listFollower": {
+      "model": "ListFollower",
+      "namespace": "lists"
+    },
     "moderationDecision": {
       "model": "ModerationDecision",
       "namespace": "ai"
@@ -147,6 +155,10 @@
     "readingHistory": {
       "model": "ReadingHistory",
       "namespace": "engagement"
+    },
+    "readingList": {
+      "model": "ReadingList",
+      "namespace": "lists"
     },
     "report": {
       "model": "Report",
@@ -6933,6 +6945,301 @@
           }
         }
       },
+      "lists": {
+        "models": {
+          "ListEntry": {
+            "fields": {
+              "addedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "listId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "note": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "storyId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "list": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "listId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "ReadingList",
+                  "namespace": "lists"
+                }
+              },
+              "story": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "storyId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "Story",
+                  "namespace": "content"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "addedAt": {
+                  "column": "addedAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "listId": {
+                  "column": "listId"
+                },
+                "note": {
+                  "column": "note"
+                },
+                "storyId": {
+                  "column": "storyId"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                }
+              },
+              "namespaceId": "lists",
+              "table": "listEntry"
+            }
+          },
+          "ListFollower": {
+            "fields": {
+              "followedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "listId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "list": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "listId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "ReadingList",
+                  "namespace": "lists"
+                }
+              },
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "followedAt": {
+                  "column": "followedAt"
+                },
+                "listId": {
+                  "column": "listId"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "lists",
+              "table": "listFollower"
+            }
+          },
+          "ReadingList": {
+            "fields": {
+              "createdAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "description": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "hiddenAt": {
+                "nullable": true,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "id": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "isPublic": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/bool@1",
+                  "kind": "scalar"
+                }
+              },
+              "name": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "slug": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              },
+              "updatedAt": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "kind": "scalar"
+                }
+              },
+              "userId": {
+                "nullable": false,
+                "type": {
+                  "codecId": "pg/text@1",
+                  "kind": "scalar"
+                }
+              }
+            },
+            "relations": {
+              "user": {
+                "cardinality": "N:1",
+                "on": {
+                  "localFields": [
+                    "userId"
+                  ],
+                  "targetFields": [
+                    "id"
+                  ]
+                },
+                "to": {
+                  "model": "User",
+                  "namespace": "auth"
+                }
+              }
+            },
+            "storage": {
+              "fields": {
+                "createdAt": {
+                  "column": "createdAt"
+                },
+                "description": {
+                  "column": "description"
+                },
+                "hiddenAt": {
+                  "column": "hiddenAt"
+                },
+                "id": {
+                  "column": "id"
+                },
+                "isPublic": {
+                  "column": "isPublic"
+                },
+                "name": {
+                  "column": "name"
+                },
+                "slug": {
+                  "column": "slug"
+                },
+                "updatedAt": {
+                  "column": "updatedAt"
+                },
+                "userId": {
+                  "column": "userId"
+                }
+              },
+              "namespaceId": "lists",
+              "table": "readingList"
+            }
+          }
+        }
+      },
       "moderation": {
         "models": {
           "Report": {
@@ -7442,6 +7749,10 @@
               {
                 "name": "BETA_FEEDBACK",
                 "value": "BETA_FEEDBACK"
+              },
+              {
+                "name": "LIST_ADDITION",
+                "value": "LIST_ADDITION"
               }
             ]
           },
@@ -7559,6 +7870,10 @@
               {
                 "name": "CHANNEL",
                 "value": "CHANNEL"
+              },
+              {
+                "name": "READING_LIST",
+                "value": "READING_LIST"
               }
             ]
           }
@@ -8721,8 +9036,8 @@
                   "prefix": "moderationDecision_outcome_check"
                 },
                 {
-                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER', 'PROFILE', 'CLUB', 'CHANNEL')",
-                  "name": "moderationDecision_targetType_check_4fe6a63e",
+                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER', 'PROFILE', 'CLUB', 'CHANNEL', 'READING_LIST')",
+                  "name": "moderationDecision_targetType_check_9328c492",
                   "prefix": "moderationDecision_targetType_check"
                 }
               ],
@@ -9462,8 +9777,8 @@
             "notificationMute": {
               "checks": [
                 {
-                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'NEW_CHAPTER', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED', 'BETA_FEEDBACK')",
-                  "name": "notificationMute_type_check_8fc7182a",
+                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'NEW_CHAPTER', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED', 'BETA_FEEDBACK', 'LIST_ADDITION')",
+                  "name": "notificationMute_type_check_95c8c07c",
                   "prefix": "notificationMute_type_check"
                 }
               ],
@@ -13087,6 +13402,336 @@
         "id": "library",
         "kind": "postgres-schema"
       },
+      "lists": {
+        "entries": {
+          "table": {
+            "listEntry": {
+              "columns": {
+                "addedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "listId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "note": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "storyId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "listId"
+                    ],
+                    "namespaceId": "lists",
+                    "tableName": "listEntry"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "lists",
+                    "tableName": "readingList"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "storyId"
+                    ],
+                    "namespaceId": "lists",
+                    "tableName": "listEntry"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "content",
+                    "tableName": "story"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "listId",
+                    "addedAt"
+                  ],
+                  "name": "listEntry_listId_addedAt_idx_959c2581",
+                  "prefix": "listEntry_listId_addedAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "listId"
+                  ],
+                  "name": "listEntry_listId_idx_0033d367",
+                  "prefix": "listEntry_listId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "storyId"
+                  ],
+                  "name": "listEntry_storyId_idx_cd452158",
+                  "prefix": "listEntry_storyId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "listId",
+                    "storyId"
+                  ]
+                }
+              ]
+            },
+            "listFollower": {
+              "columns": {
+                "followedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "listId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "userId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "listId"
+                    ],
+                    "namespaceId": "lists",
+                    "tableName": "listFollower"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "lists",
+                    "tableName": "readingList"
+                  }
+                },
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "lists",
+                    "tableName": "listFollower"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "listId"
+                  ],
+                  "name": "listFollower_listId_idx_0033d367",
+                  "prefix": "listFollower_listId_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId",
+                    "followedAt"
+                  ],
+                  "name": "listFollower_userId_followedAt_idx_c7eecc26",
+                  "prefix": "listFollower_userId_followedAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "listFollower_userId_idx_a489d58a",
+                  "prefix": "listFollower_userId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "listId",
+                  "userId"
+                ]
+              },
+              "uniques": []
+            },
+            "readingList": {
+              "columns": {
+                "createdAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "description": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": true
+                },
+                "hiddenAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "nativeType": "timestamptz",
+                  "nullable": true
+                },
+                "id": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "isPublic": {
+                  "codecId": "pg/bool@1",
+                  "default": {
+                    "kind": "literal",
+                    "value": true
+                  },
+                  "nativeType": "bool",
+                  "nullable": false
+                },
+                "name": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "slug": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                },
+                "updatedAt": {
+                  "codecId": "pg/timestamptz-temporal@1",
+                  "default": {
+                    "expression": "now()",
+                    "kind": "function"
+                  },
+                  "nativeType": "timestamptz",
+                  "nullable": false
+                },
+                "userId": {
+                  "codecId": "pg/text@1",
+                  "nativeType": "text",
+                  "nullable": false
+                }
+              },
+              "foreignKeys": [
+                {
+                  "onDelete": "cascade",
+                  "source": {
+                    "columns": [
+                      "userId"
+                    ],
+                    "namespaceId": "lists",
+                    "tableName": "readingList"
+                  },
+                  "target": {
+                    "columns": [
+                      "id"
+                    ],
+                    "namespaceId": "auth",
+                    "tableName": "user"
+                  }
+                }
+              ],
+              "indexes": [
+                {
+                  "columns": [
+                    "userId",
+                    "createdAt"
+                  ],
+                  "name": "readingList_userId_createdAt_idx_f726f04a",
+                  "prefix": "readingList_userId_createdAt_idx",
+                  "unique": false
+                },
+                {
+                  "columns": [
+                    "userId"
+                  ],
+                  "name": "readingList_userId_idx_a489d58a",
+                  "prefix": "readingList_userId_idx",
+                  "unique": false
+                }
+              ],
+              "primaryKey": {
+                "columns": [
+                  "id"
+                ]
+              },
+              "uniques": [
+                {
+                  "columns": [
+                    "slug"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "id": "lists",
+        "kind": "postgres-schema"
+      },
       "moderation": {
         "entries": {
           "table": {
@@ -13108,8 +13753,8 @@
                   "prefix": "report_status_check"
                 },
                 {
-                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER', 'PROFILE', 'CLUB', 'CHANNEL')",
-                  "name": "report_targetType_check_4fe6a63e",
+                  "expression": "\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER', 'PROFILE', 'CLUB', 'CHANNEL', 'READING_LIST')",
+                  "name": "report_targetType_check_9328c492",
                   "prefix": "report_targetType_check"
                 }
               ],
@@ -13305,13 +13950,13 @@
             "notification": {
               "checks": [
                 {
-                  "expression": "\"sourceType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER', 'PROFILE', 'CLUB', 'CHANNEL')",
-                  "name": "notification_sourceType_check_f9b36c93",
+                  "expression": "\"sourceType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER', 'PROFILE', 'CLUB', 'CHANNEL', 'READING_LIST')",
+                  "name": "notification_sourceType_check_84454683",
                   "prefix": "notification_sourceType_check"
                 },
                 {
-                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'NEW_CHAPTER', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED', 'BETA_FEEDBACK')",
-                  "name": "notification_type_check_8fc7182a",
+                  "expression": "\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'NEW_CHAPTER', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED', 'BETA_FEEDBACK', 'LIST_ADDITION')",
+                  "name": "notification_type_check_95c8c07c",
                   "prefix": "notification_type_check"
                 }
               ],
@@ -13538,7 +14183,8 @@
                 "LEVEL_UP",
                 "CONTENT_HIDDEN",
                 "REPORT_RESOLVED",
-                "BETA_FEEDBACK"
+                "BETA_FEEDBACK",
+                "LIST_ADDITION"
               ]
             },
             "ReadingStatus": {
@@ -13586,7 +14232,8 @@
                 "CHAPTER",
                 "PROFILE",
                 "CLUB",
-                "CHANNEL"
+                "CHANNEL",
+                "READING_LIST"
               ]
             }
           }
@@ -13595,10 +14242,10 @@
         "kind": "postgres-schema"
       }
     },
-    "storageHash": "b720b6732b227b2bfa239bdf5cfe49a6a9e3a8e0e5db3f47994dfe9c16f07d18"
+    "storageHash": "4e78549436ca508aadd25c219590f1319eb21efef8b109ce2a8dcf696ab8fc73"
   },
   "execution": {
-    "executionHash": "9dddf0f2060c166b12802b6cad095535b1fd702a5ea68a7df5005f17e8c169d3",
+    "executionHash": "ffafbe3d81d58e97699bc97bebe635f595dae50bcfd81e69f743275c2341080a",
     "mutations": {
       "defaults": [
         {
@@ -13872,6 +14519,17 @@
           },
           "ref": {
             "column": "id",
+            "namespace": "lists",
+            "table": "listEntry"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
             "namespace": "ai",
             "table": "moderationDecision"
           }
@@ -13918,6 +14576,17 @@
             "column": "id",
             "namespace": "engagement",
             "table": "readingHistory"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "namespace": "lists",
+            "table": "readingList"
           }
         },
         {

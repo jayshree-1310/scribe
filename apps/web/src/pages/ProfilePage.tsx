@@ -7,6 +7,7 @@ import { formatCount, formatDate, formatRelative } from '../lib/format'
 import * as books from '../data/books-api'
 import * as gamification from '../data/gamification-api'
 import * as usersApi from '../data/users-api'
+import * as listsApi from '../data/reading-lists-api'
 import { READING_STATUS_LABELS } from '../types/books'
 import type { FollowPage, FollowState } from '../types/users'
 import { Avatar } from '../components/ui/Avatar'
@@ -22,6 +23,8 @@ import { ReportMenu } from '../components/moderation/ReportMenu'
 import { BadgeTile, ClubCard } from '../components/story/Cards'
 import { StoryCard } from '../components/story/StoryCard'
 import { StoryCover } from '../components/story/StoryCover'
+import { ListCard, ListCardSkeleton } from '../components/lists/ListCard'
+import { MAX_LISTS_PER_USER } from '../types/reading-lists'
 import './pages.css'
 
 type ProfileTab =
@@ -32,6 +35,7 @@ type ProfileTab =
   | 'activity'
   | 'badges'
   | 'clubs'
+  | 'lists'
 
 /** A display name, falling back to the handle for password signups. */
 function nameOf(user: { displayName: string | null; username: string }): string {
@@ -197,6 +201,20 @@ export function ProfilePage() {
         : Promise.resolve([]),
     [found],
   )
+  /**
+   * Reading lists: the public ones for anybody, every one of their own for
+   * the owner. Loaded with the page, since the tab shows the count; a reader
+   * keeps at most fifty, so one request holds them all.
+   */
+  const lists = useAsync(
+    () =>
+      found
+        ? listsApi
+            .listReadingLists({ owner: found, limit: MAX_LISTS_PER_USER })
+            .then((page) => page.items)
+        : Promise.resolve([]),
+    [found],
+  )
   const reading = useAsync(
     () =>
       isMe
@@ -287,6 +305,7 @@ export function ProfilePage() {
     { id: 'badges' as const, label: 'Badges', count: earnedBadges.length },
     // Clubs are public; the reading shelves are still the caller's own.
     { id: 'clubs' as const, label: 'Clubs', count: myClubs.length },
+    { id: 'lists' as const, label: 'Lists', count: lists.data?.length ?? 0 },
     ...(isMe ? [{ id: 'activity' as const, label: 'Reading activity' }] : []),
   ]
 
@@ -686,6 +705,39 @@ export function ProfilePage() {
             <div className="card-grid card-grid--wide">
               {myClubs.map((club) => (
                 <ClubCard key={club.id} club={club} />
+              ))}
+            </div>
+          )}
+        </TabPanel>
+      ) : null}
+
+      {tab === 'lists' ? (
+        <TabPanel id="lists">
+          {lists.status === 'loading' ? (
+            <div className="card-grid card-grid--wide" aria-busy="true">
+              {[0, 1, 2].map((slot) => (
+                <ListCardSkeleton key={slot} />
+              ))}
+            </div>
+          ) : lists.status === 'error' ? (
+            <ErrorState
+              title="We couldn't load those lists"
+              message={lists.error}
+              onRetry={lists.reload}
+            />
+          ) : (lists.data ?? []).length === 0 ? (
+            <EmptyState
+              icon="list"
+              title={isMe ? 'No reading lists yet' : `${displayName} has no public lists`}
+              description={
+                isMe ? 'Gather stories around a theme and share them.' : undefined
+              }
+              action={isMe ? <ButtonLink to="/lists?tab=mine">Start a list</ButtonLink> : undefined}
+            />
+          ) : (
+            <div className="card-grid card-grid--wide">
+              {(lists.data ?? []).map((list) => (
+                <ListCard key={list.id} list={list} hideOwner />
               ))}
             </div>
           )}

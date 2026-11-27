@@ -20,6 +20,7 @@ export type ReportTarget =
   | 'PROFILE'
   | 'CLUB'
   | 'CHANNEL'
+  | 'READING_LIST'
 
 export type ReportReason =
   | 'SPAM'
@@ -178,6 +179,7 @@ export const TARGET_LABELS: Record<ReportTarget, string> = {
   PROFILE: 'Profile',
   CLUB: 'Club',
   CHANNEL: 'Channel',
+  READING_LIST: 'Reading list',
 }
 
 /**

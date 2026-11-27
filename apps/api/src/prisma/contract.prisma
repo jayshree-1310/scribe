@@ -87,6 +87,11 @@ enum NotificationType {
   /// A beta reader left feedback on the recipient's story. Addressed to the
   /// author only: the feedback itself is private to the two of them.
   BETA_FEEDBACK
+  /// A story was added to a public reading list the recipient follows.
+  /// Coalesced per list: a follower who has not yet read the last one for a
+  /// list is not told again, so a curator adding twenty stories in a sitting
+  /// rings each bell once. See `notifyListFollowers`.
+  LIST_ADDITION
 }
 
 /// Which of the three kinds of user-written text a row is about.
@@ -120,6 +125,10 @@ enum ReportTarget {
   PROFILE
   CLUB
   CHANNEL
+  /// A reader's reading list: its name, description and the notes on its
+  /// entries. Taken down whole, as a club or channel is; see
+  /// `services/reading-lists.ts`.
+  READING_LIST
 }
 
 /// Why a reader says something should not be there.
@@ -1363,6 +1372,91 @@ namespace library {
     // The shelf tabs read by user, filtered by status, newest first.
     @@index([userId, status, addedAt])
     @@index([storyId])
+  }
+}
+
+/// Reading lists: a reader's named, curated selection of stories, public or
+/// private, that other readers can follow. See `services/reading-lists.ts`.
+///
+/// Its own namespace rather than more of `library`: a shelf is private
+/// reading state, while a list is something its owner writes for other
+/// people to read -- it can be reported, taken down and followed, and its
+/// rules are a club's or a channel's rather than a shelf's.
+namespace lists {
+  model ReadingList {
+    id          String   @id @default(uuid())
+    userId      String
+    name        String
+
+    /// Stable, URL-safe identity, derived once from the name and kept
+    /// through a rename, as `channels.BroadcastChannel.slug` is.
+    slug        String   @unique
+
+    description String?
+
+    /// False keeps the list to its owner: nobody else can open it, find it
+    /// or follow it, and its followers hear nothing while it stays private.
+    isPublic    Boolean  @default(true)
+
+    /// A moderator's take-down of the whole list, as on
+    /// `channels.BroadcastChannel.hiddenAt`: `listsBase` filters it, so it
+    /// reads as absent to everybody, its owner included.
+    hiddenAt    DateTime?
+
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @default(now())
+
+    user auth.User
+      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    /// A reader's own lists, newest first.
+    @@index([userId, createdAt])
+  }
+
+  /// One story on a list, with the curator's optional note about it.
+  ///
+  /// Any story a reader can find: a listed Scribe story or a catalogue
+  /// book. A story that is later unlisted or taken down keeps its row and is
+  /// left out of every read, so it comes back if the story does.
+  model ListEntry {
+    id        String   @id @default(uuid())
+    listId    String
+    storyId   String
+    note      String?
+    addedAt   DateTime @default(now())
+    updatedAt DateTime @default(now())
+
+    list  ReadingList
+      @relation(fields: [listId], references: [id], onDelete: Cascade)
+    story content.Story
+      @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+    /// A story is on a list once.
+    @@unique([listId, storyId])
+    /// The list page: one list's entries, newest first.
+    @@index([listId, addedAt])
+    /// "Which of my lists already have this story?", and the cascade.
+    @@index([storyId])
+  }
+
+  /// A reader following somebody else's public list.
+  ///
+  /// The pair is the key, as with `beta.Reader`: following twice is the same
+  /// fact. Kept while the list is private, so making it public again brings
+  /// its followers back.
+  model ListFollower {
+    listId     String
+    userId     String
+    followedAt DateTime @default(now())
+
+    list ReadingList
+      @relation(fields: [listId], references: [id], onDelete: Cascade)
+    user auth.User
+      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([listId, userId])
+    /// The lists one reader follows.
+    @@index([userId, followedAt])
   }
 }
 

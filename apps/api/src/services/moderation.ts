@@ -31,9 +31,9 @@
  *   A profile works the same way: hiding it moves the display name, avatar
  *   and bio into `hidden*` columns, so every place they are drawn falls back
  *   to the username and monogram; `services/account.ts` refuses new ones
- *   while it is hidden. A club or channel is taken down whole, and the
- *   filter for that lives in exactly one place each -- `clubsBase` and
- *   `channelsBase` -- which every club and channel read goes through.
+ *   while it is hidden. A club, channel or reading list is taken down whole,
+ *   and the filter for that lives in exactly one place each -- `clubsBase`,
+ *   `channelsBase` and `listsBase` -- which every read of one goes through.
  *
  * - **A hidden row's notifications are deleted, not blanked.**
  *   `notifications.Notification.excerpt` is a copy taken at fan-out time, so
@@ -118,6 +118,7 @@ export const REPORT_TARGETS = [
   "PROFILE",
   "CLUB",
   "CHANNEL",
+  "READING_LIST",
 ] as const;
 
 export type ReportTarget = (typeof REPORT_TARGETS)[number];
@@ -175,6 +176,7 @@ const TARGET_WORDS: Record<ReportTarget, string> = {
   PROFILE: "profile",
   CLUB: "club",
   CHANNEL: "channel",
+  READING_LIST: "reading list",
 };
 
 /** The same four fields every other author summary in the app carries. */
@@ -646,6 +648,51 @@ async function loadTargets(
     });
   }
 
+  if (type === "READING_LIST") {
+    const rows = await db.orm.lists.ReadingList.select(
+      "id",
+      "slug",
+      "name",
+      "description",
+      "userId",
+      "isPublic",
+      "hiddenAt",
+    )
+      .where((row) => row.id.in(unique))
+      .all();
+
+    if (rows.length === 0) return [];
+
+    /**
+     * The notes are the list's words too, and what a report about a list is
+     * as often about as its name. Shown after the name and description, one
+     * per line, cut with the rest by `excerptOf`.
+     */
+    const notes = await db.orm.lists.ListEntry.select("listId", "note")
+      .where((row) => row.listId.in(rows.map((list) => list.id)))
+      .where((row) => row.note.isNotNull())
+      .orderBy([(row) => row.addedAt.desc(), (row) => row.id.desc()])
+      .all();
+    const notesOf = new Map<string, string[]>();
+    for (const row of notes) {
+      if (!row.note) continue;
+      notesOf.set(row.listId, [...(notesOf.get(row.listId) ?? []), row.note]);
+    }
+
+    return rows.map((row) => ({
+      type,
+      id: row.id,
+      body: [row.name, row.description ?? "", ...(notesOf.get(row.id) ?? [])]
+        .filter((line) => line.length > 0)
+        .join("\n"),
+      authorId: row.userId,
+      hidden: row.hiddenAt !== null && row.hiddenAt !== undefined,
+      // A private list is its owner's alone, so nobody else can have seen it.
+      reachable: row.isPublic,
+      href: `/lists/${row.slug}`,
+    }));
+  }
+
   if (type === "CHANNEL") {
     const rows = await db.orm.channels.BroadcastChannel.select(
       "id",
@@ -816,6 +863,15 @@ async function setHidden(
       return;
     case "CHANNEL":
       await tx.orm.channels.BroadcastChannel.where((row) => row.id.eq(id)).update({
+        hiddenAt,
+      });
+      return;
+    /**
+     * A reading list goes whole too, notes and all; `listsBase` in
+     * `services/reading-lists.ts` filters on `hiddenAt`.
+     */
+    case "READING_LIST":
+      await tx.orm.lists.ReadingList.where((row) => row.id.eq(id)).update({
         hiddenAt,
       });
       return;

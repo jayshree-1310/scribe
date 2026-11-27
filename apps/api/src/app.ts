@@ -31,6 +31,7 @@ import moderationRouter from "./routes/moderation.js";
 import notificationsRouter from "./routes/notifications.js";
 import preferencesRouter from "./routes/preferences.js";
 import readingRouter from "./routes/reading.js";
+import readingListsRouter from "./routes/reading-lists.js";
 import recommendationsRouter from "./routes/recommendations.js";
 import storiesRouter from "./routes/stories.js";
 import uploadsRouter from "./routes/uploads.js";
@@ -205,6 +206,11 @@ app.use("/api/challenges", challengesRouter);
 app.use("/api/channels", channelsRouter);
 app.use("/api/clubs", clubsRouter);
 app.use("/api/library", libraryRouter);
+/**
+ * Reading lists: a reader's curated, followable lists of stories. Not under
+ * `/api/library`, whose every route is the caller's own private shelf.
+ */
+app.use("/api/lists", readingListsRouter);
 app.use("/api/notifications", notificationsRouter);
 app.use("/api/reading", readingRouter);
 app.use("/api/recommendations", recommendationsRouter);

@@ -54,6 +54,12 @@ const GUARDED = new Set([
   // Beta feedback is private, but it is text that reaches another person.
   "beta.ts POST /feedback",
   "beta.ts PATCH /feedback/:id",
+  // A reading list's name, description and notes are public text, and so is
+  // the choice of what goes on it.
+  "reading-lists.ts POST /",
+  "reading-lists.ts PATCH /:id",
+  "reading-lists.ts POST /:id/entries",
+  "reading-lists.ts PATCH /:id/entries/:storyId",
 ]);
 
 /**
@@ -131,6 +137,8 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
       "beta.ts DELETE /stories/:storyId/link",
       "beta.ts DELETE /stories/:storyId/readers/:userId",
       "beta.ts DELETE /feedback/:id",
+      "reading-lists.ts DELETE /:id",
+      "reading-lists.ts DELETE /:id/entries/:storyId",
     ].map((route) => [route, "a draft nobody sees, an order, a pointer, or removing it"]),
 
     // Joining, leaving, following: membership rather than speech.
@@ -145,6 +153,8 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
       "users.ts DELETE /:username/follow",
       "beta.ts POST /invites/:token/join",
       "beta.ts DELETE /stories/:storyId/membership",
+      "reading-lists.ts POST /:id/follow",
+      "reading-lists.ts DELETE /:id/follow",
     ].map((route) => [route, "membership and follows, which carry no text"]),
 
     // Ratings and entries: a number and a pointer, neither of them prose.
@@ -290,6 +300,10 @@ describe("suspension coverage", () => {
       ["channels.ts", "updatePost"],
       ["clubs.ts", "createClub"],
       ["clubs.ts", "updateClub"],
+      ["reading-lists.ts", "createReadingList"],
+      ["reading-lists.ts", "updateReadingList"],
+      ["reading-lists.ts", "addListEntry"],
+      ["reading-lists.ts", "updateListEntry"],
     ];
 
     for (const [file, fn] of seams) {

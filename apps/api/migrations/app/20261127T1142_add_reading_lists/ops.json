@@ -1,0 +1,1162 @@
+[
+  {
+    "id": "schema.lists",
+    "label": "Create schema \"lists\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [],
+    "execute": [
+      {
+        "description": "Create schema \"lists\"",
+        "sql": "CREATE SCHEMA IF NOT EXISTS \"lists\"",
+        "params": []
+      }
+    ],
+    "postcheck": []
+  },
+  {
+    "id": "dropCheckConstraint.moderationDecision.moderationDecision_targetType_check_4fe6a63e",
+    "label": "Drop check constraint \"moderationDecision_targetType_check_4fe6a63e\" on \"moderationDecision\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "checkConstraint",
+        "name": "moderationDecision_targetType_check_4fe6a63e",
+        "table": "moderationDecision"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"moderationDecision_targetType_check_4fe6a63e\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "moderationDecision_targetType_check_4fe6a63e",
+          "ai",
+          "\"ai\".\"moderationDecision\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"moderationDecision_targetType_check_4fe6a63e\"",
+        "sql": "ALTER TABLE \"ai\".\"moderationDecision\" DROP CONSTRAINT \"moderationDecision_targetType_check_4fe6a63e\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"moderationDecision_targetType_check_4fe6a63e\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "moderationDecision_targetType_check_4fe6a63e",
+          "ai",
+          "\"ai\".\"moderationDecision\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropCheckConstraint.notificationMute.notificationMute_type_check_8fc7182a",
+    "label": "Drop check constraint \"notificationMute_type_check_8fc7182a\" on \"notificationMute\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "checkConstraint",
+        "name": "notificationMute_type_check_8fc7182a",
+        "table": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notificationMute_type_check_8fc7182a\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_8fc7182a",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"notificationMute_type_check_8fc7182a\"",
+        "sql": "ALTER TABLE \"auth\".\"notificationMute\" DROP CONSTRAINT \"notificationMute_type_check_8fc7182a\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notificationMute_type_check_8fc7182a\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_8fc7182a",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropCheckConstraint.report.report_targetType_check_4fe6a63e",
+    "label": "Drop check constraint \"report_targetType_check_4fe6a63e\" on \"report\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "moderation",
+        "objectType": "checkConstraint",
+        "name": "report_targetType_check_4fe6a63e",
+        "table": "report"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"report_targetType_check_4fe6a63e\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "report_targetType_check_4fe6a63e",
+          "moderation",
+          "\"moderation\".\"report\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"report_targetType_check_4fe6a63e\"",
+        "sql": "ALTER TABLE \"moderation\".\"report\" DROP CONSTRAINT \"report_targetType_check_4fe6a63e\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"report_targetType_check_4fe6a63e\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "report_targetType_check_4fe6a63e",
+          "moderation",
+          "\"moderation\".\"report\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropCheckConstraint.notification.notification_sourceType_check_f9b36c93",
+    "label": "Drop check constraint \"notification_sourceType_check_f9b36c93\" on \"notification\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_sourceType_check_f9b36c93",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_sourceType_check_f9b36c93\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_sourceType_check_f9b36c93",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"notification_sourceType_check_f9b36c93\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" DROP CONSTRAINT \"notification_sourceType_check_f9b36c93\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_sourceType_check_f9b36c93\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_sourceType_check_f9b36c93",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "dropCheckConstraint.notification.notification_type_check_8fc7182a",
+    "label": "Drop check constraint \"notification_type_check_8fc7182a\" on \"notification\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_type_check_8fc7182a",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_type_check_8fc7182a\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_8fc7182a",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "drop check constraint \"notification_type_check_8fc7182a\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" DROP CONSTRAINT \"notification_type_check_8fc7182a\""
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_type_check_8fc7182a\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_8fc7182a",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.listEntry",
+    "label": "Create table \"listEntry\"",
+    "summary": "Creates table \"listEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "table",
+        "name": "listEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"listEntry\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"listEntry\"",
+        "sql": "CREATE TABLE \"lists\".\"listEntry\" (\n  \"addedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"id\" text NOT NULL,\n  \"listId\" text NOT NULL,\n  \"note\" text,\n  \"storyId\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"listEntry\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.listFollower",
+    "label": "Create table \"listFollower\"",
+    "summary": "Creates table \"listFollower\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "table",
+        "name": "listFollower"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"listFollower\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listFollower\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"listFollower\"",
+        "sql": "CREATE TABLE \"lists\".\"listFollower\" (\n  \"followedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"listId\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"listId\", \"userId\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"listFollower\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listFollower\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "table.readingList",
+    "label": "Create table \"readingList\"",
+    "summary": "Creates table \"readingList\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "table",
+        "name": "readingList"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"readingList\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"readingList\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"readingList\"",
+        "sql": "CREATE TABLE \"lists\".\"readingList\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"description\" text,\n  \"hiddenAt\" timestamptz,\n  \"id\" text NOT NULL,\n  \"isPublic\" bool DEFAULT true NOT NULL,\n  \"name\" text NOT NULL,\n  \"slug\" text NOT NULL,\n  \"updatedAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"readingList\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"readingList\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.moderationDecision.moderationDecision_targetType_check_9328c492",
+    "label": "Add check constraint \"moderationDecision_targetType_check_9328c492\" on \"moderationDecision\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "ai",
+        "objectType": "checkConstraint",
+        "name": "moderationDecision_targetType_check_9328c492",
+        "table": "moderationDecision"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"moderationDecision_targetType_check_9328c492\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "moderationDecision_targetType_check_9328c492",
+          "ai",
+          "\"ai\".\"moderationDecision\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"moderationDecision_targetType_check_9328c492\"",
+        "sql": "ALTER TABLE \"ai\".\"moderationDecision\" ADD CONSTRAINT \"moderationDecision_targetType_check_9328c492\" CHECK (\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER', 'PROFILE', 'CLUB', 'CHANNEL', 'READING_LIST'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"moderationDecision_targetType_check_9328c492\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "moderationDecision_targetType_check_9328c492",
+          "ai",
+          "\"ai\".\"moderationDecision\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notificationMute.notificationMute_type_check_95c8c07c",
+    "label": "Add check constraint \"notificationMute_type_check_95c8c07c\" on \"notificationMute\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "auth",
+        "objectType": "checkConstraint",
+        "name": "notificationMute_type_check_95c8c07c",
+        "table": "notificationMute"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notificationMute_type_check_95c8c07c\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_95c8c07c",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notificationMute_type_check_95c8c07c\"",
+        "sql": "ALTER TABLE \"auth\".\"notificationMute\" ADD CONSTRAINT \"notificationMute_type_check_95c8c07c\" CHECK (\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'NEW_CHAPTER', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED', 'BETA_FEEDBACK', 'LIST_ADDITION'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notificationMute_type_check_95c8c07c\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notificationMute_type_check_95c8c07c",
+          "auth",
+          "\"auth\".\"notificationMute\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.listEntry.listEntry_listId_storyId_key",
+    "label": "Add unique constraint on \"listEntry\" (listId, storyId)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "unique",
+        "name": "listEntry_listId_storyId_key",
+        "table": "listEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"listEntry_listId_storyId_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "listEntry_listId_storyId_key",
+          "lists",
+          "\"lists\".\"listEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"listEntry_listId_storyId_key\"",
+        "sql": "ALTER TABLE \"lists\".\"listEntry\" ADD CONSTRAINT \"listEntry_listId_storyId_key\" UNIQUE (\"listId\", \"storyId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"listEntry_listId_storyId_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "listEntry_listId_storyId_key",
+          "lists",
+          "\"lists\".\"listEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "unique.readingList.readingList_slug_key",
+    "label": "Add unique constraint on \"readingList\" (slug)",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "unique",
+        "name": "readingList_slug_key",
+        "table": "readingList"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"readingList_slug_key\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "readingList_slug_key",
+          "lists",
+          "\"lists\".\"readingList\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add unique constraint \"readingList_slug_key\"",
+        "sql": "ALTER TABLE \"lists\".\"readingList\" ADD CONSTRAINT \"readingList_slug_key\" UNIQUE (\"slug\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"readingList_slug_key\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "readingList_slug_key",
+          "lists",
+          "\"lists\".\"readingList\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.report.report_targetType_check_9328c492",
+    "label": "Add check constraint \"report_targetType_check_9328c492\" on \"report\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "moderation",
+        "objectType": "checkConstraint",
+        "name": "report_targetType_check_9328c492",
+        "table": "report"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"report_targetType_check_9328c492\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "report_targetType_check_9328c492",
+          "moderation",
+          "\"moderation\".\"report\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"report_targetType_check_9328c492\"",
+        "sql": "ALTER TABLE \"moderation\".\"report\" ADD CONSTRAINT \"report_targetType_check_9328c492\" CHECK (\"targetType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER', 'PROFILE', 'CLUB', 'CHANNEL', 'READING_LIST'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"report_targetType_check_9328c492\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "report_targetType_check_9328c492",
+          "moderation",
+          "\"moderation\".\"report\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notification.notification_sourceType_check_84454683",
+    "label": "Add check constraint \"notification_sourceType_check_84454683\" on \"notification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_sourceType_check_84454683",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_sourceType_check_84454683\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_sourceType_check_84454683",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notification_sourceType_check_84454683\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" ADD CONSTRAINT \"notification_sourceType_check_84454683\" CHECK (\"sourceType\" IN ('COMMENT', 'CLUB_DISCUSSION', 'CHANNEL_POST', 'STORY', 'CHAPTER', 'PROFILE', 'CLUB', 'CHANNEL', 'READING_LIST'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_sourceType_check_84454683\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_sourceType_check_84454683",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "checkConstraint.notification.notification_type_check_95c8c07c",
+    "label": "Add check constraint \"notification_type_check_95c8c07c\" on \"notification\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "notifications",
+        "objectType": "checkConstraint",
+        "name": "notification_type_check_95c8c07c",
+        "table": "notification"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure constraint \"notification_type_check_95c8c07c\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_95c8c07c",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add check constraint \"notification_type_check_95c8c07c\"",
+        "sql": "ALTER TABLE \"notifications\".\"notification\" ADD CONSTRAINT \"notification_type_check_95c8c07c\" CHECK (\"type\" IN ('CHANNEL_POST', 'COMMENT_REPLY', 'STORY_COMMENT', 'CLUB_DISCUSSION', 'NEW_STORY', 'NEW_CHAPTER', 'BADGE_EARNED', 'LEVEL_UP', 'CONTENT_HIDDEN', 'REPORT_RESOLVED', 'BETA_FEEDBACK', 'LIST_ADDITION'))"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify constraint \"notification_type_check_95c8c07c\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "notification_type_check_95c8c07c",
+          "notifications",
+          "\"notifications\".\"notification\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.listEntry.listEntry_listId_addedAt_idx_959c2581",
+    "label": "Create index \"listEntry_listId_addedAt_idx_959c2581\" on \"listEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "index",
+        "name": "listEntry_listId_addedAt_idx_959c2581",
+        "table": "listEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"listEntry_listId_addedAt_idx_959c2581\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listEntry_listId_addedAt_idx_959c2581\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"listEntry_listId_addedAt_idx_959c2581\"",
+        "sql": "CREATE INDEX \"listEntry_listId_addedAt_idx_959c2581\" ON \"lists\".\"listEntry\" (\"listId\", \"addedAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"listEntry_listId_addedAt_idx_959c2581\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listEntry_listId_addedAt_idx_959c2581\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.listEntry.listEntry_listId_idx_0033d367",
+    "label": "Create index \"listEntry_listId_idx_0033d367\" on \"listEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "index",
+        "name": "listEntry_listId_idx_0033d367",
+        "table": "listEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"listEntry_listId_idx_0033d367\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listEntry_listId_idx_0033d367\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"listEntry_listId_idx_0033d367\"",
+        "sql": "CREATE INDEX \"listEntry_listId_idx_0033d367\" ON \"lists\".\"listEntry\" (\"listId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"listEntry_listId_idx_0033d367\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listEntry_listId_idx_0033d367\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.listEntry.listEntry_storyId_idx_cd452158",
+    "label": "Create index \"listEntry_storyId_idx_cd452158\" on \"listEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "index",
+        "name": "listEntry_storyId_idx_cd452158",
+        "table": "listEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"listEntry_storyId_idx_cd452158\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listEntry_storyId_idx_cd452158\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"listEntry_storyId_idx_cd452158\"",
+        "sql": "CREATE INDEX \"listEntry_storyId_idx_cd452158\" ON \"lists\".\"listEntry\" (\"storyId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"listEntry_storyId_idx_cd452158\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listEntry_storyId_idx_cd452158\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.listFollower.listFollower_listId_idx_0033d367",
+    "label": "Create index \"listFollower_listId_idx_0033d367\" on \"listFollower\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "index",
+        "name": "listFollower_listId_idx_0033d367",
+        "table": "listFollower"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"listFollower_listId_idx_0033d367\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listFollower_listId_idx_0033d367\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"listFollower_listId_idx_0033d367\"",
+        "sql": "CREATE INDEX \"listFollower_listId_idx_0033d367\" ON \"lists\".\"listFollower\" (\"listId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"listFollower_listId_idx_0033d367\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listFollower_listId_idx_0033d367\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.listFollower.listFollower_userId_followedAt_idx_c7eecc26",
+    "label": "Create index \"listFollower_userId_followedAt_idx_c7eecc26\" on \"listFollower\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "index",
+        "name": "listFollower_userId_followedAt_idx_c7eecc26",
+        "table": "listFollower"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"listFollower_userId_followedAt_idx_c7eecc26\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listFollower_userId_followedAt_idx_c7eecc26\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"listFollower_userId_followedAt_idx_c7eecc26\"",
+        "sql": "CREATE INDEX \"listFollower_userId_followedAt_idx_c7eecc26\" ON \"lists\".\"listFollower\" (\"userId\", \"followedAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"listFollower_userId_followedAt_idx_c7eecc26\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listFollower_userId_followedAt_idx_c7eecc26\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.listFollower.listFollower_userId_idx_a489d58a",
+    "label": "Create index \"listFollower_userId_idx_a489d58a\" on \"listFollower\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "index",
+        "name": "listFollower_userId_idx_a489d58a",
+        "table": "listFollower"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"listFollower_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listFollower_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"listFollower_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"listFollower_userId_idx_a489d58a\" ON \"lists\".\"listFollower\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"listFollower_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"listFollower_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.readingList.readingList_userId_createdAt_idx_f726f04a",
+    "label": "Create index \"readingList_userId_createdAt_idx_f726f04a\" on \"readingList\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "index",
+        "name": "readingList_userId_createdAt_idx_f726f04a",
+        "table": "readingList"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"readingList_userId_createdAt_idx_f726f04a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"readingList_userId_createdAt_idx_f726f04a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"readingList_userId_createdAt_idx_f726f04a\"",
+        "sql": "CREATE INDEX \"readingList_userId_createdAt_idx_f726f04a\" ON \"lists\".\"readingList\" (\"userId\", \"createdAt\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"readingList_userId_createdAt_idx_f726f04a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"readingList_userId_createdAt_idx_f726f04a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "index.readingList.readingList_userId_idx_a489d58a",
+    "label": "Create index \"readingList_userId_idx_a489d58a\" on \"readingList\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "index",
+        "name": "readingList_userId_idx_a489d58a",
+        "table": "readingList"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"readingList_userId_idx_a489d58a\" does not exist",
+        "sql": "SELECT (to_regclass($1)) IS NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"readingList_userId_idx_a489d58a\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"readingList_userId_idx_a489d58a\"",
+        "sql": "CREATE INDEX \"readingList_userId_idx_a489d58a\" ON \"lists\".\"readingList\" (\"userId\")",
+        "params": []
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"readingList_userId_idx_a489d58a\" exists",
+        "sql": "SELECT (to_regclass($1)) IS NOT NULL AS \"result\"",
+        "params": [
+          "\"lists\".\"readingList_userId_idx_a489d58a\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.listEntry.listEntry_listId_fkey",
+    "label": "Add foreign key \"listEntry_listId_fkey\" on \"listEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "foreignKey",
+        "name": "listEntry_listId_fkey",
+        "table": "listEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"listEntry_listId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "listEntry_listId_fkey",
+          "lists",
+          "\"lists\".\"listEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"listEntry_listId_fkey\"",
+        "sql": "ALTER TABLE \"lists\".\"listEntry\"\nADD CONSTRAINT \"listEntry_listId_fkey\"\nFOREIGN KEY (\"listId\")\nREFERENCES \"lists\".\"readingList\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"listEntry_listId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "listEntry_listId_fkey",
+          "lists",
+          "\"lists\".\"listEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.listEntry.listEntry_storyId_fkey",
+    "label": "Add foreign key \"listEntry_storyId_fkey\" on \"listEntry\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "foreignKey",
+        "name": "listEntry_storyId_fkey",
+        "table": "listEntry"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"listEntry_storyId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "listEntry_storyId_fkey",
+          "lists",
+          "\"lists\".\"listEntry\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"listEntry_storyId_fkey\"",
+        "sql": "ALTER TABLE \"lists\".\"listEntry\"\nADD CONSTRAINT \"listEntry_storyId_fkey\"\nFOREIGN KEY (\"storyId\")\nREFERENCES \"content\".\"story\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"listEntry_storyId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "listEntry_storyId_fkey",
+          "lists",
+          "\"lists\".\"listEntry\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.listFollower.listFollower_listId_fkey",
+    "label": "Add foreign key \"listFollower_listId_fkey\" on \"listFollower\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "foreignKey",
+        "name": "listFollower_listId_fkey",
+        "table": "listFollower"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"listFollower_listId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "listFollower_listId_fkey",
+          "lists",
+          "\"lists\".\"listFollower\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"listFollower_listId_fkey\"",
+        "sql": "ALTER TABLE \"lists\".\"listFollower\"\nADD CONSTRAINT \"listFollower_listId_fkey\"\nFOREIGN KEY (\"listId\")\nREFERENCES \"lists\".\"readingList\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"listFollower_listId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "listFollower_listId_fkey",
+          "lists",
+          "\"lists\".\"listFollower\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.listFollower.listFollower_userId_fkey",
+    "label": "Add foreign key \"listFollower_userId_fkey\" on \"listFollower\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "foreignKey",
+        "name": "listFollower_userId_fkey",
+        "table": "listFollower"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"listFollower_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "listFollower_userId_fkey",
+          "lists",
+          "\"lists\".\"listFollower\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"listFollower_userId_fkey\"",
+        "sql": "ALTER TABLE \"lists\".\"listFollower\"\nADD CONSTRAINT \"listFollower_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"listFollower_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "listFollower_userId_fkey",
+          "lists",
+          "\"lists\".\"listFollower\""
+        ]
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.readingList.readingList_userId_fkey",
+    "label": "Add foreign key \"readingList_userId_fkey\" on \"readingList\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "lists",
+        "objectType": "foreignKey",
+        "name": "readingList_userId_fkey",
+        "table": "readingList"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"readingList_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "readingList_userId_fkey",
+          "lists",
+          "\"lists\".\"readingList\""
+        ]
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"readingList_userId_fkey\"",
+        "sql": "ALTER TABLE \"lists\".\"readingList\"\nADD CONSTRAINT \"readingList_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"auth\".\"user\" (\"id\")\nON DELETE CASCADE"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"readingList_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (SELECT 1 AS \"one\" FROM \"pg_constraint\" AS \"c\" INNER JOIN \"pg_namespace\" AS \"n\" ON \"n\".\"oid\" = \"c\".\"connamespace\" WHERE (\"c\".\"conname\" = $1 AND \"n\".\"nspname\" = $2 AND \"c\".\"conrelid\" = to_regclass($3))) AS \"result\"",
+        "params": [
+          "readingList_userId_fkey",
+          "lists",
+          "\"lists\".\"readingList\""
+        ]
+      }
+    ]
+  }
+]

@@ -101,6 +101,7 @@ export const NOTIFICATION_TYPES = [
   "CONTENT_HIDDEN",
   "REPORT_RESOLVED",
   "BETA_FEEDBACK",
+  "LIST_ADDITION",
 ] as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
@@ -217,7 +218,9 @@ export type NotificationEvent =
       description: string;
     }
   /** A beta reader left feedback on a story; see `services/beta.ts`. */
-  | { event: "beta-feedback"; actorId: string; feedbackId: string };
+  | { event: "beta-feedback"; actorId: string; feedbackId: string }
+  /** A story was added to a reading list; see `services/reading-lists.ts`. */
+  | { event: "list-addition"; actorId: string; entryId: string };
 
 /* Fan-out ---------------------------------------------------------------- */
 
@@ -309,7 +312,62 @@ async function fanOut(event: NotificationEvent): Promise<void> {
       );
     case "beta-feedback":
       return notifyBetaFeedback(event.feedbackId);
+    case "list-addition":
+      return notifyListFollowers(event.entryId);
   }
+}
+
+/**
+ * A story added to a reading list, to the list's followers.
+ *
+ * Only for a public list that is not taken down, and only for a story
+ * readers can open. **Coalesced per list:** a follower who still has an
+ * unread `LIST_ADDITION` for this list is not told again, so a curator adding
+ * twenty stories in one sitting rings each follower's bell once rather than
+ * twenty times; the list page shows everything that was added, newest first.
+ *
+ * The excerpt names the story, never the curator's note. The list is the
+ * source, so a moderator taking it down sweeps these, and so does deleting it.
+ */
+async function notifyListFollowers(entryId: string): Promise<void> {
+  const plan = db.raw.sql`
+    INSERT INTO "notifications"."notification"
+      ("id", "userId", "type", "actorId", "title", "excerpt", "href",
+       "sourceType", "sourceId", "createdAt")
+    SELECT gen_random_uuid()::text,
+           follower."userId",
+           'LIST_ADDITION',
+           list."userId",
+           list."name",
+           left('Added ' || story."title", ${EXCERPT_LENGTH}),
+           '/lists/' || list."slug",
+           'READING_LIST',
+           list."id",
+           now()
+      FROM "lists"."listEntry" AS entry
+      JOIN "lists"."readingList" AS list ON list."id" = entry."listId"
+      JOIN "content"."story" AS story ON story."id" = entry."storyId"
+      JOIN "lists"."listFollower" AS follower ON follower."listId" = list."id"
+     WHERE entry."id" = ${entryId}
+       AND list."isPublic"
+       AND list."hiddenAt" IS NULL
+       AND story."listedAt" IS NOT NULL
+       AND follower."userId" <> list."userId"
+       AND NOT EXISTS (
+             SELECT 1 FROM "auth"."notificationMute" AS mute
+              WHERE mute."userId" = follower."userId"
+                AND mute."type" = 'LIST_ADDITION'
+           )
+       AND NOT EXISTS (
+             SELECT 1 FROM "notifications"."notification" AS earlier
+              WHERE earlier."sourceType" = 'READING_LIST'
+                AND earlier."sourceId" = list."id"
+                AND earlier."userId" = follower."userId"
+                AND earlier."readAt" IS NULL
+           )
+  `.affectedCount().build();
+
+  await db.runtime().query(plan);
 }
 
 /**

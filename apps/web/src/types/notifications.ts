@@ -20,6 +20,7 @@ export type NotificationType =
   | 'NEW_CHAPTER'
   | 'BADGE_EARNED'
   | 'BETA_FEEDBACK'
+  | 'LIST_ADDITION'
 
 /** The same four fields every other author summary carries, and no more. */
 export interface NotificationActor {

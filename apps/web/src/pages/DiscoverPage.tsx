@@ -6,6 +6,7 @@ import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { formatCount, formatDate, formatRating } from '../lib/format'
 import * as books from '../data/books-api'
 import * as storiesApi from '../data/stories-api'
+import * as listsApi from '../data/reading-lists-api'
 import {
   BOOK_SORTS,
   BOOK_SORT_LABELS,
@@ -27,6 +28,7 @@ import { BookCover } from '../components/books/BookCover'
 import { ShelfMenu } from '../components/books/ShelfMenu'
 import { StoryCard, StoryCardSkeleton } from '../components/story/StoryCard'
 import { StoryShelf } from '../components/story/StoryShelf'
+import { ListCard, ListCardSkeleton } from '../components/lists/ListCard'
 import { SearchResults } from '../components/ai/SearchResults'
 import '../components/story/story.css'
 import './pages.css'
@@ -222,6 +224,41 @@ function StoryRail({
               </li>
             ))}
       </StoryShelf>
+    </section>
+  )
+}
+
+/**
+ * The most-followed public reading lists: readers' own selections, which
+ * reach stories the catalogue rails do not. Loaded only while browsing, and
+ * absent until somebody has made a public list with a story on it.
+ */
+function ListRail() {
+  const lists = useAsync(() => listsApi.listReadingLists({ sort: 'popular', limit: 3 }), [])
+
+  if (lists.status === 'ready' && (lists.data?.items.length ?? 0) === 0) return null
+
+  return (
+    <section className="rail">
+      <header className="rail__head">
+        <h2 className="rail__title">Reading lists</h2>
+        <p className="rail__desc">
+          Gathered by readers around a theme.{' '}
+          <Link className="list-rail__link" to="/lists">
+            See every list
+          </Link>
+        </p>
+      </header>
+
+      {lists.status === 'error' ? (
+        <ErrorState message={lists.error} onRetry={lists.reload} />
+      ) : (
+        <div className="card-grid card-grid--wide">
+          {lists.status === 'loading'
+            ? Array.from({ length: 3 }, (_, index) => <ListCardSkeleton key={index} />)
+            : (lists.data?.items ?? []).map((list) => <ListCard key={list.id} list={list} />)}
+        </div>
+      )}
     </section>
   )
 }
@@ -497,6 +534,8 @@ export function DiscoverPage() {
               stories={stories.data}
               onRetry={stories.reload}
             />
+
+            <ListRail />
 
             {discover.data.featured ? (
               <FeaturedBook

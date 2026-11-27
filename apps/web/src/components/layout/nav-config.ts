@@ -54,6 +54,7 @@ export const READER_NAV: NavSection[] = [
       { to: '/clubs', label: 'Book Clubs', icon: 'users', primary: true, tour: 'book-clubs' },
       { to: '/challenges', label: 'Writing Challenges', icon: 'trophy' },
       { to: '/channels', label: 'Channels', icon: 'megaphone' },
+      { to: '/lists', label: 'Reading Lists', icon: 'list' },
       { to: '/badges', label: 'Badges', icon: 'medal' },
     ],
   },

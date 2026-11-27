@@ -19,6 +19,7 @@ import { EmptyState, ErrorState } from '../components/ui/States'
 import { BookCard, BookCardSkeleton } from '../components/books/BookCard'
 import { BookCover } from '../components/books/BookCover'
 import { ShelfMenu } from '../components/books/ShelfMenu'
+import { AddToListButton } from '../components/lists/AddToListButton'
 import './pages.css'
 import '../components/books/books.css'
 
@@ -174,6 +175,8 @@ export function BookDetailPage() {
             fullWidth
             onChange={setStatus}
           />
+
+          <AddToListButton storyId={current.id} storyTitle={current.title} size="md" fullWidth />
 
           {status === null ? (
             <p className="book-detail__hint">

@@ -9,7 +9,7 @@ what it is, why it is worth doing, and what it can build on.
 | 2 | Beta readers                | **Landed** (2026-11-23)   |
 | 3 | Listen mode                 | **Landed** (2026-11-23)   |
 | 4 | Quote cards                 | **Landed** (2026-11-24)   |
-| 5 | Public reading lists        | Not started               |
+| 5 | Public reading lists        | **Landed** (2026-11-27)   |
 | 6 | Paragraph comments          | **Landed** (2026-11-24)   |
 | 7 | Offline reading             | Not started               |
 
@@ -281,6 +281,51 @@ any other user text.
 
 **Open questions:** Whether lists can include catalogue books as well as Scribe
 stories. A cap on list length.
+
+**Status: landed (2026-11-27).** How it was built, and how the open questions
+were answered:
+
+- **Data:** a `lists` schema of its own: `ReadingList` (name, slug,
+  description, `isPublic`, `hiddenAt`), `ListEntry` (story, optional note) and
+  `ListFollower`. Routes under `/api/lists`; `services/reading-lists.ts`,
+  shaped after broadcast channels, the other thing one person writes for others
+  to follow. Deleting a list, a story or an account deletes the rows that
+  depend on it (foreign keys cascade).
+- **Both kinds of story.** A list takes any story a reader can find: a listed
+  Scribe story or a catalogue book (both are `content.Story`), never a draft.
+  A story later unlisted or taken down keeps its entry and is left out of
+  every read (counts, covers, the list page), so it comes back if the story
+  does. Catalogue entries link to `/book/:id`, Scribe stories to their page.
+- **Caps:** 100 stories per list, 50 lists per reader, 20 new lists a day;
+  80 characters for a name, 1,000 for a description, 500 for a note.
+- **Public or private,** chosen when the list is made and changeable later.
+  A private list is its owner's alone: anybody else gets the 404 a missing
+  list gets, it cannot be followed, and its followers hear nothing while it
+  stays private. Followers are kept, so making it public again brings them
+  back.
+- **Following and notifications.** Adding a story to a public list tells its
+  followers (`LIST_ADDITION`, mutable in Settings), naming the story, never
+  the curator's note. It is coalesced per list: a follower with an unread
+  notification for that list is not told again, so a curator adding twenty
+  stories in one sitting rings each bell once. An owner cannot follow their
+  own list and is never notified about it.
+- **Reporting.** A list is a report target (`READING_LIST`); the moderator
+  reads its name, description and notes together, and hiding takes the list
+  down whole for everybody, its owner included, and deletes the
+  notifications that announced it. A suspension stops creating or editing a
+  list and adding a story or a note; removing a story, deleting a list and
+  following still work.
+- **Where it shows:** *Reading Lists* in the sidebar (`/lists`: popular,
+  recently updated, your lists, following); a list's page (`/lists/:slug`,
+  open signed out, like a story's page), where the owner edits the list and
+  writes notes in place; *Add to list* on every story and book page, which
+  ticks the lists already holding it and can start a new one; a *Lists* tab
+  on profiles (public lists, or all of them on your own); and a *Reading
+  lists* rail on Discover with the most-followed lists that hold something.
+- **Not done:** no manual ordering (entries are newest first), no search over
+  lists, no AI moderation of list text (names and notes are reviewed only when
+  reported, as club and channel names are), and no notification to the owner
+  when somebody follows.
 
 ---
 
