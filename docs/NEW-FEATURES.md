@@ -11,6 +11,7 @@ what it is, why it is worth doing, and what it can build on.
 | 4 | Quote cards                 | **Landed** (2026-11-24)   |
 | 5 | Public reading lists        | Not started               |
 | 6 | Paragraph comments          | **Landed** (2026-11-24)   |
+| 7 | Offline reading             | Not started               |
 
 ---
 
@@ -347,3 +348,96 @@ tokens, so their fields match a Sepia page when the app is in Night mode.
 **Not done:** no paragraph comments on headings, no notification to the other
 commenters on a paragraph, and no "most discussed paragraphs" for authors
 (their analytics count paragraph comments with the rest).
+
+---
+
+## 7. Offline reading
+
+**What:** A *Save for offline* button on a story's page and in the reader.
+Scribe keeps the story's chapters inside the app, so the reader can open Scribe
+and read them with no internet connection. It is not a file download: nothing
+lands in the device's Downloads folder, and the copy can only be read in Scribe,
+in the browser it was saved in. Saved stories appear on an *Offline* shelf in
+My Library, with the space each one takes and a Remove button.
+
+**Why:** Commutes, flights and patchy mobile data are where serialised fiction
+gets read, and a reader without a connection cannot read on Scribe at all
+today: the app does not even open.
+
+**How:** Two standard browser features, and no new libraries:
+
+- A **service worker** keeps a copy of the app's own files (`index.html` and
+  the hashed scripts and styles from the Vite build), so Scribe opens without a
+  connection. There is none today, so offline the browser shows its own error
+  page.
+- **IndexedDB** holds the saved stories: each story's details, its chapter
+  list, and every chapter's text. Text is small; a 100,000-word novel is well
+  under 1 MB.
+
+**Builds on:**
+
+- The reader loads through three calls in `data/stories-api.ts` (`getStory`,
+  `getChapters`, `getChapter`). Each falls back to the saved copy when the
+  network fails, so `ReaderPage.tsx` renders a saved chapter exactly as it
+  renders a live one.
+- Reading progress (`data/reading-api.ts`) is a character offset, not a scroll
+  position, so a position saved offline can wait in a queue and be sent when
+  the connection returns.
+- `lib/tour-preview.ts`, which already marks chapter fetches the API must not
+  count as reads (see below).
+- My Library (`MyLibraryPage.tsx`) for the Offline shelf.
+
+**What has to change, beyond storing the text:**
+
+- **Saving must not count as reading.** `GET /stories/:slug/chapters/:number`
+  records a chapter read (`recordChapterRead` in `routes/stories.ts`), so
+  saving a 40-chapter story would add 40 reads to the author's analytics and
+  the reader's streaks. Saving needs a fetch that records nothing (a header
+  like the tour's, or one "whole story" endpoint). The read is then recorded
+  when the reader opens the saved chapter, and sent once they are online.
+- **Being offline must not sign the reader out.** `AuthProvider.tsx` rebuilds
+  the session from the refresh cookie on every load and drops it if that
+  fails, which offline it always does. It has to tell "no network" from "the
+  session expired" and keep the last known user. My Library is behind sign-in,
+  so without this the Offline shelf cannot be opened offline.
+- **Online-only features say so.** Comments and paragraph comments, likes,
+  ratings, highlights, quote cards, beta feedback, Explain and Ask This Book
+  all need the server; offline they are hidden or disabled, with a short
+  "You're offline" note. Listen mode keeps working with the device's own
+  voices; network voices (Chrome's "Google" voices, `localService: false`) do
+  not, so the voice list leaves them out while offline.
+- **Copies stay current.** When the connection returns, each saved story
+  checks for new and edited chapters and fetches them, so an ongoing story
+  stays up to date without being saved again. The chapter list does not carry
+  an edit time today; `content.Chapter.updatedAt` exists in the database and
+  would need to be returned with each chapter.
+- **The author stays in control.** Only chapters the reader may read are saved.
+  If the author unpublishes the story or a chapter, a moderator takes it down,
+  or a beta link is turned off, the next check deletes the saved copy. As with
+  quote cards, this is a rule the app honours, not a lock: the text sits in the
+  reader's browser storage, where a determined person can read it. It is not
+  copy protection.
+- **Shared devices.** Signing out deletes every story saved under that account.
+- **Storage the browser keeps.** The app asks for persistent storage
+  (`navigator.storage.persist()`), so the browser does not clear saved stories
+  when the device runs low on space. Safari on iPhone and iPad can delete a
+  website's stored data after seven days of browser use without a visit; a web
+  app added to the Home Screen is exempt. Offline reading on iOS therefore works
+  best installed, which needs a web app manifest (name, icons) as well.
+- **Releases reach readers.** The service worker file must be served uncached,
+  both by the Render static site (`render.yaml`) and by the Docker image
+  (`apps/web/nginx.conf`). Otherwise a new release never replaces the copy of
+  the app on readers' devices.
+
+**Open questions:**
+
+- Text only, or chapter images, audio and video (`ChapterMedia`) too? Images
+  are usually small; audio and video can be large and would need a size
+  warning.
+- Whether beta readers can save unpublished chapters, or offline is for
+  published chapters only.
+- How long a copy lasts without a connection: indefinitely, or re-checked after
+  (say) 30 days, so a takedown reaches readers who never reconnect.
+- A cap on saved stories per device.
+- Whether signed-out readers can save stories, or it is for accounts only. Tying
+  each copy to an account is simpler, because signing out clears it.
