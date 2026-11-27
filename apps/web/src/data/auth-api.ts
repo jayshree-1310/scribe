@@ -6,7 +6,7 @@
  * script — this module included — can read it.
  */
 
-import { request } from '../lib/api-client'
+import { ApiError, request } from '../lib/api-client'
 import {
   refreshAccessToken,
   registerTokenRefresher,
@@ -93,6 +93,14 @@ export async function signInWithGoogleIdToken(idToken: string): Promise<AuthResu
  * Registered with the token store below so that `api-client` can drive it —
  * on a cold load, and again whenever a request comes back 401 — without this
  * module and that one importing each other.
+ *
+ * Only the API saying no means no session. A refresh that never reached it
+ * (no connection, a timeout) or that it could not answer (a 5xx while it
+ * wakes) proves nothing about the cookie, so it is thrown rather than turned
+ * into "signed out": settling the store on null there signed a reader out
+ * every time they opened Scribe offline, which locked them out of the very
+ * stories they had saved to read offline. Left unsettled, the next request
+ * simply tries the refresh again.
  */
 async function requestRefresh(): Promise<string | null> {
   try {
@@ -101,7 +109,10 @@ async function requestRefresh(): Promise<string | null> {
     })
     setAccessToken(response.accessToken)
     return response.accessToken
-  } catch {
+  } catch (cause) {
+    if (cause instanceof ApiError && (cause.isOffline || cause.status >= 500)) {
+      throw cause
+    }
     setAccessToken(null)
     return null
   }

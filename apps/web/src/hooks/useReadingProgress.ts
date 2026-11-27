@@ -4,6 +4,7 @@ import { ApiError } from '../lib/api-client'
 import { useAuth } from '../lib/auth'
 import { useIsTouring } from '../lib/tour'
 import * as reading from '../data/reading-api'
+import { rememberPosition, savedProgress } from '../lib/offline'
 import type { Chapter, ReadingProgress } from '../types/stories'
 
 /**
@@ -131,7 +132,15 @@ export function useReadingProgress({
 
     let active = true
     // A signed-out visitor has no saved place, and asking would only be refused.
-    const load = readerId === null ? Promise.resolve(null) : reading.getProgress(storyId)
+    // With no connection, a story saved for offline reading still knows the
+    // place this device last kept for it.
+    const load =
+      readerId === null
+        ? Promise.resolve(null)
+        : reading.getProgress(storyId).catch((cause: unknown) => {
+            if (cause instanceof ApiError && cause.isOffline) return savedProgress(storyId)
+            throw cause
+          })
     load.then(
       (progress) => {
         if (active) setSaved({ storyId, progress })
@@ -286,6 +295,7 @@ export function useReadingProgress({
     }
 
     let active = true
+    const place = { id: chapter.id, number: chapter.number }
 
     reading
       .saveProgress({
@@ -293,6 +303,18 @@ export function useReadingProgress({
         chapterId: chapter.id,
         offset: debouncedOffset,
       })
+      .then(
+        // A saved story keeps the place on the device too, for the Offline
+        // shelf and for an offline visit.
+        () => rememberPosition(storyId, place, debouncedOffset, { unsent: false }),
+        (cause: unknown) => {
+          // Not lost: kept, and sent once the reader is back online.
+          if (cause instanceof ApiError && cause.isOffline) {
+            return rememberPosition(storyId, place, debouncedOffset, { unsent: true })
+          }
+          throw cause
+        },
+      )
       .catch((cause: unknown) => {
         if (!active) return
 

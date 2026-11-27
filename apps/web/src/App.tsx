@@ -14,6 +14,7 @@ import { ReaderPrefsProvider } from './components/providers/ReaderPrefsProvider'
 import { ThemeProvider } from './components/providers/ThemeProvider'
 import { TourProvider } from './components/providers/TourProvider'
 import { ToastProvider } from './components/ui/ToastProvider'
+import { OfflineSync } from './components/offline/OfflineSync'
 import { RequireAuth } from './components/RequireAuth'
 import { ReaderShellLayout, ShellLayout } from './components/layout/ShellLayout'
 
@@ -262,6 +263,7 @@ function App() {
         <NotificationsProvider>
           <ReaderPrefsProvider>
             <ToastProvider>
+              <OfflineSync />
               <RouterProvider router={router} />
             </ToastProvider>
           </ReaderPrefsProvider>

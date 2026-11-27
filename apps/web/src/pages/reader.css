@@ -603,3 +603,23 @@
     flex-basis: 100%;
   }
 }
+
+/* Offline: what is missing, and why, where the reactions would be. */
+.reader__offline {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--read-rule);
+  border-radius: var(--radius-md);
+  color: var(--read-ink-soft);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.reader__offline svg {
+  flex: none;
+  margin-top: 0.15em;
+}

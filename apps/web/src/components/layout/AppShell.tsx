@@ -12,6 +12,7 @@ import { MobileNav } from './MobileNav'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { VerifyEmailBanner } from './VerifyEmailBanner'
+import { OfflineBanner } from '../offline/OfflineBanner'
 import { ADMIN_NAV, AUTHOR_NAV, READER_NAV } from './nav-config'
 import './layout.css'
 
@@ -101,6 +102,7 @@ export function AppShell({ children, variant = 'reader', width = 'default' }: Ap
 
       <div className="shell__main">
         <TopBar onOpenNav={() => setDrawerOpen(true)} />
+        <OfflineBanner />
         <VerifyEmailBanner />
         {/* Deliberately not keyed on the path. This element persists across
             navigations — see `ShellLayout` — so CSS `page-in` runs on first

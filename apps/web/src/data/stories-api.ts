@@ -7,6 +7,12 @@
  */
 
 import { request } from '../lib/api-client'
+import {
+  savedChapter,
+  savedChapterList,
+  savedStory,
+  withSavedCopy,
+} from '../lib/offline'
 import { tourPreviewHeaders } from '../lib/tour-preview'
 import type {
   Chapter,
@@ -54,33 +60,53 @@ export async function getGenres(): Promise<StoryGenreSummary[]> {
 /**
  * The two reads the API counts -- a story view, a chapter read -- carry the
  * product tour's marker while it is on screen. See `lib/tour-preview.ts`.
+ *
+ * These three are what the reader is built from, and each falls back to the
+ * story's offline copy when the request cannot reach the server (or the
+ * browser says it is offline), so a saved story reads the same with no
+ * connection. See `withSavedCopy` in `lib/offline.ts`.
  */
 export async function getStory(slugOrId: string): Promise<StoryDetail> {
-  const { story } = await request<{ story: StoryDetail }>(
-    `/stories/${encodeURIComponent(slugOrId)}`,
-    { headers: tourPreviewHeaders() },
+  return withSavedCopy(
+    async () => {
+      const { story } = await request<{ story: StoryDetail }>(
+        `/stories/${encodeURIComponent(slugOrId)}`,
+        { headers: tourPreviewHeaders() },
+      )
+      return story
+    },
+    () => savedStory(slugOrId),
   )
-  return story
 }
 
 export async function getChapters(
   slugOrId: string,
 ): Promise<ChapterSummary[]> {
-  const { chapters } = await request<{ chapters: ChapterSummary[] }>(
-    `/stories/${encodeURIComponent(slugOrId)}/chapters`,
+  return withSavedCopy(
+    async () => {
+      const { chapters } = await request<{ chapters: ChapterSummary[] }>(
+        `/stories/${encodeURIComponent(slugOrId)}/chapters`,
+      )
+      return chapters
+    },
+    () => savedChapterList(slugOrId),
   )
-  return chapters
 }
 
 export async function getChapter(
   slugOrId: string,
   number: number,
 ): Promise<Chapter> {
-  const { chapter } = await request<{ chapter: Chapter }>(
-    `/stories/${encodeURIComponent(slugOrId)}/chapters/${number}`,
-    { headers: tourPreviewHeaders() },
+  return withSavedCopy(
+    async () => {
+      const { chapter } = await request<{ chapter: Chapter }>(
+        `/stories/${encodeURIComponent(slugOrId)}/chapters/${number}`,
+        { headers: tourPreviewHeaders() },
+      )
+      return chapter
+    },
+    () => savedChapter(slugOrId, number),
   )
-  return chapter
 }
 
 export async function getRelatedStories(slugOrId: string): Promise<Story[]> {

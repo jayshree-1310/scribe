@@ -104,6 +104,8 @@ const EXEMPT: Record<string, string> = Object.fromEntries(
       "library.ts DELETE /:bookId",
       "reading.ts PUT /progress",
       "reading.ts DELETE /progress/:storyId",
+      // Chapters read from a copy saved for offline reading: a count, no text.
+      "reading.ts POST /reads",
       // Highlights and their notes are private: nobody but the reader sees
       // them, and authors only ever get anonymous counts.
       "reading.ts POST /highlights",

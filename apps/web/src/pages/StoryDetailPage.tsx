@@ -28,6 +28,7 @@ import { useAuth } from '../lib/auth'
 import { LikeButton } from '../components/engagement/LikeButton'
 import { ReportMenu } from '../components/moderation/ReportMenu'
 import { AddToListButton } from '../components/lists/AddToListButton'
+import { SaveOfflineButton } from '../components/offline/SaveOfflineButton'
 import { SignInPrompt } from '../components/engagement/SignInPrompt'
 import { Avatar } from '../components/ui/Avatar'
 import { Button, ButtonLink } from '../components/ui/Button'
@@ -476,6 +477,10 @@ export function StoryDetailPage() {
               {betaDraft || data.listedAt === null ? null : (
                 <AddToListButton storyId={data.id} storyTitle={data.title} />
               )}
+
+              {/* Its published chapters, kept in this browser. Renders
+                  nothing for a draft, a book, or a signed-out visitor. */}
+              {data.chapterCount === 0 ? null : <SaveOfflineButton story={data} />}
 
               {betaDraft ? null : (
                 <Button

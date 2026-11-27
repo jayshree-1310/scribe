@@ -61,6 +61,10 @@ import { ListenBar } from '../components/reader/ListenBar'
 import { useNarration } from '../hooks/useNarration'
 import { LISTEN_RATES, firstVisibleBlock, narrationBlocks } from '../lib/narration'
 import { prefersReducedMotion } from '../lib/motion'
+import { useOnline } from '../lib/network-status'
+import { isSavedCopy } from '../lib/offline'
+import { SaveOfflineButton } from '../components/offline/SaveOfflineButton'
+import '../components/offline/offline.css'
 import '../components/reader/beta.css'
 import '../components/reader/paragraph-comments.css'
 import { Button, ButtonLink } from '../components/ui/Button'
@@ -172,6 +176,17 @@ export function ReaderPage() {
     [storyId, chapterNumber],
   )
 
+  /**
+   * Reading without the server: the browser is offline, or this chapter came
+   * from the story's offline copy because the server could not be reached
+   * (`lib/offline.ts`). Everything that needs the server -- comments, likes,
+   * highlights, reports, the AI tools, beta feedback -- is left out, and the
+   * footer says why. Reading, chapter navigation, reading settings and listen
+   * mode (with the device's own voices) all carry on.
+   */
+  const online = useOnline()
+  const fromCopy = isSavedCopy(chapter.data) || isSavedCopy(story.data)
+  const live = online && !fromCopy
 
   /**
    * A beta reader: somebody the author invited to read unpublished chapters
@@ -252,10 +267,10 @@ export function ReaderPage() {
    */
   const comments = useAsync(
     () =>
-      storyId && chapterId && showComments
+      storyId && chapterId && showComments && live
         ? engagement.listComments(storyId, { chapterId, limit: 20 })
         : Promise.resolve(null),
-    [storyId, chapterId, showComments],
+    [storyId, chapterId, showComments, live],
   )
 
   const [commentBody, setCommentBody] = useState('')
@@ -445,8 +460,9 @@ export function ReaderPage() {
     // `chapter.data` rather than the `current` alias below, which is declared
     // after the hooks.
     const chapterData = chapter.data
-    // Explaining a passage asks a model on the caller's behalf, which needs one.
-    if (!chapterData || !signedIn) return
+    // Explaining a passage asks a model on the caller's behalf, which needs
+    // one; and everything the menu offers needs the server.
+    if (!chapterData || !signedIn || !live) return
 
     const found = readSelection(proseRef.current, chapterData.content)
     if (!found) {
@@ -478,7 +494,7 @@ export function ReaderPage() {
     setSelection(found)
     // A new selection is a new question: the answer to the last one goes.
     setPanel((open) => (open?.kind === 'explain' || open?.kind === 'note' ? null : open))
-  }, [chapter.data, signedIn])
+  }, [chapter.data, signedIn, live])
 
   /* Highlights and margin notes --------------------------------------- */
 
@@ -488,10 +504,10 @@ export function ReaderPage() {
    */
   const fetchedHighlights = useAsync(
     () =>
-      signedIn && storyId
+      signedIn && storyId && live
         ? highlightsApi.listHighlights(storyId)
         : Promise.resolve(null),
-    [signedIn, storyId],
+    [signedIn, storyId, live],
   )
 
   /**
@@ -734,7 +750,8 @@ export function ReaderPage() {
    * Readable signed out, like the chapter's comments; writing needs an
    * account, which the panel asks for.
    */
-  const paragraphCommentsOn = chapterData !== null && chapterData !== undefined && !betaUnpublished
+  const paragraphCommentsOn =
+    chapterData !== null && chapterData !== undefined && !betaUnpublished && live
   const commentChapterId = paragraphCommentsOn ? chapterData.id : null
 
   /**
@@ -1152,7 +1169,7 @@ export function ReaderPage() {
 
   /** The open panel, drawn; null when there is none, or it is not for this chapter. */
   let panelNode: ReactNode = null
-  if (panel && current && storyId) {
+  if (panel && current && storyId && live) {
     switch (panel.kind) {
       case 'explain':
         if (panel.chapterId === current.id) {
@@ -1325,7 +1342,7 @@ export function ReaderPage() {
             />
           ) : null}
 
-          {signedIn && storyId ? (
+          {signedIn && storyId && live ? (
             <Button
               variant="ghost"
               iconOnly
@@ -1344,7 +1361,7 @@ export function ReaderPage() {
             is built from it, and a story with nothing readable has nothing
             to ask about.
           */}
-          {signedIn && storyId && chapters.status === 'ready' && total > 0 && !betaDraftStory ? (
+          {signedIn && storyId && live && chapters.status === 'ready' && total > 0 && !betaDraftStory ? (
             <Button
               variant="ghost"
               iconOnly
@@ -1358,7 +1375,7 @@ export function ReaderPage() {
             />
           ) : null}
 
-          {betaRead && storyId ? (
+          {betaRead && storyId && live ? (
             <Button
               variant="ghost"
               iconOnly
@@ -1391,6 +1408,11 @@ export function ReaderPage() {
               }}
               startIcon={<Icon name="headphones" size="1.1rem" />}
             />
+          ) : null}
+
+          {/* Renders nothing signed out, or for a draft. */}
+          {data ? (
+            <SaveOfflineButton story={data} iconOnly variant="ghost" size="md" iconSize="1.1rem" />
           ) : null}
 
           <Button
@@ -1434,7 +1456,7 @@ export function ReaderPage() {
               Renders nothing when there is no previous chapter they can open,
               and never calls a model until they ask it to.
             */}
-            {signedIn && !betaDraftStory ? (
+            {signedIn && live && !betaDraftStory ? (
               <RecapCard
                 key={`${slug}:${current.number}`}
                 storyKey={slug}
@@ -1453,13 +1475,15 @@ export function ReaderPage() {
                   published yet. Your feedback goes only to{' '}
                   {data ? storyAuthorName(data.author) : 'the author'}.
                 </span>
-                <button
-                  type="button"
-                  className="reader__beta-action"
-                  onClick={() => openFeedback(null)}
-                >
-                  Leave feedback
-                </button>
+                {live ? (
+                  <button
+                    type="button"
+                    className="reader__beta-action"
+                    onClick={() => openFeedback(null)}
+                  >
+                    Leave feedback
+                  </button>
+                ) : null}
               </div>
             ) : null}
 
@@ -1467,6 +1491,7 @@ export function ReaderPage() {
               Chapter {current.number}
               {total > 0 ? ` of ${total}` : ''} ·{' '}
               {readingMinutes(current.wordCount)} min read
+              {fromCopy ? ' · Offline copy' : ''}
             </p>
             <h1 className="reader__title">{current.title}</h1>
             <p className="reader__byline">
@@ -1631,55 +1656,71 @@ export function ReaderPage() {
 
             {/* Chapter footer ------------------------------------------- */}
             <footer className="reader__footer">
-              <div className="reader__reactions">
-                {/*
-                  A like on the chapter just read, not on the story: the button
-                  is at the end of one chapter, and that is what "I liked this"
-                  said here is about. See `engagement.ChapterLike` in the
-                  contract.
-                */}
-                <LikeButton
-                  subject="chapter"
-                  subjectId={current.id}
-                  likeCount={current.likeCount}
-                  likedByMe={current.likedByMe}
-                  variant="pill"
-                  noun="this chapter"
-                  readOnly={isOwnStory || !signedIn || betaUnpublished}
-                />
+              {live ? (
+                <div className="reader__reactions">
+                  {/*
+                    A like on the chapter just read, not on the story: the button
+                    is at the end of one chapter, and that is what "I liked this"
+                    said here is about. See `engagement.ChapterLike` in the
+                    contract.
+                  */}
+                  <LikeButton
+                    subject="chapter"
+                    subjectId={current.id}
+                    likeCount={current.likeCount}
+                    likedByMe={current.likedByMe}
+                    variant="pill"
+                    noun="this chapter"
+                    readOnly={isOwnStory || !signedIn || betaUnpublished}
+                  />
 
-                {/*
-                  Comments are public, so they stay closed on a chapter that is
-                  not: a beta reader has the feedback sheet instead.
-                */}
-                {betaUnpublished ? null : (
-                  <button
-                    type="button"
-                    className={cn(
-                      'reader__toggle',
-                      showComments && 'is-open',
-                    )}
-                    aria-expanded={showComments}
-                    onClick={() => setShowComments((open) => !open)}
-                  >
-                    <Icon name="comment" size="1em" />
-                    <span>
-                      {commentTotal === null
-                        ? 'Comments'
-                        : commentTotal === 1
-                          ? '1 comment'
-                          : `${formatCount(commentTotal)} comments`}
-                    </span>
-                  </button>
-                )}
+                  {/*
+                    Comments are public, so they stay closed on a chapter that is
+                    not: a beta reader has the feedback sheet instead.
+                  */}
+                  {betaUnpublished ? null : (
+                    <button
+                      type="button"
+                      className={cn(
+                        'reader__toggle',
+                        showComments && 'is-open',
+                      )}
+                      aria-expanded={showComments}
+                      onClick={() => setShowComments((open) => !open)}
+                    >
+                      <Icon name="comment" size="1em" />
+                      <span>
+                        {commentTotal === null
+                          ? 'Comments'
+                          : commentTotal === 1
+                            ? '1 comment'
+                            : `${formatCount(commentTotal)} comments`}
+                      </span>
+                    </button>
+                  )}
 
-                <ReportMenu
-                  targetType="CHAPTER"
-                  targetId={current.id}
-                  noun="chapter"
-                  hidden={!signedIn || isOwnStory || betaUnpublished}
-                />
-              </div>
+                  <ReportMenu
+                    targetType="CHAPTER"
+                    targetId={current.id}
+                    noun="chapter"
+                    hidden={!signedIn || isOwnStory || betaUnpublished}
+                  />
+                </div>
+              ) : (
+                <p className="reader__offline" role="note">
+                  <Icon name="cloud-off" size="1.1em" />
+                  <span>
+                    {online
+                      ? "Scribe can't be reached, so this is your offline copy."
+                      : "You're offline."}{' '}
+                    Comments, likes, highlights and Ask this book come back when
+                    you reconnect.
+                    {current.multimedia.some((item) => item.type !== 'LINK')
+                      ? ' Pictures, audio and video are not saved for offline reading.'
+                      : ''}
+                  </span>
+                </p>
+              )}
 
               <nav
                 className="reader__pager"
@@ -1733,7 +1774,7 @@ export function ReaderPage() {
             </footer>
 
             {/* Comments ------------------------------------------------- */}
-            {showComments && !betaUnpublished ? (
+            {showComments && !betaUnpublished && live ? (
               <section className="reader__comments" aria-label="Chapter comments">
                 <header className="reader__comments-head">
                   <h2>Comments on this chapter</h2>

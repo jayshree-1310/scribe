@@ -298,6 +298,8 @@ describe.skipIf(!available)("GET /api/stories/:slug/chapters", () => {
     ]);
     expect(body.chapters[0]).not.toHaveProperty("content");
     expect(body.chapters[0].wordCount).toBeGreaterThan(0);
+    // An offline copy compares it with the one it saved.
+    expect(Number.isNaN(Date.parse(body.chapters[0].updatedAt))).toBe(false);
   });
 
   it("includes the author's unpublished chapter for the author", async () => {
@@ -326,6 +328,7 @@ describe.skipIf(!available)("GET /api/stories/:slug/chapters/:number", () => {
     expect(status).toBe(200);
     expect(body.chapter).toMatchObject({ number: 1, title: "Dark" });
     expect(body.chapter.content).toContain("chapter 1");
+    expect(Number.isNaN(Date.parse(body.chapter.updatedAt))).toBe(false);
   });
 
   it("has no previous chapter on the first", async () => {

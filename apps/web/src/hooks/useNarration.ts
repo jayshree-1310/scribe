@@ -4,6 +4,7 @@ import {
   Narrator,
   type NarrationState,
 } from '../lib/narration'
+import { useOnline } from '../lib/network-status'
 
 /** Whether this browser can speak at all. Checked once; it does not change. */
 export const SPEECH_SUPPORTED =
@@ -28,6 +29,18 @@ function voicesFor(all: SpeechSynthesisVoice[], lang: string): SpeechSynthesisVo
   return (matching.length > 0 ? matching : all)
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name))
+}
+
+/**
+ * Offline, only the voices on the device can speak: a network voice (Chrome's
+ * "Google" voices, `localService: false`) accepts the text and says nothing.
+ * When the browser lists no local voice at all, every voice is kept, so the
+ * player still tries and reports it if nothing starts.
+ */
+function reachable(all: SpeechSynthesisVoice[], online: boolean): SpeechSynthesisVoice[] {
+  if (online) return all
+  const local = all.filter((voice) => voice.localService)
+  return local.length > 0 ? local : all
 }
 
 export interface Narration {
@@ -73,8 +86,18 @@ export function useNarration(rate: number, voiceURI: string | null): Narration {
     return () => synth.removeEventListener('voiceschanged', refresh)
   }, [])
 
-  const voices = useMemo(() => voicesFor(allVoices, pageLanguage()), [allVoices])
-  const voice = voices.find((candidate) => candidate.voiceURI === voiceURI) ?? null
+  const online = useOnline()
+  const voices = useMemo(
+    () => voicesFor(reachable(allVoices, online), pageLanguage()),
+    [allVoices, online],
+  )
+  /**
+   * The browser's own default can be a network voice, so offline the fallback
+   * is named: the device's default if it is local, else the first local one.
+   */
+  const voice =
+    voices.find((candidate) => candidate.voiceURI === voiceURI) ??
+    (online ? null : (voices.find((candidate) => candidate.default) ?? voices[0] ?? null))
 
   useEffect(() => {
     narrator?.setRate(rate)

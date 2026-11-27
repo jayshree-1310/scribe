@@ -132,6 +132,15 @@ Then **Redirects/Rewrites** → source `/*`, destination `/index.html`, action
 handled with `try_files`. A redirect instead of a rewrite rewrites the address
 bar and breaks deep links.
 
+Then **Headers** → path `/sw.js`, name `Cache-Control`, value `no-cache`. The
+build writes a service worker there (offline reading; see `apps/web/vite.config.ts`),
+and the browser notices a new release by fetching it and comparing bytes. A
+CDN-cached copy keeps readers on the old app until the cache expires. The rule
+is in `render.yaml` too, but a service created by hand only takes it from the
+dashboard (or by syncing the blueprint). The rewrite above does not touch
+`/sw.js`: Render serves a file that exists before it applies a rewrite, as it
+already does for `/favicon.svg`.
+
 ## 4. Close the loop
 
 Both URLs exist now, so fill in the two that reference each other. On

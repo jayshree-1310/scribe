@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TestApi, databaseAvailable } from "../test/harness.js";
 import { flushAnalytics } from "../services/analytics.js";
-import { TOUR_PREVIEW_HEADER } from "./stories.js";
+import { OFFLINE_SAVE_HEADER, TOUR_PREVIEW_HEADER } from "./stories.js";
 
 const api = new TestApi();
 const available = await databaseAvailable();
@@ -148,6 +148,18 @@ describe.skipIf(!available)("recording story views", () => {
     expect(await api.countChapterReads(opened)).toBe(1);
   });
 
+  it("records nothing while a story is saved for offline reading", async () => {
+    const saved = await api.createStory({ title: "Saved Story", authorId: watched });
+    const first = await api.createChapter({ storyId: saved.id, number: 1 });
+    const offline = { [OFFLINE_SAVE_HEADER]: "1" };
+
+    expect(await read(`/api/stories/${saved.slug}`, reader, offline)).toBe(200);
+    expect(await read(`/api/stories/${saved.slug}/chapters/1`, reader, offline)).toBe(200);
+
+    expect(await api.countStoryViews(saved.id)).toBe(0);
+    expect(await api.countChapterReads(first)).toBe(0);
+  });
+
   it("records nothing for a story the caller cannot see", async () => {
     const draft = await api.createStory({
       title: "Hidden Draft",
@@ -158,6 +170,70 @@ describe.skipIf(!available)("recording story views", () => {
     expect(await read(`/api/stories/${draft.slug}`, reader)).toBe(404);
 
     expect(await api.countStoryViews(draft.id)).toBe(0);
+  });
+});
+
+describe.skipIf(!available)("POST /api/reading/reads", () => {
+  async function send(chapterIds: unknown, as?: string) {
+    const response = await api.request("/api/reading/reads", {
+      method: "POST",
+      ...(as ? { as } : {}),
+      body: { chapterIds },
+    });
+    await flushAnalytics();
+    return response;
+  }
+
+  it("records a chapter read from a saved copy, once per reader per day", async () => {
+    const saved = await api.createStory({ title: "Read Offline", authorId: watched });
+    const one = await api.createChapter({ storyId: saved.id, number: 1 });
+    const two = await api.createChapter({ storyId: saved.id, number: 2 });
+
+    const first = await send([one, two, one], reader);
+    expect(first.status).toBe(200);
+    expect(first.body.recorded).toBe(2);
+    expect(await api.countChapterReads(one)).toBe(1);
+    expect(await api.countChapterReads(two)).toBe(1);
+
+    // The same queue sent twice -- a flush that was cut off -- adds nothing.
+    expect((await send([one], reader)).status).toBe(200);
+    expect(await api.countChapterReads(one)).toBe(1);
+  });
+
+  it("skips a chapter the reader may no longer read", async () => {
+    const saved = await api.createStory({ title: "Pulled Chapter", authorId: watched });
+    const pulled = await api.createChapter({
+      storyId: saved.id,
+      number: 1,
+      published: false,
+    });
+    const draft = await api.createStory({
+      title: "Pulled Story",
+      authorId: watched,
+      listed: false,
+    });
+    const drafted = await api.createChapter({ storyId: draft.id, number: 1 });
+
+    const response = await send([pulled, drafted], reader);
+
+    expect(response.status).toBe(200);
+    expect(response.body.recorded).toBe(0);
+    expect(await api.countChapterReads(pulled)).toBe(0);
+    expect(await api.countChapterReads(drafted)).toBe(0);
+  });
+
+  it("does not count the author reading their own saved chapter", async () => {
+    const saved = await api.createStory({ title: "Own Copy", authorId: watched });
+    const own = await api.createChapter({ storyId: saved.id, number: 1 });
+
+    expect((await send([own], watched)).status).toBe(200);
+    expect(await api.countChapterReads(own)).toBe(0);
+  });
+
+  it("needs a reader, and a list of chapter ids", async () => {
+    expect((await send([chapterId])).status).toBe(401);
+    expect((await send([], reader)).status).toBe(400);
+    expect((await send(["not-an-id"], reader)).status).toBe(400);
   });
 });
 

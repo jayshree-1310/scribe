@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { cn } from '../lib/cn'
 import { useAsync } from '../hooks/useAsync'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
@@ -21,6 +21,9 @@ import { EmptyState, ErrorState } from '../components/ui/States'
 import { BookCardSkeleton } from '../components/books/BookCard'
 import { BookCover } from '../components/books/BookCover'
 import { ShelfMenu } from '../components/books/ShelfMenu'
+import { OfflineShelf } from '../components/offline/OfflineShelf'
+import { isOnline } from '../lib/network-status'
+import { useOffline } from '../lib/offline'
 import './pages.css'
 import '../components/books/books.css'
 
@@ -86,8 +89,27 @@ function ShelfItem({
   )
 }
 
+/** The tab beside the reading shelves: stories saved for offline reading. */
+const OFFLINE_TAB = 'OFFLINE' as const
+type LibraryTab = ReadingStatus | typeof OFFLINE_TAB
+
 export function MyLibraryPage() {
   const [shelf, setShelf] = useState<ReadingStatus>('READING')
+
+  /**
+   * The Offline shelf is read from this device rather than the API, so it is
+   * where the page opens with no connection -- and where `?shelf=offline`
+   * (the offline banner's link) sends a reader already on this page.
+   */
+  const [params] = useSearchParams()
+  const wantsOffline = params.get('shelf') === 'offline'
+  const [showOffline, setShowOffline] = useState(() => wantsOffline || !isOnline())
+  const [seenParam, setSeenParam] = useState(wantsOffline)
+  if (wantsOffline !== seenParam) {
+    setSeenParam(wantsOffline)
+    if (wantsOffline) setShowOffline(true)
+  }
+  const offline = useOffline()
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 260)
 
@@ -121,11 +143,22 @@ export function MyLibraryPage() {
   const items = view?.items ?? []
   const searching = debouncedSearch.trim().length > 0
 
-  const tabs = READING_STATUSES.map((status) => ({
-    id: status,
-    label: READING_STATUS_LABELS[status],
-    count: counts?.[status],
-  }))
+  const tabs: Array<{ id: LibraryTab; label: string; count: number | undefined }> = [
+    ...READING_STATUSES.map((status) => ({
+      id: status,
+      label: READING_STATUS_LABELS[status],
+      count: counts?.[status],
+    })),
+    ...(offline.supported
+      ? [
+          {
+            id: OFFLINE_TAB,
+            label: 'Offline',
+            count: offline.ready ? offline.stories.length : undefined,
+          },
+        ]
+      : []),
+  ]
 
   return (
     <>
@@ -144,71 +177,80 @@ export function MyLibraryPage() {
 
       <Tabs
         items={tabs}
-        active={shelf}
-        onChange={setShelf}
+        active={showOffline ? OFFLINE_TAB : shelf}
+        onChange={(tab) => {
+          setShowOffline(tab === OFFLINE_TAB)
+          if (tab !== OFFLINE_TAB) setShelf(tab)
+        }}
         label="Reading shelves"
         data-tour="shelves"
       />
 
-      <div className="filters">
-        <div className="filters__row">
-          <TextField
-            label="Search your library"
-            hideLabel
-            placeholder="Search your library…"
-            value={search}
-            startIcon={<Icon name="search" size="1em" />}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </div>
-      </div>
-
-      {library.status === 'loading' && view === null ? (
-        <div className="shelf-list" aria-busy="true">
-          {Array.from({ length: 4 }, (_, index) => (
-            <BookCardSkeleton key={index} variant="row" />
-          ))}
-        </div>
-      ) : library.status === 'error' ? (
-        <ErrorState message={library.error} onRetry={library.reload} />
-      ) : items.length === 0 ? (
-        searching ? (
-          <EmptyState
-            icon="search"
-            title="Nothing here matches"
-            description={`No book on your ${READING_STATUS_LABELS[shelf].toLowerCase()} shelf matches “${debouncedSearch.trim()}”.`}
-            action={
-              <Button variant="secondary" onClick={() => setSearch('')}>
-                Clear search
-              </Button>
-            }
-          />
-        ) : (
-          <EmptyState
-            icon="library"
-            title={EMPTY_COPY[shelf].title}
-            description={EMPTY_COPY[shelf].description}
-            action={<ButtonLink to="/discover">Browse books</ButtonLink>}
-          />
-        )
+      {showOffline ? (
+        <OfflineShelf />
       ) : (
-        <div
-          className={cn('shelf-list', isStale && 'is-stale')}
-          // Re-keying on the shelf that actually loaded replays the entry
-          // animation once the new books are really there.
-          key={loaded?.key ?? requestKey}
-          aria-busy={isStale}
-        >
-          {items.map((entry) => (
-            <ShelfItem
-              key={entry.id}
-              entry={entry}
-              // Moving a book off this shelf — or removing it — changes what
-              // belongs here and every tab count, so reload rather than patch.
-              onChange={() => library.reload()}
-            />
-          ))}
-        </div>
+        <>
+          <div className="filters">
+            <div className="filters__row">
+              <TextField
+                label="Search your library"
+                hideLabel
+                placeholder="Search your library…"
+                value={search}
+                startIcon={<Icon name="search" size="1em" />}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </div>
+          </div>
+
+          {library.status === 'loading' && view === null ? (
+            <div className="shelf-list" aria-busy="true">
+              {Array.from({ length: 4 }, (_, index) => (
+                <BookCardSkeleton key={index} variant="row" />
+              ))}
+            </div>
+          ) : library.status === 'error' ? (
+            <ErrorState message={library.error} onRetry={library.reload} />
+          ) : items.length === 0 ? (
+            searching ? (
+              <EmptyState
+                icon="search"
+                title="Nothing here matches"
+                description={`No book on your ${READING_STATUS_LABELS[shelf].toLowerCase()} shelf matches “${debouncedSearch.trim()}”.`}
+                action={
+                  <Button variant="secondary" onClick={() => setSearch('')}>
+                    Clear search
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                icon="library"
+                title={EMPTY_COPY[shelf].title}
+                description={EMPTY_COPY[shelf].description}
+                action={<ButtonLink to="/discover">Browse books</ButtonLink>}
+              />
+            )
+          ) : (
+            <div
+              className={cn('shelf-list', isStale && 'is-stale')}
+              // Re-keying on the shelf that actually loaded replays the entry
+              // animation once the new books are really there.
+              key={loaded?.key ?? requestKey}
+              aria-busy={isStale}
+            >
+              {items.map((entry) => (
+                <ShelfItem
+                  key={entry.id}
+                  entry={entry}
+                  // Moving a book off this shelf — or removing it — changes what
+                  // belongs here and every tab count, so reload rather than patch.
+                  onChange={() => library.reload()}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </>
   )

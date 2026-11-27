@@ -99,6 +99,11 @@ export interface ChapterSummary {
   publishedAt: string | null
   /** When an unpublished chapter goes live. Only the author sees such rows. */
   scheduledAt: string | null
+  /**
+   * When the chapter last changed. An offline copy compares it with the one
+   * it saved to know which chapters to fetch again.
+   */
+  updatedAt: string
 }
 
 export interface ChapterMedia {

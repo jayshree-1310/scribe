@@ -11,7 +11,7 @@ what it is, why it is worth doing, and what it can build on.
 | 4 | Quote cards                 | **Landed** (2026-11-24)   |
 | 5 | Public reading lists        | **Landed** (2026-11-27)   |
 | 6 | Paragraph comments          | **Landed** (2026-11-24)   |
-| 7 | Offline reading             | Not started               |
+| 7 | Offline reading             | **Landed** (2026-11-27)   |
 
 ---
 
@@ -486,3 +486,99 @@ today: the app does not even open.
 - A cap on saved stories per device.
 - Whether signed-out readers can save stories, or it is for accounts only. Tying
   each copy to an account is simpler, because signing out clears it.
+
+**Status: landed (2026-11-27).** How it was built, and how the open questions
+were answered:
+
+- **Where:** *Save for offline* on a story's page and as an icon in the
+  reader's top bar (`components/offline/SaveOfflineButton.tsx`), showing
+  "Saving 3 of 12" while it works and "Saved offline" after; tapping a saved
+  story's button offers to remove the copy. My Library has an **Offline** tab
+  (`OfflineShelf`): each saved story with its chapter count, size and save
+  date, *Continue · Ch. N* from the place kept on this device, and Remove.
+  The tab is read from the device, so it opens with no connection, and the
+  page opens on it when the browser is offline. A banner across the app says
+  "You're offline" and links to it.
+- **Storage:** IndexedDB (`lib/offline-db.ts`), three stores: `stories` (the
+  story's details, the saved chapter list, sizes, when it was saved and last
+  checked, the reader's place), `chapters` (one row per chapter's text) and
+  `pending` (what still has to reach the server). Every row carries the
+  account that saved it. `lib/offline.ts` holds the rules; its tests run
+  against an in-memory store, since jsdom has no IndexedDB.
+- **Reading offline:** `getStory`, `getChapters` and `getChapter` in
+  `data/stories-api.ts` go through `withSavedCopy`. With the browser offline
+  the copy is read first and the network not tried. Otherwise the network
+  is, and the copy answers only when a request never reached the server; a
+  404 or a 500 is the server's answer and stands. A chapter from the copy
+  takes its number, title and neighbours from the saved list, so a renumbered
+  chapter still pages correctly. The reader marks it "Offline copy".
+- **The app opens offline:** a service worker (`apps/web/sw/service-worker.js`)
+  keeps every file of the build. A small Vite plugin (`serviceWorker()` in
+  `vite.config.ts`) writes `dist/sw.js` after each build with the list of
+  files and a hash of them as its version, so each release is a new worker.
+  Pages are network-first with a 5-second limit, then the saved `index.html`,
+  so an online reader always gets the latest release. Built files come from
+  the saved copy, Google Fonts are kept for offline use, and the API and
+  uploads are never touched. Production builds only; the dev server has no
+  worker. `sw.js` is served `no-cache` by nginx and by the Render static site
+  (`render.yaml`, and the dashboard step in `docs/DEPLOYMENT.md`).
+- **Saving is not reading.** Saving and later checks send `X-Scribe-Offline`
+  (`OFFLINE_SAVE_HEADER` in `routes/stories.ts`), so they record no story view
+  and no chapter read. Opening a saved chapter queues its read, and
+  `POST /api/reading/reads` (up to 50 chapter ids, only chapters the reader
+  may still read) records them once the reader is online. A read counts on the
+  day it arrives, not the day it happened; it is still one per reader, chapter
+  and day, so a queue sent twice adds nothing. The reader's place is kept on
+  the device as they read. If it cannot be sent, it is queued and the latest
+  one is sent later. `OfflineSync` flushes the queue on every load and each
+  time the connection returns.
+- **Being offline no longer signs the reader out.** The session refresh only
+  treats the API saying no (a 401) as "no session". A refresh that never
+  reached the API, timed out or got a 5xx is thrown instead
+  (`requestRefresh` in `data/auth-api.ts`), so `AuthProvider` keeps the cached
+  session and the next request tries again. This also stopped a sleeping API,
+  which takes longer to wake than the client's 15-second timeout, from signing
+  readers out on a cold load.
+- **Copies stay current:** chapters now carry `updatedAt` from the API. On
+  load (for copies not checked in the last hour) and when the connection
+  returns (not in the last five minutes), each saved story is checked, one at
+  a time. New and edited chapters are fetched, and chapters no longer
+  published are deleted. A story that is gone (404: unpublished, unlisted or
+  taken down) or has no published chapters left is deleted, and a toast says
+  which.
+- **Online-only features say so.** In the reader, offline or on a copy:
+  comments, likes, reports, highlights and notes, quote cards, paragraph
+  comments, Explain, Ask This Book, the recap card and beta feedback are left
+  out. A note where the reactions would be says they come back on
+  reconnecting, and adds that pictures, audio and video are not saved when
+  the chapter has any. Listen mode keeps working; while offline its voice list
+  leaves out network voices (`localService: false`) and falls back to a
+  local one.
+- **Installable:** a web app manifest (`public/manifest.webmanifest`) with
+  PNG icons drawn from the favicon (192, 512, a maskable 512, and a 180
+  `apple-touch-icon`), so Scribe can be added to a Home Screen. The shelf tells
+  iPhone and iPad readers why that matters. The first save also asks the
+  browser for persistent storage, and the shelf notes when it was refused.
+
+**The open questions, answered:**
+
+- **Text only.** Chapter images, audio and video are not saved. Offline they
+  fail to load like any picture, and the reader says so.
+- **Published chapters of listed stories only.** A beta reader saves what
+  everybody can read. Drafts, scheduled chapters and beta previews are never
+  saved, and catalogue books have no chapters to save.
+- **30 days.** A copy not checked against the server for 30 days will not open
+  until it is checked again (the shelf flags it). So a take-down reaches
+  readers who never reconnect, without deleting their copy.
+- **20 stories** per account on a device. A long novel is under 1 MB, so the
+  cap keeps the refresh check bounded rather than saving space.
+- **Accounts only.** Each copy belongs to the account that saved it, and
+  signing out (or deleting the account) deletes that account's copies and
+  queue, leaving another account's in the same browser alone.
+
+**Not done:** no offline highlights or notes (they still need the server), no
+saving of chapter media, no "save next chapters automatically" for an ongoing
+story beyond the checks above, and no way to see or remove another account's
+copies left in a shared browser except by signing in as it. A determined
+person can read the copies in browser storage. This is a rule the app
+honours, not copy protection, as with quote cards.

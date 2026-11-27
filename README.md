@@ -34,6 +34,7 @@ idle, so the first request after a quiet spell takes a while to answer.
 | Quote cards — a highlight as a shareable image; authors can opt out      | Client-drawn (`<canvas>`), API flag  |
 | Paragraph comments — public threads beside a paragraph, in a side panel  | **Real API**                         |
 | Reading lists — curated, public or private, followable; notes per story  | **Real API**                         |
+| Offline reading — saved stories open with no connection; app installable  | Client (IndexedDB, service worker), API |
 | Uploads — images (`kind=cover`) and chapter audio/video (`kind=media`)    | **Real API**                         |
 | Home feed, public profiles & follows, clubs, channels                     | **Real API**                         |
 | Comments, ratings, reading progress & streak                              | **Real API**                         |
@@ -74,7 +75,7 @@ current tree rather than in the abstract:
   landed.
 - `docs/NEW-FEATURES.md` — product features queued next (highlights, beta
   readers, listen mode, quote cards, public reading lists, paragraph
-  comments, offline reading). All but offline reading have landed.
+  comments, offline reading). All of them have landed.
 - `docs/AI-NEXT.md` — the work after it (AI 21 – AI 25), from the CopilotKit
   assessment. All of it has run: AI 21 – AI 24 have landed, and AI 25, the
   CopilotKit trial, was run and then removed.

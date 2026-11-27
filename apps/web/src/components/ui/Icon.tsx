@@ -20,6 +20,7 @@ export type IconName =
   | 'image' | 'audio' | 'video' | 'play' | 'upload' | 'type'
   | 'google' | 'eye-off' | 'send' | 'text-size' | 'columns' | 'maximize'
   | 'highlight' | 'pause' | 'headphones' | 'skip-back' | 'skip-forward'
+  | 'download' | 'cloud-off'
 
 const PATHS: Record<IconName, ReactElement> = {
   home: <path d="M4 11.5 12 4l8 7.5M6.5 10v10h11V10" />,
@@ -240,6 +241,10 @@ const PATHS: Record<IconName, ReactElement> = {
   'skip-back': <path d="M6.5 5.5v13M18 5.5 9.5 12l8.5 6.5z" />,
   'skip-forward': <path d="M17.5 5.5v13M6 5.5l8.5 6.5L6 18.5z" />,
   upload: <path d="M12 16V4M8.5 7.5 12 4l3.5 3.5M4.5 14v6h15v-6" />,
+  download: <path d="M12 4v12M8.5 12.5 12 16l3.5-3.5M4.5 14v6h15v-6" />,
+  'cloud-off': (
+    <path d="M4 4l16 16M8.6 8.2A5 5 0 0 0 7 11.6 3.8 3.8 0 0 0 7.5 19h9.3M19.6 17.6A3.6 3.6 0 0 0 17.4 11a5.5 5.5 0 0 0-7.2-4.3" />
+  ),
   type: <path d="M4 6.5h16M12 6.5V20M8.5 20h7" />,
   'text-size': <path d="M3 8h8M7 8v11M13 12h8M17 12v7" />,
   columns: <path d="M4.5 5.5h15v13h-15zM12 5.5v13" />,

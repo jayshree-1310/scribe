@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import {
   AuthContext,
@@ -15,6 +15,7 @@ import {
   signOutRequest,
 } from '../../data/auth-api'
 import { requestGoogleIdToken } from '../../lib/google-identity'
+import { forgetSavedStories, setOfflineOwner } from '../../lib/offline'
 
 /**
  * The account the API returns *is* the session's user.
@@ -66,7 +67,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return next
   }, [])
 
+  /**
+   * Whose offline copies the data layer reads (`lib/offline.ts`). A layout
+   * effect because those run before any page's effects: a reader opening a
+   * saved chapter with no connection must find it on the first request.
+   */
+  const userId = session?.user.id ?? null
+  useLayoutEffect(() => {
+    setOfflineOwner(userId)
+  }, [userId])
+
   const signOut = useCallback(() => {
+    // Stories saved for offline reading go with the account: on a shared
+    // computer, the next person must not find them.
+    void forgetSavedStories()
     setSession(null)
     persist(null)
     void signOutRequest()

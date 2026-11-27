@@ -82,8 +82,22 @@ function visitor(req: Request) {
  */
 export const TOUR_PREVIEW_HEADER = "x-scribe-tour";
 
-function isTourPreview(req: Request): boolean {
-  return req.get(TOUR_PREVIEW_HEADER) === "1";
+/**
+ * The header the web client sends while it saves a story for offline reading
+ * (and later, while it checks that copy for new and edited chapters).
+ *
+ * Saving a forty-chapter story fetches forty chapters, and none of them has
+ * been read yet: recorded, a save would add forty reads to the author's
+ * analytics and to the reader's badges. The client records each chapter
+ * when the reader actually opens its saved copy, through
+ * `POST /api/reading/reads`. Trusted for the tour's reason: all it can do is
+ * withhold a count of the caller's own visit.
+ */
+export const OFFLINE_SAVE_HEADER = "x-scribe-offline";
+
+/** A fetch that is not somebody reading: the tour, or an offline save. */
+function isUncounted(req: Request): boolean {
+  return req.get(TOUR_PREVIEW_HEADER) === "1" || req.get(OFFLINE_SAVE_HEADER) === "1";
 }
 
 /**
@@ -182,7 +196,7 @@ router.get("/:slug", async (req, res, next) => {
      * returns `void` by design, so this line cannot delay the response or
      * turn a counter's failure into a failed read.
      */
-    if (!isTourPreview(req) && !isUnpublishedRead(story.listedAt)) {
+    if (!isUncounted(req) && !isUnpublishedRead(story.listedAt)) {
       recordStoryView(story.id, visitor(req));
     }
 
@@ -233,8 +247,9 @@ router.get("/:slug/chapters/:number", async (req, res, next) => {
     // The reader endpoint: fetching a chapter's body is the closest thing to
     // "somebody read this" the API can observe. See `engagement.ChapterRead`.
     // Not for the product tour, which is showing the reader off rather than
-    // reading -- see `TOUR_PREVIEW_HEADER`.
-    if (!isTourPreview(req) && !isUnpublishedRead(chapter.publishedAt)) {
+    // reading -- see `TOUR_PREVIEW_HEADER` -- nor for an offline save, which
+    // is counted when the saved copy is opened (`OFFLINE_SAVE_HEADER`).
+    if (!isUncounted(req) && !isUnpublishedRead(chapter.publishedAt)) {
       recordChapterRead(chapter.id, visitor(req));
     }
 

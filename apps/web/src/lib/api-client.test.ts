@@ -55,6 +55,31 @@ describe('the session on a cold load', () => {
     expect(api.callsTo('GET /books').map(bearer)).toEqual([null, null])
   })
 
+  /**
+   * Opening Scribe with no connection: the refresh fails to reach the API,
+   * which says nothing about the session. Settled as "signed out", it used to
+   * drop the reader's session on every offline load.
+   */
+  it('does not take a refresh that never reached the server as signed out', async () => {
+    const { request, getAccessToken } = await load()
+    let reachable = false
+    api
+      .on('POST /auth/refresh', () => {
+        if (!reachable) throw new TypeError('Failed to fetch')
+        return { accessToken: 'back' }
+      })
+      .on('GET /library', () => ({ items: [] }))
+
+    await expect(request('/library')).rejects.toMatchObject({ code: 'network_error' })
+    expect(getAccessToken()).toBeNull()
+
+    reachable = true
+    await request('/library')
+
+    expect(api.callsTo('POST /auth/refresh')).toHaveLength(2)
+    expect(bearer(api.callsTo('GET /library').at(-1)!)).toBe('Bearer back')
+  })
+
   it('never routes signing in through the refresh', async () => {
     const { request } = await load()
     api.on('POST /auth/login', () => ({ accessToken: 'new' }))

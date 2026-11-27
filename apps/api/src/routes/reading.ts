@@ -8,6 +8,8 @@ import { Router } from "express";
 import { z } from "zod";
 import { parseOrThrow } from "../lib/validate.js";
 import { requireUser, requireUserId } from "../middleware/current-user.js";
+import { recordChapterRead, visitorFor } from "../services/analytics.js";
+import { findVisibleChapterIds } from "../services/stories.js";
 import {
   MAX_CONTINUE_LIMIT,
   clearProgress,
@@ -91,6 +93,48 @@ router.delete("/progress/:storyId", async (req, res, next) => {
     await clearProgress(requireUserId(res), storyId);
 
     res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+/* Reads of saved chapters ----------------------------------------------- */
+
+/** As many as one flush of the web client's queue sends at once. */
+export const MAX_SAVED_READS = 50;
+
+const savedReadsSchema = z.object({
+  chapterIds: z
+    .array(z.uuid("That chapter could not be found."))
+    .min(1, "Name a chapter.")
+    .max(MAX_SAVED_READS, `Send at most ${MAX_SAVED_READS} chapters at a time.`),
+});
+
+/**
+ * Chapters the reader opened from a copy saved for offline reading.
+ *
+ * Fetching a chapter is how the API usually learns it was read, but a saved
+ * chapter is fetched once, when it is saved -- with `OFFLINE_SAVE_HEADER`,
+ * so that fetch counts nothing -- and read later, often with no connection.
+ * The web client queues each one it opens and sends the queue when it is
+ * online again, and this records them as the chapter route would have.
+ *
+ * Only chapters the reader may read now: one unpublished or taken down since
+ * it was saved is skipped. The day is the day the read arrives, not the day
+ * it happened, so a chapter read on a flight counts on the day of landing.
+ * Each is still one read per reader per chapter per day, so sending the same
+ * queue twice adds nothing.
+ */
+router.post("/reads", async (req, res, next) => {
+  try {
+    const { chapterIds } = parseOrThrow(savedReadsSchema, req.body);
+    const userId = requireUserId(res);
+
+    const readable = await findVisibleChapterIds([...new Set(chapterIds)], userId);
+    const visitor = visitorFor({ userId, ip: req.ip });
+    for (const chapterId of readable) recordChapterRead(chapterId, visitor);
+
+    res.json({ recorded: readable.size });
   } catch (error) {
     next(error);
   }

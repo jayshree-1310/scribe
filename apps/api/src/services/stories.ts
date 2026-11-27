@@ -87,6 +87,12 @@ export interface ChapterSummary {
    * readers get the release through `StoryDetail.nextRelease` instead.
    */
   scheduledAt: string | null;
+  /**
+   * When the chapter last changed: its text, title or publication. A reader's
+   * offline copy compares it with the one it saved, to know which chapters
+   * to fetch again.
+   */
+  updatedAt: string;
 }
 
 export interface ChapterMedia {
@@ -948,7 +954,16 @@ export async function listChapters(
   if (!story) throw HttpError.notFound(NOT_FOUND);
 
   const rows = await chaptersFor(story.row.id, story.access)
-    .select("id", "storyId", "chapterNumber", "title", "wordCount", "publishedAt", "scheduledAt")
+    .select(
+      "id",
+      "storyId",
+      "chapterNumber",
+      "title",
+      "wordCount",
+      "publishedAt",
+      "scheduledAt",
+      "updatedAt",
+    )
     .orderBy((chapter) => chapter.chapterNumber.asc())
     .all();
 
@@ -960,6 +975,7 @@ export async function listChapters(
     wordCount: row.wordCount,
     publishedAt: toIso(row.publishedAt),
     scheduledAt: toIso(row.scheduledAt),
+    updatedAt: toIso(row.updatedAt) ?? new Date(0).toISOString(),
   }));
 }
 
@@ -988,6 +1004,7 @@ export async function getChapter(
       "wordCount",
       "publishedAt",
       "scheduledAt",
+      "updatedAt",
     )
     .where((chapter) => chapter.chapterNumber.eq(number))
     .first();
@@ -1044,6 +1061,7 @@ export async function getChapter(
     wordCount: row.wordCount,
     publishedAt: toIso(row.publishedAt),
     scheduledAt: toIso(row.scheduledAt),
+    updatedAt: toIso(row.updatedAt) ?? new Date(0).toISOString(),
     multimedia: media.map((item) => ({
       id: item.id,
       type: item.type as ChapterMedia["type"],
